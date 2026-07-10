@@ -617,6 +617,61 @@ def notificar_dispatchers_finalizacion(sender, instance: OrdenServicio, created:
 
 
 @receiver(post_save, sender=OrdenServicio)
+def encolar_recordatorios_imagen_al_finalizar(sender, instance: OrdenServicio, created: bool, **kwargs):
+    """
+    Al pasar a 'finalizado', encola recordatorios inmediatos de imágenes faltantes.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Feedback de negocio: los técnicos e inspectores deben enterarse EN EL MOMENTO
+    en que la orden queda lista para entrega, no 48 h después del egreso.
+
+    - Técnico: fotos de diagnóstico/reparación según cotización (o reparación en VM).
+    - Inspectores: fotos de egreso si aún no se subieron.
+
+    La tarea hija revalida las reglas: si ya están todas las fotos, no notifica.
+    Pasamos db_alias para que el worker Celery use la BD del país correcto.
+    """
+    if created:
+        return
+
+    estado_anterior = getattr(instance, '_estado_anterior', None)
+
+    # Solo cuando ACABA de entrar a finalizado (no en cada save posterior)
+    if instance.estado != 'finalizado' or estado_anterior == 'finalizado':
+        return
+
+    from config.paises_config import get_pais_actual
+    from servicio_tecnico.tasks import enviar_recordatorio_imagen_task
+
+    db_alias = get_pais_actual()['db_alias']
+
+    # Técnico: diag/rep según cotización o reparación en venta mostrador
+    try:
+        enviar_recordatorio_imagen_task.delay(
+            orden_id=instance.pk,
+            tipo_recordatorio='tecnico_faltantes',
+            db_alias=db_alias,
+        )
+    except Exception as exc:
+        logger_push.warning(
+            f'[RECORDATORIO-IMAGEN] No se pudo encolar técnico orden {instance.pk}: {exc}'
+        )
+
+    # Inspectores: egreso faltante (si ya hay egreso, la task sale sin notificar)
+    try:
+        enviar_recordatorio_imagen_task.delay(
+            orden_id=instance.pk,
+            tipo_recordatorio='egreso_inspector',
+            db_alias=db_alias,
+        )
+    except Exception as exc:
+        logger_push.warning(
+            f'[RECORDATORIO-IMAGEN] No se pudo encolar egreso inspector orden {instance.pk}: {exc}'
+        )
+
+
+@receiver(post_save, sender=OrdenServicio)
 def notificar_inspectores_control_calidad(sender, instance: OrdenServicio, created: bool, **kwargs):
     """
     Notifica a todos los inspectores cuando el estado de una orden

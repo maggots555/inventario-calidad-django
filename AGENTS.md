@@ -609,7 +609,7 @@ The app is installable on Android and iOS as a native-like app:
 - **Service Worker**: `static/ts/service_worker.ts` → compilado con `tsconfig.sw.json` separado. Registrado en `base.html`. Incluye página `templates/offline.html` para modo sin conexión.
 - **Prompt de instalación personalizado**: `static/ts/pwa_install.ts` — reemplaza el prompt nativo del navegador con UI de marca
 - **Web Push Notifications (staff)**: Sistema completo con VAPID keys y `pywebpush`. Modelo `PushSubscription` en `notificaciones/`. Signal en `HistorialOrden` dispara push al técnico asignado **solo si el estado está en `ESTADOS_PUSH_TECNICO`**. Push de ingreso/egreso para dispatchers. Toggle en "Mi Perfil".
-- **Recordatorio imágenes**: Celery Beat diario (8:00) → `verificar_recordatorios_imagenes` si faltan fotos a las 48 h (modelo `RecordatorioImagenOrden`)
+- **Recordatorio imágenes**: aviso inmediato al pasar a `finalizado` (técnico según cotización; inspectores si falta egreso) + Celery Beat diario (8:00) para ingreso sin fotos (ventana 2–7 días) y pendientes en `finalizado` con ≤1 semana (`RecordatorioImagenOrden`)
 
 **Ver también:** subsección *Portal de Seguimiento del Cliente* (PWA/push del cliente son un canal separado).
 

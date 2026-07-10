@@ -2155,13 +2155,14 @@ class RecordatorioImagenOrden(models.Model):
     Registra el último envío de recordatorio push/campanita por imágenes faltantes.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Celery Beat revisa diariamente si hay órdenes sin fotos obligatorias.
+    Hay avisos inmediatos (al pasar a 'finalizado') y un barrido diario de Celery Beat.
     Este modelo evita mandar más de un aviso el mismo día por orden y tipo,
     pero permite repetir el recordatorio al día siguiente si aún faltan fotos.
     """
 
     TIPO_RECORDATORIO_CHOICES = [
         ('ingreso_inspector', 'Ingreso pendiente — inspector'),
+        ('egreso_inspector', 'Egreso pendiente — inspector'),
         ('tecnico_faltantes', 'Evidencias pendientes — técnico'),
     ]
 
@@ -2174,7 +2175,7 @@ class RecordatorioImagenOrden(models.Model):
     tipo = models.CharField(
         max_length=20,
         choices=TIPO_RECORDATORIO_CHOICES,
-        help_text="Tipo de recordatorio enviado (inspector o técnico)",
+        help_text="Tipo de recordatorio enviado (inspector ingreso/egreso o técnico)",
     )
     fecha_ultimo_envio = models.DateTimeField(
         help_text="Fecha y hora del último recordatorio enviado",

@@ -764,7 +764,7 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **FeedbackCliente**: Encuestas de satisfacción NPS con comentarios
 - **EnlaceSeguimientoCliente**: Enlaces de seguimiento público para órdenes OOW/FL
 - **EventoSeguimientoCliente**: Analytics de adopción (visitas, PWA, push, chat, PDF)
-- **RecordatorioImagenOrden**: Control de recordatorios por imágenes faltantes
+- **RecordatorioImagenOrden**: Control de recordatorios por imágenes faltantes (ingreso inspector a 2 días; técnico/egreso al pasar a finalizado)
 - **BannerPromocional**: Banners promocionales con carrusel en portal público (gestionados desde admin)
 - **AnalisisSentimientoEncuesta**: Resultados del análisis de sentimientos con IA
 - **VideoOrden**: Videos de evidencia y video resumen por orden

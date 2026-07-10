@@ -2328,9 +2328,10 @@ def verificar_encuestas_pendientes_task():
 # ═══════════════════════════════════════════════════════════════════════
 # TAREAS: Recordatorios de imágenes faltantes (push + campanita)
 # ═══════════════════════════════════════════════════════════════════════
-# Celery Beat ejecuta la orquestadora diariamente a las 8:00 AM.
-# Avisa a inspectores (ingreso faltante) y técnicos (diagnóstico/reparación
-# faltantes tras egreso), repitiendo cada día hasta subir las fotos.
+# Disparadores:
+# 1) Inmediato (señal): al pasar a 'finalizado' → técnico + egreso inspector.
+# 2) Celery Beat diario 8:00: ingreso inspector (≥2 días) + pendientes que
+#    siguen en finalizado (técnico / egreso inspector).
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_recordatorio_imagen')
@@ -2340,7 +2341,7 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
 
     Parámetros:
         orden_id: PK de OrdenServicio.
-        tipo_recordatorio: 'ingreso_inspector' o 'tecnico_faltantes'.
+        tipo_recordatorio: 'ingreso_inspector', 'egreso_inspector' o 'tecnico_faltantes'.
         db_alias: Alias de BD del país (configurado por task_prerun).
 
     Efectos secundarios:
@@ -2356,9 +2357,11 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
 
     from .models import HistorialOrden, OrdenServicio
     from .utils_recordatorio_imagenes import (
+        construir_mensaje_recordatorio_egreso_inspector,
         construir_mensaje_recordatorio_ingreso_inspector,
         construir_mensaje_recordatorio_tecnico,
         obtener_etiqueta_orden,
+        orden_requiere_recordatorio_egreso_inspector,
         orden_requiere_recordatorio_ingreso_inspector,
         orden_requiere_recordatorio_tecnico,
         registrar_envio_recordatorio,
@@ -2369,6 +2372,7 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
         orden = OrdenServicio.objects.select_related(
             'tecnico_asignado_actual__user',
             'detalle_equipo',
+            'cotizacion',
         ).get(pk=orden_id)
     except OrdenServicio.DoesNotExist:
         return {'success': False, 'mensaje': f'Orden ID {orden_id} no encontrada.'}
@@ -2380,11 +2384,20 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
     etiqueta = obtener_etiqueta_orden(orden)
     destinatarios_notificados = 0
 
-    if tipo_recordatorio == 'ingreso_inspector':
-        if not orden_requiere_recordatorio_ingreso_inspector(orden):
-            return {'success': False, 'mensaje': 'La orden ya no requiere recordatorio de ingreso.'}
+    # ── Inspectores: ingreso (≥2 días) o egreso (orden en finalizado) ──
+    if tipo_recordatorio in ('ingreso_inspector', 'egreso_inspector'):
+        if tipo_recordatorio == 'ingreso_inspector':
+            if not orden_requiere_recordatorio_ingreso_inspector(orden):
+                return {'success': False, 'mensaje': 'La orden ya no requiere recordatorio de ingreso.'}
+            titulo, mensaje = construir_mensaje_recordatorio_ingreso_inspector(orden)
+            tipo_foto_historial = 'ingreso'
+        else:
+            if not orden_requiere_recordatorio_egreso_inspector(orden):
+                return {'success': False, 'mensaje': 'La orden ya no requiere recordatorio de egreso.'}
+            titulo, mensaje = construir_mensaje_recordatorio_egreso_inspector(orden)
+            tipo_foto_historial = 'egreso'
 
-        titulo, mensaje = construir_mensaje_recordatorio_ingreso_inspector(orden)
+        # Broadcast a todos los inspectores activos (mismo patrón que ingreso)
         inspectores = Empleado.objects.filter(
             rol='inspector',
             user__is_active=True,
@@ -2413,8 +2426,8 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
                 )
 
         comentario_historial = (
-            f'🔔 Recordatorio de fotos de ingreso enviado a {destinatarios_notificados} '
-            f'inspector(es) — Orden {etiqueta}'
+            f'🔔 Recordatorio de fotos de {tipo_foto_historial} enviado a '
+            f'{destinatarios_notificados} inspector(es) — Orden {etiqueta}'
         )
 
     elif tipo_recordatorio == 'tecnico_faltantes':
@@ -2483,11 +2496,17 @@ def verificar_recordatorios_imagenes_task():
     Tarea periódica diaria (Celery Beat) que detecta órdenes con fotos faltantes
     y encola recordatorios push/campanita para inspectores y técnicos.
 
+    Casos:
+        - Ingreso inspector: sin fotos de ingreso tras 2 días.
+        - Egreso inspector: en finalizado sin fotos de egreso.
+        - Técnico: en finalizado con diag/rep faltantes según cotización.
+
     MULTI-PAÍS: Itera PAISES_CONFIG y pasa db_alias a cada tarea hija.
     """
     from config.paises_config import PAISES_CONFIG
 
     from .utils_recordatorio_imagenes import (
+        ordenes_pendientes_egreso_inspector,
         ordenes_pendientes_ingreso_inspector,
         ordenes_pendientes_tecnico,
     )
@@ -2498,6 +2517,7 @@ def verificar_recordatorios_imagenes_task():
         db_alias = pais_config['db_alias']
         encoladas_pais = 0
 
+        # 1) Ingreso faltante tras 2 días → inspectores
         for orden in ordenes_pendientes_ingreso_inspector(db_alias):
             try:
                 enviar_recordatorio_imagen_task.delay(
@@ -2512,6 +2532,22 @@ def verificar_recordatorios_imagenes_task():
                     f'Error al encolar ingreso inspector orden {orden.pk}: {exc}'
                 )
 
+        # 2) Egreso faltante en finalizado → inspectores (repetición diaria)
+        for orden in ordenes_pendientes_egreso_inspector(db_alias):
+            try:
+                enviar_recordatorio_imagen_task.delay(
+                    orden_id=orden.pk,
+                    tipo_recordatorio='egreso_inspector',
+                    db_alias=db_alias,
+                )
+                encoladas_pais += 1
+            except Exception as exc:
+                logger.error(
+                    f'[VERIFICAR-RECORDATORIO-IMAGEN] [{subdominio}] '
+                    f'Error al encolar egreso inspector orden {orden.pk}: {exc}'
+                )
+
+        # 3) Evidencias técnico en finalizado (según cotización / VM)
         for orden in ordenes_pendientes_tecnico(db_alias):
             try:
                 enviar_recordatorio_imagen_task.delay(

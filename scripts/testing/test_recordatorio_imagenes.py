@@ -20,125 +20,264 @@ django.setup()
 
 from django.utils import timezone
 
+from servicio_tecnico.models import Cotizacion
 from servicio_tecnico.utils_recordatorio_imagenes import (
-    orden_requiere_recordatorio_ingreso_inspector,
-    tipos_faltantes_tecnico,
-    construir_mensaje_recordatorio_tecnico,
-    construir_mensaje_recordatorio_ingreso_inspector,
+    DIAS_MAX_VENTANA_RECORDATORIO,
     HORAS_ANTES_RECORDATORIO,
+    construir_mensaje_recordatorio_egreso_inspector,
+    construir_mensaje_recordatorio_ingreso_inspector,
+    construir_mensaje_recordatorio_tecnico,
+    orden_requiere_recordatorio_egreso_inspector,
+    orden_requiere_recordatorio_ingreso_inspector,
+    orden_requiere_recordatorio_tecnico,
+    tipos_faltantes_tecnico,
 )
 
 
-def _orden_mock(**kwargs):
-    """Crea un mock de OrdenServicio con atributos mínimos."""
-    orden = MagicMock()
-    orden.estado = kwargs.get('estado', 'recepcion')
-    orden.tipo_servicio = kwargs.get('tipo_servicio', 'diagnostico')
-    orden.fecha_ingreso = kwargs.get('fecha_ingreso', timezone.now() - timedelta(hours=72))
-    orden.numero_orden_interno = kwargs.get('numero_orden_interno', 'ORD-2026-0001')
-    orden.tecnico_asignado_actual = kwargs.get('tecnico_asignado_actual')
-    orden.detalle_equipo.orden_cliente = kwargs.get('orden_cliente', 'OOW-12345')
+class _StubOrden:
+    """
+    Stub simple de OrdenServicio para pruebas de lógica (sin BD).
 
-    tipos = kwargs.get('tipos_imagen', set())
-    orden.imagenes.values_list.return_value.distinct.return_value = list(tipos)
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    MagicMock crea atributos automáticamente y rompe el caso "sin cotización"
+    (devolvería otro mock en vez de DoesNotExist). Este stub controla eso.
+    """
 
-    def _filter_imagenes(**filter_kwargs):
-        tipo = filter_kwargs.get('tipo')
-        mock_qs = MagicMock()
-        if tipo in tipos:
-            fecha = kwargs.get(f'fecha_{tipo}', timezone.now() - timedelta(hours=72))
-            mock_qs.order_by.return_value.values_list.return_value.first.return_value = fecha
-        else:
-            mock_qs.order_by.return_value.values_list.return_value.first.return_value = None
-        return mock_qs
+    def __init__(self, **kwargs):
+        self.estado = kwargs.get('estado', 'recepcion')
+        self.tipo_servicio = kwargs.get('tipo_servicio', 'diagnostico')
+        self.fecha_ingreso = kwargs.get(
+            'fecha_ingreso',
+            timezone.now() - timedelta(hours=72),
+        )
+        self.numero_orden_interno = kwargs.get('numero_orden_interno', 'ORD-2026-0001')
+        self.tecnico_asignado_actual = kwargs.get('tecnico_asignado_actual')
+        self.fecha_finalizacion = kwargs.get(
+            'fecha_finalizacion',
+            timezone.now() - timedelta(hours=1) if kwargs.get('estado') == 'finalizado' else None,
+        )
+        self._tipos_imagen = set(kwargs.get('tipos_imagen', set()))
+        self._cotizacion = kwargs.get('cotizacion', 'SIN_COTIZACION')
+        self._fecha_creacion_historial = kwargs.get('fecha_creacion_historial')
 
-    orden.imagenes.filter.side_effect = lambda **kw: _filter_imagenes(**kw)
+        detalle = MagicMock()
+        detalle.orden_cliente = kwargs.get('orden_cliente', 'OOW-12345')
+        self.detalle_equipo = detalle
 
-    historial_mock = MagicMock()
-    historial_mock.filter.return_value.order_by.return_value.values_list.return_value.first.return_value = (
-        kwargs.get('fecha_creacion_historial')
-    )
-    orden.historial = historial_mock
-    return orden
+        # Historial: evento 'creacion' opcional
+        historial_mock = MagicMock()
+        historial_mock.filter.return_value.order_by.return_value.values_list.return_value.first.return_value = (
+            self._fecha_creacion_historial
+        )
+        self.historial = historial_mock
+
+        # Imágenes: values_list('tipo') y filter(tipo=...)
+        imagenes_mock = MagicMock()
+        imagenes_mock.values_list.return_value.distinct.return_value = list(self._tipos_imagen)
+
+        def _filter_imagenes(**filter_kwargs):
+            tipo = filter_kwargs.get('tipo')
+            mock_qs = MagicMock()
+            if tipo in self._tipos_imagen:
+                fecha = kwargs.get(f'fecha_{tipo}', timezone.now() - timedelta(hours=72))
+                mock_qs.order_by.return_value.values_list.return_value.first.return_value = fecha
+            else:
+                mock_qs.order_by.return_value.values_list.return_value.first.return_value = None
+            return mock_qs
+
+        imagenes_mock.filter.side_effect = _filter_imagenes
+        self.imagenes = imagenes_mock
+
+    @property
+    def cotizacion(self):
+        """Simula OneToOne: sin cotización → DoesNotExist."""
+        if self._cotizacion == 'SIN_COTIZACION' or self._cotizacion is None:
+            raise Cotizacion.DoesNotExist
+        return self._cotizacion
+
+
+def _cotizacion(usuario_acepto):
+    cot = MagicMock()
+    cot.usuario_acepto = usuario_acepto
+    return cot
 
 
 def test_inspector_sin_ingreso_48h():
-    orden = _orden_mock(tipos_imagen=set(), estado='recepcion')
+    orden = _StubOrden(tipos_imagen=set(), estado='recepcion')
     assert orden_requiere_recordatorio_ingreso_inspector(orden) is True
     print('OK: inspector — sin ingreso tras 48h')
 
 
 def test_inspector_con_ingreso():
-    orden = _orden_mock(tipos_imagen={'ingreso'})
+    orden = _StubOrden(tipos_imagen={'ingreso'})
     assert orden_requiere_recordatorio_ingreso_inspector(orden) is False
     print('OK: inspector — con ingreso no notifica')
 
 
 def test_inspector_cancelada():
-    orden = _orden_mock(tipos_imagen=set(), estado='cancelado')
+    orden = _StubOrden(tipos_imagen=set(), estado='cancelado')
     assert orden_requiere_recordatorio_ingreso_inspector(orden) is False
     print('OK: inspector — orden cancelada excluida')
 
 
-def test_tecnico_vm_falta_reparacion():
+def test_inspector_egreso_finalizado_sin_fotos():
+    orden = _StubOrden(estado='finalizado', tipos_imagen={'ingreso'})
+    assert orden_requiere_recordatorio_egreso_inspector(orden) is True
+    print('OK: inspector — finalizado sin egreso')
+
+
+def test_inspector_egreso_con_fotos():
+    orden = _StubOrden(estado='finalizado', tipos_imagen={'ingreso', 'egreso'})
+    assert orden_requiere_recordatorio_egreso_inspector(orden) is False
+    print('OK: inspector — finalizado con egreso no notifica')
+
+
+def test_tecnico_aceptada_pide_diag_y_rep():
     tecnico = MagicMock()
     tecnico.user_id = 1
     tecnico.user.is_active = True
-    orden = _orden_mock(
+    orden = _StubOrden(
+        estado='finalizado',
+        tipos_imagen={'ingreso', 'egreso'},
+        tecnico_asignado_actual=tecnico,
+        cotizacion=_cotizacion(True),
+    )
+    faltantes = tipos_faltantes_tecnico(orden)
+    assert faltantes == ['diagnostico', 'reparacion']
+    print('OK: técnico — cotización aceptada pide diag+rep')
+
+
+def test_tecnico_rechazada_solo_diag():
+    tecnico = MagicMock()
+    tecnico.user_id = 1
+    tecnico.user.is_active = True
+    orden = _StubOrden(
+        estado='finalizado',
+        tipos_imagen={'ingreso', 'egreso'},
+        tecnico_asignado_actual=tecnico,
+        cotizacion=_cotizacion(False),
+    )
+    faltantes = tipos_faltantes_tecnico(orden)
+    assert faltantes == ['diagnostico']
+    print('OK: técnico — cotización rechazada solo diagnóstico')
+
+
+def test_tecnico_pendiente_solo_diag():
+    tecnico = MagicMock()
+    tecnico.user_id = 1
+    tecnico.user.is_active = True
+    orden = _StubOrden(
+        estado='finalizado',
+        tipos_imagen={'ingreso', 'egreso'},
+        tecnico_asignado_actual=tecnico,
+        cotizacion=_cotizacion(None),
+    )
+    faltantes = tipos_faltantes_tecnico(orden)
+    assert faltantes == ['diagnostico']
+    print('OK: técnico — cotización pendiente solo diagnóstico')
+
+
+def test_tecnico_vm_sin_cotizacion_solo_rep():
+    tecnico = MagicMock()
+    tecnico.user_id = 1
+    tecnico.user.is_active = True
+    orden = _StubOrden(
+        estado='finalizado',
         tipo_servicio='venta_mostrador',
         tipos_imagen={'ingreso', 'egreso'},
         tecnico_asignado_actual=tecnico,
+        cotizacion=None,
     )
-    with patch(
-        'servicio_tecnico.utils_recordatorio_imagenes.obtener_tipos_imagen',
-        return_value={'ingreso', 'egreso'},
-    ):
-        faltantes = tipos_faltantes_tecnico(orden)
+    faltantes = tipos_faltantes_tecnico(orden)
     assert faltantes == ['reparacion']
-    print('OK: técnico VM — falta reparación tras egreso')
+    print('OK: técnico VM sin cotización — solo reparación')
 
 
-def test_tecnico_diagnostico_faltan_ambas():
+def test_tecnico_no_finalizado_no_pide():
+    orden = _StubOrden(
+        estado='reparacion',
+        tipos_imagen={'ingreso'},
+        cotizacion=_cotizacion(True),
+    )
+    faltantes = tipos_faltantes_tecnico(orden)
+    assert faltantes == []
+    print('OK: técnico — fuera de finalizado no pide fotos')
+
+
+def test_ingreso_mas_de_una_semana_no_pide():
+    orden = _StubOrden(
+        tipos_imagen=set(),
+        estado='recepcion',
+        fecha_ingreso=timezone.now() - timedelta(days=10),
+    )
+    assert orden_requiere_recordatorio_ingreso_inspector(orden) is False
+    print('OK: inspector ingreso — más de 1 semana no notifica')
+
+
+def test_egreso_mas_de_una_semana_no_pide():
+    orden = _StubOrden(
+        estado='finalizado',
+        tipos_imagen={'ingreso'},
+        fecha_finalizacion=timezone.now() - timedelta(days=10),
+    )
+    assert orden_requiere_recordatorio_egreso_inspector(orden) is False
+    print('OK: inspector egreso — finalizado hace >1 semana no notifica')
+
+
+def test_tecnico_mas_de_una_semana_no_pide():
     tecnico = MagicMock()
     tecnico.user_id = 1
     tecnico.user.is_active = True
-    orden = _orden_mock(
-        tipo_servicio='diagnostico',
+    orden = _StubOrden(
+        estado='finalizado',
         tipos_imagen={'ingreso', 'egreso'},
         tecnico_asignado_actual=tecnico,
+        cotizacion=_cotizacion(True),
+        fecha_finalizacion=timezone.now() - timedelta(days=10),
     )
-    with patch(
-        'servicio_tecnico.utils_recordatorio_imagenes.obtener_tipos_imagen',
-        return_value={'ingreso', 'egreso'},
-    ):
-        faltantes = tipos_faltantes_tecnico(orden)
-    assert 'diagnostico' in faltantes
-    assert 'reparacion' in faltantes
-    print('OK: técnico diagnóstico — faltan diagnóstico y reparación')
+    assert orden_requiere_recordatorio_tecnico(orden) is False
+    print('OK: técnico — finalizado hace >1 semana no notifica')
 
 
 def test_mensajes():
-    orden = _orden_mock(orden_cliente='OOW-999')
+    orden = _StubOrden(
+        orden_cliente='OOW-999',
+        estado='finalizado',
+        cotizacion=_cotizacion(True),
+    )
     t1, m1 = construir_mensaje_recordatorio_ingreso_inspector(orden)
     assert 'ingreso' in m1.lower()
     assert 'OOW-999' in t1
 
-    orden_vm = _orden_mock(tipo_servicio='venta_mostrador', orden_cliente='FL-100')
+    t_egr, m_egr = construir_mensaje_recordatorio_egreso_inspector(orden)
+    assert 'egreso' in m_egr.lower()
+
     with patch(
         'servicio_tecnico.utils_recordatorio_imagenes.tipos_faltantes_tecnico',
         return_value=['reparacion'],
     ):
-        t2, m2 = construir_mensaje_recordatorio_tecnico(orden_vm)
-    assert 'reparación' in m2.lower() or 'reparacion' in m2.lower()
+        t2, m2 = construir_mensaje_recordatorio_tecnico(orden)
+    assert 'reparación' in m2.lower() or 'reparacion' in m2.lower() or 'Reparación' in m2
     print('OK: mensajes construidos correctamente')
 
 
 if __name__ == '__main__':
-    print(f'Validando lógica (umbral: {HORAS_ANTES_RECORDATORIO} h)...')
+    print(
+        f'Validando lógica (ingreso ≥{HORAS_ANTES_RECORDATORIO} h, '
+        f'ventana máx {DIAS_MAX_VENTANA_RECORDATORIO} días)...'
+    )
     test_inspector_sin_ingreso_48h()
     test_inspector_con_ingreso()
     test_inspector_cancelada()
-    test_tecnico_vm_falta_reparacion()
-    test_tecnico_diagnostico_faltan_ambas()
+    test_inspector_egreso_finalizado_sin_fotos()
+    test_inspector_egreso_con_fotos()
+    test_tecnico_aceptada_pide_diag_y_rep()
+    test_tecnico_rechazada_solo_diag()
+    test_tecnico_pendiente_solo_diag()
+    test_tecnico_vm_sin_cotizacion_solo_rep()
+    test_tecnico_no_finalizado_no_pide()
+    test_ingreso_mas_de_una_semana_no_pide()
+    test_egreso_mas_de_una_semana_no_pide()
+    test_tecnico_mas_de_una_semana_no_pide()
     test_mensajes()
     print('\nTodas las pruebas de lógica pasaron.')
