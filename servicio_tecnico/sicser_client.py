@@ -71,6 +71,11 @@ SEGMENTO_CIS_A_CODIGO_URL: dict[str, str] = {
     'MTR': 'MTR',
     'GUADALAJARA': 'GDL',
     'GDL': 'GDL',
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El folio de Argentina suele traer "BUENOSAIRES" junto (sin espacio).
+    # Si no lo mapeamos, parsear_codigo_cis_para_url() no lo reconoce y
+    # cae al valor por defecto "SAT" (Satélite), que es incorrecto.
+    'BUENOSAIRES': 'BUA',
     'BUENOS': 'BUA',
     'BUA': 'BUA',
     'BOGOTA': 'BOG',
