@@ -142,6 +142,12 @@ def mejorar_diagnostico(
     # Usar modelo_override si viene del frontend, si no el default del settings
     model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'OLLAMA_MODEL', 'gemma3:12b')
     timeout = getattr(settings, 'OLLAMA_TIMEOUT', 120)
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Usamos el MISMO num_ctx que el chat de seguimiento (CHAT_SEGUIMIENTO_NUM_CTX,
+    # default 8192). Si el diagnóstico pedía otro tamaño de contexto (o ninguno,
+    # y Ollama usaba su default), Ollama podía descargar/recargar el modelo aunque
+    # el nombre fuera el mismo (ej. gemma4:12b). Unificar evita ese swap en RAM.
+    num_ctx = getattr(settings, 'CHAT_SEGUIMIENTO_NUM_CTX', 8192)
 
     # Construir el prompt con todos los datos del equipo
     prompt = construir_prompt(
@@ -181,6 +187,8 @@ def mejorar_diagnostico(
             # Ideal para corrección de texto (no queremos creatividad excesiva)
             "temperature": 0.3,
             "top_p": 0.9,
+            # Misma ventana de contexto que el chat de seguimiento (evita unload en Ollama)
+            "num_ctx": num_ctx,
         }
     }
 
