@@ -881,11 +881,15 @@ def enviar_diagnostico_cliente_task(
         # ===================================================================
         # PASO 4: CREAR/OBTENER COTIZACIÓN Y PRE-CREAR PIEZAS
         # ===================================================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Al enviar el diagnóstico por correo también puede crearse la Cotizacion.
+        # Copiamos la mano de obra ya registrada en la orden (si el técnico la
+        # capturó antes) para no perderla. Si no hay valor, queda en 0.
         cotizacion, cotizacion_creada = Cotizacion.objects.get_or_create(
             orden=orden,
             defaults={
                 'fecha_envio': timezone.now(),
-                'costo_mano_obra': Decimal('0.00'),
+                'costo_mano_obra': orden.costo_mano_obra or Decimal('0.00'),
             }
         )
 

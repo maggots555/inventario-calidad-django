@@ -3099,7 +3099,8 @@ class SolicitudCotizacion(models.Model):
         en el módulo de Servicio Técnico.
         
         Si ya existe (creada manualmente o desde diagnóstico), la reutiliza.
-        Si no existe, la crea con costo_mano_obra = 0.
+        Si no existe, la crea copiando OrdenServicio.costo_mano_obra
+        (si el técnico ya la registró en ST; si no, queda en 0).
         
         Las piezas (PiezaCotizada) se sincronizan desde LineaCotizacion.save()
         
@@ -3110,6 +3111,7 @@ class SolicitudCotizacion(models.Model):
         Cotizacion no tiene sentido. Las piezas van directamente a PiezaVentaMostrador
         y los servicios a VentaMostrador.
         """
+        from decimal import Decimal
         from servicio_tecnico.models import Cotizacion
         
         if not self.orden_servicio:
@@ -3120,12 +3122,17 @@ class SolicitudCotizacion(models.Model):
         if self.orden_servicio.tipo_servicio == 'venta_mostrador':
             return
         
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si el técnico ya guardó mano de obra en la orden (sin cotización),
+        # al crear la Cotizacion desde Almacén NO la perdemos: la copiamos.
+        mano_obra_orden = self.orden_servicio.costo_mano_obra or Decimal('0.00')
+
         # Buscar o crear Cotizacion en ST
         cotizacion, creada = Cotizacion.objects.get_or_create(
             orden=self.orden_servicio,
             defaults={
                 'fecha_envio': timezone.now(),
-                'costo_mano_obra': 0,
+                'costo_mano_obra': mano_obra_orden,
             }
         )
         

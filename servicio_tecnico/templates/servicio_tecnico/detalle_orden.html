@@ -772,37 +772,89 @@
                     
                     {% if not cotizacion %}
                         <!-- ========================================== -->
-                        <!-- NO EXISTE COTIZACIÓN - Mostrar botón crear -->
+                        <!-- NO EXISTE COTIZACIÓN: MO en la orden + Generar -->
+                        <!-- EXPLICACIÓN: La mano de obra se guarda en la -->
+                        <!-- orden sin crear cotización ni cambiar estado. -->
+                        <!-- "Generar cotización" crea Cotizacion y copia MO. -->
                         <!-- ========================================== -->
                         <div class="alert alert-info d-flex align-items-center mb-4">
                             <i class="bi bi-info-circle-fill fs-3 me-3"></i>
                             <div>
-                                <h6 class="mb-1">No hay cotización para esta orden</h6>
-                                <p class="mb-0 small">Crea una cotización para enviar al cliente con el costo de mano de obra. Después agrega las piezas necesarias desde el admin.</p>
+                                <h6 class="mb-1">Mano de obra y cotización (pasos separados)</h6>
+                                <p class="mb-0 small">
+                                    Primero registra la <strong>mano de obra</strong> (queda en la orden).
+                                    Cuando quieras abrir la cotización para agregar piezas, usa
+                                    <strong>Generar cotización</strong>. El estado de la orden
+                                    <em>no</em> cambia automáticamente.
+                                </p>
                             </div>
                         </div>
-                        
-                        <form method="post" id="formCrearCotizacion">
+
+                        <!-- Guardar solo mano de obra (NO crea Cotizacion) -->
+                        <form method="post" id="formGuardarManoObra" class="mb-3">
                             {% csrf_token %}
-                            <input type="hidden" name="form_type" value="crear_cotizacion">
-                            
-                            <div class="row">
+                            <input type="hidden" name="form_type" value="guardar_mano_obra">
+
+                            <div class="row g-3 align-items-end">
                                 <div class="col-md-6">
-                                    {{ form_crear_cotizacion.costo_mano_obra.errors }}
-                                    <label for="{{ form_crear_cotizacion.costo_mano_obra.id_for_label }}" class="form-label">
-                                        <i class="bi bi-tools"></i> {{ form_crear_cotizacion.costo_mano_obra.label }}
-                                    </label>
-                                    {{ form_crear_cotizacion.costo_mano_obra }}
-                                    <small class="text-muted">{{ form_crear_cotizacion.costo_mano_obra.help_text }}</small>
+                                    {% if form_guardar_mano_obra %}
+                                        {{ form_guardar_mano_obra.costo_mano_obra.errors }}
+                                        <label for="{{ form_guardar_mano_obra.costo_mano_obra.id_for_label }}" class="form-label">
+                                            <i class="bi bi-tools"></i> {{ form_guardar_mano_obra.costo_mano_obra.label }}
+                                        </label>
+                                        {{ form_guardar_mano_obra.costo_mano_obra }}
+                                        <small class="text-muted">{{ form_guardar_mano_obra.costo_mano_obra.help_text }}</small>
+                                    {% else %}
+                                        <label for="id_costo_mano_obra" class="form-label">
+                                            <i class="bi bi-tools"></i> Costo de Mano de Obra
+                                        </label>
+                                        <input type="number" name="costo_mano_obra" id="id_costo_mano_obra"
+                                               class="form-control" step="0.01" min="0"
+                                               value="{{ orden.costo_mano_obra|floatformat:2 }}" required>
+                                    {% endif %}
                                 </div>
-                                <div class="col-md-6 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-success w-100">
-                                        <i class="bi bi-plus-circle"></i> Crear Cotización
+                                <div class="col-md-6">
+                                    <button type="submit" class="btn btn-outline-primary w-100">
+                                        <i class="bi bi-save"></i> Guardar mano de obra
                                     </button>
                                 </div>
                             </div>
                         </form>
-                    
+
+                        <!-- Generar cotización (copia MO de la orden; NO cambia estado) -->
+                        <form method="post" id="formGenerarCotizacion"
+                              onsubmit="return confirm('¿Generar la cotización con la mano de obra registrada? El estado de la orden no cambiará automáticamente.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="generar_cotizacion">
+                            {# Si el usuario escribió un valor y no lo guardó, lo enviamos también #}
+                            <input type="hidden" name="costo_mano_obra" id="hiddenCostoManoObraGenerar"
+                                   value="{{ orden.costo_mano_obra|floatformat:2 }}">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-plus-circle"></i> Generar cotización
+                            </button>
+                            <small class="text-muted d-block mt-1">
+                                Crea el registro de cotización y habilita agregar piezas.
+                                Si Almacén ya vinculó una solicitud, la cotización puede existir sin este botón.
+                            </small>
+                        </form>
+                        <script>
+                        // EXPLICACIÓN: Al generar, copiamos el valor visible del input de MO
+                        // por si el técnico lo cambió sin pulsar "Guardar" antes.
+                        (function () {
+                            var formGen = document.getElementById('formGenerarCotizacion');
+                            var formMo = document.getElementById('formGuardarManoObra');
+                            var hidden = document.getElementById('hiddenCostoManoObraGenerar');
+                            if (formGen && formMo && hidden) {
+                                formGen.addEventListener('submit', function () {
+                                    var inputMo = formMo.querySelector('[name="costo_mano_obra"]');
+                                    if (inputMo) {
+                                        hidden.value = inputMo.value;
+                                    }
+                                });
+                            }
+                        })();
+                        </script>
+
                     {% else %}
                         <!-- ========================================== -->
                         <!-- EXISTE COTIZACIÓN - Mostrar información -->

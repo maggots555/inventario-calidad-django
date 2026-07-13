@@ -3508,6 +3508,71 @@ def _serializar_costeo_reacondicionado_config() -> str:
     return _json.dumps(serializar_config_costeo(), separators=(',', ':'))
 
 
+def _actualizar_estado_st_esperando_aprobacion_cliente(solicitud, usuario=None):
+    """
+    Al enviar la cotización al cliente desde Almacén, pone la orden de ST
+    en estado ``cotizacion`` («Esperando Aprobación Cliente»).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Antes, ese cambio de estado ocurría al crear la cotización en ST.
+    Ahora la MO y la cotización se separaron, y el momento correcto de
+    avisar «estamos esperando al cliente» es cuando realmente se le
+    envía la cotización por correo desde este módulo.
+
+    Args:
+        solicitud: SolicitudCotizacion (debe tener orden_servicio vinculada).
+        usuario: User opcional; si tiene empleado, se asocia al historial.
+
+    Returns:
+        bool: True si se cambió el estado; False si no había orden,
+        ya estaba en ``cotizacion``, o no aplica.
+    """
+    # Sin orden vinculada (modo sin_orden_activa) no hay nada que actualizar en ST
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    # Ya está esperando al cliente: no duplicar historial ni push
+    if orden.estado == 'cotizacion':
+        return False
+
+    estado_anterior = orden.estado
+    # Código de estado en constants: 'cotizacion' → «Esperando Aprobación Cliente»
+    orden.estado = 'cotizacion'
+    # OrdenServicio.save() registra solo el cambio de estado en el historial
+    orden.save(update_fields=['estado'])
+
+    # Enriquecer el último historial con el usuario de Almacén y un comentario claro
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    ultimo = (
+        orden.historial.filter(tipo_evento='cambio_estado', estado_nuevo='cotizacion')
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        from config.constants import ESTADO_ORDEN_CHOICES
+        ultimo.comentario = (
+            f'Cambio de estado al enviar cotización al cliente desde Almacén: '
+            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)} → '
+            f'Esperando Aprobación Cliente '
+            f'(solicitud {solicitud.numero_solicitud})'
+        )
+        if empleado is not None:
+            ultimo.usuario = empleado
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=['comentario', 'usuario', 'es_sistema'])
+
+    logger.info(
+        f"[API_COTIZACION_CLIENTE] Orden ST {orden.numero_orden_interno}: "
+        f"{estado_anterior} → cotizacion (envío al cliente, solicitud {solicitud.numero_solicitud})"
+    )
+    return True
+
+
 def _extraer_datos_reacondicionado_post(post) -> dict:
     """
     Lee del POST los campos del equipo reacondicionado capturados en el modal.
@@ -4021,7 +4086,9 @@ def api_enviar_cotizacion_cliente(request, pk):
     2. Cambia el estado de la solicitud a 'enviada_cliente'
     3. Agrupa los ítems según el modo elegido (todo junto / piezas vs servicios / etc.)
     4. Para cada grupo, dispara una tarea Celery que genera el PDF y lo envía por email
-    5. Retorna JsonResponse inmediato (el email se procesa en background)
+    5. Si hay orden de ST vinculada, cambia su estado a 'cotizacion'
+       («Esperando Aprobación Cliente») — este es el momento real de espera al cliente
+    6. Retorna JsonResponse inmediato (el email se procesa en background)
 
     Args:
         request: HttpRequest POST con los datos del modal.
@@ -4133,6 +4200,8 @@ def api_enviar_cotizacion_cliente(request, pk):
                 datos_equipo_reac=resultado['datos_equipo'],
                 costeo_reac=resultado['costeo'],
             )
+            # Al enviar al cliente: ST pasa a «Esperando Aprobación Cliente»
+            _actualizar_estado_st_esperando_aprobacion_cliente(solicitud, usuario=request.user)
             return JsonResponse({
                 'success': True,
                 'mensaje': (
@@ -4219,6 +4288,10 @@ def api_enviar_cotizacion_cliente(request, pk):
                 usuario_id=usuario_id,
                 db_alias=_db,
             )
+
+        # Al enviar al cliente: orden ST → «Esperando Aprobación Cliente»
+        # (si hay orden vinculada y aún no estaba en ese estado)
+        _actualizar_estado_st_esperando_aprobacion_cliente(solicitud, usuario=request.user)
 
         # Mensaje de éxito según cuántos grupos se enviaron
         n_grupos = len(grupos)

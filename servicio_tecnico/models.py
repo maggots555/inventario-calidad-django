@@ -215,6 +215,24 @@ class OrdenServicio(models.Model):
         blank=True,
         help_text="Motivo por el cual no se ha emitido la factura"
     )
+
+    # MANO DE OBRA (independiente de Cotizacion)
+    # =========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Este campo guarda el costo de mano de obra en la ORDEN, aunque todavía
+    # no exista una Cotizacion. Así el técnico puede registrar el monto sin
+    # "abrir" la cotización ni cambiar el estado de la orden.
+    # Cuando se genera la Cotizacion (desde ST o Almacén), se copia este valor
+    # a Cotizacion.costo_mano_obra. Si luego se edita la MO, se sincronizan ambos.
+    costo_mano_obra = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text=(
+            "Costo de mano de obra del servicio (independiente de si ya hay cotización). "
+            "Al generar la cotización se copia a Cotizacion.costo_mano_obra."
+        ),
+    )
     
     # TIPO DE SERVICIO (Sistema Venta Mostrador)
     # =========================================================================

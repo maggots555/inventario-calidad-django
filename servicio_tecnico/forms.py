@@ -1583,29 +1583,28 @@ class ReferenciaGamaEquipoForm(forms.ModelForm):
 
 
 # ============================================================================
-# FORMULARIO: CREAR COTIZACIÓN
+# FORMULARIO: GUARDAR MANO DE OBRA (en la orden, sin crear cotización)
 # ============================================================================
 
-class CrearCotizacionForm(forms.ModelForm):
+class GuardarManoObraForm(forms.ModelForm):
     """
-    Formulario para crear una nueva cotización para una orden.
-    
+    Guarda el costo de mano de obra en la ORDEN, sin crear Cotizacion.
+
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Este formulario permite iniciar el proceso de cotización. Captura solo
-    el costo de mano de obra inicialmente. Las piezas se agregan después
-    desde el admin de Django.
-    
-    FLUJO:
-    1. Usuario crea cotización con costo de mano de obra
-    2. Se va al admin para agregar las piezas necesarias (PiezaCotizada)
-    3. Se envía cotización al cliente
-    4. Cliente responde (acepta/rechaza) usando GestionarCotizacionForm
+    --------------------------------
+    Antes, al capturar la mano de obra se creaba automáticamente la cotización
+    y se cambiaba el estado de la orden. Ahora son dos pasos separados:
+
+    1. Guardar mano de obra → solo actualiza OrdenServicio.costo_mano_obra
+    2. Generar cotización → crea el registro Cotizacion (copia la MO de la orden)
+
+    Así puedes registrar el monto aunque todavía no haya piezas ni cotización.
     """
-    
+
     class Meta:
-        model = Cotizacion
+        model = OrdenServicio
         fields = ['costo_mano_obra']
-        
+
         widgets = {
             'costo_mano_obra': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -1615,15 +1614,72 @@ class CrearCotizacionForm(forms.ModelForm):
                 'required': True,
             }),
         }
-        
+
         labels = {
             'costo_mano_obra': 'Costo de Mano de Obra',
         }
-        
+
+        help_texts = {
+            'costo_mano_obra': (
+                'Costo del servicio técnico (diagnóstico + reparación). '
+                'Se guarda en la orden; al generar la cotización se copia automáticamente.'
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        """
+        Añade clases Bootstrap de validación al widget.
+        """
+        super().__init__(*args, **kwargs)
+
+        # EXPLICACIÓN: Bootstrap usa is-validatable para estilos de validación
+        for field_name, field in self.fields.items():
+            if 'class' in field.widget.attrs:
+                field.widget.attrs['class'] += ' '
+            else:
+                field.widget.attrs['class'] = ''
+            field.widget.attrs['class'] += 'is-validatable'
+
+
+# ============================================================================
+# FORMULARIO: CREAR COTIZACIÓN (legado / compatibilidad)
+# ============================================================================
+
+class CrearCotizacionForm(forms.ModelForm):
+    """
+    Formulario legado para crear Cotizacion (solo costo_mano_obra).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El flujo nuevo ya no depende de este formulario para capturar la MO:
+    la MO vive en OrdenServicio y “Generar cotización” copia ese valor.
+
+    Se mantiene por compatibilidad con código que aún lo importe.
+    Preferir GuardarManoObraForm + POST generar_cotizacion / crear_cotizacion.
+    """
+
+    class Meta:
+        model = Cotizacion
+        fields = ['costo_mano_obra']
+
+        widgets = {
+            'costo_mano_obra': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+                'required': True,
+            }),
+        }
+
+        labels = {
+            'costo_mano_obra': 'Costo de Mano de Obra',
+        }
+
         help_texts = {
             'costo_mano_obra': 'Costo del servicio técnico (diagnóstico + reparación)',
         }
-    
+
     def __init__(self, *args, **kwargs):
         """
         EXPLICACIÓN:
@@ -1631,7 +1687,7 @@ class CrearCotizacionForm(forms.ModelForm):
         cómo se ve o comporta el formulario antes de mostrarlo.
         """
         super().__init__(*args, **kwargs)
-        
+
         # Agregar clase de validación de Bootstrap
         for field_name, field in self.fields.items():
             if 'class' in field.widget.attrs:

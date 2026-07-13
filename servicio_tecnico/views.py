@@ -46,7 +46,9 @@ from .models import (
     TipoIncidenciaRHITSO,
     CategoriaDiagnostico,
     ConfiguracionRHITSO,
+    Cotizacion,
 )
+from decimal import Decimal
 from inventario.models import Empleado, Sucursal
 from scorecard.models import ComponenteEquipo
 from config.constants import (
@@ -76,6 +78,7 @@ from .forms import (
     SubirVideoForm,
     EditarInformacionEquipoForm,
     CrearCotizacionForm,
+    GuardarManoObraForm,
     GestionarCotizacionForm,
     ActualizarEstadoRHITSOForm,
     RegistrarIncidenciaRHITSOForm,
@@ -2378,75 +2381,95 @@ def detalle_orden(request, orden_id):
                 messages.error(request, '❌ Error al actualizar la información del equipo.')
         
         # ------------------------------------------------------------------------
-        # FORMULARIO 8: Crear Cotización
+        # FORMULARIO 8: Guardar Mano de Obra (SIN crear cotización ni cambiar estado)
         # ------------------------------------------------------------------------
-        elif form_type == 'crear_cotizacion':
-            # Verificar que no exista ya una cotización
-            if hasattr(orden, 'cotizacion'):
-                messages.warning(request, '⚠️ Esta orden ya tiene una cotización. Edítala desde el admin.')
-                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-            
-            form_crear_cotizacion = CrearCotizacionForm(request.POST)
-            
-            if form_crear_cotizacion.is_valid():
-                # Crear la cotización vinculada a la orden
-                cotizacion = form_crear_cotizacion.save(commit=False)
-                cotizacion.orden = orden
-                cotizacion.save()
-                
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # La mano de obra vive en OrdenServicio.costo_mano_obra. Guardarla aquí
+        # NO crea Cotizacion ni cambia el estado de la orden. Si ya existe
+        # cotización, también sincronizamos Cotizacion.costo_mano_obra.
+        elif form_type == 'guardar_mano_obra':
+            form_guardar_mo = GuardarManoObraForm(request.POST, instance=orden)
+            if form_guardar_mo.is_valid():
+                costo_anterior = orden.costo_mano_obra
+                orden_actualizada = form_guardar_mo.save()
+                nuevo_costo = orden_actualizada.costo_mano_obra
+
+                # Si ya hay cotización, mantener ambos valores alineados
+                if hasattr(orden_actualizada, 'cotizacion'):
+                    cotizacion_mo = orden_actualizada.cotizacion
+                    cotizacion_mo.costo_mano_obra = nuevo_costo
+                    cotizacion_mo.save(update_fields=['costo_mano_obra'])
+
                 messages.success(
                     request,
-                    f'✅ Cotización creada correctamente con mano de obra: ${cotizacion.costo_mano_obra}. '
-                    f'Ahora agrega las piezas necesarias desde el admin.'
+                    f'✅ Mano de obra guardada: ${costo_anterior} → ${nuevo_costo}. '
+                    f'La cotización no se crea automáticamente.'
                 )
-                
-                # Registrar en historial
                 HistorialOrden.objects.create(
-                    orden=orden,
+                    orden=orden_actualizada,
                     tipo_evento='cotizacion',
-                    comentario=f'Cotización creada - Mano de obra: ${cotizacion.costo_mano_obra}',
+                    comentario=(
+                        f'Mano de obra guardada en la orden: '
+                        f'${costo_anterior} → ${nuevo_costo} (sin crear cotización)'
+                    ),
                     usuario=empleado_actual,
-                    es_sistema=False
+                    es_sistema=False,
                 )
-                
-                # ================================================================
-                # CAMBIO AUTOMÁTICO DE ESTADO: Esperando Aprobación Cliente
-                # ================================================================
-                # Al crear una nueva cotización, cambiar automáticamente el estado
-                # de la orden a "Esperando Aprobación Cliente" (estado: 'cotizacion')
-                # para reflejar que está pendiente de respuesta del cliente.
-                estado_anterior = orden.estado
-                
-                # Solo cambiar si NO está ya en ese estado
-                if estado_anterior != 'cotizacion':
-                    orden.estado = 'cotizacion'
-                    orden.save()
-                    
-                    # Mensaje informativo al usuario
-                    messages.info(
-                        request,
-                        '📋 Estado actualizado automáticamente a: "Esperando Aprobación Cliente"'
-                    )
-                    
-                    # Registrar el cambio automático en el historial
-                    HistorialOrden.objects.create(
-                        orden=orden,
-                        tipo_evento='cambio_estado',
-                        estado_anterior=estado_anterior,
-                        estado_nuevo='cotizacion',
-                        comentario=(
-                            f'Cambio automático de estado: '
-                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)} → '
-                            f'Esperando Aprobación Cliente (cotización creada)'
-                        ),
-                        usuario=empleado_actual,
-                        es_sistema=True  # Marcar como evento del sistema
-                    )
-                
-                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
-                messages.error(request, '❌ Error al crear la cotización.')
-        
+                messages.error(request, '❌ Error al guardar la mano de obra. Revisa el valor ingresado.')
+
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
+        # ------------------------------------------------------------------------
+        # FORMULARIO 8.1: Generar Cotización (solo crea Cotizacion; NO cambia estado)
+        # ------------------------------------------------------------------------
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Este paso crea el registro Cotizacion (OneToOne) y copia la mano de obra
+        # desde la orden. Almacén también puede crear la cotización al vincular
+        # una SolicitudCotizacion. Aquí NO se cambia el estado de la orden:
+        # el técnico lo hace manualmente cuando corresponda.
+        elif form_type in ('crear_cotizacion', 'generar_cotizacion'):
+            if hasattr(orden, 'cotizacion'):
+                messages.warning(
+                    request,
+                    '⚠️ Esta orden ya tiene una cotización. Puedes agregar piezas o editar la mano de obra.'
+                )
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
+            # Si el usuario envió un valor de MO en el mismo POST, lo guardamos
+            # en la orden antes de crear la cotización (opcional, por comodidad).
+            costo_mo_post = request.POST.get('costo_mano_obra', '').strip()
+            if costo_mo_post:
+                form_mo_previo = GuardarManoObraForm(request.POST, instance=orden)
+                if form_mo_previo.is_valid():
+                    orden = form_mo_previo.save()
+                else:
+                    messages.error(request, '❌ Valor de mano de obra inválido. No se generó la cotización.')
+                    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
+            # Crear Cotizacion copiando la MO ya registrada en la orden
+            cotizacion = Cotizacion.objects.create(
+                orden=orden,
+                costo_mano_obra=orden.costo_mano_obra or Decimal('0.00'),
+            )
+
+            messages.success(
+                request,
+                f'✅ Cotización generada con mano de obra: ${cotizacion.costo_mano_obra}. '
+                f'Ahora puedes agregar piezas. El estado de la orden no se cambió automáticamente.'
+            )
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='cotizacion',
+                comentario=(
+                    f'Cotización generada - Mano de obra copiada de la orden: '
+                    f'${cotizacion.costo_mano_obra} (sin cambio automático de estado)'
+                ),
+                usuario=empleado_actual,
+                es_sistema=False,
+            )
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
         # ------------------------------------------------------------------------
         # FORMULARIO 8.5: Editar Fecha de Envío de Cotización
         # ------------------------------------------------------------------------
@@ -2454,7 +2477,7 @@ def detalle_orden(request, orden_id):
             if not hasattr(orden, 'cotizacion'):
                 messages.error(request, '❌ No existe una cotización para esta orden.')
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-            
+
             fecha_envio_str = request.POST.get('fecha_envio', '').strip()
             if fecha_envio_str:
                 try:
@@ -2463,14 +2486,14 @@ def detalle_orden(request, orden_id):
                     from django.utils import timezone
                     if timezone.is_naive(nueva_fecha):
                         nueva_fecha = timezone.make_aware(nueva_fecha)
-                    
+
                     cotizacion = orden.cotizacion
                     fecha_anterior = cotizacion.fecha_envio
                     cotizacion.fecha_envio = nueva_fecha
                     cotizacion.save(update_fields=['fecha_envio'])
-                    
+
                     messages.success(request, f'✅ Fecha de envío actualizada a: {nueva_fecha.strftime("%d/%m/%Y %H:%M")}')
-                    
+
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='cotizacion',
@@ -2482,17 +2505,17 @@ def detalle_orden(request, orden_id):
                     messages.error(request, f'❌ Formato de fecha inválido: {str(e)}')
             else:
                 messages.error(request, '❌ No se proporcionó una fecha válida.')
-            
+
             return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-        
+
         # ------------------------------------------------------------------------
-        # FORMULARIO 8.6: Editar Costo de Mano de Obra
+        # FORMULARIO 8.6: Editar Costo de Mano de Obra (sincroniza orden + cotización)
         # ------------------------------------------------------------------------
         elif form_type == 'editar_mano_obra':
             if not hasattr(orden, 'cotizacion'):
                 messages.error(request, '❌ No existe una cotización para esta orden.')
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-            
+
             costo_mano_obra_str = request.POST.get('costo_mano_obra', '').strip()
             if costo_mano_obra_str:
                 try:
@@ -2501,14 +2524,17 @@ def detalle_orden(request, orden_id):
                     if nuevo_costo < 0:
                         messages.error(request, '❌ El costo de mano de obra no puede ser negativo.')
                         return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-                    
+
                     cotizacion = orden.cotizacion
                     costo_anterior = cotizacion.costo_mano_obra
+                    # Sincronizar ambos: cotización y orden (fuente de verdad de la MO)
                     cotizacion.costo_mano_obra = nuevo_costo
                     cotizacion.save(update_fields=['costo_mano_obra'])
-                    
+                    orden.costo_mano_obra = nuevo_costo
+                    orden.save(update_fields=['costo_mano_obra'])
+
                     messages.success(request, f'✅ Mano de obra actualizada: ${costo_anterior} → ${nuevo_costo}')
-                    
+
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='cotizacion',
@@ -2520,7 +2546,7 @@ def detalle_orden(request, orden_id):
                     messages.error(request, f'❌ Valor de mano de obra inválido: {str(e)}')
             else:
                 messages.error(request, '❌ No se proporcionó un valor válido para mano de obra.')
-            
+
             return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
         
         # ------------------------------------------------------------------------
@@ -2920,31 +2946,33 @@ def detalle_orden(request, orden_id):
     # DATOS DE COTIZACIÓN (Si existe)
     # ========================================================================
     
-    # Inicializar formularios de cotización
+    # Inicializar formularios de cotización / mano de obra
     form_crear_cotizacion = None
+    form_guardar_mano_obra = None
     form_gestionar_cotizacion = None
     piezas_cotizadas = None
     seguimientos_piezas = None
-    
+
     if cotizacion:
         # Si existe cotización, preparar formulario de gestión
         # Solo si no tiene respuesta aún (usuario_acepto es None)
         if cotizacion.usuario_acepto is None:
             form_gestionar_cotizacion = GestionarCotizacionForm(instance=cotizacion)
-        
+
         # Obtener piezas cotizadas ordenadas por prioridad
         piezas_cotizadas = cotizacion.piezas_cotizadas.select_related(
             'componente'
         ).order_by('orden_prioridad', 'fecha_creacion')
-        
+
         # Obtener seguimientos de piezas (pedidos a proveedores)
         seguimientos_piezas = cotizacion.seguimientos_piezas.all().order_by(
             '-fecha_pedido'
         )
     else:
-        # Si no existe cotización, preparar formulario para crear
-        form_crear_cotizacion = CrearCotizacionForm()
-    
+        # Sin cotización: formulario para guardar MO en la orden (no crea Cotizacion)
+        form_guardar_mano_obra = GuardarManoObraForm(instance=orden)
+        # Mantener alias legado por si algún template aún lo referencia
+        form_crear_cotizacion = form_guardar_mano_obra
     # ========================================================================
     # CALCULAR SEGUIMIENTOS CON RETRASO
     # ========================================================================
@@ -3057,6 +3085,7 @@ def detalle_orden(request, orden_id):
         
         # Formularios de Cotización
         'form_crear_cotizacion': form_crear_cotizacion,
+        'form_guardar_mano_obra': form_guardar_mano_obra,
         'form_gestionar_cotizacion': form_gestionar_cotizacion,
         
         # Formularios para modales (Piezas y Seguimientos)
