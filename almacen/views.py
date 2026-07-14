@@ -3549,67 +3549,19 @@ def _serializar_costeo_reacondicionado_config() -> str:
 
 def _actualizar_estado_st_esperando_aprobacion_cliente(solicitud, usuario=None):
     """
-    Al enviar la cotización al cliente desde Almacén, pone la orden de ST
-    en estado ``cotizacion`` («Esperando Aprobación Cliente»).
+    Compatibilidad: delega en el util de sync (no retrocede estados posteriores).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    --------------------------------
-    Antes, ese cambio de estado ocurría al crear la cotización en ST.
-    Ahora la MO y la cotización se separaron, y el momento correcto de
-    avisar «estamos esperando al cliente» es cuando realmente se le
-    envía la cotización por correo desde este módulo.
-
-    Args:
-        solicitud: SolicitudCotizacion (debe tener orden_servicio vinculada).
-        usuario: User opcional; si tiene empleado, se asocia al historial.
-
-    Returns:
-        bool: True si se cambió el estado; False si no había orden,
-        ya estaba en ``cotizacion``, o no aplica.
+    La lógica real vive en sincronizar_estado_st.py. Esta función solo existe
+    para que las vistas de envío de cotización sigan llamando el mismo nombre.
     """
-    # Sin orden vinculada (modo sin_orden_activa) no hay nada que actualizar en ST
-    orden = getattr(solicitud, 'orden_servicio', None)
-    if not orden:
-        return False
-
-    # Ya está esperando al cliente: no duplicar historial ni push
-    if orden.estado == 'cotizacion':
-        return False
-
-    estado_anterior = orden.estado
-    # Código de estado en constants: 'cotizacion' → «Esperando Aprobación Cliente»
-    orden.estado = 'cotizacion'
-    # OrdenServicio.save() registra solo el cambio de estado en el historial
-    orden.save(update_fields=['estado'])
-
-    # Enriquecer el último historial con el usuario de Almacén y un comentario claro
-    empleado = None
-    if usuario is not None and hasattr(usuario, 'empleado'):
-        empleado = getattr(usuario, 'empleado', None)
-
-    ultimo = (
-        orden.historial.filter(tipo_evento='cambio_estado', estado_nuevo='cotizacion')
-        .order_by('-fecha_evento')
-        .first()
+    from almacen.utils.sincronizar_estado_st import (
+        sincronizar_estado_st_al_enviar_cotizacion_cliente,
     )
-    if ultimo:
-        from config.constants import ESTADO_ORDEN_CHOICES
-        ultimo.comentario = (
-            f'Cambio de estado al enviar cotización al cliente desde Almacén: '
-            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)} → '
-            f'Esperando Aprobación Cliente '
-            f'(solicitud {solicitud.numero_solicitud})'
-        )
-        if empleado is not None:
-            ultimo.usuario = empleado
-        ultimo.es_sistema = True
-        ultimo.save(update_fields=['comentario', 'usuario', 'es_sistema'])
-
-    logger.info(
-        f"[API_COTIZACION_CLIENTE] Orden ST {orden.numero_orden_interno}: "
-        f"{estado_anterior} → cotizacion (envío al cliente, solicitud {solicitud.numero_solicitud})"
+    return sincronizar_estado_st_al_enviar_cotizacion_cliente(
+        solicitud,
+        usuario=usuario,
     )
-    return True
 
 
 def _extraer_datos_reacondicionado_post(post) -> dict:

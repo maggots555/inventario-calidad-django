@@ -22,6 +22,22 @@ logger = logging.getLogger('almacen')
 # (esperando_piezas, reparacion, etc.).
 ESTADO_ST_ESPERANDO_CLIENTE = 'cotizacion'
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Al enviar/reenviar la cotización al cliente, SOLO podemos pasar a «cotizacion»
+# desde estados previos (diagnóstico, armado de cotización, etc.) o desde
+# «rechazada» (nueva propuesta). Nunca desde esperando_piezas, reparación, etc.
+ESTADOS_ST_PERMITIDOS_PARA_ESPERAR_CLIENTE = (
+    'almacen',
+    'espera',
+    'recepcion',
+    'diagnostico',
+    'equipo_diagnosticado',
+    'diagnostico_enviado_cliente',
+    'cotizacion_enviada_proveedor',
+    'cotizacion_recibida_proveedor',
+    'rechazada',  # Reenvío tras rechazo: reinicia espera de aprobación
+)
+
 # Mapeo: estado de SolicitudCotizacion → estado de OrdenServicio
 MAPEO_RESPUESTA_SOLICITUD_A_ESTADO_ST = {
     'totalmente_aprobada': 'cliente_acepta_cotizacion',
@@ -40,6 +56,86 @@ ETIQUETAS_RESPUESTA_SOLICITUD = {
     'parcialmente_aprobada': 'parcialmente aprobada',
     'totalmente_rechazada': 'totalmente rechazada',
 }
+
+
+def sincronizar_estado_st_al_enviar_cotizacion_cliente(
+    solicitud: 'SolicitudCotizacion',
+    usuario=None,
+) -> bool:
+    """
+    Al enviar la cotización al cliente desde Almacén, pone la orden ST en ``cotizacion``.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El momento correcto de marcar «Esperando Aprobación Cliente» es cuando
+    realmente se envía el correo. Si la orden YA avanzó (aceptada, esperando
+    piezas, reparación…), un reenvío del PDF/correo NO debe retroceder el
+    workflow: el correo sí se manda, pero el estado ST se deja igual.
+
+    Args:
+        solicitud: SolicitudCotizacion (con o sin orden_servicio).
+        usuario: User opcional; si tiene empleado, se asocia al historial.
+
+    Returns:
+        bool: True si se cambió el estado; False si no aplica o se omitió a propósito.
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    # Ya está esperando al cliente: no duplicar historial ni push
+    if orden.estado == ESTADO_ST_ESPERANDO_CLIENTE:
+        return False
+
+    # Guardia anti-regresión: no pisar estados posteriores del flujo
+    if orden.estado not in ESTADOS_ST_PERMITIDOS_PARA_ESPERAR_CLIENTE:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; reenvío de cotización NO cambia a 'cotizacion' "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return False
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_ESPERANDO_CLIENTE
+    # OrdenServicio.save() crea HistorialOrden(tipo_evento='cambio_estado')
+    orden.save(update_fields=['estado'])
+
+    # Enriquecer historial con contexto de Almacén (quién envió / número solicitud)
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_ESPERANDO_CLIENTE,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        ultimo.comentario = (
+            f'Cambio de estado al enviar cotización al cliente desde Almacén: '
+            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)} → '
+            f'Esperando Aprobación Cliente '
+            f'(solicitud {solicitud.numero_solicitud})'
+        )
+        update_fields = ['comentario', 'es_sistema']
+        if empleado is not None:
+            ultimo.usuario = empleado
+            update_fields.append('usuario')
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=update_fields)
+
+    logger.info(
+        f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → cotizacion "
+        f"(envío al cliente, solicitud {solicitud.numero_solicitud})"
+    )
+    return True
 
 
 def sincronizar_estado_st_por_respuesta_cliente(
