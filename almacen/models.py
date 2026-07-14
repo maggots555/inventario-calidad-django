@@ -1045,18 +1045,22 @@ class CompraProducto(models.Model):
         self.save()
         return True
     
-    def recibir(self, fecha_recepcion=None, crear_unidades=True):
+    def recibir(self, fecha_recepcion=None, crear_unidades=True, notificar_tecnico_st=True):
         """
         Marca la compra como recibida y opcionalmente crea las UnidadInventario.
         
         Args:
             fecha_recepcion: Fecha de recepción (default: hoy)
             crear_unidades: Si True, crea UnidadInventario automáticamente
+            notificar_tecnico_st: Si True, al sincronizar con ST se avisa al técnico
+                por email (misma función que al marcar recibido en Servicio Técnico).
         
         Returns:
             bool: True si se recibió exitosamente
         
         NOTA: Este método crea MovimientoAlmacen de entrada para actualizar stock.
+        Tras marcar recibida, sincroniza SeguimientoPieza en ST (si aplica).
+        El resultado del sync queda en ``self._resultado_sync_seguimiento_st``.
         """
         if not self.puede_recibir():
             return False
@@ -1071,6 +1075,18 @@ class CompraProducto(models.Model):
             self.producto.save(update_fields=['costo_unitario', 'fecha_actualizacion'])
         
         self.save()
+
+        # Sync ST: marcar SeguimientoPieza como recibido + piezas_recibidas si aplica
+        from almacen.utils.sincronizar_seguimiento_piezas import (
+            sincronizar_seguimiento_piezas_al_recibir_compra,
+        )
+        self._resultado_sync_seguimiento_st = (
+            sincronizar_seguimiento_piezas_al_recibir_compra(
+                self,
+                notificar_tecnico=notificar_tecnico_st,
+            )
+        )
+
         return True
     
     def marcar_wpb(self, motivo=''):

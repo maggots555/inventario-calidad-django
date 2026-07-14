@@ -62,6 +62,19 @@
                             </div>
                             <div class="form-text">{{ form.crear_unidades.help_text }}</div>
                         </div>
+
+                        {% if compra.tipo == 'cotizacion' %}
+                        {# Solo tiene sentido avisar al técnico si la compra viene de una cotización ST #}
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.notificar_tecnico_st }}
+                                <label class="form-check-label" for="{{ form.notificar_tecnico_st.id_for_label }}">
+                                    {{ form.notificar_tecnico_st.label }}
+                                </label>
+                            </div>
+                            <div class="form-text">{{ form.notificar_tecnico_st.help_text }}</div>
+                        </div>
+                        {% endif %}
                         
                         <div class="mb-4">
                             <label class="form-label">{{ form.observaciones.label }}</label>
@@ -74,6 +87,9 @@
                             <ul class="mb-0 mt-2">
                                 <li>Se actualizará el stock del producto (+{{ compra.cantidad }} unidades)</li>
                                 <li>Se registrará un movimiento de entrada en el almacén</li>
+                                {% if compra.tipo == 'cotizacion' %}
+                                <li>Si el seguimiento de piezas en ST queda completo, se marcará como recibido y (si está marcado) se avisará al técnico por correo</li>
+                                {% endif %}
                                 {% if compra.unidades_compra.exists %}
                                 <li>Se procesarán las {{ compra.unidades_compra.count }} unidades individuales definidas</li>
                                 {% else %}

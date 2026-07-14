@@ -634,6 +634,19 @@ class RecepcionCompraForm(forms.Form):
         label='Crear Unidades de Inventario',
         help_text='Crear UnidadInventario automáticamente para cada unidad recibida'
     )
+
+    notificar_tecnico_st = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        }),
+        label='Notificar al técnico (Servicio Técnico)',
+        help_text=(
+            'Enviar el mismo correo que usa ST al marcar la pieza como recibida '
+            '(técnico asignado, jefe y calidad).'
+        ),
+    )
     
     observaciones = forms.CharField(
         required=False,

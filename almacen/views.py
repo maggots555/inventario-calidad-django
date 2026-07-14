@@ -2710,6 +2710,7 @@ def recibir_compra(request, pk):
         if form.is_valid():
             fecha_recepcion = form.cleaned_data['fecha_recepcion']
             crear_unidades = form.cleaned_data['crear_unidades']
+            notificar_tecnico_st = form.cleaned_data.get('notificar_tecnico_st', True)
             observaciones = form.cleaned_data.get('observaciones', '')
             
             # Obtener empleado para el movimiento
@@ -2732,8 +2733,12 @@ def recibir_compra(request, pk):
                 if not orden_servicio:
                     orden_servicio = compra.orden_servicio
             
-            # Recibir la compra
-            if compra.recibir(fecha_recepcion=fecha_recepcion, crear_unidades=False):
+            # Recibir la compra (sync ST + email al técnico si aplica)
+            if compra.recibir(
+                fecha_recepcion=fecha_recepcion,
+                crear_unidades=False,
+                notificar_tecnico_st=notificar_tecnico_st,
+            ):
                 # Crear movimiento de entrada
                 MovimientoAlmacen.objects.create(
                     tipo='entrada',
@@ -2780,6 +2785,33 @@ def recibir_compra(request, pk):
                     mensaje_resultado += f' (Asignadas automáticamente a servicio)'
                 
                 messages.success(request, mensaje_resultado)
+
+                # Aviso del sync hacia Servicio Técnico (seguimiento + estado orden)
+                sync_st = getattr(compra, '_resultado_sync_seguimiento_st', None) or {}
+                n_seg = sync_st.get('seguimientos_actualizados', 0)
+                if n_seg:
+                    messages.info(
+                        request,
+                        f'{n_seg} seguimiento(s) de piezas actualizado(s) a «Recibido» en Servicio Técnico.'
+                    )
+                if sync_st.get('estado_orden_actualizado'):
+                    messages.info(
+                        request,
+                        'Orden ST actualizada a «Piezas Recibidas».'
+                    )
+                if notificar_tecnico_st and n_seg:
+                    if sync_st.get('emails_enviados'):
+                        messages.info(
+                            request,
+                            f'Se notificó por correo al técnico '
+                            f'({sync_st["emails_enviados"]} email(s)).'
+                        )
+                    elif sync_st.get('emails_fallidos'):
+                        messages.warning(
+                            request,
+                            'No se pudo notificar al técnico por correo. '
+                            'Revisa el historial de la orden en ST.'
+                        )
             else:
                 messages.error(request, 'Error al recibir la compra.')
             
@@ -2788,6 +2820,7 @@ def recibir_compra(request, pk):
         form = RecepcionCompraForm(initial={
             'fecha_recepcion': timezone.now().date(),
             'crear_unidades': True,
+            'notificar_tecnico_st': True,
         })
     
     context = {

@@ -1,12 +1,14 @@
 """
-Creación de SeguimientoPieza y avance a «Esperando Llegada de Piezas» desde Almacén.
+Creación/actualización de SeguimientoPieza y avance de estado de orden desde Almacén.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-Cuando se genera la compra de piezas en Almacén, ya se confirmó el pedido al
-proveedor. En ese momento Servicio Técnico debe:
-1. Ver los pedidos en «Seguimiento de Piezas» (modelo SeguimientoPieza).
-2. Pasar la orden a «Esperando Llegada de Piezas» (esperando_piezas).
+Ciclo completo piezas Almacén ↔ Servicio Técnico:
+
+1. Generar compras → crea SeguimientoPieza en «En Tránsito» y orden en
+   «Esperando Llegada de Piezas».
+2. Recibir compra → marca SeguimientoPieza como «Recibido» con la fecha de
+   llegada, y si ya no quedan pendientes pasa la orden a «Piezas Recibidas».
 
 Se reutiliza el mismo criterio que al aceptar cotización en ST: agrupar por
 proveedor y enlazar las PiezaCotizada ya sincronizadas desde LineaCotizacion.
@@ -20,7 +22,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional
 
 if TYPE_CHECKING:
-    from almacen.models import LineaCotizacion, SolicitudCotizacion
+    from almacen.models import CompraProducto, LineaCotizacion, SolicitudCotizacion
 
 logger = logging.getLogger('almacen')
 
@@ -31,6 +33,7 @@ ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS = (
 )
 
 ESTADO_ST_ESPERANDO_PIEZAS = 'esperando_piezas'
+ESTADO_ST_PIEZAS_RECIBIDAS = 'piezas_recibidas'
 DIAS_ENTREGA_DEFAULT = 7
 
 
@@ -259,5 +262,326 @@ def _pasar_orden_a_esperando_piezas(orden, solicitud: 'SolicitudCotizacion') -> 
         f"[SYNC_SEGUIMIENTO] Orden {orden.numero_orden_interno}: "
         f"{estado_anterior} → esperando_piezas "
         f"(solicitud {solicitud.numero_solicitud})"
+    )
+    return True
+
+
+def sincronizar_seguimiento_piezas_al_recibir_compra(
+    compra: 'CompraProducto',
+    notificar_tecnico: bool = True,
+) -> Dict[str, Any]:
+    """
+    Al recibir una compra en Almacén, actualiza SeguimientoPieza y la orden ST.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Un SeguimientoPieza puede agrupar varias PiezaCotizada del mismo proveedor.
+    Solo se marca como «Recibido» cuando TODAS esas piezas ya tienen su
+    CompraProducto en estado «recibida». Si después todos los seguimientos de
+    la cotización están recibidos, la orden pasa a «Piezas Recibidas».
+    Opcionalmente reutiliza ``_enviar_notificacion_pieza_recibida`` de ST
+    para avisar al técnico por correo (igual que al marcar recibido a mano).
+
+    Args:
+        compra: CompraProducto recién marcada como recibida (con fecha_recepcion).
+        notificar_tecnico: Si True, envía el email al técnico por cada seguimiento cerrado.
+
+    Returns:
+        dict: seguimientos_actualizados, estado_orden_actualizado,
+        emails_enviados, emails_fallidos, motivo_omitido.
+    """
+    from config.constants import ESTADOS_PIEZA_PENDIENTES
+
+    resultado: Dict[str, Any] = {
+        'seguimientos_actualizados': 0,
+        'estado_orden_actualizado': False,
+        'emails_enviados': 0,
+        'emails_fallidos': 0,
+        'motivo_omitido': None,
+    }
+
+    if getattr(compra, 'estado', None) != 'recibida':
+        resultado['motivo_omitido'] = 'compra_no_recibida'
+        return resultado
+
+    # Cadena: Compra → LineaCotizacion → PiezaCotizada
+    linea = None
+    try:
+        linea = compra.linea_cotizacion_origen
+    except Exception:
+        linea = None
+
+    if linea is None:
+        resultado['motivo_omitido'] = 'sin_linea_cotizacion'
+        return resultado
+
+    pieza = getattr(linea, 'pieza_cotizada_origen', None)
+    if pieza is None:
+        resultado['motivo_omitido'] = 'sin_pieza_cotizada'
+        return resultado
+
+    orden = None
+    solicitud = getattr(linea, 'solicitud', None)
+    if solicitud is not None:
+        orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is None:
+        orden = getattr(compra, 'orden_servicio', None)
+
+    if orden is None:
+        resultado['motivo_omitido'] = 'sin_orden'
+        return resultado
+
+    if getattr(orden, 'tipo_servicio', None) == 'venta_mostrador':
+        resultado['motivo_omitido'] = 'venta_mostrador'
+        return resultado
+
+    # Seguimientos pendientes que incluyen esta pieza
+    seguimientos_pendientes = list(
+        pieza.seguimientos.filter(estado__in=ESTADOS_PIEZA_PENDIENTES)
+        .prefetch_related(
+            'piezas',
+            'piezas__linea_cotizacion_almacen',
+            'piezas__linea_cotizacion_almacen__compra_generada',
+        )
+    )
+
+    if not seguimientos_pendientes:
+        resultado['motivo_omitido'] = 'sin_seguimientos_pendientes'
+        resultado['estado_orden_actualizado'] = _pasar_orden_a_piezas_recibidas_si_aplica(
+            orden=orden,
+            solicitud=solicitud,
+        )
+        return resultado
+
+    fecha_recepcion = compra.fecha_recepcion or date.today()
+    actualizados = 0
+    emails_enviados = 0
+    emails_fallidos = 0
+
+    for seguimiento in seguimientos_pendientes:
+        # Solo cerrar el seguimiento si TODAS sus piezas ya llegaron a Almacén
+        if not _todas_piezas_del_seguimiento_recibidas_en_almacen(seguimiento):
+            continue
+
+        fecha_real = _fecha_recepcion_mas_reciente(seguimiento) or fecha_recepcion
+        seguimiento.estado = 'recibido'
+        seguimiento.fecha_entrega_real = fecha_real
+        nota_extra = (
+            f'\nRecepción registrada automáticamente desde Almacén '
+            f'(compra #{compra.pk}, fecha {fecha_real}).'
+        )
+        seguimiento.notas_seguimiento = (
+            (seguimiento.notas_seguimiento or '').rstrip() + nota_extra
+        )
+        seguimiento.save(update_fields=[
+            'estado',
+            'fecha_entrega_real',
+            'notas_seguimiento',
+            'fecha_actualizacion',
+        ])
+        actualizados += 1
+
+        # Notificar al técnico con la misma función que usa ST al marcar recibido
+        if notificar_tecnico:
+            email_ok = _notificar_tecnico_pieza_recibida(
+                orden=orden,
+                seguimiento=seguimiento,
+            )
+            if email_ok:
+                emails_enviados += 1
+            else:
+                emails_fallidos += 1
+
+    resultado['seguimientos_actualizados'] = actualizados
+    resultado['emails_enviados'] = emails_enviados
+    resultado['emails_fallidos'] = emails_fallidos
+    resultado['estado_orden_actualizado'] = _pasar_orden_a_piezas_recibidas_si_aplica(
+        orden=orden,
+        solicitud=solicitud,
+    )
+
+    if actualizados == 0 and not resultado['estado_orden_actualizado']:
+        resultado['motivo_omitido'] = 'grupo_incompleto'
+
+    logger.info(
+        f"[SYNC_SEGUIMIENTO_RECIBIR] Compra #{compra.pk}: "
+        f"{actualizados} seguimiento(s) → recibido; "
+        f"emails_ok={emails_enviados} fallidos={emails_fallidos}; "
+        f"orden_actualizada={resultado['estado_orden_actualizado']}"
+    )
+    return resultado
+
+
+def _notificar_tecnico_pieza_recibida(orden, seguimiento) -> bool:
+    """
+    Reutiliza el email de ST al marcar pieza recibida y deja rastro en historial.
+
+    Args:
+        orden: OrdenServicio.
+        seguimiento: SeguimientoPieza ya en estado «recibido».
+
+    Returns:
+        bool: True si el email se envió correctamente.
+    """
+    # Import diferido para no crear dependencia circular al cargar el módulo
+    from servicio_tecnico.views import (
+        _enviar_notificacion_pieza_recibida,
+        registrar_historial,
+    )
+
+    try:
+        resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+    except Exception as exc:
+        logger.error(
+            f"[SYNC_SEGUIMIENTO_RECIBIR] Error al notificar técnico "
+            f"(orden {orden.numero_orden_interno}, seguimiento {seguimiento.pk}): {exc}",
+            exc_info=True,
+        )
+        registrar_historial(
+            orden=orden,
+            tipo_evento='cotizacion',
+            usuario=None,
+            comentario=(
+                f'📬 Pieza recibida desde Almacén - {seguimiento.proveedor}\n'
+                f'❌ Error inesperado al enviar email: {exc}'
+            ),
+            es_sistema=True,
+        )
+        return False
+
+    if resultado_email.get('success'):
+        destinatarios_str = ', '.join(resultado_email.get('destinatarios') or [])
+        mensaje = (
+            f'📬 Pieza recibida desde Almacén - {seguimiento.proveedor}\n'
+            f'✉️ Email enviado a: {destinatarios_str}'
+        )
+        cc = resultado_email.get('destinatarios_copia') or []
+        if cc:
+            mensaje += f"\n📧 Con copia a: {', '.join(cc)}"
+        registrar_historial(
+            orden=orden,
+            tipo_evento='cotizacion',
+            usuario=None,
+            comentario=mensaje,
+            es_sistema=True,
+        )
+        return True
+
+    registrar_historial(
+        orden=orden,
+        tipo_evento='cotizacion',
+        usuario=None,
+        comentario=(
+            f'📬 Pieza recibida desde Almacén - {seguimiento.proveedor}\n'
+            f'❌ Error al enviar email: {resultado_email.get("message", "desconocido")}\n'
+            f'⚠️ El técnico NO fue notificado automáticamente'
+        ),
+        es_sistema=True,
+    )
+    return False
+
+
+def _pieza_tiene_compra_recibida(pieza) -> bool:
+    """True si la PiezaCotizada tiene LineaCotizacion con CompraProducto recibida."""
+    try:
+        linea = pieza.linea_cotizacion_almacen
+    except Exception:
+        return False
+    if linea is None:
+        return False
+    compra = getattr(linea, 'compra_generada', None)
+    if compra is None:
+        return False
+    return compra.estado == 'recibida'
+
+
+def _todas_piezas_del_seguimiento_recibidas_en_almacen(seguimiento) -> bool:
+    """
+    True si todas las PiezaCotizada del seguimiento ya tienen compra recibida.
+
+    Sin piezas M2M no se cierra automáticamente (evita falsos positivos).
+    """
+    piezas = list(seguimiento.piezas.all())
+    if not piezas:
+        return False
+    return all(_pieza_tiene_compra_recibida(pieza) for pieza in piezas)
+
+
+def _fecha_recepcion_mas_reciente(seguimiento) -> Optional[date]:
+    """Fecha de recepción más reciente entre las compras del seguimiento."""
+    fechas: List[date] = []
+    for pieza in seguimiento.piezas.all():
+        try:
+            linea = pieza.linea_cotizacion_almacen
+        except Exception:
+            continue
+        if linea is None:
+            continue
+        compra = getattr(linea, 'compra_generada', None)
+        if compra is None or compra.estado != 'recibida':
+            continue
+        if compra.fecha_recepcion:
+            fechas.append(compra.fecha_recepcion)
+    return max(fechas) if fechas else None
+
+
+def _pasar_orden_a_piezas_recibidas_si_aplica(orden, solicitud=None) -> bool:
+    """
+    Si la orden está en esperando_piezas y todos los seguimientos ya llegaron,
+    pasa a piezas_recibidas.
+
+    Returns:
+        bool: True si se cambió el estado.
+    """
+    from config.constants import ESTADOS_PIEZA_RECIBIDOS, ESTADO_ORDEN_CHOICES
+
+    if orden.estado == ESTADO_ST_PIEZAS_RECIBIDAS:
+        return False
+
+    if orden.estado != ESTADO_ST_ESPERANDO_PIEZAS:
+        logger.info(
+            f"[SYNC_SEGUIMIENTO_RECIBIR] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; no se cambia a piezas_recibidas."
+        )
+        return False
+
+    try:
+        cotizacion = orden.cotizacion
+    except Exception:
+        return False
+
+    seguimientos = list(cotizacion.seguimientos_piezas.all())
+    if not seguimientos:
+        return False
+
+    if not all(s.estado in ESTADOS_PIEZA_RECIBIDOS for s in seguimientos):
+        return False
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_PIEZAS_RECIBIDAS
+    orden.save(update_fields=['estado'])
+
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_PIEZAS_RECIBIDAS,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        etiqueta_anterior = dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)
+        ref_solicitud = ''
+        if solicitud is not None:
+            ref_solicitud = f' (solicitud {solicitud.numero_solicitud})'
+        ultimo.comentario = (
+            f'Cambio de estado al recibir todas las piezas desde Almacén: '
+            f'{etiqueta_anterior} → Piezas Recibidas{ref_solicitud}'
+        )
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=['comentario', 'es_sistema'])
+
+    logger.info(
+        f"[SYNC_SEGUIMIENTO_RECIBIR] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → piezas_recibidas"
     )
     return True
