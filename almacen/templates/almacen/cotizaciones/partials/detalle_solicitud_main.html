@@ -17,10 +17,10 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                 {% if solicitud.creado_por %}por {{ solicitud.creado_por.get_full_name|default:solicitud.creado_por.username }}{% endif %}
             </p>
             <div class="detalle-solicitud-chips">
-                <span class="detalle-chip"><i class="bi bi-list-ul"></i>{{ solicitud.total_lineas }} piezas</span>
-                <span class="detalle-chip chip-success"><i class="bi bi-check-circle"></i>{{ solicitud.lineas_aprobadas }} aprobadas</span>
-                <span class="detalle-chip chip-danger"><i class="bi bi-x-circle"></i>{{ solicitud.lineas_rechazadas }} rechazadas</span>
-                <span class="detalle-chip chip-warning"><i class="bi bi-hourglass"></i>{{ solicitud.lineas_pendientes }} pendientes</span>
+                <span class="detalle-chip"><i class="bi bi-list-ul"></i>{{ solicitud.total_items_respuesta }} ítems</span>
+                <span class="detalle-chip chip-success"><i class="bi bi-check-circle"></i>{{ solicitud.items_aceptados_respuesta }} aceptados</span>
+                <span class="detalle-chip chip-danger"><i class="bi bi-x-circle"></i>{{ solicitud.items_rechazados_respuesta }} rechazados</span>
+                <span class="detalle-chip chip-warning"><i class="bi bi-hourglass"></i>{{ solicitud.items_pendientes_respuesta }} pendientes</span>
                 {% if solicitud.precio_total_sin_iva_cliente %}
                 <span class="detalle-chip chip-primary"><i class="bi bi-currency-dollar"></i>${{ solicitud.precio_total_sin_iva_cliente|floatformat:2 }} cliente</span>
                 {% endif %}
@@ -63,24 +63,30 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                 <div class="card-body">
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-2 small">
-                            <span>Líneas totales</span><strong>{{ solicitud.total_lineas }}</strong>
+                            <span>Ítems totales</span><strong>{{ solicitud.total_items_respuesta }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 small">
-                            <span class="text-success">Aprobadas</span><strong class="text-success">{{ solicitud.lineas_aprobadas }}</strong>
+                            <span class="text-success">Aceptados</span><strong class="text-success">{{ solicitud.items_aceptados_respuesta }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-2 small">
-                            <span class="text-danger">Rechazadas</span><strong class="text-danger">{{ solicitud.lineas_rechazadas }}</strong>
+                            <span class="text-danger">Rechazados</span><strong class="text-danger">{{ solicitud.items_rechazados_respuesta }}</strong>
                         </div>
                         <div class="d-flex justify-content-between small">
-                            <span class="text-secondary">Pendientes</span><strong class="text-secondary">{{ solicitud.lineas_pendientes }}</strong>
+                            <span class="text-secondary">Pendientes</span><strong class="text-secondary">{{ solicitud.items_pendientes_respuesta }}</strong>
                         </div>
+                        {% if solicitud.total_servicios_adicionales > 0 %}
+                        <p class="text-muted small mb-0 mt-2">
+                            Incluye {{ solicitud.total_lineas }} pieza{{ solicitud.total_lineas|pluralize:"s" }}
+                            y {{ solicitud.total_servicios_adicionales }} servicio{{ solicitud.total_servicios_adicionales|pluralize:"s" }}.
+                        </p>
+                        {% endif %}
                     </div>
                     <div class="progress detalle-progress">
-                        {% with total=solicitud.total_lineas %}
+                        {% with total=solicitud.total_items_respuesta %}
                         {% if total > 0 %}
-                        <div class="progress-bar bg-success" style="width: {% widthratio solicitud.lineas_aprobadas total 100 %}%">{{ solicitud.lineas_aprobadas }}</div>
-                        <div class="progress-bar bg-danger" style="width: {% widthratio solicitud.lineas_rechazadas total 100 %}%">{{ solicitud.lineas_rechazadas }}</div>
-                        <div class="progress-bar bg-secondary" style="width: {% widthratio solicitud.lineas_pendientes total 100 %}%">{{ solicitud.lineas_pendientes }}</div>
+                        <div class="progress-bar bg-success" style="width: {% widthratio solicitud.items_aceptados_respuesta total 100 %}%">{{ solicitud.items_aceptados_respuesta }}</div>
+                        <div class="progress-bar bg-danger" style="width: {% widthratio solicitud.items_rechazados_respuesta total 100 %}%">{{ solicitud.items_rechazados_respuesta }}</div>
+                        <div class="progress-bar bg-secondary" style="width: {% widthratio solicitud.items_pendientes_respuesta total 100 %}%">{{ solicitud.items_pendientes_respuesta }}</div>
                         {% endif %}
                         {% endwith %}
                     </div>

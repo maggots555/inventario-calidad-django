@@ -3334,6 +3334,47 @@ class SolicitudCotizacion(models.Model):
     def servicios_pendientes(self):
         """Número de servicios adicionales pendientes de respuesta."""
         return self.servicios_adicionales.filter(estado_cliente='pendiente').count()
+
+    # ========== CONTEOS COMBINADOS (piezas + servicios) — UI Resumen ==========
+
+    @property
+    def total_items_respuesta(self):
+        """
+        Total de ítems sujetos a respuesta del cliente (piezas + servicios).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El sidebar Resumen debe reflejar el mismo universo que
+        actualizar_estado_segun_lineas(), no solo las líneas de piezas.
+        """
+        return self.total_lineas + self.total_servicios_adicionales
+
+    @property
+    def items_aceptados_respuesta(self):
+        """
+        Ítems aceptados por el cliente (piezas + servicios).
+
+        Incluye 'aprobada' y 'compra_generada' para que, tras generar compras,
+        el Resumen no baje a cero.
+        """
+        from config.constants import ESTADOS_LINEA_COTIZACION_ACEPTADA
+
+        piezas = self.lineas.filter(
+            estado_cliente__in=ESTADOS_LINEA_COTIZACION_ACEPTADA
+        ).count()
+        servicios = self.servicios_adicionales.filter(
+            estado_cliente__in=ESTADOS_LINEA_COTIZACION_ACEPTADA
+        ).count()
+        return piezas + servicios
+
+    @property
+    def items_rechazados_respuesta(self):
+        """Ítems rechazados por el cliente (piezas + servicios)."""
+        return self.lineas_rechazadas + self.servicios_rechazados
+
+    @property
+    def items_pendientes_respuesta(self):
+        """Ítems aún sin respuesta del cliente (piezas + servicios)."""
+        return self.lineas_pendientes + self.servicios_pendientes
     
     @property
     def costo_servicios_adicionales(self):
@@ -3499,6 +3540,8 @@ class SolicitudCotizacion(models.Model):
         IMPORTANTE:
         - Los servicios adicionales también cuentan para determinar el estado
         - No se marca como "totalmente_aprobada" hasta que servicios también respondan
+        - Al quedar aprobada/parcial/rechazada, sincroniza el estado de la orden ST
+          (Cliente Acepta Cotización / Cotización Rechazada) si aún está en cotizacion
         
         Returns:
             str: Nuevo estado de la solicitud
@@ -3543,6 +3586,14 @@ class SolicitudCotizacion(models.Model):
             self.estado = 'parcialmente_aprobada'
         
         self.save()
+
+        # Reflejar la respuesta del cliente en el estado de la orden ST
+        # (solo si la orden sigue en «Esperando Aprobación Cliente»)
+        from almacen.utils.sincronizar_estado_st import (
+            sincronizar_estado_st_por_respuesta_cliente,
+        )
+        sincronizar_estado_st_por_respuesta_cliente(self, estado_solicitud=self.estado)
+
         return self.estado
     
     def puede_generar_compras(self):
