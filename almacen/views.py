@@ -2431,9 +2431,15 @@ def detalle_compra(request, pk):
     - Lista de unidades individuales con sus estados
     - Historial de cambios (si aplica)
     """
+    # linea_cotizacion_origen: necesario para ETA (tiempo_entrega_estimado)
+    # sin disparar una query extra al leer las propiedades de llegada.
     compra = get_object_or_404(
         CompraProducto.objects.select_related(
-            'producto', 'proveedor', 'orden_servicio', 'registrado_por'
+            'producto',
+            'proveedor',
+            'orden_servicio',
+            'registrado_por',
+            'linea_cotizacion_origen',
         ).prefetch_related('unidades_compra'),
         pk=pk
     )

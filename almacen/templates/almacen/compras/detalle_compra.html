@@ -76,13 +76,56 @@ Muestra toda la información y botones de acción según el estado
                             <strong>Fecha Pedido:</strong><br>
                             {{ compra.fecha_pedido|date:"d/m/Y" }}
                         </div>
+
+                        {# ETA / countdown: solo si hay estimado y aún no se recibió #}
+                        {% if compra.fecha_llegada_estimada and not compra.fecha_recepcion %}
+                        <div class="col-md-3">
+                            <strong>Llegada estimada:</strong><br>
+                            {{ compra.fecha_llegada_estimada|date:"d/m/Y" }}
+                            <br>
+                            <small class="text-muted">
+                                {% if compra.origen_dias_estimado == 'cotizacion' %}
+                                    Según cotización: {{ compra.dias_estimado_entrega }}d
+                                {% elif compra.origen_dias_estimado == 'proveedor' %}
+                                    Según proveedor: {{ compra.dias_estimado_entrega }}d
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Estado de llegada:</strong><br>
+                            {% if compra.esta_atrasada %}
+                                {# Atraso: borde rojo sobrio, sin fondo chillón #}
+                                <span class="badge border border-danger text-danger bg-transparent">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    Atraso de {{ compra.dias_atraso }} día{{ compra.dias_atraso|pluralize:"s" }}
+                                </span>
+                            {% elif compra.dias_para_llegada == 0 %}
+                                <span class="badge border border-secondary text-secondary bg-transparent">
+                                    <i class="bi bi-clock me-1"></i>
+                                    Llega hoy (estimado)
+                                </span>
+                            {% elif compra.dias_para_llegada %}
+                                <span class="badge border border-secondary text-secondary bg-transparent">
+                                    <i class="bi bi-hourglass-split me-1"></i>
+                                    Faltan {{ compra.dias_para_llegada }} día{{ compra.dias_para_llegada|pluralize:"s" }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                         
                         {% if compra.orden_cliente %}
                         <div class="col-md-6">
                             <strong>Orden de Cliente:</strong><br>
-                            <span class="badge bg-info fs-6">{{ compra.orden_cliente }}</span>
                             {% if compra.orden_servicio %}
-                            <a href="#" class="ms-2 small">(Ver orden)</a>
+                            {# El número es el enlace directo a la orden de Servicio Técnico #}
+                            <a href="{% url 'servicio_tecnico:detalle_orden' compra.orden_servicio.pk %}"
+                               class="text-decoration-none fw-semibold">
+                                {{ compra.orden_cliente }}
+                            </a>
+                            <a href="{% url 'servicio_tecnico:detalle_orden' compra.orden_servicio.pk %}"
+                               class="ms-2 small">Ver orden</a>
+                            {% else %}
+                            <span class="fw-semibold">{{ compra.orden_cliente }}</span>
                             {% endif %}
                         </div>
                         {% endif %}

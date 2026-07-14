@@ -19,6 +19,8 @@ Integración con otros módulos:
 Agregado: Diciembre 2025
 """
 
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, FileExtensionValidator
@@ -1247,6 +1249,123 @@ class CompraProducto(models.Model):
         if self.estado == 'pendiente_aprobacion':
             delta = timezone.now() - self.fecha_registro
             return delta.days
+        return 0
+
+    @property
+    def dias_estimado_entrega(self):
+        """
+        Días estimados de entrega del proveedor (countdown, no histórico).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        -------------------------------
+        Prioridad de fuentes (de más específica a más genérica):
+        1. LineaCotizacion origen (lo capturado al cotizar la pieza).
+        2. Proveedor.tiempo_entrega_dias (promedio configurado del proveedor).
+
+        Esto NO es lo mismo que `dias_entrega`: ese campo solo se llena
+        cuando ya recibiste la pieza (días reales que tardó).
+
+        Returns:
+            int | None: Días estimados, o None si no hay dato disponible.
+        """
+        # Paso 1: intentar leer el estimado de la línea de cotización vinculada.
+        # hasattr evita RelatedObjectDoesNotExist cuando la compra es directa.
+        if hasattr(self, 'linea_cotizacion_origen'):
+            linea = self.linea_cotizacion_origen
+            if linea is not None and linea.tiempo_entrega_estimado is not None:
+                return linea.tiempo_entrega_estimado
+
+        # Paso 2: fallback al tiempo promedio del proveedor.
+        if self.proveedor and self.proveedor.tiempo_entrega_dias is not None:
+            return self.proveedor.tiempo_entrega_dias
+
+        return None
+
+    @property
+    def origen_dias_estimado(self):
+        """
+        Indica de dónde salió el estimado de días (para mostrar en la UI).
+
+        Returns:
+            str | None: 'cotizacion', 'proveedor', o None si no hay estimado.
+        """
+        if hasattr(self, 'linea_cotizacion_origen'):
+            linea = self.linea_cotizacion_origen
+            if linea is not None and linea.tiempo_entrega_estimado is not None:
+                return 'cotizacion'
+
+        if self.proveedor and self.proveedor.tiempo_entrega_dias is not None:
+            return 'proveedor'
+
+        return None
+
+    @property
+    def fecha_llegada_estimada(self):
+        """
+        Fecha estimada de llegada = fecha_pedido + días estimados.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        -------------------------------
+        Si pediste el 1 de enero y el estimado es 5 días, la ETA es 6 de enero.
+        Usamos días calendario (igual que el patrón de SeguimientoPieza en ST).
+
+        Returns:
+            date | None: Fecha estimada, o None si faltan días o fecha_pedido.
+        """
+        dias = self.dias_estimado_entrega
+        if dias is None or not self.fecha_pedido:
+            return None
+        # Sumar los días estimados a la fecha en que se hizo el pedido.
+        return self.fecha_pedido + timedelta(days=dias)
+
+    @property
+    def dias_para_llegada(self):
+        """
+        Countdown hacia la fecha estimada de llegada.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        -------------------------------
+        - Positivo: aún faltan X días para la ETA.
+        - Cero: la ETA es hoy.
+        - Negativo: ya pasó la ETA (atraso de |X| días).
+        - None: no hay estimado, o la compra ya se recibió (ya no aplica countdown).
+
+        Returns:
+            int | None: Días relativos a hoy respecto a la ETA.
+        """
+        # Si ya llegó, el countdown deja de tener sentido (usa dias_entrega real).
+        if self.fecha_recepcion:
+            return None
+
+        fecha_est = self.fecha_llegada_estimada
+        if fecha_est is None:
+            return None
+
+        # Diferencia en días calendario entre la ETA y el día de hoy.
+        return (fecha_est - timezone.now().date()).days
+
+    @property
+    def esta_atrasada(self):
+        """
+        True si aún no se recibe y ya pasó la fecha estimada de llegada.
+
+        Returns:
+            bool: True cuando dias_para_llegada es negativo.
+        """
+        dias = self.dias_para_llegada
+        return dias is not None and dias < 0
+
+    @property
+    def dias_atraso(self):
+        """
+        Días de atraso en valor positivo (para badges / pluralize en templates).
+
+        Returns:
+            int: |dias_para_llegada| si está atrasada; 0 en caso contrario.
+        """
+        dias = self.dias_para_llegada
+        if dias is not None and dias < 0:
+            return abs(dias)
         return 0
     
     def get_badge_estado(self):
