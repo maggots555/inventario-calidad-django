@@ -408,7 +408,9 @@
 
 [data-bs-theme="dark"] .producto-autocomplete-item:hover,
 [data-bs-theme="dark"] .producto-autocomplete-item.active {
-    background-color: #1e293b;
+    /* EXPLICACIÓN: #334155 (hover) contrasta con el card #1e293b;
+       antes ambos eran #1e293b y el hover no se notaba con fondo opaco. */
+    background-color: var(--hover-bg);
 }
 
 [data-bs-theme="dark"] .producto-autocomplete-item .prod-nombre {
@@ -427,7 +429,8 @@
 
 [data-bs-theme="dark"] .orden-autocomplete-item:hover,
 [data-bs-theme="dark"] .orden-autocomplete-item.active {
-    background-color: #1e293b;
+    /* Mismo contraste de hover que el autocomplete de producto */
+    background-color: var(--hover-bg);
 }
 
 [data-bs-theme="dark"] .orden-autocomplete-orden {

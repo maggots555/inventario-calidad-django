@@ -66,6 +66,20 @@
     --gray-900: #111827;
     /* Texto muy oscuro */
 
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Variables semánticas de superficie/texto. Varios CSS de páginas
+     * (form_solicitud, cotizacion_cliente, etc.) usan --card-bg y
+     * --text-primary. Si no existen, el navegador ignora el color y
+     * el fondo queda transparente (bug del autocomplete en modo oscuro).
+     */
+    --body-bg: #ffffff;
+    --card-bg: #ffffff;
+    --hover-bg: #f1f5f9;
+    --border-color: #e5e7eb;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+
     /* Tipografía */
     --font-sans: 'Plus Jakarta Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
@@ -191,6 +205,19 @@
     --gray-700: #f3f4f6;
     --gray-800: #f9fafb;
     --gray-900: #ffffff;
+
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Misma paleta semántica que en :root, pero con los valores de
+     * modo oscuro documentados en AGENTS.md. Así var(--card-bg) ya
+     * no es inválida y los dropdowns / cards pintan fondo opaco.
+     */
+    --body-bg: #0f172a;
+    --card-bg: #1e293b;
+    --hover-bg: #334155;
+    --border-color: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #cbd5e1;
 
     /* Sombras oscuras */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
