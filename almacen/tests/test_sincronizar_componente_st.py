@@ -150,6 +150,67 @@ class SincronizarPiezaStComponenteTest(SimpleTestCase):
         pieza_instancia.save.assert_called_once()
 
 
+class SincronizarPiezaStNoReutilizaVinculadaTest(SimpleTestCase):
+    """
+    La búsqueda por descripción debe exigir piezas aún libres
+    (linea_cotizacion_almacen__isnull=True) para no romper el OneToOne.
+    """
+
+    @patch('servicio_tecnico.models.PiezaCotizada')
+    @patch('servicio_tecnico.models.Cotizacion')
+    @patch('almacen.utils.resolver_componente.resolver_componente_desde_producto')
+    def test_filtro_busca_solo_piezas_sin_linea_almacen(
+        self,
+        mock_resolver,
+        mock_cotizacion_cls,
+        mock_pieza_cls,
+    ):
+        from almacen.models import LineaCotizacion
+
+        mock_resolver.return_value = MagicMock()
+
+        orden = SimpleNamespace(
+            tipo_servicio='diagnostico',
+            numero_orden_interno='OOW-002',
+        )
+        solicitud = SimpleNamespace(orden_servicio=orden)
+        producto = SimpleNamespace(nombre='SSD 1TB')
+
+        # MagicMock(spec=...) permite super(LineaCotizacion, self).save()
+        linea = MagicMock(spec=LineaCotizacion)
+        linea.pk = 100
+        linea.solicitud = solicitud
+        linea.producto = producto
+        linea.producto_id = 2
+        linea.descripcion_pieza = 'SSD 1TB NVMe'
+        linea.pieza_cotizada_origen = None
+        linea.pieza_cotizada_origen_id = None
+        linea.es_linea_reacondicionado = False
+        linea.cantidad = 1
+        linea.costo_unitario = Decimal('50')
+        linea.precio_unitario_cliente = None
+        linea.proveedor = None
+        linea.sugerida_por_tecnico = False
+        linea.es_necesaria = True
+        linea.numero_linea = 2
+        linea.estado_cliente = 'pendiente'
+        linea.motivo_rechazo = ''
+
+        mock_cotizacion_cls.objects.get.return_value = MagicMock()
+        mock_pieza_cls.objects.filter.return_value.first.return_value = None
+        mock_pieza_cls.return_value = MagicMock()
+
+        with patch('django.db.models.base.Model.save'):
+            LineaCotizacion._sincronizar_pieza_st(linea)
+
+        filter_kwargs = mock_pieza_cls.objects.filter.call_args.kwargs
+        self.assertEqual(filter_kwargs.get('linea_cotizacion_almacen__isnull'), True)
+        self.assertEqual(
+            filter_kwargs.get('descripcion_adicional__icontains'),
+            'SSD 1TB NVMe',
+        )
+
+
 class GenerarPiezasVentaMostradorComponenteTest(SimpleTestCase):
     """Verifica asignación de componente al crear PiezaVentaMostrador."""
 

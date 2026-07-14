@@ -3762,20 +3762,37 @@ class SolicitudCotizacion(models.Model):
         2. Crea un CompraProducto para cada una
         3. Vincula la compra con la línea
         4. Actualiza el estado de la solicitud a 'completada' cuando termina
+        5. En órdenes OOW de reparación: crea SeguimientoPieza en ST y pasa
+           la orden a «Esperando Llegada de Piezas»
         
         Args:
             usuario: Usuario que genera las compras (para registrado_por)
         
         Returns:
             list: Lista de CompraProducto creados
+        
+        Nota:
+            El resultado del sync ST queda en ``self._resultado_sync_seguimiento_st``
+            (dict) para que la vista pueda mostrar un mensaje al usuario.
         """
         if not self.puede_generar_compras():
+            self._resultado_sync_seguimiento_st = {
+                'seguimientos_creados': 0,
+                'estado_actualizado': False,
+                'motivo_omitido': 'no_puede_generar',
+            }
             return []
         
         compras_creadas = []
+        lineas_procesadas = []
         lineas_pendientes = self.lineas.filter(
             estado_cliente='aprobada',
             compra_generada__isnull=True
+        ).select_related(
+            'producto',
+            'proveedor',
+            'pieza_cotizada_origen',
+            'pieza_cotizada_origen__componente',
         )
         
         for linea in lineas_pendientes:
@@ -3814,6 +3831,7 @@ class SolicitudCotizacion(models.Model):
             linea.save()
             
             compras_creadas.append(compra)
+            lineas_procesadas.append(linea)
         
         # Actualizar estado de la solicitud
         if not self.lineas.filter(estado_cliente='aprobada', compra_generada__isnull=True).exists():
@@ -3823,6 +3841,17 @@ class SolicitudCotizacion(models.Model):
         else:
             self.estado = 'en_proceso'
             self.save()
+
+        # Sync ST: SeguimientoPieza + estado esperando_piezas (solo reparación OOW)
+        from almacen.utils.sincronizar_seguimiento_piezas import (
+            sincronizar_seguimiento_piezas_al_generar_compras,
+        )
+        self._resultado_sync_seguimiento_st = (
+            sincronizar_seguimiento_piezas_al_generar_compras(
+                self,
+                lineas=lineas_procesadas,
+            )
+        )
         
         return compras_creadas
     
@@ -4556,14 +4585,18 @@ class LineaCotizacion(models.Model):
         if self.pieza_cotizada_origen:
             pieza = self.pieza_cotizada_origen
         
-        # 2. Buscar por descripción en la misma cotización (no por componente erróneo previo)
+        # 2. Buscar por descripción en la misma cotización (no por componente erróneo previo).
+        # IMPORTANTE: pieza_cotizada_origen es OneToOne — solo reutilizar piezas que
+        # aún NO estén vinculadas a otra LineaCotizacion. Si no, SQLite/Postgres
+        # lanzan UNIQUE constraint failed: almacen_lineacotizacion.pieza_cotizada_origen_id
         if not pieza and self.descripcion_pieza:
             pieza = PiezaCotizada.objects.filter(
                 cotizacion=cotizacion,
                 descripcion_adicional__icontains=self.descripcion_pieza[:50],
+                linea_cotizacion_almacen__isnull=True,
             ).first()
         
-        # 3. Crear nueva si no existe
+        # 3. Crear nueva si no existe (o no hay ninguna libre que coincida)
         if not pieza:
             pieza = PiezaCotizada(
                 cotizacion=cotizacion,
@@ -4592,11 +4625,43 @@ class LineaCotizacion(models.Model):
         
         pieza.save()
         
-        # Vincular bidireccionalmente
+        # Vincular bidireccionalmente (OneToOne: una PiezaCotizada → una sola línea)
         if not self.pieza_cotizada_origen:
             self.pieza_cotizada_origen = pieza
-            # Guardar sin disparar sincronización recursiva
-            super(LineaCotizacion, self).save(update_fields=['pieza_cotizada_origen'])
+            try:
+                # Guardar sin disparar sincronización recursiva
+                super(LineaCotizacion, self).save(update_fields=['pieza_cotizada_origen'])
+            except Exception as exc:
+                # Defensa ante carrera/UNIQUE: crear pieza propia y reintentar
+                from django.db import IntegrityError
+                if not isinstance(exc, IntegrityError):
+                    raise
+                logger.warning(
+                    "[SYNC_PIEZA_ST] UNIQUE en pieza_cotizada_origen para línea #%s; "
+                    "se crea PiezaCotizada nueva. Error: %s",
+                    self.pk,
+                    exc,
+                )
+                pieza = PiezaCotizada(
+                    cotizacion=cotizacion,
+                    componente=componente,
+                    descripcion_adicional=self.descripcion_pieza,
+                    cantidad=self.cantidad,
+                    costo_unitario=self.costo_unitario or Decimal('0.00'),
+                    precio_unitario_cliente=self.precio_unitario_cliente,
+                    proveedor=self.proveedor.nombre if self.proveedor else '',
+                    sugerida_por_tecnico=self.sugerida_por_tecnico,
+                    es_necesaria=self.es_necesaria,
+                    orden_prioridad=self.numero_linea,
+                )
+                if self.estado_cliente == 'aprobada':
+                    pieza.aceptada_por_cliente = True
+                elif self.estado_cliente == 'rechazada':
+                    pieza.aceptada_por_cliente = False
+                    pieza.motivo_rechazo_pieza = self.motivo_rechazo
+                pieza.save()
+                self.pieza_cotizada_origen = pieza
+                super(LineaCotizacion, self).save(update_fields=['pieza_cotizada_origen'])
         
         logger.debug(
             f"PiezaCotizada #{pieza.pk} sincronizada desde LineaCotizacion #{self.pk}"

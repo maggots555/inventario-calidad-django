@@ -5063,6 +5063,9 @@ def generar_compras_solicitud(request, pk):
        - Mapea cada servicio a su campo correspondiente en VentaMostrador
        - Ejemplo: 'limpieza' → incluye_limpieza=True, costo_limpieza=$450
     
+    3. En órdenes OOW de reparación (no FL-): crea SeguimientoPieza en ST
+       agrupados por proveedor y pasa la orden a «Esperando Llegada de Piezas».
+    
     Esto integra el flujo de cotizaciones con el flujo existente de compras
     y ventas mostrador.
     """
@@ -5117,6 +5120,17 @@ def generar_compras_solicitud(request, pk):
             if compras:
                 mensajes_exito.append(
                     f'{len(compras)} compra(s) de piezas generada(s)'
+                )
+            # Mensaje del sync ST (seguimiento de piezas + estado esperando_piezas)
+            sync_st = getattr(solicitud, '_resultado_sync_seguimiento_st', None) or {}
+            n_seg = sync_st.get('seguimientos_creados', 0)
+            if n_seg:
+                mensajes_exito.append(
+                    f'{n_seg} seguimiento(s) de piezas registrado(s) en Servicio Técnico'
+                )
+            if sync_st.get('estado_actualizado'):
+                mensajes_exito.append(
+                    'orden ST actualizada a «Esperando Llegada de Piezas»'
                 )
         
         # Generar VentaMostrador para servicios adicionales (paquetes, limpieza, etc.)
