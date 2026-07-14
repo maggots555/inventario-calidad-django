@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional
 from config.constants import (
     ESTADOS_LINEA_COTIZACION_ACEPTADA,
     ESTADOS_LINEA_COTIZACION_ACTIVA,
+    formatear_descripcion_servicio_con_inclusiones,
 )
+from config.paises_config import get_pais_actual
 
 IVA_FACTOR = 1.16
 
@@ -24,6 +26,19 @@ ESTADOS_SOLICITUD_PDF_FINAL = (
     'en_proceso',
     'completada',
 )
+
+
+def _pais_codigo_activo() -> str:
+    """
+    Código ISO del país del request/worker (ej. 'MX').
+
+    Returns:
+        str: Código de país; vacío si no hay configuración.
+    """
+    try:
+        return get_pais_actual().get('codigo', '') or ''
+    except Exception:
+        return ''
 
 
 def linea_es_cotizable(estado_cliente: str) -> bool:
@@ -66,20 +81,33 @@ def serializar_servicio_cotizacion(servicio) -> Dict[str, Any]:
     """
     Convierte LineaServicioAdicional al dict del generador PDF.
 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En México, Solución Plata (paquete_plata) lleva bullets de inclusiones en
+    la descripción para que el cliente las vea en el PDF junto al precio.
+
     Args:
         servicio: Instancia de LineaServicioAdicional.
 
     Returns:
         Dict serializable; costo_unitario trae IVA incluido.
     """
+    tipo = servicio.tipo_servicio
+    nombre = servicio.get_tipo_servicio_display()
+    # Enriquecer descripción solo si el catálogo MX tiene inclusiones para este tipo
+    descripcion = formatear_descripcion_servicio_con_inclusiones(
+        nombre_display=nombre,
+        tipo_servicio=tipo,
+        pais_codigo=_pais_codigo_activo(),
+    )
     return {
         'pk': servicio.pk,
-        'descripcion': servicio.get_tipo_servicio_display(),
+        'descripcion': descripcion,
         'cantidad': 1,
         'costo_unitario': float(servicio.costo or 0),
         'es_necesaria': servicio.es_necesaria,
         'dias_entrega': None,
         'es_servicio': True,
+        'tipo_servicio': tipo,
         'estado_cliente': servicio.estado_cliente,
     }
 
@@ -252,12 +280,24 @@ def serializar_linea_final(linea) -> Optional[Dict[str, Any]]:
 
 
 def serializar_servicio_final(servicio) -> Dict[str, Any]:
-    """Serializa servicio aceptado; costo ya es precio final con IVA."""
+    """
+    Serializa servicio aceptado; costo ya es precio final con IVA.
+
+    En México incluye las inclusiones del paquete (ej. Solución Plata) en la
+    descripción, igual que en el envío inicial al cliente.
+    """
+    tipo = servicio.tipo_servicio
+    nombre = servicio.get_tipo_servicio_display()
+    descripcion = formatear_descripcion_servicio_con_inclusiones(
+        nombre_display=nombre,
+        tipo_servicio=tipo,
+        pais_codigo=_pais_codigo_activo(),
+    )
     costo_con_iva = float(servicio.costo or 0)
     precio_sin_iva = costo_con_iva / IVA_FACTOR if costo_con_iva > 0 else 0.0
     return {
         'pk': servicio.pk,
-        'descripcion': servicio.get_tipo_servicio_display(),
+        'descripcion': descripcion,
         'cantidad': 1,
         'precio_unitario_cliente': round(precio_sin_iva, 2),
         'subtotal_cliente': round(precio_sin_iva, 2),
@@ -265,6 +305,7 @@ def serializar_servicio_final(servicio) -> Dict[str, Any]:
         'es_necesaria': servicio.es_necesaria,
         'dias_entrega': None,
         'es_servicio': True,
+        'tipo_servicio': tipo,
         'estado_cliente': servicio.estado_cliente,
         '_precio_ya_calculado': True,
     }

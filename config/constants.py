@@ -737,8 +737,106 @@ MAPEO_SERVICIO_A_VENTA_MOSTRADOR = {
 }
 
 # ============================================================================
+# INCLUSIONES DE SERVICIOS ADICIONALES (cotización al cliente — México)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Estas listas alimentan el PDF/email de cotización de Almacén cuando se ofrece
+# un paquete (ej. Solución Plata). Son independientes de DESCRIPCION_PAQUETES
+# (Venta Mostrador), porque precios e inclusiones pueden diferir.
+# Solo se usan cuando el país activo es México (codigo ISO 'MX').
+
+INCLUSIONES_SERVICIO_ADICIONAL = {
+    'paquete_plata': [
+        'SSD 1 TB',
+        'Mantenimiento',
+        'Limpieza',
+        'Respaldo de información',
+        'Instalación de S.O. y drivers',
+        'Transferencia de datos',
+    ],
+}
+
+# Aviso comercial cuando el documento (PDF/email) es solo de servicios.
+# El cálculo ya omite el descuento de diagnóstico; este texto lo explica al cliente.
+AVISO_DIAGNOSTICO_SOLO_SERVICIOS = (
+    'Este documento no incluye descuento de diagnóstico. '
+    'El descuento de diagnóstico aplica únicamente para el reemplazo de piezas.'
+)
+
+# Países donde aplican inclusiones de paquetes y el aviso de diagnóstico.
+PAISES_INCLUSIONES_SERVICIO_ADICIONAL = ('MX',)
+
+# ============================================================================
 # FUNCIONES DE UTILIDAD - MÓDULO ALMACÉN
 # ============================================================================
+
+def obtener_inclusiones_servicio_adicional(tipo_servicio, pais_codigo='MX'):
+    """
+    Devuelve la lista de inclusiones de un servicio adicional para cotización.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Solo México muestra estas inclusiones en el PDF. Si el tipo no tiene
+    catálogo (ej. limpieza suelta) o el país no es MX, regresa None.
+
+    Args:
+        tipo_servicio (str): Código del choice (ej. 'paquete_plata').
+        pais_codigo (str): Código ISO del país activo (ej. 'MX', 'AR').
+
+    Returns:
+        list[str] | None: Bullets a mostrar, o None si no aplica.
+    """
+    # Paso 1: fuera de México no mostramos inclusiones de paquetes de cotización
+    if pais_codigo not in PAISES_INCLUSIONES_SERVICIO_ADICIONAL:
+        return None
+    # Paso 2: buscar en el catálogo; si no hay entrada, no enriquecer descripción
+    inclusiones = INCLUSIONES_SERVICIO_ADICIONAL.get(tipo_servicio)
+    if not inclusiones:
+        return None
+    return list(inclusiones)
+
+
+def formatear_descripcion_servicio_con_inclusiones(
+    nombre_display,
+    tipo_servicio,
+    pais_codigo='MX',
+):
+    """
+    Arma el texto HTML de descripción para ReportLab (PDF de cotización).
+
+    Args:
+        nombre_display (str): Label visible (ej. 'Solución Plata').
+        tipo_servicio (str): Código interno (ej. 'paquete_plata').
+        pais_codigo (str): Código ISO del país activo.
+
+    Returns:
+        str: Solo el nombre, o nombre + bullets con <br/> si hay inclusiones.
+    """
+    inclusiones = obtener_inclusiones_servicio_adicional(tipo_servicio, pais_codigo)
+    if not inclusiones:
+        return nombre_display
+    # ReportLab Paragraph acepta HTML básico: negrita en el título + bullets
+    lineas = [f'<b>{nombre_display}</b>']
+    for item in inclusiones:
+        lineas.append(f'• {item}')
+    return '<br/>'.join(lineas)
+
+
+def debe_mostrar_aviso_diagnostico_solo_servicios(pais_codigo, solo_servicios):
+    """
+    Indica si el PDF/email debe mostrar el aviso de diagnóstico (solo servicios).
+
+    Args:
+        pais_codigo (str): Código ISO del país (ej. 'MX').
+        solo_servicios (bool): True si el documento no tiene piezas.
+
+    Returns:
+        bool: True solo en México y cuando el envío es únicamente servicios.
+    """
+    return (
+        bool(solo_servicios)
+        and pais_codigo in PAISES_INCLUSIONES_SERVICIO_ADICIONAL
+    )
+
 
 def obtener_nombre_tipo_producto(codigo_tipo):
     """

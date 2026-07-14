@@ -702,11 +702,31 @@ def enviar_cotizacion_cliente_task(
 
         # Variables adicionales según país (referencia de pago, textos México, etc.)
         from .utils.cotizacion_email_context import construir_contexto_email_cotizacion
+        from config.constants import (
+            AVISO_DIAGNOSTICO_SOLO_SERVICIOS,
+            debe_mostrar_aviso_diagnostico_solo_servicios,
+        )
         contexto_pais = construir_contexto_email_cotizacion(
             solicitud=solicitud,
             pais_config=_pais,
             fecha_local=ahora_local,
             asunto_fallback=asunto_base,
+        )
+
+        # Avisos MX: solo-servicios (descuento diagnóstico) y mención Solución Plata
+        # EXPLICACIÓN: en modo piezas_vs_servicios, el envío de solo servicios
+        # también entra aquí porque items no trae piezas.
+        hay_piezas_email = any(not item.get('es_servicio') for item in (items or []))
+        hay_servicios_email = any(item.get('es_servicio') for item in (items or []))
+        es_solo_servicios = (not hay_piezas_email) and hay_servicios_email and not es_reacondicionado
+        pais_codigo_email = _pais.get('codigo', '')
+        mostrar_aviso_diag = debe_mostrar_aviso_diagnostico_solo_servicios(
+            pais_codigo=pais_codigo_email,
+            solo_servicios=es_solo_servicios,
+        )
+        incluye_paquete_plata = (
+            pais_codigo_email == 'MX'
+            and any(item.get('tipo_servicio') == 'paquete_plata' for item in (items or []))
         )
 
         context_email = {
@@ -726,6 +746,11 @@ def enviar_cotizacion_cliente_task(
             'es_reacondicionado':    es_reacondicionado,
             'costeo_reac':           costeo_reac or {},
             'info_equipo_reac':      info_equipo_reac or {},
+            'mostrar_aviso_diagnostico_solo_servicios': mostrar_aviso_diag,
+            'aviso_diagnostico_solo_servicios': (
+                AVISO_DIAGNOSTICO_SOLO_SERVICIOS if mostrar_aviso_diag else ''
+            ),
+            'incluye_paquete_plata': incluye_paquete_plata,
             **contexto_pais,
         }
 
