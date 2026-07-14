@@ -454,20 +454,6 @@
                     <div class="info-label">📅 Fecha de Ingreso:</div>
                     <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
                 </div>
-                
-                <div class="info-row">
-                    <div class="info-label">🔌 Cargador:</div>
-                    <div class="info-value">
-                        {% if detalle.tiene_cargador %}
-                            ✅ Incluido
-                            {% if detalle.numero_serie_cargador %}
-                                (S/N: {{ detalle.numero_serie_cargador }})
-                            {% endif %}
-                        {% else %}
-                            ❌ No incluido
-                        {% endif %}
-                    </div>
-                </div>
             </div>
             
             {% if mensaje_personalizado %}
