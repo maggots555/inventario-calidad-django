@@ -225,7 +225,7 @@ Muestra toda la información y botones de acción según el estado
                                         </span>
                                     </td>
                                     <td class="text-end">
-                                        {% if unidad.estado == 'pendiente' %}
+                                        {% if unidad.estado == 'pendiente' and compra.tipo != 'cotizacion' %}
                                         <form method="post" action="{% url 'almacen:recibir_unidad' compra.pk unidad.pk %}" 
                                               class="d-inline" onsubmit="return confirm('¿Confirmar recepción de esta unidad?');">
                                             {% csrf_token %}

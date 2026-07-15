@@ -3005,20 +3005,34 @@ def recibir_unidad_compra(request, compra_pk, pk):
     Esto es útil cuando:
     - Las piezas llegan en diferentes momentos
     - Se quiere verificar cada pieza antes de darla por recibida
+    
+    IMPORTANTE: No aplica a compras tipo «cotizacion». Ahí se debe usar
+    «Confirmar Recepción» (flujo completo con stock y sync ST).
     """
     compra = get_object_or_404(CompraProducto, pk=compra_pk)
     unidad = get_object_or_404(UnidadCompra, pk=pk, compra=compra)
+
+    # Bloqueo de seguridad: aunque ocultemos el botón, alguien podría POST a la URL
+    if compra.tipo == 'cotizacion':
+        messages.error(
+            request,
+            'En compras de cotización debes usar «Confirmar Recepción» '
+            '(cierra la compra, actualiza stock y notifica a Servicio Técnico).'
+        )
+        return redirect('almacen:detalle_compra', pk=compra_pk)
     
     if not unidad.puede_recibir():
         messages.error(request, 'Esta unidad no puede ser recibida.')
         return redirect('almacen:detalle_compra', pk=compra_pk)
     
     if request.method == 'POST':
-        unidad_inv = unidad.recibir(crear_unidad_inventario=True)
-        if unidad_inv:
+        unidades_inv = unidad.recibir(crear_unidad_inventario=True)
+        # recibir() devuelve una lista de UnidadInventario creadas
+        if unidades_inv:
+            codigos = ', '.join(u.codigo_interno for u in unidades_inv if getattr(u, 'codigo_interno', None))
             messages.success(
                 request,
-                f'Unidad #{unidad.numero_linea} recibida. Inventario: {unidad_inv.codigo_interno}'
+                f'Unidad #{unidad.numero_linea} recibida. Inventario: {codigos or "creado"}'
             )
         else:
             messages.error(request, 'Error al recibir la unidad.')
@@ -3031,9 +3045,21 @@ def recibir_unidad_compra(request, compra_pk, pk):
 def problema_unidad_compra(request, compra_pk, pk):
     """
     Reportar problema con una unidad específica de una compra.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Solo para compras directas. En cotizaciones el WPB/DOA se reporta
+    con el botón grande «Reportar Problema» de la compra completa.
     """
     compra = get_object_or_404(CompraProducto, pk=compra_pk)
     unidad = get_object_or_404(UnidadCompra, pk=pk, compra=compra)
+
+    if compra.tipo == 'cotizacion':
+        messages.error(
+            request,
+            'En compras de cotización usa «Reportar Problema (WPB/DOA)» '
+            'desde las acciones de la compra completa.'
+        )
+        return redirect('almacen:detalle_compra', pk=compra_pk)
     
     if request.method == 'POST':
         tipo = request.POST.get('tipo_problema', 'wpb')
