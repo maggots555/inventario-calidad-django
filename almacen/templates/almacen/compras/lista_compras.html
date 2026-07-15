@@ -17,6 +17,11 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
 
 {% block title %}Compras - Almacén{% endblock %}
 
+{% block extra_css %}
+{# CSS de filas retrasadas + overrides de modo oscuro (sin rosa ilegible) #}
+<link rel="stylesheet" href="{% static 'css/lista_compras.css' %}">
+{% endblock extra_css %}
+
 {% block almacen_content %}
 <div class="container-fluid py-4">
     <!-- Encabezado -->
@@ -120,7 +125,7 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
     <div class="card shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle lista-compras-tabla">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
@@ -138,7 +143,7 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
                     <tbody>
                         {% for grupo in grupos %}
                         {# Cabecera del grupo: una fila que resume la orden #}
-                        <tr class="table-secondary">
+                        <tr class="fila-grupo-orden">
                             <td colspan="10" class="py-2">
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <strong>
@@ -169,7 +174,7 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
                             </td>
                         </tr>
                         {% for compra in grupo.compras %}
-                        <tr {% if compra.esta_atrasada %}class="table-danger"{% endif %}>
+                        <tr {% if compra.esta_atrasada %}class="fila-compra-retrasada"{% endif %}>
                             <td>
                                 <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="fw-bold text-decoration-none">
                                     {{ compra.pk }}
@@ -273,7 +278,7 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
     <div class="card shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle lista-compras-tabla">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
@@ -291,7 +296,7 @@ Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa
                     </thead>
                     <tbody>
                         {% for compra in compras %}
-                        <tr {% if compra.esta_atrasada %}class="table-danger"{% endif %}>
+                        <tr {% if compra.esta_atrasada %}class="fila-compra-retrasada"{% endif %}>
                             <td>
                                 <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="fw-bold text-decoration-none">
                                     {{ compra.pk }}

@@ -1,0 +1,99 @@
+/*
+ * Lista de Compras (Almacén) — estilos de ETA / retraso
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * -------------------------------
+ * Bootstrap usa .table-danger con fondo rosa claro. En modo oscuro ese rosa
+ * queda ilegible con el texto claro del tema. Aquí usamos una clase propia
+ * (.fila-compra-retrasada) con fondo rojo suave en claro y tinte oscuro en dark.
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+/* Tabla de la lista: un poco más compacta en la columna de entrega */
+.lista-compras-tabla td {
+    vertical-align: middle;
+}
+
+/* Fila retrasada: fondo rojo muy suave + borde izquierdo de aviso */
+.lista-compras-tabla tr.fila-compra-retrasada > * {
+    --bs-table-bg: #fef2f2;
+    --bs-table-color: #1e293b;
+    --bs-table-hover-bg: #fee2e2;
+    --bs-table-hover-color: #1e293b;
+    background-color: #fef2f2;
+    color: #1e293b;
+    box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.lista-compras-tabla tr.fila-compra-retrasada:hover > * {
+    background-color: #fee2e2;
+    color: #1e293b;
+}
+
+/* Cabecera de grupo (orden): un poco más marcada */
+.lista-compras-tabla tr.fila-grupo-orden > * {
+    --bs-table-bg: var(--gray-100, #f1f5f9);
+    background-color: var(--gray-100, #f1f5f9);
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+/* Thead Bootstrap table-light → fondo de card oscuro */
+[data-bs-theme="dark"] .lista-compras-tabla thead.table-light > tr > * {
+    --bs-table-bg: #1e293b;
+    --bs-table-color: #e2e8f0;
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+/* Cabecera de grupo en oscuro (antes quedaba gris claro) */
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-grupo-orden > * {
+    --bs-table-bg: #0f172a;
+    --bs-table-color: #e2e8f0;
+    background-color: #0f172a;
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-grupo-orden .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Fila retrasada en oscuro: tinte rojo sobre fondo oscuro, texto legible */
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-compra-retrasada > * {
+    --bs-table-bg: rgba(239, 68, 68, 0.14);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(239, 68, 68, 0.24);
+    --bs-table-hover-color: #e2e8f0;
+    background-color: rgba(239, 68, 68, 0.14);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+    box-shadow: inset 3px 0 0 #ef4444;
+}
+
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-compra-retrasada:hover > * {
+    background-color: rgba(239, 68, 68, 0.24);
+    color: #e2e8f0;
+}
+
+/* Forzar contraste en enlaces y textos secundarios de la fila */
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-compra-retrasada a {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .lista-compras-tabla tr.fila-compra-retrasada .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Badges de cabecera de grupo que usan bg-light */
+[data-bs-theme="dark"] .lista-compras-tabla .badge.bg-light {
+    background-color: #334155 !important;
+    color: #e2e8f0 !important;
+    border-color: #475569 !important;
+}
