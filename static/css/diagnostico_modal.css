@@ -31,20 +31,31 @@
     color: #0f172a;
 }
 
-/* Fila de componente adicional en la tabla del checklist */
+/* Fila de componente adicional en la tabla del checklist.
+   Mismo layout que filas fijas; solo un acento sutil a la izquierda. */
 #tablaComponentesDiagnostico tr.fila-componente-adicional > * {
-    --bs-table-bg: #f0fdf4;
-    --bs-table-color: #14532d;
-    --bs-table-hover-bg: #dcfce7;
-    --bs-table-hover-color: #14532d;
-    background-color: #f0fdf4;
-    color: #14532d;
+    --bs-table-bg: transparent;
+    --bs-table-color: inherit;
+    --bs-table-hover-bg: rgba(34, 197, 94, 0.06);
+    background-color: transparent;
     box-shadow: inset 3px 0 0 #22c55e;
 }
 
 #tablaComponentesDiagnostico tr.fila-componente-adicional:hover > * {
-    background-color: #dcfce7;
-    color: #14532d;
+    background-color: rgba(34, 197, 94, 0.06);
+}
+
+/* Input DPN dinámico: mismo ancho que los fijos */
+#tablaComponentesDiagnostico .input-dpn-dinamico {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Botón eliminar junto al nombre: compacto, no deforma la fila */
+#tablaComponentesDiagnostico .btn-eliminar-componente-adic {
+    padding: 0.15rem 0.4rem;
+    line-height: 1.2;
+    flex-shrink: 0;
 }
 
 /* Piezas detectadas: estados propios (pendiente / conflicto / aplicada) */
@@ -102,26 +113,36 @@
     border-color: #334155;
 }
 
-/* Fila ADICIONAL: tinte verde oscuro + texto legible */
+/* Fila ADICIONAL: mismo fondo de tabla + borde izquierdo verde (sin bloque verde) */
 [data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional > * {
-    --bs-table-bg: rgba(34, 197, 94, 0.14);
+    --bs-table-bg: transparent;
     --bs-table-color: #e2e8f0;
-    --bs-table-hover-bg: rgba(34, 197, 94, 0.24);
+    --bs-table-hover-bg: rgba(34, 197, 94, 0.12);
     --bs-table-hover-color: #e2e8f0;
-    background-color: rgba(34, 197, 94, 0.14);
+    background-color: transparent;
     color: #e2e8f0;
     border-bottom-color: #334155;
     box-shadow: inset 3px 0 0 #22c55e;
 }
 
 [data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional:hover > * {
-    background-color: rgba(34, 197, 94, 0.24);
+    background-color: rgba(34, 197, 94, 0.12);
     color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional .text-muted,
 [data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional label {
     color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] #tablaComponentesDiagnostico .btn-eliminar-componente-adic {
+    border-color: #f87171;
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] #tablaComponentesDiagnostico .btn-eliminar-componente-adic:hover {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #fecaca;
 }
 
 /* Piezas detectadas en oscuro */

@@ -1110,6 +1110,13 @@ function initDiagnosticoModal() {
     /**
      * Agrega una fila dinámica para un componente adicional.
      * Incluye la celda "Tipo" con badge Necesaria/Opcional.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * -------------------------------
+     * El orden de columnas DEBE coincidir con el thead de la tabla:
+     * 1) ✓ checkbox  2) Componente  3) DPN  4) Tipo
+     * Antes se insertaba Tipo antes que DPN y el input quedaba en la
+     * columna angosta de Tipo (110px), con el botón de borrar apilado.
      */
     function agregarComponenteDinamico(nombreComponente) {
         if (!componentesAdicionalesTbody)
@@ -1125,7 +1132,7 @@ function initDiagnosticoModal() {
         const tr = document.createElement('tr');
         tr.className = 'fila-componente-adicional';
         tr.setAttribute('data-componente-nombre', nombreComponente);
-        // Celda checkbox
+        // 1) Celda checkbox (igual que filas fijas)
         const tdCheck = document.createElement('td');
         tdCheck.className = 'text-center align-middle';
         const checkbox = document.createElement('input');
@@ -1139,20 +1146,26 @@ function initDiagnosticoModal() {
             actualizarContadorComponentes();
         });
         tdCheck.appendChild(checkbox);
-        // Celda nombre
+        // 2) Celda nombre + badge ADICIONAL + botón eliminar (compacto, no rompe el DPN)
         const tdNombre = document.createElement('td');
         tdNombre.className = 'align-middle fw-semibold';
+        const wrapNombre = document.createElement('div');
+        wrapNombre.className = 'd-flex align-items-center gap-2 flex-wrap';
         const label = document.createElement('label');
         label.htmlFor = idUnico;
-        label.className = 'mb-0 cursor-pointer d-block';
-        label.innerHTML = `${nombreComponente} <span class="badge bg-success ms-2">ADICIONAL</span>`;
-        tdNombre.appendChild(label);
-        // Celda Tipo (badge Necesaria/Opcional) — visible porque viene pre-seleccionado
-        const tdTipo = document.createElement('td');
-        tdTipo.className = 'text-center align-middle celda-tipo-dinamico';
-        const badgeTipo = crearBadgeTipo(nombreComponente, true);
-        tdTipo.appendChild(badgeTipo);
-        // Celda DPN
+        label.className = 'mb-0 cursor-pointer';
+        label.innerHTML = `${nombreComponente} <span class="badge bg-success ms-1">ADICIONAL</span>`;
+        wrapNombre.appendChild(label);
+        const btnEliminar = document.createElement('button');
+        btnEliminar.type = 'button';
+        btnEliminar.className = 'btn btn-outline-danger btn-sm btn-eliminar-componente-adic';
+        btnEliminar.innerHTML = '<i class="bi bi-x-lg"></i>';
+        btnEliminar.title = 'Eliminar componente';
+        btnEliminar.setAttribute('aria-label', `Eliminar ${nombreComponente}`);
+        btnEliminar.addEventListener('click', () => eliminarComponenteDinamico(tr, nombreComponente));
+        wrapNombre.appendChild(btnEliminar);
+        tdNombre.appendChild(wrapNombre);
+        // 3) Celda DPN — solo el input a ancho completo (como las filas fijas)
         const tdDpn = document.createElement('td');
         tdDpn.className = 'align-middle';
         const inputDpn = document.createElement('input');
@@ -1161,19 +1174,16 @@ function initDiagnosticoModal() {
         inputDpn.setAttribute('data-componente-db', nombreComponente);
         inputDpn.placeholder = 'Ej: DPN: 0XPJWG';
         tdDpn.appendChild(inputDpn);
-        // Botón eliminar
-        const btnEliminar = document.createElement('button');
-        btnEliminar.type = 'button';
-        btnEliminar.className = 'btn btn-danger btn-sm ms-2';
-        btnEliminar.innerHTML = '<i class="bi bi-x-circle"></i>';
-        btnEliminar.title = 'Eliminar componente';
-        btnEliminar.addEventListener('click', () => eliminarComponenteDinamico(tr, nombreComponente));
-        tdDpn.appendChild(btnEliminar);
-        // Ensamblar fila (4 celdas: check, nombre, tipo, dpn)
+        // 4) Celda Tipo (badge Necesaria/Opcional) — misma columna que las filas fijas
+        const tdTipo = document.createElement('td');
+        tdTipo.className = 'text-center align-middle celda-tipo-dinamico';
+        const badgeTipo = crearBadgeTipo(nombreComponente, true);
+        tdTipo.appendChild(badgeTipo);
+        // Ensamblar en el mismo orden que el thead
         tr.appendChild(tdCheck);
         tr.appendChild(tdNombre);
-        tr.appendChild(tdTipo);
         tr.appendChild(tdDpn);
+        tr.appendChild(tdTipo);
         // Insertar en tabla
         componentesAdicionalesTbody.appendChild(tr);
         // Registrar como agregado
