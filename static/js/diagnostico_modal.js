@@ -977,8 +977,18 @@ function initDiagnosticoModal() {
         }
     }
     // Event listeners para checkboxes de imágenes
+    // EXPLICACIÓN: al cargar, todas vienen checked en el HTML; aquí
+    // sincronizamos el contador y el "seleccionar todas".
     document.querySelectorAll('.checkbox-imagen-diag').forEach(cb => {
-        cb.addEventListener('change', actualizarContadorImagenes);
+        cb.addEventListener('change', () => {
+            actualizarContadorImagenes();
+            // Si el usuario desmarca una, el master deja de estar "todas"
+            if (checkboxSelectAllImgs) {
+                const todas = document.querySelectorAll('.checkbox-imagen-diag');
+                const marcadas = document.querySelectorAll('.checkbox-imagen-diag:checked');
+                checkboxSelectAllImgs.checked = todas.length > 0 && todas.length === marcadas.length;
+            }
+        });
     });
     // Seleccionar/deseleccionar todas las imágenes
     if (checkboxSelectAllImgs) {
@@ -990,6 +1000,8 @@ function initDiagnosticoModal() {
             actualizarContadorImagenes();
         });
     }
+    // Contador inicial (todas marcadas por defecto)
+    actualizarContadorImagenes();
     // ====================================================================
     // 4. Componentes adicionales dinámicos
     // ====================================================================

@@ -4342,9 +4342,10 @@
                         {% if imagenes_por_tipo.diagnostico %}
                         <div class="mb-3">
                             <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenesDiag">
+                                {# Por defecto todas las imágenes van marcadas: el usuario solo desmarca las que no quiera enviar #}
+                                <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenesDiag" checked>
                                 <label class="form-check-label fw-bold" for="seleccionarTodasImagenesDiag">
-                                    <i class="bi bi-check-all"></i> Seleccionar todas las imágenes
+                                    <i class="bi bi-check-all"></i> Seleccionar / desmarcar todas
                                 </label>
                             </div>
                         </div>
@@ -4364,6 +4365,7 @@
                                                    name="imagenes_seleccionadas" 
                                                    value="{{ imagen.id }}" 
                                                    id="diag_img_{{ imagen.id }}"
+                                                   checked
                                                    style="width: 1.5rem; height: 1.5rem;">
                                         </div>
                                         <div class="position-absolute bottom-0 end-0 m-2">
