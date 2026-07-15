@@ -1056,8 +1056,9 @@ function initDiagnosticoModal() {
                 const li = document.createElement('li');
                 li.setAttribute('data-nombre-normalizado', normalizarTexto(nombreComponente));
                 const a = document.createElement('a');
+                // EXPLICACIÓN: no forzar color inline (#000 rompe el modo oscuro).
+                // El color lo controla CSS (.dropdown-item + overrides dark).
                 a.className = 'dropdown-item cursor-pointer';
-                a.style.color = '#000'; // Forzar color negro para visibilidad
                 a.textContent = nombreComponente;
                 a.addEventListener('click', () => agregarComponenteDinamico(nombreComponente));
                 li.appendChild(a);
@@ -1120,9 +1121,9 @@ function initDiagnosticoModal() {
         }
         contadorComponentesDinamicos++;
         const idUnico = `comp_dinamico_${contadorComponentesDinamicos}`;
-        // Crear fila
+        // Crear fila — clase propia (no table-success: en dark mode queda verde claro ilegible)
         const tr = document.createElement('tr');
-        tr.className = 'table-success'; // Destacar que es dinámico
+        tr.className = 'fila-componente-adicional';
         tr.setAttribute('data-componente-nombre', nombreComponente);
         // Celda checkbox
         const tdCheck = document.createElement('td');
@@ -1567,10 +1568,10 @@ function initDiagnosticoModal() {
                         // Solo llenar el input DPN si la pieza trae un número de parte real
                         if (pieza.numeroParte) {
                             nuevoInputDpn.value = pieza.numeroParte;
-                            nuevoInputDpn.style.transition = 'background-color 0.5s ease';
-                            nuevoInputDpn.style.backgroundColor = '#d4edda';
+                            // Flash de confirmación vía clase CSS (no #d4edda hardcodeado)
+                            nuevoInputDpn.classList.add('input-dpn-flash');
                             setTimeout(() => {
-                                nuevoInputDpn.style.backgroundColor = '';
+                                nuevoInputDpn.classList.remove('input-dpn-flash');
                             }, 2000);
                         }
                     }
@@ -1594,9 +1595,9 @@ function initDiagnosticoModal() {
         }
         // Actualizar contador
         actualizarContadorComponentes();
-        // Marcar la fila de la UI como aplicada
-        filaUI.classList.remove('list-group-item-light', 'list-group-item-warning');
-        filaUI.classList.add('list-group-item-success');
+        // Marcar la fila de la UI como aplicada (clase propia, compatible con dark mode)
+        filaUI.classList.remove('list-group-item-light', 'list-group-item-warning', 'pieza-detectada-pendiente', 'pieza-detectada-conflicto');
+        filaUI.classList.add('pieza-detectada-aplicada');
         const btnAplicar = filaUI.querySelector('.btn-aplicar-pieza');
         if (btnAplicar) {
             btnAplicar.disabled = true;
@@ -1663,9 +1664,10 @@ function initDiagnosticoModal() {
             // Determinar si esta pieza debe tener aplicación directa o dropdown
             const necesitaDropdown = !pieza.componenteDb || esComponenteDuplicado;
             const fila = document.createElement('div');
+            // Clases propias (no list-group-item-light/warning: en dark mode pierden contraste)
             fila.className = necesitaDropdown
-                ? 'list-group-item list-group-item-warning d-flex align-items-center justify-content-between py-2'
-                : 'list-group-item list-group-item-light d-flex align-items-center justify-content-between py-2';
+                ? 'list-group-item pieza-detectada-conflicto d-flex align-items-center justify-content-between py-2'
+                : 'list-group-item pieza-detectada-pendiente d-flex align-items-center justify-content-between py-2';
             fila.id = `pieza-detectada-${index}`;
             // Marcar filas duplicadas con data-attribute para que "Aplicar todas" las salte
             if (esComponenteDuplicado) {

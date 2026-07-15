@@ -1,0 +1,162 @@
+/*
+ * Modal Enviar Diagnóstico — estilos dark-mode friendly
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * -------------------------------
+ * Antes se usaban clases Bootstrap semánticas (table-success, list-group-item-success)
+ * y un color negro hardcodeado en el dropdown. En modo oscuro eso dejaba:
+ * - Texto negro sobre fondo oscuro (ilegible) en "Agregar Componente"
+ * - Verde claro con texto claro (ilegible) en filas ADICIONAL / aplicadas
+ *
+ * Aquí usamos clases propias + sección [data-bs-theme="dark"].
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+/* Dropdown "Agregar Componente": el color viene de .dropdown-item (base.css).
+   Solo aseguramos scroll y ancho cómodo. */
+#dropdownComponentesAdicionales {
+    min-width: 260px;
+}
+
+#dropdownComponentesAdicionales .dropdown-item {
+    color: #1e293b;
+}
+
+#dropdownComponentesAdicionales .dropdown-item:hover,
+#dropdownComponentesAdicionales .dropdown-item:focus {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Fila de componente adicional en la tabla del checklist */
+#tablaComponentesDiagnostico tr.fila-componente-adicional > * {
+    --bs-table-bg: #f0fdf4;
+    --bs-table-color: #14532d;
+    --bs-table-hover-bg: #dcfce7;
+    --bs-table-hover-color: #14532d;
+    background-color: #f0fdf4;
+    color: #14532d;
+    box-shadow: inset 3px 0 0 #22c55e;
+}
+
+#tablaComponentesDiagnostico tr.fila-componente-adicional:hover > * {
+    background-color: #dcfce7;
+    color: #14532d;
+}
+
+/* Piezas detectadas: estados propios (pendiente / conflicto / aplicada) */
+#contenedorPiezasDetectadas .pieza-detectada-pendiente {
+    background-color: #f8fafc;
+    color: #1e293b;
+    border-color: #e2e8f0;
+}
+
+#contenedorPiezasDetectadas .pieza-detectada-conflicto {
+    background-color: #fffbeb;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+#contenedorPiezasDetectadas .pieza-detectada-aplicada {
+    background-color: #f0fdf4;
+    color: #14532d;
+    border-color: #86efac;
+}
+
+/* Flash al rellenar DPN automáticamente */
+.input-dpn-flash {
+    transition: background-color 0.5s ease;
+    background-color: #dcfce7 !important;
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+/* Dropdown: texto claro sobre fondo oscuro (antes forzaban #000 en JS) */
+[data-bs-theme="dark"] #dropdownComponentesAdicionales {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] #dropdownComponentesAdicionales .dropdown-item {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] #dropdownComponentesAdicionales .dropdown-item:hover,
+[data-bs-theme="dark"] #dropdownComponentesAdicionales .dropdown-item:focus {
+    background-color: #334155;
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] #dropdownComponentesAdicionales .form-control {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] #dropdownComponentesAdicionales .dropdown-divider {
+    border-color: #334155;
+}
+
+/* Fila ADICIONAL: tinte verde oscuro + texto legible */
+[data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional > * {
+    --bs-table-bg: rgba(34, 197, 94, 0.14);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(34, 197, 94, 0.24);
+    --bs-table-hover-color: #e2e8f0;
+    background-color: rgba(34, 197, 94, 0.14);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+    box-shadow: inset 3px 0 0 #22c55e;
+}
+
+[data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional:hover > * {
+    background-color: rgba(34, 197, 94, 0.24);
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional .text-muted,
+[data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional label {
+    color: #e2e8f0;
+}
+
+/* Piezas detectadas en oscuro */
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .list-group-item {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-pendiente {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-conflicto {
+    background-color: rgba(234, 179, 8, 0.12);
+    color: #e2e8f0;
+    border-color: rgba(234, 179, 8, 0.35);
+}
+
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-aplicada {
+    background-color: rgba(34, 197, 94, 0.14);
+    color: #e2e8f0;
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-aplicada .fw-semibold,
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-conflicto .fw-semibold,
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-pendiente .fw-semibold {
+    color: #e2e8f0;
+}
+
+/* Flash DPN en oscuro */
+[data-bs-theme="dark"] .input-dpn-flash {
+    background-color: rgba(34, 197, 94, 0.25) !important;
+    color: #e2e8f0;
+}
