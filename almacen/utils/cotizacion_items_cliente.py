@@ -311,6 +311,49 @@ def serializar_servicio_final(servicio) -> Dict[str, Any]:
     }
 
 
+def _ordenar_necesarias_luego_opcionales(
+    items_piezas: List[Dict[str, Any]],
+    items_servicios: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Ordena ítems para el PDF: necesarias primero, opcionales al final.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Dentro de cada bloque (necesarias / opcionales) se mantiene el orden
+    relativo: primero piezas, luego servicios, tal como llegaron.
+    Así una limpieza opcional no aparece arriba de un paquete necesario
+    solo porque se agregó antes en la solicitud.
+
+    Args:
+        items_piezas    : Dicts de piezas (con clave es_necesaria).
+        items_servicios : Dicts de servicios (con clave es_necesaria).
+
+    Returns:
+        Lista única: piezas_nec + serv_nec + piezas_opc + serv_opc.
+    """
+    piezas_nec = [d for d in items_piezas if d.get('es_necesaria')]
+    piezas_opc = [d for d in items_piezas if not d.get('es_necesaria')]
+    servicios_nec = [d for d in items_servicios if d.get('es_necesaria')]
+    servicios_opc = [d for d in items_servicios if not d.get('es_necesaria')]
+    return piezas_nec + servicios_nec + piezas_opc + servicios_opc
+
+
+def _ordenar_lista_nec_luego_opc(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Dentro de un solo tipo (solo piezas o solo servicios): necesarias y luego opcionales.
+
+    Args:
+        items: Lista de dicts con es_necesaria.
+
+    Returns:
+        Misma lista reordenada (orden relativo estable dentro de cada grupo).
+    """
+    nec = [d for d in items if d.get('es_necesaria')]
+    opc = [d for d in items if not d.get('es_necesaria')]
+    return nec + opc
+
+
 def construir_items_cotizacion_final(solicitud) -> List[Dict[str, Any]]:
     """
     Ítems para PDF final: solo aceptados con precios al cliente persistidos.
@@ -320,18 +363,23 @@ def construir_items_cotizacion_final(solicitud) -> List[Dict[str, Any]]:
 
     Returns:
         Lista de dicts listos para calcular_totales_items_finales / PDF modo_final.
+        Orden: necesarias primero, opcionales al final.
     """
-    items: List[Dict[str, Any]] = []
+    items_piezas: List[Dict[str, Any]] = []
+    items_servicios: List[Dict[str, Any]] = []
+
+    # Separar piezas y servicios para poder ordenar nec → opc como en el envío
     for linea in obtener_lineas_aceptadas_final(solicitud):
         # El equipo reacondicionado tiene PDF propio; no entra al de piezas
         if getattr(linea, 'es_linea_reacondicionado', False):
             continue
         item = serializar_linea_final(linea)
         if item:
-            items.append(item)
+            items_piezas.append(item)
     for servicio in obtener_servicios_aceptados_final(solicitud):
-        items.append(serializar_servicio_final(servicio))
-    return items
+        items_servicios.append(serializar_servicio_final(servicio))
+
+    return _ordenar_necesarias_luego_opcionales(items_piezas, items_servicios)
 
 
 def construir_grupos_cotizacion(
@@ -349,6 +397,7 @@ def construir_grupos_cotizacion(
 
     Returns:
         Lista de dicts {'titulo': str, 'items': list}.
+        En modos unificados, las opcionales van siempre al final.
     """
     items_piezas_nec = [d for d in items_piezas if d.get('es_necesaria')]
     items_piezas_opc = [d for d in items_piezas if not d.get('es_necesaria')]
@@ -356,18 +405,28 @@ def construir_grupos_cotizacion(
     items_servicios_opc = [d for d in items_servicios if not d.get('es_necesaria')]
 
     if modo_agrupacion == 'todo_junto':
-        grupos = [{'titulo': '', 'items': items_piezas + items_servicios}]
+        # Un solo PDF: necesarias (piezas+servicios) y luego opcionales
+        grupos = [{
+            'titulo': '',
+            'items': _ordenar_necesarias_luego_opcionales(items_piezas, items_servicios),
+        }]
     elif modo_agrupacion == 'piezas_vs_servicios':
         grupos = []
         if items_piezas:
-            grupos.append({'titulo': 'Cotización de Piezas', 'items': items_piezas})
+            grupos.append({
+                'titulo': 'Cotización de Piezas',
+                'items': _ordenar_lista_nec_luego_opc(items_piezas),
+            })
         if items_servicios:
             grupos.append({
                 'titulo': 'Cotización de Servicios Adicionales',
-                'items': items_servicios,
+                'items': _ordenar_lista_nec_luego_opc(items_servicios),
             })
         if not grupos:
-            grupos = [{'titulo': '', 'items': items_piezas + items_servicios}]
+            grupos = [{
+                'titulo': '',
+                'items': _ordenar_necesarias_luego_opcionales(items_piezas, items_servicios),
+            }]
     elif modo_agrupacion == 'necesarias_vs_opcionales':
         grupos = []
         items_necesarios = items_piezas_nec + items_servicios_nec
@@ -383,8 +442,14 @@ def construir_grupos_cotizacion(
                 'items': items_opcionales,
             })
         if not grupos:
-            grupos = [{'titulo': '', 'items': items_piezas + items_servicios}]
+            grupos = [{
+                'titulo': '',
+                'items': _ordenar_necesarias_luego_opcionales(items_piezas, items_servicios),
+            }]
     else:
-        grupos = [{'titulo': '', 'items': items_piezas + items_servicios}]
+        grupos = [{
+            'titulo': '',
+            'items': _ordenar_necesarias_luego_opcionales(items_piezas, items_servicios),
+        }]
 
     return [g for g in grupos if g.get('items')]

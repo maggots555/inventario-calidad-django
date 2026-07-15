@@ -4612,10 +4612,11 @@ def notificar_front(request, pk):
     recepción la comparta con el cliente.
     
     Flujo:
-    1. Valida que la solicitud esté en estado 'borrador' y tenga líneas
-    2. Cambia el estado a 'enviada_front'
-    3. Dispara la tarea Celery para enviar el correo en segundo plano
-    4. Devuelve JsonResponse inmediato
+    1. Valida que la solicitud esté en borrador o enviada_front y tenga líneas
+    2. Cambia el estado de la solicitud a 'enviada_front' (si estaba en borrador)
+    3. Sincroniza la orden ST a 'cotizacion_recibida_proveedor' si aplica
+    4. Dispara la tarea Celery para enviar el correo en segundo plano
+    5. Devuelve JsonResponse inmediato
     
     Args:
         request: HttpRequest con datos POST del formulario
@@ -4625,6 +4626,7 @@ def notificar_front(request, pk):
         JsonResponse — el correo se procesa en background via Celery
     """
     from .tasks import notificar_front_cotizacion_task
+    from .utils.sincronizar_estado_st import sincronizar_estado_st_al_notificar_front
     
     try:
         solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
@@ -4661,6 +4663,15 @@ def notificar_front(request, pk):
         # Cambiar estado de la solicitud a 'enviada_front' solo si está en borrador
         if solicitud.estado == 'borrador':
             solicitud.enviar_a_front(usuario=request.user)
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Tras avisar a Front, la orden vinculada en ST pasa a
+        # «Se Recibe Cotización de Proveedores» (si aún no avanzó más adelante).
+        # También se intenta en reenvíos por si la orden se vinculó después.
+        sincronizar_estado_st_al_notificar_front(
+            solicitud,
+            usuario=request.user,
+        )
         
         # Disparar tarea Celery
         usuario_id = request.user.pk if request.user.is_authenticated else None
