@@ -385,11 +385,54 @@ class OrdenAutocompleteManager {
     mostrarInfoSeleccion(r) {
         this.ordenInfo.classList.remove('d-none', 'alert-warning');
         this.ordenInfo.classList.add('alert-info');
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Armamos el resumen de la orden elegida. Si el diagnóstico ya se envió
+        // con piezas marcadas, la API trae piezas_sugeridas para orientar a Almacén
+        // (no se agregan solas al formset; solo se muestran aquí).
+        let htmlSugerencias = '';
+        const sugerencias = r.piezas_sugeridas || [];
+        if (sugerencias.length > 0) {
+            const items = sugerencias.map((p) => {
+                const dpn = p.dpn ? ` · DPN: ${this.escaparHtml(p.dpn)}` : '';
+                const tipoLabel = p.es_necesaria ? 'Necesaria' : 'Opcional';
+                const tipoClass = p.es_necesaria
+                    ? 'badge-sugerencia-necesaria'
+                    : 'badge-sugerencia-opcional';
+                return (`<li class="orden-sugerencia-pieza">` +
+                    `<span class="orden-sugerencia-nombre">${this.escaparHtml(p.componente_db)}</span>` +
+                    `<span class="orden-sugerencia-dpn">${dpn}</span>` +
+                    `<span class="badge ${tipoClass}">${tipoLabel}</span>` +
+                    `</li>`);
+            }).join('');
+            htmlSugerencias = `
+                <div class="orden-sugerencias-piezas mt-2">
+                    <strong class="orden-sugerencias-titulo">
+                        <i class="bi bi-lightbulb"></i> Piezas sugeridas por diagnóstico
+                        <span class="badge bg-secondary">${sugerencias.length}</span>
+                    </strong>
+                    <ul class="orden-sugerencias-lista mb-0 mt-1">${items}</ul>
+                    <small class="text-muted d-block mt-1">
+                        Solo referencia: valida y cotiza las piezas en las líneas de abajo.
+                    </small>
+                </div>
+            `;
+        }
+        else {
+            htmlSugerencias = `
+                <div class="orden-sugerencias-piezas mt-2 orden-sugerencias-vacias">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i>
+                        Sin piezas sugeridas de diagnóstico (aún no se envió o no se marcaron componentes).
+                    </small>
+                </div>
+            `;
+        }
         this.ordenInfoTexto.innerHTML = `
             <strong>${this.escaparHtml(r.orden_cliente)}</strong><br>
             Estado: ${this.escaparHtml(r.estado)}<br>
             Marca: ${this.escaparHtml(r.marca)}${r.modelo ? ` · ${this.escaparHtml(r.modelo)}` : ''}<br>
             Orden interna: ${this.escaparHtml(r.numero_orden_interno)} · Serie: ${this.escaparHtml(r.numero_serie)}
+            ${htmlSugerencias}
         `;
     }
     mostrarInfoPrellenada(ordenCliente) {

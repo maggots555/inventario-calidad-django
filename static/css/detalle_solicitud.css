@@ -680,3 +680,96 @@
     background-color: #1e293b;
     border-left-color: #fbbf24;
 }
+
+/* ============================================================
+   SUGERENCIAS DE PIEZAS (diagnóstico) en orden vinculada
+   ============================================================ */
+.orden-sugerencias-detalle {
+    border-top: 1px solid var(--gray-200);
+    padding-top: 0.75rem;
+}
+
+.orden-sugerencias-detalle-titulo {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.orden-sugerencias-detalle-lista {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.orden-sugerencia-detalle-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    padding: 0.35rem 0;
+    font-size: 0.875rem;
+    border-bottom: 1px dashed var(--gray-200);
+}
+
+.orden-sugerencia-detalle-item:last-child {
+    border-bottom: none;
+}
+
+.orden-sugerencia-detalle-item .orden-sugerencia-nombre {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.orden-sugerencia-detalle-item .orden-sugerencia-dpn {
+    color: var(--gray-600);
+    font-size: 0.8rem;
+}
+
+.badge-sugerencia-necesaria {
+    background-color: #d1fae5;
+    color: #065f46;
+    font-weight: 500;
+}
+
+.badge-sugerencia-opcional {
+    background-color: #fef3c7;
+    color: #92400e;
+    font-weight: 500;
+}
+
+/* ============================================================
+   MODO OSCURO — sugerencias de piezas en detalle
+   ============================================================ */
+[data-bs-theme="dark"] .orden-sugerencias-detalle {
+    border-top-color: #334155;
+}
+
+[data-bs-theme="dark"] .orden-sugerencias-detalle-titulo {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .orden-sugerencia-detalle-item {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .orden-sugerencia-detalle-item .orden-sugerencia-nombre {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .orden-sugerencia-detalle-item .orden-sugerencia-dpn {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .badge-sugerencia-necesaria {
+    background-color: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .badge-sugerencia-opcional {
+    background-color: #78350f;
+    color: #fcd34d;
+}

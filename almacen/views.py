@@ -3805,6 +3805,7 @@ def detalle_solicitud_cotizacion(request, pk):
     --------------------------------
     Esta vista muestra toda la información de una solicitud:
     - Datos de la cabecera (número, orden vinculada, estado)
+    - Sugerencias de piezas del diagnóstico (si la orden ya las tiene)
     - Tabla con todas las líneas y sus estados
     - Imágenes de referencia de cada línea
     - Totales y resúmenes
@@ -3822,6 +3823,7 @@ def detalle_solicitud_cotizacion(request, pk):
         SolicitudCotizacion.objects.select_related(
             'orden_servicio',
             'orden_servicio__sucursal',        # Sucursal de la orden vinculada
+            'orden_servicio__detalle_equipo',  # Detalle (incluye sugerencias de diagnóstico)
             'creado_por',
             'creado_por__empleado',            # Perfil de empleado del creador
             'creado_por__empleado__sucursal',  # Sucursal del creador (para sin_orden_activa)
@@ -3842,6 +3844,25 @@ def detalle_solicitud_cotizacion(request, pk):
             info_orden = solicitud.orden_servicio.detalle_equipo
         except Exception:
             pass
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Al enviar el diagnóstico en ST se guardan piezas_sugeridas_diagnostico (JSON).
+    # Front las ve aquí para comparar vs lo que cotizó Compras. No se editan desde Almacén.
+    piezas_sugeridas_diagnostico = []
+    if info_orden:
+        sugerencias_raw = getattr(info_orden, 'piezas_sugeridas_diagnostico', None) or []
+        if isinstance(sugerencias_raw, list):
+            for item in sugerencias_raw:
+                if not isinstance(item, dict):
+                    continue
+                componente = (item.get('componente_db') or '').strip()
+                if not componente:
+                    continue
+                piezas_sugeridas_diagnostico.append({
+                    'componente_db': componente,
+                    'dpn': (item.get('dpn') or '').strip(),
+                    'es_necesaria': bool(item.get('es_necesaria', True)),
+                })
 
     # --- Datos extra para el modal de envío de cotización al cliente ---
     # Obtenemos gama, mano de obra y email del cliente para pre-llenar el modal
@@ -3950,6 +3971,7 @@ def detalle_solicitud_cotizacion(request, pk):
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
+        'piezas_sugeridas_diagnostico': piezas_sugeridas_diagnostico,
         'titulo': f'Solicitud {solicitud.numero_solicitud}',
         'puede_subir_imagenes': puede_subir_imagenes,
         'max_imagenes_por_linea': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,

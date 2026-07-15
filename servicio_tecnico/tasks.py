@@ -751,12 +751,15 @@ def enviar_diagnostico_cliente_task(
     email_empleado, nombre_empleado, usuario_id=None, db_alias='default'
 ):
     """
-    Tarea Celery: genera PDF de diagnóstico, comprime imágenes, crea Cotización
-    y PiezaCotizada, envía el correo al cliente, cambia estado y registra historial.
+    Tarea Celery: genera PDF de diagnóstico, comprime imágenes, guarda sugerencias
+    de piezas, envía el correo al cliente, cambia estado y registra historial.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta tarea recibe SOLO tipos simples (int, str, list, dict).
     Dentro de la tarea recuperamos los objetos Django desde la BD usando los IDs.
+    Ya NO crea Cotizacion ni PiezaCotizada en Servicio Técnico: las piezas marcadas
+    se guardan como sugerencias en DetalleEquipo.piezas_sugeridas_diagnostico
+    para que Almacén las vea al cotizar.
 
     Parámetros:
         orden_id              : ID de la OrdenServicio
@@ -768,10 +771,10 @@ def enviar_diagnostico_cliente_task(
         email_empleado        : Email del empleado que envía
         nombre_empleado       : Nombre del empleado que envía
         usuario_id            : ID del usuario (para historial)
+        db_alias              : Alias de BD del país activo (multi-tenant Celery)
     """
     import io
     import re
-    from decimal import Decimal
     from pathlib import Path
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string
@@ -782,8 +785,7 @@ def enviar_diagnostico_cliente_task(
     from email.mime.image import MIMEImage
     from PIL import Image
 
-    from scorecard.models import ComponenteEquipo
-    from .models import OrdenServicio, ImagenOrden, Cotizacion, PiezaCotizada
+    from .models import OrdenServicio, ImagenOrden
 
     logger.info(f"[DIAGNOSTICO] Iniciando tarea para Orden ID {orden_id}, Folio {folio}")
 
@@ -879,55 +881,39 @@ def enviar_diagnostico_cliente_task(
                     logger.warning(f"[DIAGNOSTICO] Error procesando imagen {imagen.id}: {e}")
 
         # ===================================================================
-        # PASO 4: CREAR/OBTENER COTIZACIÓN Y PRE-CREAR PIEZAS
+        # PASO 4: GUARDAR SUGERENCIAS DE PIEZAS (sin crear cotización ST)
         # ===================================================================
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Al enviar el diagnóstico por correo también puede crearse la Cotizacion.
-        # Copiamos la mano de obra ya registrada en la orden (si el técnico la
-        # capturó antes) para no perderla. Si no hay valor, queda en 0.
-        cotizacion, cotizacion_creada = Cotizacion.objects.get_or_create(
-            orden=orden,
-            defaults={
-                'fecha_envio': timezone.now(),
-                'costo_mano_obra': orden.costo_mano_obra or Decimal('0.00'),
-            }
-        )
-
-        piezas_creadas = 0
+        # Antes este paso creaba Cotizacion + PiezaCotizada en Servicio Técnico.
+        # Ahora Almacén cotiza las piezas, así que solo guardamos las marcadas
+        # como "sugerencias" en el detalle del equipo. El PDF y el correo
+        # siguen usando los mismos componentes (no cambia lo que ve el cliente).
+        piezas_sugeridas = []
         componentes_seleccionados_nombres = []
 
         for comp in componentes_data:
-            if comp.get('seleccionado', False):
-                componente_nombre = comp.get('componente_db', '')
-                dpn = comp.get('dpn', '')
-                if not componente_nombre:
-                    continue
+            # Solo persistimos lo que el técnico dejó marcado en el modal
+            if not comp.get('seleccionado', False):
+                continue
 
-                try:
-                    componente_obj = ComponenteEquipo.objects.get(nombre=componente_nombre)
-                except ComponenteEquipo.DoesNotExist:
-                    continue
+            componente_nombre = (comp.get('componente_db') or '').strip()
+            if not componente_nombre:
+                continue
 
-                pieza_existente = PiezaCotizada.objects.filter(
-                    cotizacion=cotizacion, componente=componente_obj
-                ).exists()
+            piezas_sugeridas.append({
+                'componente_db': componente_nombre,
+                'dpn': (comp.get('dpn') or '').strip(),
+                'es_necesaria': bool(comp.get('es_necesaria', True)),
+            })
+            componentes_seleccionados_nombres.append(componente_nombre)
 
-                if not pieza_existente:
-                    PiezaCotizada.objects.create(
-                        cotizacion=cotizacion,
-                        componente=componente_obj,
-                        descripcion_adicional=dpn,
-                        costo_unitario=Decimal('0.00'),
-                        proveedor='',
-                        cantidad=1,
-                        sugerida_por_tecnico=True,
-                        es_necesaria=comp.get('es_necesaria', True),
-                        orden_prioridad=piezas_creadas + 1
-                    )
-                    piezas_creadas += 1
-                    componentes_seleccionados_nombres.append(componente_nombre)
-
-        logger.info(f"[DIAGNOSTICO] Piezas pre-creadas: {piezas_creadas}")
+        detalle.piezas_sugeridas_diagnostico = piezas_sugeridas
+        detalle.save(update_fields=['piezas_sugeridas_diagnostico'])
+        componentes_marcados = len(piezas_sugeridas)
+        logger.info(
+            f"[DIAGNOSTICO] Sugerencias de piezas guardadas: {componentes_marcados} "
+            f"(sin crear Cotizacion/PiezaCotizada)"
+        )
 
         # ===================================================================
         # PASO 5: PREPARAR Y ENVIAR CORREO
@@ -969,8 +955,10 @@ def enviar_diagnostico_cliente_task(
             'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
             'hora_envio_texto': ahora_local.strftime('%H:%M'),
             'cantidad_imagenes': len(imagenes_comprimidas),
+            # Compatibilidad: el template de correo no lista piezas, pero mantenemos
+            # estos nombres por si algún template los usa o se extiende después.
             'componentes_seleccionados': componentes_seleccionados_nombres,
-            'piezas_creadas': piezas_creadas,
+            'piezas_creadas': componentes_marcados,
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
             'email_empleado': email_empleado,
@@ -1102,7 +1090,7 @@ def enviar_diagnostico_cliente_task(
                 f"📧 Diagnóstico enviado al cliente (background) ({email_cliente})\n"
                 f"📋 Folio: {folio}\n"
                 f"📄 PDF adjunto: {resultado_pdf['archivo']}\n"
-                f"🔧 Componentes marcados: {piezas_creadas}\n"
+                f"🔧 Componentes marcados (sugerencias Almacén): {componentes_marcados}\n"
                 f"📸 Imágenes adjuntas: {len(imagenes_comprimidas)}"
             )
             if destinatarios_copia:
@@ -1151,7 +1139,7 @@ def enviar_diagnostico_cliente_task(
                     f"Orden {_oc}"
                     f" — Folio {folio}. "
                     f"Enviado a {email_cliente}. "
-                    f"{piezas_creadas} pieza(s) pre-cotizada(s), "
+                    f"{componentes_marcados} sugerencia(s) de pieza para Almacén, "
                     f"{len(imagenes_comprimidas)} imagen(es) adjunta(s)."
                 ),
                 usuario=_usuario_notif,
@@ -1166,7 +1154,7 @@ def enviar_diagnostico_cliente_task(
             'orden': orden.numero_orden_interno,
             'destinatario': email_cliente,
             'folio': folio,
-            'piezas_creadas': piezas_creadas,
+            'piezas_sugeridas': componentes_marcados,
             'imagenes_enviadas': len(imagenes_comprimidas),
         }
 

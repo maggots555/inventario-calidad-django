@@ -14096,7 +14096,10 @@ def api_buscar_ordenes_autocomplete(request):
         prefijo (str, opcional): 'OOW' o 'FL' — filtra orden_cliente por prefijo
     
     Returns:
-        JsonResponse: { "resultados": [ { id, orden_cliente, numero_serie, ... } ] }
+        JsonResponse: { "resultados": [ { id, orden_cliente, numero_serie, ..., piezas_sugeridas } ] }
+        
+        piezas_sugeridas: lista de { componente_db, dpn, es_necesaria } guardada al
+        enviar el diagnóstico (ayuda para Almacén; no crea cotización en ST).
     """
     query = request.GET.get('q', '').strip()
     tipo = request.GET.get('tipo', 'activas').strip()
@@ -14135,6 +14138,24 @@ def api_buscar_ordenes_autocomplete(request):
     resultados = []
     for orden in ordenes:
         detalle = orden.detalle_equipo
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # piezas_sugeridas_diagnostico es un JSON guardado al enviar el diagnóstico.
+        # Solo se muestran en Almacén como ayuda; no crean líneas de cotización solas.
+        sugerencias_raw = detalle.piezas_sugeridas_diagnostico or []
+        piezas_sugeridas = []
+        if isinstance(sugerencias_raw, list):
+            for item in sugerencias_raw:
+                if not isinstance(item, dict):
+                    continue
+                componente = (item.get('componente_db') or '').strip()
+                if not componente:
+                    continue
+                piezas_sugeridas.append({
+                    'componente_db': componente,
+                    'dpn': (item.get('dpn') or '').strip(),
+                    'es_necesaria': bool(item.get('es_necesaria', True)),
+                })
+
         resultados.append({
             'id': orden.id,
             'orden_cliente': detalle.orden_cliente or '',
@@ -14146,6 +14167,7 @@ def api_buscar_ordenes_autocomplete(request):
             'sucursal_id': orden.sucursal.id if orden.sucursal else 0,
             'estado': orden.get_estado_display(),
             'url_detalle': reverse('servicio_tecnico:detalle_orden', args=[orden.id]),
+            'piezas_sugeridas': piezas_sugeridas,
         })
     
     return JsonResponse({'resultados': resultados})

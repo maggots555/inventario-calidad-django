@@ -961,6 +961,19 @@ class DetalleEquipo(models.Model):
         blank=True,
         help_text="Diagnóstico técnico del equipo (SIC - Sistema de Información del Cliente)"
     )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Al enviar el diagnóstico, el técnico marca componentes (con ayuda del detector).
+    # Ya NO se crean Cotizacion/PiezaCotizada en Servicio Técnico; en su lugar guardamos
+    # aquí una lista JSON para que Almacén las vea como sugerencias al cotizar.
+    # Formato esperado: [{"componente_db": "BATERIA", "dpn": "CP6DF", "es_necesaria": true}, ...]
+    piezas_sugeridas_diagnostico = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Sugerencias de piezas detectadas/marcadas al enviar el diagnóstico. "
+            "No crea cotización en ST; Almacén las muestra como ayuda al cotizar."
+        ),
+    )
     fecha_inicio_diagnostico = models.DateField(
         null=True,
         blank=True,
@@ -1092,6 +1105,16 @@ class DetalleEquipo(models.Model):
     class Meta:
         verbose_name = "Detalle de Equipo"
         verbose_name_plural = "Detalles de Equipos"
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Evita duplicar el mismo registro SICSER (origen + id externo) cuando
+        # el id externo no está vacío. Órdenes sin datos SICSER pueden coexistir.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sicser_origen', 'sicser_id_externo'],
+                condition=models.Q(sicser_id_externo__gt=''),
+                name='unico_sicser_origen_id_externo',
+            ),
+        ]
 
 
 # ============================================================================
@@ -2210,9 +2233,13 @@ class RecordatorioImagenOrden(models.Model):
         verbose_name = "Recordatorio de imagen pendiente"
         verbose_name_plural = "Recordatorios de imágenes pendientes"
         unique_together = [['orden', 'tipo']]
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Los name= deben coincidir con los de la migración 0044.
+        # Si se omiten, Django genera otros hashes y makemigrations
+        # intenta "RenameIndex" innecesarios.
         indexes = [
-            models.Index(fields=['orden', 'tipo']),
-            models.Index(fields=['-fecha_ultimo_envio']),
+            models.Index(fields=['orden', 'tipo'], name='servicio_te_orden_i_6a8f21_idx'),
+            models.Index(fields=['-fecha_ultimo_envio'], name='servicio_te_fecha_u_2c4b9a_idx'),
         ]
 
 

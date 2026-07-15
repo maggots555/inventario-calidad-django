@@ -275,6 +275,44 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                 </div>
                                 {% endif %}
                             </div>
+
+                            {# Sugerencias de piezas del diagnóstico SIC (referencia para Front vs Compras) #}
+                            {% if info_orden %}
+                            <div class="orden-sugerencias-detalle mt-3">
+                                <div class="orden-sugerencias-detalle-titulo">
+                                    <i class="bi bi-lightbulb"></i>
+                                    <strong>Piezas sugeridas por diagnóstico</strong>
+                                    {% if piezas_sugeridas_diagnostico %}
+                                    <span class="badge bg-secondary">{{ piezas_sugeridas_diagnostico|length }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if piezas_sugeridas_diagnostico %}
+                                <p class="orden-sugerencias-detalle-ayuda small text-muted mb-2">
+                                    Compara con las líneas cotizadas por Compras. Solo es referencia; no modifica la cotización.
+                                </p>
+                                <ul class="orden-sugerencias-detalle-lista mb-0">
+                                    {% for pieza in piezas_sugeridas_diagnostico %}
+                                    <li class="orden-sugerencia-detalle-item">
+                                        <span class="orden-sugerencia-nombre">{{ pieza.componente_db }}</span>
+                                        {% if pieza.dpn %}
+                                        <span class="orden-sugerencia-dpn">· DPN: {{ pieza.dpn }}</span>
+                                        {% endif %}
+                                        {% if pieza.es_necesaria %}
+                                        <span class="badge badge-sugerencia-necesaria">Necesaria</span>
+                                        {% else %}
+                                        <span class="badge badge-sugerencia-opcional">Opcional</span>
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <p class="small text-muted mb-0 mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    Sin piezas sugeridas (el diagnóstico aún no se envió o no se marcaron componentes).
+                                </p>
+                                {% endif %}
+                            </div>
+                            {% endif %}
                             {% else %}
                             <span class="text-muted">Sin orden vinculada</span>
                             {% endif %}
