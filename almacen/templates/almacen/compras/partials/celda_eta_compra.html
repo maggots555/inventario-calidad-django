@@ -1,0 +1,55 @@
+{% comment %}
+Celda de ETA / días transcurridos / Retrasada para una compra.
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+-------------------------------
+Reutiliza properties del modelo CompraProducto (ya usadas en detalle_compra):
+- dias_estimado_entrega / fecha_llegada_estimada: cuándo debería llegar
+- dias_desde_pedido: cuántos días van desde el pedido
+- esta_atrasada / dias_atraso: si ya pasó la ETA sin recibirla
+
+Espera en el contexto: compra (CompraProducto)
+{% endcomment %}
+{% if compra.fecha_recepcion %}
+    {# Ya llegó: mostramos el tiempo real que tardó #}
+    <small class="text-muted">
+        Recibida en {{ compra.dias_entrega|default:compra.dias_desde_pedido|default:"-" }}d
+    </small>
+{% elif compra.fecha_llegada_estimada %}
+    <div class="small">
+        <span title="Fecha estimada de llegada">
+            ETA {{ compra.fecha_llegada_estimada|date:"d/m/Y" }}
+        </span>
+        <br>
+        <span class="text-muted">
+            Estimado {{ compra.dias_estimado_entrega }}d
+            · Transcurridos {{ compra.dias_desde_pedido|default:0 }}d
+        </span>
+        {% if compra.esta_atrasada %}
+        <br>
+        {# Badge sobrio (borde), coherente con detalle_compra #}
+        <span class="badge border border-danger text-danger bg-transparent mt-1">
+            <i class="bi bi-exclamation-triangle me-1"></i>Retrasada
+            ({{ compra.dias_atraso }}d)
+        </span>
+        {% elif compra.dias_para_llegada == 0 %}
+        <br>
+        <span class="badge border border-secondary text-secondary bg-transparent mt-1">
+            <i class="bi bi-clock me-1"></i>Llega hoy
+        </span>
+        {% elif compra.dias_para_llegada %}
+        <br>
+        <span class="text-muted">
+            <i class="bi bi-hourglass-split me-1"></i>Faltan {{ compra.dias_para_llegada }}d
+        </span>
+        {% endif %}
+    </div>
+{% elif compra.dias_desde_pedido is not None %}
+    {# Hay pedido pero no hay estimado (ni en cotización ni en proveedor) #}
+    <small class="text-muted">
+        Transcurridos {{ compra.dias_desde_pedido }}d
+        <br>Sin estimado
+    </small>
+{% else %}
+    <span class="text-muted">-</span>
+{% endif %}

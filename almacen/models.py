@@ -1383,6 +1383,31 @@ class CompraProducto(models.Model):
         if dias is not None and dias < 0:
             return abs(dias)
         return 0
+
+    @property
+    def dias_desde_pedido(self):
+        """
+        Días transcurridos desde la fecha de pedido.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        -------------------------------
+        Sirve para la lista de compras: "hace cuántos días pedimos esto".
+        - Si aún no llega: cuenta desde fecha_pedido hasta hoy.
+        - Si ya se recibió: cuenta desde fecha_pedido hasta fecha_recepcion
+          (es el tiempo real que tardó; coherente con dias_entrega).
+
+        Returns:
+            int | None: Días transcurridos, o None si no hay fecha_pedido.
+        """
+        if not self.fecha_pedido:
+            return None
+
+        # Si ya llegó, medimos el tramo real pedido → recepción
+        if self.fecha_recepcion:
+            return (self.fecha_recepcion - self.fecha_pedido).days
+
+        # Si sigue pendiente, medimos pedido → hoy
+        return (timezone.now().date() - self.fecha_pedido).days
     
     def get_badge_estado(self):
         """Retorna la clase CSS para el badge de estado"""

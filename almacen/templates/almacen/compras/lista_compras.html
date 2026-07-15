@@ -2,12 +2,17 @@
 {% load static %}
 
 {% comment %}
-Lista de Compras del Almacén
-Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
+Lista de Compras del Almacén — con pestañas
 
-NOTA: Las cotizaciones ahora se gestionan en el sistema de SolicitudCotizacion.
-Este listado muestra compras directas y compras generadas desde cotizaciones.
-El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizacion.
+EXPLICACIÓN PARA PRINCIPIANTES:
+-------------------------------
+Hay dos pestañas (filtro en servidor con ?tab=...):
+1) Cotizaciones: compras tipo=cotizacion, agrupadas por orden de servicio.
+   Cada pieza sigue siendo un enlace independiente a detalle_compra
+   (puedes confirmar recepción de una aunque las demás aún no lleguen).
+2) Directas: compras tipo=compra, tabla plana como antes.
+
+Los filtros (estado, producto, proveedor, orden) se aplican a la pestaña activa.
 {% endcomment %}
 
 {% block title %}Compras - Almacén{% endblock %}
@@ -15,18 +20,18 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
 {% block almacen_content %}
 <div class="container-fluid py-4">
     <!-- Encabezado -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
             <h1 class="h2 mb-0">
                 <i class="bi bi-cart3 me-2"></i>Compras
             </h1>
             <p class="text-muted mb-0">Gestión de compras de piezas</p>
         </div>
-        <div>
-            <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-warning me-2">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-warning">
                 <i class="bi bi-clipboard-check me-1"></i>Panel Cotizaciones
             </a>
-            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i>Dashboard
             </a>
             <a href="{% url 'almacen:crear_compra' %}" class="btn btn-primary">
@@ -35,34 +40,46 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
         </div>
     </div>
 
-    <!-- Filtros -->
+    {# Pestañas: cambian la URL (servidor filtra). Preservamos los filtros activos. #}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if tab == 'cotizaciones' %}active{% endif %}"
+               href="?tab=cotizaciones&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                <i class="bi bi-clipboard-check me-1"></i>Cotizaciones
+                <span class="badge bg-secondary ms-1">{{ total_cotizaciones }}</span>
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if tab == 'directas' %}active{% endif %}"
+               href="?tab=directas&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                <i class="bi bi-cart me-1"></i>Directas
+                <span class="badge bg-secondary ms-1">{{ total_directas }}</span>
+            </a>
+        </li>
+    </ul>
+
+    <!-- Filtros (sin "Tipo": la pestaña ya lo define) -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-2">
-                    <label class="form-label">Tipo</label>
-                    <select name="tipo" class="form-select">
-                        <option value="">Todos</option>
-                        <option value="cotizacion" {% if tipo_filtro == 'cotizacion' %}selected{% endif %}>📋 Cotización</option>
-                        <option value="compra" {% if tipo_filtro == 'compra' %}selected{% endif %}>🛒 Compra Directa</option>
-                    </select>
-                </div>
+                {# Hidden: al filtrar nos quedamos en la misma pestaña #}
+                <input type="hidden" name="tab" value="{{ tab }}">
                 <div class="col-md-2">
                     <label class="form-label">Estado</label>
                     <select name="estado" class="form-select">
                         <option value="">Todos</option>
-                        <option value="pendiente_aprobacion" {% if estado_filtro == 'pendiente_aprobacion' %}selected{% endif %}>⏳ Pendiente Aprob.</option>
-                        <option value="aprobada" {% if estado_filtro == 'aprobada' %}selected{% endif %}>✅ Aprobada</option>
-                        <option value="rechazada" {% if estado_filtro == 'rechazada' %}selected{% endif %}>❌ Rechazada</option>
-                        <option value="pendiente_llegada" {% if estado_filtro == 'pendiente_llegada' %}selected{% endif %}>🚚 Pend. Llegada</option>
-                        <option value="recibida" {% if estado_filtro == 'recibida' %}selected{% endif %}>📦 Recibida</option>
-                        <option value="wpb" {% if estado_filtro == 'wpb' %}selected{% endif %}>⚠️ WPB</option>
-                        <option value="doa" {% if estado_filtro == 'doa' %}selected{% endif %}>⚠️ DOA</option>
-                        <option value="devolucion_garantia" {% if estado_filtro == 'devolucion_garantia' %}selected{% endif %}>↩️ Devolución</option>
-                        <option value="devuelta" {% if estado_filtro == 'devuelta' %}selected{% endif %}>✓ Devuelta</option>
+                        <option value="pendiente_aprobacion" {% if estado_filtro == 'pendiente_aprobacion' %}selected{% endif %}>Pendiente Aprob.</option>
+                        <option value="aprobada" {% if estado_filtro == 'aprobada' %}selected{% endif %}>Aprobada</option>
+                        <option value="rechazada" {% if estado_filtro == 'rechazada' %}selected{% endif %}>Rechazada</option>
+                        <option value="pendiente_llegada" {% if estado_filtro == 'pendiente_llegada' %}selected{% endif %}>Pend. Llegada</option>
+                        <option value="recibida" {% if estado_filtro == 'recibida' %}selected{% endif %}>Recibida</option>
+                        <option value="wpb" {% if estado_filtro == 'wpb' %}selected{% endif %}>WPB</option>
+                        <option value="doa" {% if estado_filtro == 'doa' %}selected{% endif %}>DOA</option>
+                        <option value="devolucion_garantia" {% if estado_filtro == 'devolucion_garantia' %}selected{% endif %}>Devolución</option>
+                        <option value="devuelta" {% if estado_filtro == 'devuelta' %}selected{% endif %}>Devuelta</option>
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label">Producto</label>
                     <select name="producto" class="form-select">
                         <option value="">Todos</option>
@@ -84,9 +101,9 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                     <label class="form-label">Orden Cliente</label>
-                    <input type="text" name="orden_cliente" class="form-control" 
+                    <input type="text" name="orden_cliente" class="form-control"
                            value="{{ orden_cliente_filtro }}" placeholder="Ej: OS-2024-0001">
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
@@ -98,15 +115,168 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
         </div>
     </div>
 
-    <!-- Tabla de Compras -->
+    {% if tab == 'cotizaciones' %}
+    {# ========== PESTAÑA COTIZACIONES: agrupadas por orden ========== #}
     <div class="card shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
-                            <th>Tipo</th>
+                            <th>Producto</th>
+                            <th class="text-center">Cant.</th>
+                            <th class="text-end">Costo Unit.</th>
+                            <th class="text-end">Total</th>
+                            <th>Proveedor</th>
+                            <th>Estado</th>
+                            <th>Pedido</th>
+                            <th>Entrega</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for grupo in grupos %}
+                        {# Cabecera del grupo: una fila que resume la orden #}
+                        <tr class="table-secondary">
+                            <td colspan="10" class="py-2">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <strong>
+                                        <i class="bi bi-folder2-open me-1"></i>{{ grupo.label }}
+                                    </strong>
+                                    <span class="badge bg-primary">{{ grupo.total }} pieza{{ grupo.total|pluralize:"s" }}</span>
+                                    {% if grupo.pendientes %}
+                                    <span class="badge bg-warning text-dark">{{ grupo.pendientes }} pend.</span>
+                                    {% endif %}
+                                    {% if grupo.recibidas %}
+                                    <span class="badge bg-success">{{ grupo.recibidas }} recibida{{ grupo.recibidas|pluralize:"s" }}</span>
+                                    {% endif %}
+                                    {% if grupo.problema %}
+                                    <span class="badge bg-danger">{{ grupo.problema }} problema{{ grupo.problema|pluralize:"s" }}</span>
+                                    {% endif %}
+                                    {% if grupo.retrasadas %}
+                                    <span class="badge border border-danger text-danger bg-transparent">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>{{ grupo.retrasadas }} retrasada{{ grupo.retrasadas|pluralize:"s" }}
+                                    </span>
+                                    {% endif %}
+                                    {% for num_sol in grupo.numeros_solicitud %}
+                                    <span class="badge bg-light text-dark border">{{ num_sol }}</span>
+                                    {% endfor %}
+                                    <small class="text-muted ms-auto">
+                                        Cada pieza se recibe por separado
+                                    </small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% for compra in grupo.compras %}
+                        <tr {% if compra.esta_atrasada %}class="table-danger"{% endif %}>
+                            <td>
+                                <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="fw-bold text-decoration-none">
+                                    {{ compra.pk }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{% url 'almacen:detalle_producto' compra.producto.pk %}" class="text-decoration-none">
+                                    {{ compra.producto.codigo_producto }}
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ compra.producto.nombre|truncatechars:35 }}</small>
+                            </td>
+                            <td class="text-center">{{ compra.cantidad }}</td>
+                            <td class="text-end">${{ compra.costo_unitario|floatformat:2 }}</td>
+                            <td class="text-end fw-bold">${{ compra.costo_total|floatformat:2 }}</td>
+                            <td>
+                                {% if compra.proveedor %}
+                                    {{ compra.proveedor.nombre|truncatechars:20 }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ compra.get_badge_estado }}">
+                                    {{ compra.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <small>{{ compra.fecha_pedido|date:"d/m/Y" }}</small>
+                            </td>
+                            <td>
+                                {% include 'almacen/compras/partials/celda_eta_compra.html' %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'almacen:detalle_compra' compra.pk %}"
+                                   class="btn btn-sm btn-outline-primary" title="Ver detalle / recibir">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if compra.estado not in 'recibida,devuelta,cancelada' %}
+                                <a href="{% url 'almacen:editar_compra' compra.pk %}"
+                                   class="btn btn-sm btn-outline-secondary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox display-1 d-block mb-3"></i>
+                                No hay compras de cotización con estos filtros.
+                                <br>
+                                <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-warning mt-3">
+                                    <i class="bi bi-clipboard-check me-1"></i>Ir al Panel de Cotizaciones
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Paginación por grupos de orden #}
+    {% if grupos.has_other_pages %}
+    <nav aria-label="Paginación" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if grupos.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ grupos.previous_page_number }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            {% for num in grupos.paginator.page_range %}
+                {% if grupos.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > grupos.number|add:'-3' and num < grupos.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if grupos.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ grupos.next_page_number }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    {# ========== PESTAÑA DIRECTAS: tabla plana ========== #}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
                             <th>Producto</th>
                             <th class="text-center">Cant.</th>
                             <th class="text-end">Costo Unit.</th>
@@ -114,21 +284,18 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
                             <th>Proveedor</th>
                             <th>Orden Cliente</th>
                             <th>Estado</th>
-                            <th>Fecha</th>
+                            <th>Pedido</th>
+                            <th>Entrega</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for compra in compras %}
-                        <tr>
+                        <tr {% if compra.esta_atrasada %}class="table-danger"{% endif %}>
                             <td>
                                 <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="fw-bold text-decoration-none">
                                     {{ compra.pk }}
                                 </a>
-                            </td>
-                            <td>
-                                {{ compra.get_tipo_icon }}
-                                <small class="text-muted">{{ compra.get_tipo_display }}</small>
                             </td>
                             <td>
                                 <a href="{% url 'almacen:detalle_producto' compra.producto.pk %}" class="text-decoration-none">
@@ -162,13 +329,16 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
                             <td>
                                 <small>{{ compra.fecha_pedido|date:"d/m/Y" }}</small>
                             </td>
+                            <td>
+                                {% include 'almacen/compras/partials/celda_eta_compra.html' %}
+                            </td>
                             <td class="text-end">
-                                <a href="{% url 'almacen:detalle_compra' compra.pk %}" 
+                                <a href="{% url 'almacen:detalle_compra' compra.pk %}"
                                    class="btn btn-sm btn-outline-primary" title="Ver detalle">
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 {% if compra.estado not in 'recibida,devuelta,cancelada' %}
-                                <a href="{% url 'almacen:editar_compra' compra.pk %}" 
+                                <a href="{% url 'almacen:editar_compra' compra.pk %}"
                                    class="btn btn-sm btn-outline-secondary" title="Editar">
                                     <i class="bi bi-pencil"></i>
                                 </a>
@@ -179,10 +349,10 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
                         <tr>
                             <td colspan="11" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox display-1 d-block mb-3"></i>
-                                No hay compras registradas.
+                                No hay compras directas registradas.
                                 <br>
                                 <a href="{% url 'almacen:crear_compra' %}" class="btn btn-primary mt-3">
-                                    <i class="bi bi-plus-lg me-1"></i>Crear Primera Compra
+                                    <i class="bi bi-plus-lg me-1"></i>Crear Primera Compra Directa
                                 </a>
                             </td>
                         </tr>
@@ -193,37 +363,37 @@ El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizac
         </div>
     </div>
 
-    <!-- Paginación -->
     {% if compras.has_other_pages %}
     <nav aria-label="Paginación" class="mt-4">
         <ul class="pagination justify-content-center">
             {% if compras.has_previous %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ compras.previous_page_number }}&tipo={{ tipo_filtro }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                <a class="page-link" href="?page={{ compras.previous_page_number }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
                     <i class="bi bi-chevron-left"></i>
                 </a>
             </li>
             {% endif %}
-            
+
             {% for num in compras.paginator.page_range %}
                 {% if compras.number == num %}
                 <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                 {% elif num > compras.number|add:'-3' and num < compras.number|add:'3' %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}&tipo={{ tipo_filtro }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">{{ num }}</a>
+                    <a class="page-link" href="?page={{ num }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">{{ num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}
-            
+
             {% if compras.has_next %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ compras.next_page_number }}&tipo={{ tipo_filtro }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
+                <a class="page-link" href="?page={{ compras.next_page_number }}&tab={{ tab }}&estado={{ estado_filtro }}&producto={{ producto_filtro }}&proveedor={{ proveedor_filtro }}&orden_cliente={{ orden_cliente_filtro }}">
                     <i class="bi bi-chevron-right"></i>
                 </a>
             </li>
             {% endif %}
         </ul>
     </nav>
+    {% endif %}
     {% endif %}
 </div>
 {% endblock almacen_content %}

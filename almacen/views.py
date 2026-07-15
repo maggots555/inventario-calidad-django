@@ -27,6 +27,7 @@ Organización:
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, Count, F, DecimalField
 from django.db.models.functions import Coalesce
@@ -36,6 +37,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from functools import wraps
+from collections import OrderedDict
 
 from .models import (
     Proveedor,
@@ -2088,75 +2090,220 @@ def api_buscar_crear_orden_cliente(request):
 # COMPRAS Y COTIZACIONES
 # ============================================================================
 
+def _clave_grupo_compra_cotizacion(compra):
+    """
+    Arma la clave de agrupación para compras generadas desde cotización.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    -------------------------------
+    Varias piezas distintas de la misma orden deben verse juntas en la lista.
+    Prioridad de agrupación:
+    1) FK a OrdenServicio (lo más confiable)
+    2) Texto orden_cliente (si aún no hay orden vinculada)
+    3) Grupo genérico "sin orden" (stock / sin referencia)
+
+    Args:
+        compra (CompraProducto): Compra individual a clasificar.
+
+    Returns:
+        str: Clave estable usada como llave del OrderedDict de grupos.
+    """
+    # Paso 1: si hay orden de servicio formal, usamos su ID
+    if compra.orden_servicio_id:
+        return f'os:{compra.orden_servicio_id}'
+
+    # Paso 2: fallback por número visible de orden del cliente
+    orden_texto = (compra.orden_cliente or '').strip()
+    if orden_texto:
+        return f'oc:{orden_texto.lower()}'
+
+    # Paso 3: compras sin ninguna referencia de orden
+    return '__sin_orden__'
+
+
+def _agrupar_compras_por_orden(compras):
+    """
+    Agrupa compras de cotización por orden, preservando el orden de llegada.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    -------------------------------
+    Recorremos la lista ya ordenada por fecha y metemos cada compra en su
+    "canasta" de orden. Así en la plantilla podemos pintar una cabecera por
+    orden y debajo cada pieza con su propio enlace a detalle/recepción.
+
+    Args:
+        compras (iterable): QuerySet o lista de CompraProducto.
+
+    Returns:
+        list[dict]: Lista de grupos con label, compras y contadores de estado.
+    """
+    grupos = OrderedDict()
+
+    for compra in compras:
+        # Cada compra cae en exactamente un grupo según la clave calculada
+        clave = _clave_grupo_compra_cotizacion(compra)
+
+        if clave not in grupos:
+            # Cabecera legible: preferimos orden_cliente; si no, el ID de OS
+            if compra.orden_servicio_id:
+                label = (
+                    compra.orden_cliente
+                    or getattr(compra.orden_servicio, 'orden_cliente', None)
+                    or f'OS #{compra.orden_servicio_id}'
+                )
+            elif (compra.orden_cliente or '').strip():
+                label = compra.orden_cliente.strip()
+            else:
+                label = 'Sin orden / Stock'
+
+            grupos[clave] = {
+                'clave': clave,
+                'label': label,
+                'orden_servicio': compra.orden_servicio,
+                'orden_cliente': (compra.orden_cliente or '').strip(),
+                'numeros_solicitud': [],
+                'compras': [],
+                'total': 0,
+                'pendientes': 0,
+                'recibidas': 0,
+                'problema': 0,
+                'retrasadas': 0,
+            }
+
+        grupo = grupos[clave]
+        grupo['compras'].append(compra)
+        grupo['total'] += 1
+
+        # Contadores para el resumen visual de la cabecera del grupo
+        if compra.estado == 'recibida':
+            grupo['recibidas'] += 1
+        elif compra.estado in ('wpb', 'doa', 'devolucion_garantia'):
+            grupo['problema'] += 1
+        elif compra.estado == 'pendiente_llegada':
+            grupo['pendientes'] += 1
+
+        # Retrasada = aún no llega y ya pasó la ETA (usa property del modelo)
+        if compra.esta_atrasada:
+            grupo['retrasadas'] += 1
+
+        # OneToOne inverso: si la compra no vino de cotización, no existe la relación
+        try:
+            linea_origen = compra.linea_cotizacion_origen
+        except ObjectDoesNotExist:
+            linea_origen = None
+
+        if linea_origen and linea_origen.solicitud_id:
+            num = linea_origen.solicitud.numero_solicitud
+            if num and num not in grupo['numeros_solicitud']:
+                grupo['numeros_solicitud'].append(num)
+
+    return list(grupos.values())
+
+
 @login_required
 @permission_required_with_message('almacen.view_compraproducto')
 def lista_compras(request):
     """
-    Lista de todas las compras y cotizaciones.
-    
+    Lista de compras separada en pestañas: directas vs cotizaciones.
+
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Esta vista muestra una tabla con todas las compras/cotizaciones,
-    permitiendo filtrar por tipo, estado, producto y proveedor.
-    
-    Filtros disponibles:
-    - tipo: 'cotizacion' o 'compra'
-    - estado: cualquier estado del workflow
-    - producto: ID del producto
-    - proveedor: ID del proveedor
-    - orden_cliente: búsqueda por número de orden visible
+    Antes todo salía en una sola tabla. Ahora:
+    - Pestaña "Cotizaciones" (default): compras tipo=cotizacion, agrupadas
+      por orden de servicio para ver juntas las piezas de la misma OS.
+    - Pestaña "Directas": compras tipo=compra, tabla plana como antes.
+
+    Cada CompraProducto sigue siendo independiente: puedes entrar a confirmar
+    la recepción de una pieza aunque las hermanas del grupo aún no lleguen.
+
+    Filtros GET (compartidos por ambas pestañas):
+    - tab: 'cotizaciones' | 'directas'
+    - estado, producto, proveedor, orden_cliente
     """
-    compras = CompraProducto.objects.select_related(
-        'producto', 'proveedor', 'orden_servicio', 'registrado_por'
-    ).prefetch_related('unidades_compra')
-    
-    # Filtro por tipo
-    tipo = request.GET.get('tipo', '')
-    if tipo:
-        compras = compras.filter(tipo=tipo)
-    
-    # Filtro por estado
+    # Pestaña activa: cotizaciones por defecto (ahí importa el agrupado)
+    tab = request.GET.get('tab', 'cotizaciones').strip().lower()
+    if tab not in ('cotizaciones', 'directas'):
+        tab = 'cotizaciones'
+
+    # tipo real en BD: la pestaña traduce a filtro de modelo
+    tipo_bd = 'cotizacion' if tab == 'cotizaciones' else 'compra'
+
+    # Base queryset con joins para evitar N+1 en la plantilla
+    compras_qs = CompraProducto.objects.select_related(
+        'producto',
+        'proveedor',
+        'orden_servicio',
+        'registrado_por',
+        'linea_cotizacion_origen__solicitud',
+    ).prefetch_related('unidades_compra').filter(tipo=tipo_bd)
+
+    # --- Filtros compartidos (excepto tipo, que ya lo fija la pestaña) ---
     estado = request.GET.get('estado', '')
     if estado:
-        compras = compras.filter(estado=estado)
-    
-    # Filtro por producto
+        compras_qs = compras_qs.filter(estado=estado)
+
     producto_id = request.GET.get('producto', '')
     if producto_id:
-        compras = compras.filter(producto_id=producto_id)
-    
-    # Filtro por proveedor
+        compras_qs = compras_qs.filter(producto_id=producto_id)
+
     proveedor_id = request.GET.get('proveedor', '')
     if proveedor_id:
-        compras = compras.filter(proveedor_id=proveedor_id)
-    
-    # Búsqueda por orden_cliente
+        compras_qs = compras_qs.filter(proveedor_id=proveedor_id)
+
     orden_cliente = request.GET.get('orden_cliente', '').strip()
     if orden_cliente:
-        compras = compras.filter(orden_cliente__icontains=orden_cliente)
-    
-    compras = compras.order_by('-fecha_registro')
-    
-    # Paginación
-    paginator = Paginator(compras, 25)
+        compras_qs = compras_qs.filter(orden_cliente__icontains=orden_cliente)
+
+    compras_qs = compras_qs.order_by('-fecha_registro')
+
+    # Contadores de pestaña (respetan los mismos filtros, sin forzar tipo de tab)
+    filtros_comunes = Q()
+    if estado:
+        filtros_comunes &= Q(estado=estado)
+    if producto_id:
+        filtros_comunes &= Q(producto_id=producto_id)
+    if proveedor_id:
+        filtros_comunes &= Q(proveedor_id=proveedor_id)
+    if orden_cliente:
+        filtros_comunes &= Q(orden_cliente__icontains=orden_cliente)
+
+    conteo_base = CompraProducto.objects.filter(filtros_comunes)
+    total_cotizaciones = conteo_base.filter(tipo='cotizacion').count()
+    total_directas = conteo_base.filter(tipo='compra').count()
+
     page = request.GET.get('page', 1)
-    compras_page = paginator.get_page(page)
-    
-    # Datos para filtros
+    grupos_page = None
+    compras_page = None
+
+    if tab == 'cotizaciones':
+        # Agrupamos TODAS las compras filtradas y paginamos por grupos de orden
+        # (así un grupo no se parte entre dos páginas).
+        grupos = _agrupar_compras_por_orden(compras_qs)
+        paginator = Paginator(grupos, 15)
+        grupos_page = paginator.get_page(page)
+    else:
+        # Directas: tabla plana, una fila por compra (comportamiento clásico)
+        paginator = Paginator(compras_qs, 25)
+        compras_page = paginator.get_page(page)
+
+    # Datos para los selects de filtros
     productos = ProductoAlmacen.objects.filter(activo=True).order_by('nombre')
     proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
-    
+
     context = {
+        'tab': tab,
         'compras': compras_page,
+        'grupos': grupos_page,
         'productos': productos,
         'proveedores': proveedores,
-        'tipo_filtro': tipo,
         'estado_filtro': estado,
         'producto_filtro': producto_id,
         'proveedor_filtro': proveedor_id,
         'orden_cliente_filtro': orden_cliente,
+        'total_cotizaciones': total_cotizaciones,
+        'total_directas': total_directas,
     }
-    
+
     return render(request, 'almacen/compras/lista_compras.html', context)
 
 
