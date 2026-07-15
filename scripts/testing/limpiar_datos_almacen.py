@@ -4,19 +4,21 @@ Script para limpiar datos de prueba del módulo Almacén
 EXPLICACIÓN PARA PRINCIPIANTES:
 -------------------------------
 Este script borra todos los datos de prueba del módulo almacén,
-EXCEPTO la tabla de Productos de Almacén que necesitas para continuar.
+EXCEPTO el catálogo base que necesitas para continuar trabajando.
 
-Tablas que se BORRARÁN (datos de prueba):
-- Compras de Productos
+Tablas que se BORRARÁN (datos de prueba / operativos):
+- Imágenes de Líneas de Cotización
+- Imágenes de Solicitud de Cotización (referencia)
+- Líneas de Servicio Adicional (limpieza, paquetes, etc.)
+- Líneas de Cotización
+- Solicitudes de Cotización
+- Diferencias de Auditoría
+- Auditorías
+- Solicitudes de Baja
 - Unidades de Compra
 - Movimientos de Almacén
-- Solicitudes de Baja
-- Auditorías
-- Diferencias de Auditoría
 - Unidades de Inventario
-- Solicitudes de Cotización
-- Líneas de Cotización
-- Imágenes de Líneas de Cotización
+- Compras de Productos
 
 Tablas que se MANTIENEN (datos importantes):
 ✅ ProductoAlmacen (Productos de Almacén)
@@ -52,6 +54,8 @@ from almacen.models import (
     SolicitudCotizacion,
     LineaCotizacion,
     ImagenLineaCotizacion,
+    ImagenSolicitudCotizacion,
+    LineaServicioAdicional,
 )
 
 
@@ -67,16 +71,18 @@ def confirmar_accion():
     print("="*70)
     print("\nEste script borrará TODOS los datos de prueba del módulo Almacén.")
     print("\n📋 Tablas que se BORRARÁN:")
-    print("   ❌ Compras de Productos")
+    print("   ❌ Imágenes de Líneas de Cotización")
+    print("   ❌ Imágenes de Solicitud de Cotización")
+    print("   ❌ Líneas de Servicio Adicional")
+    print("   ❌ Líneas de Cotización")
+    print("   ❌ Solicitudes de Cotización")
+    print("   ❌ Diferencias de Auditoría")
+    print("   ❌ Auditorías")
+    print("   ❌ Solicitudes de Baja")
     print("   ❌ Unidades de Compra")
     print("   ❌ Movimientos de Almacén")
-    print("   ❌ Solicitudes de Baja")
-    print("   ❌ Auditorías")
-    print("   ❌ Diferencias de Auditoría")
     print("   ❌ Unidades de Inventario")
-    print("   ❌ Solicitudes de Cotización")
-    print("   ❌ Líneas de Cotización")
-    print("   ❌ Imágenes de Líneas de Cotización")
+    print("   ❌ Compras de Productos")
     print("\n✅ Tablas que se MANTENDRÁN:")
     print(f"   ✅ Productos de Almacén ({ProductoAlmacen.objects.count()} registros)")
     print(f"   ✅ Categorías de Almacén ({CategoriaAlmacen.objects.count()} registros)")
@@ -97,15 +103,17 @@ def limpiar_datos():
     
     Orden de borrado (de hijos a padres):
     1. Imágenes de líneas de cotización
-    2. Líneas de cotización
-    3. Solicitudes de cotización
-    4. Diferencias de auditoría
-    5. Auditorías
-    6. Solicitudes de baja
-    7. Unidades de compra
-    8. Movimientos de almacén
-    9. Unidades de inventario
-    10. Compras de productos
+    2. Imágenes de solicitud de cotización (referencia)
+    3. Líneas de servicio adicional
+    4. Líneas de cotización
+    5. Solicitudes de cotización
+    6. Diferencias de auditoría
+    7. Auditorías
+    8. Solicitudes de baja
+    9. Unidades de compra
+    10. Movimientos de almacén
+    11. Unidades de inventario
+    12. Compras de productos
     
     SE MANTIENEN (no se borran):
     - ProductoAlmacen
@@ -119,9 +127,11 @@ def limpiar_datos():
     total_eliminados = 0
     
     # Orden de borrado (de hijos a padres para evitar conflictos)
-    # NOTA: Proveedores y CategoriaAlmacen NO se borran
+    # NOTA: ProductoAlmacen, CategoriaAlmacen y Proveedor NO se borran
     modelos_a_limpiar = [
         ('Imágenes de Líneas de Cotización', ImagenLineaCotizacion),
+        ('Imágenes de Solicitud de Cotización', ImagenSolicitudCotizacion),
+        ('Líneas de Servicio Adicional', LineaServicioAdicional),
         ('Líneas de Cotización', LineaCotizacion),
         ('Solicitudes de Cotización', SolicitudCotizacion),
         ('Diferencias de Auditoría', DiferenciaAuditoria),
