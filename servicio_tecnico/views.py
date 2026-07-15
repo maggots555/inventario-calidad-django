@@ -18591,10 +18591,28 @@ def directorio_empleados(request):
     """
     Vista gerencial: muestra una cuadrícula de mini-cards con todos los
     empleados activos. Cada card muestra avatar, nombre, rol y rating rápido.
-    Solo accesible para roles gerenciales.
+
+    Acceso permitido para:
+    - Roles gerenciales (gerente_general, gerente_operacional, supervisor)
+    - Usuarios con is_superuser=True (aunque no tengan rol gerencial)
+
+    Args:
+        request: HttpRequest del usuario autenticado.
+
+    Efectos secundarios:
+        Ninguno sobre la BD; solo lectura de empleados activos.
     """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Primero dejamos pasar a los superusuarios (casilla "Es superusuario"
+    # en el admin de Django). Si no lo son, exigimos perfil Empleado con
+    # un rol gerencial. Así un admin técnico puede ver el directorio
+    # aunque su rol de negocio sea otro (o no tenga empleado ligado).
     empleado_actual = getattr(request.user, 'empleado', None)
-    if not empleado_actual or empleado_actual.rol not in ROLES_GERENCIALES:
+    es_superusuario = request.user.is_superuser
+    es_rol_gerencial = bool(
+        empleado_actual and empleado_actual.rol in ROLES_GERENCIALES
+    )
+    if not es_superusuario and not es_rol_gerencial:
         messages.error(request, 'No tienes permiso para acceder al directorio de empleados.')
         return redirect('servicio_tecnico:inicio')
 
@@ -18662,10 +18680,23 @@ def perfil_empleado(request, empleado_id):
     """
     Vista gerencial: muestra la tarjeta completa de un empleado específico.
     Reutiliza la misma template de mi_perfil con contexto adicional.
-    Solo accesible para roles gerenciales.
+
+    Acceso permitido para roles gerenciales o usuarios superusuario.
+
+    Args:
+        request: HttpRequest del usuario autenticado.
+        empleado_id: PK del Empleado cuyo perfil se quiere ver.
+
+    Efectos secundarios:
+        Ninguno sobre la BD; solo lectura.
     """
+    # Misma regla de acceso que directorio_empleados (superusuario O rol gerencial)
     empleado_actual = getattr(request.user, 'empleado', None)
-    if not empleado_actual or empleado_actual.rol not in ROLES_GERENCIALES:
+    es_superusuario = request.user.is_superuser
+    es_rol_gerencial = bool(
+        empleado_actual and empleado_actual.rol in ROLES_GERENCIALES
+    )
+    if not es_superusuario and not es_rol_gerencial:
         messages.error(request, 'No tienes permiso para ver perfiles de otros empleados.')
         return redirect('servicio_tecnico:inicio')
 
