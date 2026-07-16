@@ -66,6 +66,13 @@ urlpatterns = [
     
     # Panel de cotizaciones pendientes (dashboard específico)
     path('cotizaciones/', views.panel_cotizaciones, name='panel_cotizaciones'),
+
+    # Panel gerencial: márgenes profit + parámetros reacondicionados
+    path(
+        'parametros-cotizador/',
+        views.panel_parametros_cotizador,
+        name='panel_parametros_cotizador',
+    ),
     
     # CRUD de compras/cotizaciones
     path('compras/crear/', views.crear_compra, name='crear_compra'),

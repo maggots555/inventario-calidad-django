@@ -419,6 +419,11 @@
                             <a href="{% url 'admin_storage_monitor' %}" class="dropdown-item">
                                 <i class="bi bi-hdd-stack text-info"></i> Monitor de Almacenamiento
                             </a>
+                            {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' %}
+                            <a href="{% url 'almacen:panel_parametros_cotizador' %}" class="dropdown-item">
+                                <i class="bi bi-sliders text-primary"></i> Parámetros del cotizador
+                            </a>
+                            {% endif %}
                             {% if user.is_superuser %}
                             <a href="{% url 'admin_clear_redis_cache' %}" class="dropdown-item" 
                                onclick="return confirm('¿Estás seguro de limpiar la caché de Redis? Los dashboards se regenerarán en la próxima carga.');">
@@ -839,6 +844,14 @@
                                 <span class="sidebar-text">Monitor Almacenamiento</span>
                             </a>
                         </li>
+                        {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' %}
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:panel_parametros_cotizador' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-sliders"></i>
+                                <span class="sidebar-text">Parámetros cotizador</span>
+                            </a>
+                        </li>
+                        {% endif %}
                         <li class="sidebar-submenu-item">
                             <a href="/admin/" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-gear-fill"></i>

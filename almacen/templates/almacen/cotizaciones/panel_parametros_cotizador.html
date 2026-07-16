@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Parámetros del cotizador - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/panel_parametros_cotizador.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 panel-parametros-cotizador">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-sliders me-2"></i>Parámetros del cotizador
+            </h1>
+            <p class="text-muted mb-0">
+                Ajusta márgenes de reparación y costeo de reacondicionados.
+                Los cambios aplican a <strong>cotizaciones nuevas</strong>;
+                las ya enviadas no se recalculan.
+            </p>
+        </div>
+        <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Volver a cotizaciones
+        </a>
+    </div>
+
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle me-1"></i>
+        Los porcentajes se capturan como <strong>fracción</strong>
+        (ejemplo: <code>0.36</code> = 36%). Los montos van en MXN sin IVA.
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-reparacion-btn"
+                        data-bs-toggle="tab" data-bs-target="#tab-reparacion"
+                        type="button" role="tab" aria-controls="tab-reparacion"
+                        aria-selected="true">
+                    <i class="bi bi-wrench-adjustable me-1"></i>Reparación (profit)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-reac-btn"
+                        data-bs-toggle="tab" data-bs-target="#tab-reacondicionado"
+                        type="button" role="tab" aria-controls="tab-reacondicionado"
+                        aria-selected="false">
+                    <i class="bi bi-arrow-repeat me-1"></i>Reacondicionados
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            {# ========== PESTAÑA REPARACIÓN ========== #}
+            <div class="tab-pane fade show active" id="tab-reparacion" role="tabpanel"
+                 aria-labelledby="tab-reparacion-btn">
+                <div class="row g-3">
+                    {% for item in perfiles_ui %}
+                    <div class="col-12 col-lg-6">
+                        <div class="card param-card h-100">
+                            <div class="card-header">
+                                <h2 class="h6 mb-0">{{ item.etiqueta }}</h2>
+                                <span class="badge text-bg-secondary">{{ item.clave }}</span>
+                            </div>
+                            <div class="card-body">
+                                {% with f=item.form %}
+                                <div class="mb-3">
+                                    <label class="form-label" for="{{ f.profit_target.id_for_label }}">
+                                        {{ f.profit_target.label }}
+                                    </label>
+                                    {{ f.profit_target }}
+                                    {% if f.profit_target.errors %}
+                                        <div class="invalid-feedback d-block">{{ f.profit_target.errors|join:", " }}</div>
+                                    {% endif %}
+                                    <div class="form-text">{{ f.profit_target.help_text }}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="{{ f.costos_fijos.id_for_label }}">
+                                        {{ f.costos_fijos.label }}
+                                    </label>
+                                    {{ f.costos_fijos }}
+                                    {% if f.costos_fijos.errors %}
+                                        <div class="invalid-feedback d-block">{{ f.costos_fijos.errors|join:", " }}</div>
+                                    {% endif %}
+                                    <div class="form-text">{{ f.costos_fijos.help_text }}</div>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label" for="{{ f.diagnostico.id_for_label }}">
+                                        {{ f.diagnostico.label }}
+                                    </label>
+                                    {{ f.diagnostico }}
+                                    {% if f.diagnostico.errors %}
+                                        <div class="invalid-feedback d-block">{{ f.diagnostico.errors|join:", " }}</div>
+                                    {% endif %}
+                                    <div class="form-text">{{ f.diagnostico.help_text }}</div>
+                                </div>
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if ultimo_profit %}
+                <p class="text-muted small mt-3 mb-0">
+                    Última actualización (reparación):
+                    {{ ultimo_profit.actualizado_en|date:"d/m/Y H:i" }}
+                    {% if ultimo_profit.actualizado_por %}
+                        — {{ ultimo_profit.actualizado_por.get_full_name|default:ultimo_profit.actualizado_por.username }}
+                    {% endif %}
+                </p>
+                {% endif %}
+            </div>
+
+            {# ========== PESTAÑA REACONDICIONADOS ========== #}
+            <div class="tab-pane fade" id="tab-reacondicionado" role="tabpanel"
+                 aria-labelledby="tab-reac-btn">
+                {% if form_reac.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form_reac.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <div class="card param-card mb-3">
+                    <div class="card-header">
+                        <h2 class="h6 mb-0">Costos fijos y front desk</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for field in form_reac %}
+                                {% if field.name == 'recurso_front_desk_mensual' or field.name == 'pct_front_desk' or field.name == 'mantenimiento_materiales' or field.name == 'gastos_operacion_ingeniero' %}
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card param-card mb-3">
+                    <div class="card-header">
+                        <h2 class="h6 mb-0">Porcentajes variables e IVA</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for field in form_reac %}
+                                {% if field.name == 'pct_overhead' or field.name == 'pct_mkt' or field.name == 'pct_comision_venta' or field.name == 'pct_margen_ganancia' or field.name == 'pct_iva' %}
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card param-card mb-3">
+                    <div class="card-header">
+                        <h2 class="h6 mb-0">Comisiones de financiamiento</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for field in form_reac %}
+                                {% if field.name == 'pct_comision_cobro_base' or field.name == 'pct_comision_3m' or field.name == 'pct_comision_6m' or field.name == 'pct_comision_12m' %}
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if ultimo_reac %}
+                <p class="text-muted small mb-0">
+                    Última actualización (reacondicionados):
+                    {{ ultimo_reac.actualizado_en|date:"d/m/Y H:i" }}
+                    {% if ultimo_reac.actualizado_por %}
+                        — {{ ultimo_reac.actualizado_por.get_full_name|default:ultimo_reac.actualizado_por.username }}
+                    {% endif %}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4 mb-5">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-save me-1"></i>Guardar parámetros
+            </button>
+            <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-secondary btn-lg">
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

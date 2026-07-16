@@ -36,6 +36,8 @@ from .models import (
     ImagenLineaCotizacion,
     ImagenSolicitudCotizacion,
     LineaServicioAdicional,
+    ConfiguracionProfitPerfil,
+    ConfiguracionReacondicionado,
 )
 
 from config.constants import (
@@ -1492,14 +1494,14 @@ class ImagenSolicitudCotizacionAdmin(admin.ModelAdmin):
     def solicitud_display(self, obj):
         """Muestra el número de solicitud"""
         return obj.solicitud.numero_solicitud
-    
+
     @admin.display(description='Descripción')
     def descripcion_corta(self, obj):
         """Muestra la descripción truncada"""
         if obj.descripcion and len(obj.descripcion) > 50:
             return obj.descripcion[:50] + '...'
         return obj.descripcion or '-'
-    
+
     @admin.display(description='Tamaño')
     def tamano_display(self, obj):
         """Muestra información de compresión"""
@@ -1513,6 +1515,68 @@ class ImagenSolicitudCotizacionAdmin(admin.ModelAdmin):
         if obj.tamano_final_kb:
             return f'{obj.tamano_final_kb} KB'
         return '-'
+
+
+# ============================================================================
+# ADMIN: PARÁMETROS DEL COTIZADOR (inspección de emergencia)
+# ============================================================================
+# La UI principal es el panel gerencial; el admin solo sirve para revisar.
+
+
+@admin.register(ConfiguracionProfitPerfil)
+class ConfiguracionProfitPerfilAdmin(admin.ModelAdmin):
+    """
+    Inspección de perfiles de profit en Django Admin.
+
+    La edición diaria se hace en el panel web de Almacén
+    (Parámetros del cotizador).
+    """
+
+    list_display = (
+        'perfil',
+        'profit_target',
+        'costos_fijos',
+        'diagnostico',
+        'actualizado_por',
+        'actualizado_en',
+    )
+    list_filter = ('perfil',)
+    search_fields = ('perfil',)
+    readonly_fields = ('actualizado_en',)
+    ordering = ('perfil',)
+
+
+@admin.register(ConfiguracionReacondicionado)
+class ConfiguracionReacondicionadoAdmin(admin.ModelAdmin):
+    """
+    Inspección del singleton de parámetros REAC.
+
+    Preferir el panel gerencial para cambios de negocio.
+    Solo se permite una fila (pk=1); no se pueden agregar más desde admin.
+    """
+
+    list_display = (
+        'id',
+        'pct_margen_ganancia',
+        'pct_iva',
+        'actualizado_por',
+        'actualizado_en',
+    )
+    readonly_fields = ('actualizado_en',)
+
+    def has_add_permission(self, request):
+        """
+        Bloquea crear una segunda fila si ya existe configuración REAC.
+
+        Args:
+            request: HttpRequest del admin.
+
+        Returns:
+            bool: False si ya hay al menos un registro.
+        """
+        if ConfiguracionReacondicionado.objects.exists():
+            return False
+        return super().has_add_permission(request)
 
 
 # ============================================================================

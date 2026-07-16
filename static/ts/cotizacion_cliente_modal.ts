@@ -191,6 +191,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Si el config no existe en esta página, salir silenciosamente
     if (!config) return;
 
+    // --------------------------------------------------------
+    // Badges de % profit: se actualizan desde profitConfig (panel BD / .env)
+    // para no mostrar porcentajes hardcodeados desactualizados.
+    // --------------------------------------------------------
+    document.querySelectorAll<HTMLElement>('.profit-badge[data-profit-tipo]').forEach((badge) => {
+        const tipo = badge.dataset.profitTipo;
+        if (!tipo) return;
+        const target = config.profitConfig?.[tipo]?.profit_target;
+        if (typeof target === 'number') {
+            badge.textContent = `${Math.round(target * 100)}% profit`;
+        }
+    });
+
     // --- Referencias a elementos del DOM ---
     const tipoServicioInput  = document.querySelector<HTMLInputElement>('#tipoServicioInput');
     // manoObraOverride ya no existe como input — el campo es solo informativo.

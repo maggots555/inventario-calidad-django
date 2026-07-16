@@ -17,10 +17,8 @@ from typing import Any, Dict, List, Optional
 
 from django.utils import timezone
 
-from .pdf_cotizacion_cliente import (
-    PROFIT_CONFIG,
-    calcular_precios_items_cotizacion,
-)
+from .pdf_cotizacion_cliente import calcular_precios_items_cotizacion
+from .parametros_cotizador import obtener_profit_config
 
 logger = logging.getLogger('almacen')
 
@@ -36,8 +34,10 @@ def obtener_tipo_servicio_solicitud(solicitud) -> str:
     2. mostrador si la solicitud es sin orden activa
     3. estandar como valor por defecto
     """
+    # Perfiles vigentes del panel (o .env si aún no hay filas)
+    perfiles_validos = obtener_profit_config()
     tipo = (getattr(solicitud, 'tipo_servicio_cliente', '') or '').strip()
-    if tipo in PROFIT_CONFIG:
+    if tipo in perfiles_validos:
         return tipo
     if getattr(solicitud, 'sin_orden_activa', False):
         return 'mostrador'

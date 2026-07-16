@@ -57,8 +57,20 @@ def _cargar_config_costeo() -> Dict[str, float]:
     }
 
 
-# Configuración cargada una vez al importar el módulo (mismo patrón que PROFIT_CONFIG)
+# Respaldo estático desde .env (compatibilidad / semilla).
+# El valor VIGENTE se obtiene con obtener_costeo_reacondicionado_config().
 COSTEO_REACONDICIONADO_CONFIG: Dict[str, float] = _cargar_config_costeo()
+
+
+def _costeo_config_vigente() -> Dict[str, float]:
+    """
+    Parámetros REAC activos (panel BD + fallback .env).
+
+    Import diferido para evitar ciclo con parametros_cotizador.
+    """
+    from .parametros_cotizador import obtener_costeo_reacondicionado_config
+
+    return obtener_costeo_reacondicionado_config()
 
 
 def calcular_costeo(
@@ -75,12 +87,13 @@ def calcular_costeo(
         costo_proveedor     : Costo de adquisición del equipo (MXN sin IVA).
         dias_front_desk     : Días de uso proporcional del recurso front desk.
         pct_margen_ganancia : Override opcional del margen (simulación).
-        config              : Dict de parámetros; si es None usa .env.
+        config              : Dict de parámetros; si es None usa panel/.env.
 
     Returns:
         dict: Resultados redondeados a 2 decimales, listos para PDF/email/JSON.
     """
-    cfg = config or COSTEO_REACONDICIONADO_CONFIG
+    # Si el caller no pasa config, leemos la vigente (BD o .env)
+    cfg = config or _costeo_config_vigente()
     margen = (
         pct_margen_ganancia
         if pct_margen_ganancia is not None
@@ -151,8 +164,13 @@ def calcular_costeo(
 
 
 def serializar_config_costeo() -> Dict[str, float]:
-    """Expone la configuración para inyectarla en el modal (TypeScript)."""
-    return dict(COSTEO_REACONDICIONADO_CONFIG)
+    """
+    Expone la configuración vigente para inyectarla en el modal (TypeScript).
+
+    Returns:
+        dict: Copia de los parámetros REAC (panel BD o .env).
+    """
+    return dict(_costeo_config_vigente())
 
 
 IVA_FACTOR_REAC = 1.16

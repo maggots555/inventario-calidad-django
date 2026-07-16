@@ -766,32 +766,32 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
                                     <i class="bi bi-star-fill" style="font-size: 0.9rem; color: #f59e0b;"></i>
                                     <span class="nombre-servicio">Alta Gama</span>
-                                    <span class="profit-badge">44% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="alta_gama">--% profit</span>
                                 </div>
                                 <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo != 'ALTA' and gama_equipo != 'BAJA' %}activo{% endif %}" data-tipo="estandar" id="btnEstandar">
                                     <i class="bi bi-laptop" style="font-size: 0.9rem; color: #3b82f6;"></i>
                                     <span class="nombre-servicio">Estándar</span>
-                                    <span class="profit-badge">36% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="estandar">--% profit</span>
                                 </div>
                                 <div class="servicio-tipo-btn {% if solicitud.sin_orden_activa or gama_equipo == 'BAJA' %}activo{% endif %}" data-tipo="mostrador">
                                     <i class="bi bi-phone" style="font-size: 0.9rem; color: #10b981;"></i>
                                     <span class="nombre-servicio">Mostrador</span>
-                                    <span class="profit-badge">42% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="mostrador">--% profit</span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="express">
                                     <i class="bi bi-lightning-charge-fill" style="font-size: 0.9rem; color: #f97316;"></i>
                                     <span class="nombre-servicio">Express</span>
-                                    <span class="profit-badge">44% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="express">--% profit</span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="server">
                                     <i class="bi bi-server" style="font-size: 0.9rem; color: #8b5cf6;"></i>
                                     <span class="nombre-servicio">Server</span>
-                                    <span class="profit-badge">59% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="server">--% profit</span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="rep_nivel_componente">
                                     <i class="bi bi-cpu" style="font-size: 0.9rem; color: #0ea5e9;"></i>
                                     <span class="nombre-servicio">Rep. nivel componente</span>
-                                    <span class="profit-badge">42% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="rep_nivel_componente">--% profit</span>
                                 </div>
                             </div>
                             <input type="hidden" id="tipoServicioInput" name="tipo_servicio"

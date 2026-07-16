@@ -151,9 +151,22 @@ def _cargar_profit_config() -> Dict[str, Dict]:
     }
 
 
-# Se construye una sola vez al importar el módulo (igual que antes,
-# pero ahora los valores vienen del .env en lugar del código fuente).
+# Respaldo estático desde .env (compatibilidad / semilla).
+# EXPLICACIÓN: el valor VIGENTE en runtime se obtiene con
+# obtener_profit_config() (BD + fallback .env). No uses PROFIT_CONFIG
+# para cálculos nuevos: puede estar desactualizado respecto al panel.
 PROFIT_CONFIG: Dict[str, Dict] = _cargar_profit_config()
+
+
+def _profit_config_vigente() -> Dict[str, Dict]:
+    """
+    Configuración de profit activa (panel BD + fallback .env).
+
+    Import diferido para evitar ciclo con parametros_cotizador.
+    """
+    from .parametros_cotizador import obtener_profit_config
+
+    return obtener_profit_config()
 
 
 # =============================================================================
@@ -350,10 +363,12 @@ def calcular_precio_cliente(
     Returns:
         Dict con precios sin IVA, con IVA y métricas de control.
     """
-    if tipo_servicio not in PROFIT_CONFIG:
+    # Paso 1: leer parámetros vigentes (panel o .env) en cada cálculo
+    profit_cfg = _profit_config_vigente()
+    if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
 
-    perfil = PROFIT_CONFIG[tipo_servicio]
+    perfil = profit_cfg[tipo_servicio]
 
     if isinstance(costo_piezas, (list, tuple)):
         costo_total = float(sum(costo_piezas))
@@ -438,9 +453,10 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     Returns:
         float: Precio al cliente sin IVA (aproximado, sin contexto de cotización).
     """
-    if tipo_servicio not in PROFIT_CONFIG:
+    profit_cfg = _profit_config_vigente()
+    if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
-    factor = 1 - PROFIT_CONFIG[tipo_servicio]['profit_target']
+    factor = 1 - profit_cfg[tipo_servicio]['profit_target']
     return float(costo_unitario) / factor
 
 
@@ -470,9 +486,11 @@ def calcular_precios_items_cotizacion(
     Returns:
         Dict con items_calculados y totales (precio_sin_iva, precio_con_iva, etc.).
     """
-    if tipo_servicio not in PROFIT_CONFIG:
+    # Parámetros vigentes del panel (o .env si aún no hay filas en BD)
+    profit_cfg = _profit_config_vigente()
+    if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
-    perfil = PROFIT_CONFIG[tipo_servicio]
+    perfil = profit_cfg[tipo_servicio]
     mano_obra = float(mano_de_obra_override or 0)
 
     items_piezas = [i for i in items if not i.get('es_servicio')]
@@ -720,7 +738,9 @@ class PDFCotizacionCliente:
             modo_final                  : Si True, usa precios persistidos sin recalcular profit.
         """
         self.solicitud = solicitud
-        self.tipo_servicio = tipo_servicio if tipo_servicio in PROFIT_CONFIG else 'estandar'
+        # Validar perfil contra config vigente (panel BD o .env)
+        _cfg_init = _profit_config_vigente()
+        self.tipo_servicio = tipo_servicio if tipo_servicio in _cfg_init else 'estandar'
         self.items = items
         self.incluir_descuento_diagnostico = incluir_descuento_diagnostico
         self.mano_de_obra_override = mano_de_obra_override
@@ -962,7 +982,9 @@ class PDFCotizacionCliente:
         En modo_final suma precios guardados en BD; en modo normal aplica profit Excel.
         """
         if self.modo_final:
-            perfil = PROFIT_CONFIG.get(self.tipo_servicio, PROFIT_CONFIG['estandar'])
+            # En modo final solo necesitamos el monto de diagnóstico del perfil
+            profit_cfg = _profit_config_vigente()
+            perfil = profit_cfg.get(self.tipo_servicio, profit_cfg['estandar'])
             return calcular_totales_items_finales(
                 items=self.items,
                 incluir_descuento_diagnostico=self.incluir_descuento_diagnostico,

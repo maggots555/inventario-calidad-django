@@ -18,6 +18,7 @@ Todos los formularios usan clases de Bootstrap 5 para consistencia visual.
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
+from decimal import Decimal
 
 from .models import (
     Proveedor,
@@ -34,6 +35,7 @@ from .models import (
     LineaCotizacion,
     ImagenLineaCotizacion,
     LineaServicioAdicional,
+    ConfiguracionReacondicionado,
 )
 from config.constants import (
     TIPO_PRODUCTO_ALMACEN_CHOICES,
@@ -2613,3 +2615,190 @@ LineaServicioAdicionalFormSet = inlineformset_factory(
     min_num=0,                # No es obligatorio tener servicios
     validate_min=False,
 )
+
+
+# ============================================================================
+# PANEL DE PARÁMETROS DEL COTIZADOR
+# ============================================================================
+
+
+class ParametrosProfitPerfilForm(forms.Form):
+    """
+    Campos de un perfil de profit (reparación) para el panel gerencial.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    No es un ModelForm “puro” porque el panel edita varios perfiles a la vez
+    con prefijos (mostrador-profit_target, estandar-profit_target, etc.).
+    Usamos un Form simple y la vista arma un form por perfil.
+    """
+
+    profit_target = forms.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        min_value=0,
+        max_value=Decimal('0.99'),
+        label='Profit (fracción)',
+        help_text='Ejemplo: 0.36 = 36% de margen. Debe ser menor que 1.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+            'max': '0.99',
+        }),
+    )
+    costos_fijos = forms.CharField(
+        max_length=100,
+        label='Costos fijos',
+        help_text='Montos internos separados por coma, sin IVA (ej. 25,160).',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '25,160',
+        }),
+    )
+    diagnostico = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        label='Diagnóstico (MXN sin IVA)',
+        help_text='Cargo de evaluación técnica incluido en el precio al cliente.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+        }),
+    )
+
+    def clean_costos_fijos(self):
+        """
+        Valida que costos_fijos sea una lista de números separados por coma.
+
+        Returns:
+            str: Cadena limpia (sin espacios sobrantes).
+        """
+        raw = (self.cleaned_data.get('costos_fijos') or '').strip()
+        if not raw:
+            raise ValidationError('Indica al menos un costo fijo (ej. 25,160).')
+        partes_limpias = []
+        for trozo in raw.split(','):
+            trozo = trozo.strip()
+            if not trozo:
+                continue
+            try:
+                float(trozo)
+            except ValueError:
+                raise ValidationError(
+                    f'"{trozo}" no es un número válido. Usa formato: 25,160'
+                )
+            partes_limpias.append(trozo)
+        if not partes_limpias:
+            raise ValidationError('Indica al menos un costo fijo numérico.')
+        return ','.join(partes_limpias)
+
+
+class ParametrosReacondicionadoForm(forms.ModelForm):
+    """
+    Formulario del singleton de parámetros REAC (reacondicionados).
+
+    Objetivo:
+        Editar montos y porcentajes de la matriz Certificados SIC.
+    """
+
+    class Meta:
+        model = ConfiguracionReacondicionado
+        fields = [
+            'recurso_front_desk_mensual',
+            'pct_front_desk',
+            'mantenimiento_materiales',
+            'gastos_operacion_ingeniero',
+            'pct_overhead',
+            'pct_mkt',
+            'pct_comision_venta',
+            'pct_margen_ganancia',
+            'pct_iva',
+            'pct_comision_cobro_base',
+            'pct_comision_3m',
+            'pct_comision_6m',
+            'pct_comision_12m',
+        ]
+        widgets = {
+            'recurso_front_desk_mensual': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.01', 'min': '0',
+            }),
+            'pct_front_desk': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'mantenimiento_materiales': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.01', 'min': '0',
+            }),
+            'gastos_operacion_ingeniero': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.01', 'min': '0',
+            }),
+            'pct_overhead': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_mkt': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_comision_venta': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_margen_ganancia': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_iva': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_comision_cobro_base': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_comision_3m': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_comision_6m': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+            'pct_comision_12m': forms.NumberInput(attrs={
+                'class': 'form-control', 'step': '0.0001', 'min': '0', 'max': '0.99',
+            }),
+        }
+        labels = {
+            'recurso_front_desk_mensual': 'Recurso front desk mensual (MXN)',
+            'pct_front_desk': '% Front desk (fracción)',
+            'mantenimiento_materiales': 'Mantenimiento materiales (MXN)',
+            'gastos_operacion_ingeniero': 'Gastos operación ingeniero (MXN)',
+            'pct_overhead': '% Overhead',
+            'pct_mkt': '% Marketing',
+            'pct_comision_venta': '% Comisión venta',
+            'pct_margen_ganancia': '% Margen de ganancia',
+            'pct_iva': '% IVA',
+            'pct_comision_cobro_base': '% Comisión cobro base',
+            'pct_comision_3m': '% Comisión financiamiento 3 meses',
+            'pct_comision_6m': '% Comisión financiamiento 6 meses',
+            'pct_comision_12m': '% Comisión financiamiento 12 meses',
+        }
+
+    def clean(self):
+        """
+        Valida que la suma de porcentajes variables del costeo sea < 100%.
+
+        Efectos secundarios:
+            Ninguno sobre BD; solo agrega errores de formulario.
+        """
+        cleaned = super().clean()
+        # Misma regla que calcular_costeo(): overhead + mkt + comisión + margen < 1
+        try:
+            suma = (
+                float(cleaned.get('pct_overhead') or 0)
+                + float(cleaned.get('pct_mkt') or 0)
+                + float(cleaned.get('pct_comision_venta') or 0)
+                + float(cleaned.get('pct_margen_ganancia') or 0)
+            )
+        except (TypeError, ValueError):
+            return cleaned
+        if suma >= 1:
+            raise ValidationError(
+                'La suma de % Overhead + Marketing + Comisión venta + Margen '
+                f'debe ser menor a 100% (ahora: {suma * 100:.2f}%).'
+            )
+        return cleaned

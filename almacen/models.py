@@ -5794,3 +5794,268 @@ class LineaServicioAdicional(models.Model):
             'respaldo': 'cloud-arrow-up-fill',
         }
         return iconos.get(self.tipo_servicio, 'gear-fill')
+
+
+# ============================================================================
+# PARÁMETROS DEL COTIZADOR (editables desde panel gerencial)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# --------------------------------
+# Antes estos valores vivían solo en el archivo .env y había que reiniciar
+# el servidor para aplicar cambios. Ahora se guardan en la BD por país
+# (multi-tenant) y un panel web permite a Presidencia/Gerencia ajustarlos.
+# El .env sigue existiendo como respaldo si la BD aún no tiene filas.
+
+
+class ConfiguracionProfitPerfil(models.Model):
+    """
+    Márgenes de ganancia (profit), costos fijos y diagnóstico por perfil
+    de servicio del cotizador de reparación.
+
+    Objetivo de negocio:
+        Definir cuánto margen se aplica al cotizar piezas según el tipo
+        de servicio (mostrador, estándar, express, alta gama, server, etc.).
+
+    Campos clave:
+        perfil         : Clave interna usada por el motor de profit y el PDF.
+        profit_target  : Fracción de margen (ej. 0.36 = 36%).
+        costos_fijos   : Montos internos separados por coma (ej. "25,160").
+        diagnostico    : Cargo de evaluación técnica (MXN sin IVA).
+
+    Efectos secundarios:
+        Al guardar desde el panel, los cálculos nuevos (modal, PDF, Celery)
+        usan estos valores de inmediato. Las cotizaciones ya enviadas no
+        se recalculan.
+    """
+
+    PERFIL_CHOICES = [
+        ('mostrador', 'Mostrador'),
+        ('estandar', 'Estándar'),
+        ('express', 'Express'),
+        ('alta_gama', 'Alta Gama'),
+        ('server', 'Server'),
+        ('rep_nivel_componente', 'Reparación nivel componente'),
+    ]
+
+    perfil = models.CharField(
+        max_length=40,
+        choices=PERFIL_CHOICES,
+        unique=True,
+        verbose_name='Perfil de servicio',
+        help_text='Clave del perfil usada por el cotizador (una fila por perfil).',
+    )
+    profit_target = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0)],
+        verbose_name='Profit target',
+        help_text='Margen como fracción (0.36 = 36%). Debe ser menor que 1.',
+    )
+    costos_fijos = models.CharField(
+        max_length=100,
+        verbose_name='Costos fijos',
+        help_text='Gastos internos separados por coma, sin IVA (ej. 25,160).',
+    )
+    diagnostico = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name='Diagnóstico (MXN sin IVA)',
+        help_text='Cargo de evaluación técnica incluido en el precio al cliente.',
+    )
+    actualizado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='profit_perfiles_actualizados',
+        verbose_name='Actualizado por',
+    )
+    actualizado_en = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última actualización',
+    )
+
+    class Meta:
+        verbose_name = 'Configuración profit (perfil)'
+        verbose_name_plural = 'Configuraciones profit (perfiles)'
+        ordering = ['perfil']
+
+    def __str__(self):
+        """Muestra perfil y porcentaje de profit para admin y depuración."""
+        pct = float(self.profit_target) * 100
+        return f"{self.get_perfil_display()} — {pct:.0f}% profit"
+
+    def costos_fijos_lista(self):
+        """
+        Convierte la cadena 'a,b,c' en lista de floats.
+
+        Returns:
+            list[float]: Costos fijos listos para el motor de profit.
+
+        Raises:
+            ValueError: Si algún trozo no es numérico (fila corrupta en BD).
+        """
+        # EXPLICACIÓN: el motor espera una lista numérica; el formulario
+        # guarda el mismo formato que el .env para no romper compatibilidad.
+        partes = []
+        for trozo in (self.costos_fijos or '').split(','):
+            trozo = trozo.strip()
+            if not trozo:
+                continue
+            # float() puede lanzar ValueError → lo atrapa obtener_profit_config
+            partes.append(float(trozo))
+        if not partes:
+            raise ValueError('costos_fijos vacío o sin números válidos')
+        return partes
+
+
+class ConfiguracionReacondicionado(models.Model):
+    """
+    Parámetros de la matriz de costeo de equipos reacondicionados
+    (Certificados SIC). Solo debe existir una fila (singleton pk=1).
+
+    Objetivo de negocio:
+        Permitir a Gerencia ajustar overhead, comisiones, margen e IVA
+        del costeo de reacondicionados sin tocar el servidor.
+
+    Efectos secundarios:
+        Al guardar, calcular_costeo() y el modal TS leen estos valores
+        en la siguiente cotización nueva.
+    """
+
+    recurso_front_desk_mensual = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=10000,
+        validators=[MinValueValidator(0)],
+        verbose_name='Recurso front desk mensual (MXN)',
+    )
+    pct_front_desk = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.21,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Front desk',
+    )
+    mantenimiento_materiales = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=25,
+        validators=[MinValueValidator(0)],
+        verbose_name='Mantenimiento materiales (MXN)',
+    )
+    gastos_operacion_ingeniero = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=160,
+        validators=[MinValueValidator(0)],
+        verbose_name='Gastos operación ingeniero (MXN)',
+    )
+    pct_overhead = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.01,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Overhead',
+    )
+    pct_mkt = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.01,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Marketing',
+    )
+    pct_comision_venta = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.036,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Comisión venta',
+    )
+    pct_margen_ganancia = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.194,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Margen de ganancia',
+    )
+    pct_iva = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.16,
+        validators=[MinValueValidator(0)],
+        verbose_name='% IVA',
+    )
+    pct_comision_cobro_base = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.035,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Comisión cobro base',
+    )
+    pct_comision_3m = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.0469,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Comisión financiamiento 3 meses',
+    )
+    pct_comision_6m = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.0769,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Comisión financiamiento 6 meses',
+    )
+    pct_comision_12m = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=0.1289,
+        validators=[MinValueValidator(0)],
+        verbose_name='% Comisión financiamiento 12 meses',
+    )
+    actualizado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reacondicionado_config_actualizada',
+        verbose_name='Actualizado por',
+    )
+    actualizado_en = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última actualización',
+    )
+
+    class Meta:
+        verbose_name = 'Configuración reacondicionado'
+        verbose_name_plural = 'Configuración reacondicionado'
+
+    def __str__(self):
+        """Identifica la fila singleton para admin."""
+        return 'Parámetros de costeo reacondicionados (Certificados SIC)'
+
+    def a_dict(self):
+        """
+        Convierte la fila a dict float compatible con calcular_costeo().
+
+        Returns:
+            dict: Claves iguales a COSTEO_REACONDICIONADO_CONFIG / .env REAC_*.
+        """
+        return {
+            'recurso_front_desk_mensual': float(self.recurso_front_desk_mensual),
+            'pct_front_desk': float(self.pct_front_desk),
+            'mantenimiento_materiales': float(self.mantenimiento_materiales),
+            'gastos_operacion_ingeniero': float(self.gastos_operacion_ingeniero),
+            'pct_overhead': float(self.pct_overhead),
+            'pct_mkt': float(self.pct_mkt),
+            'pct_comision_venta': float(self.pct_comision_venta),
+            'pct_margen_ganancia': float(self.pct_margen_ganancia),
+            'pct_iva': float(self.pct_iva),
+            'pct_comision_cobro_base': float(self.pct_comision_cobro_base),
+            'pct_comision_3m': float(self.pct_comision_3m),
+            'pct_comision_6m': float(self.pct_comision_6m),
+            'pct_comision_12m': float(self.pct_comision_12m),
+        }

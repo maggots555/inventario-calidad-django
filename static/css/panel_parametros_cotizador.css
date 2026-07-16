@@ -1,0 +1,56 @@
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   Panel de parámetros del cotizador (profit + reacondicionados)
+   ============================================================ */
+
+.panel-parametros-cotizador .param-card {
+    background-color: var(--card-bg, var(--white));
+    border: 1px solid var(--border-color, var(--gray-200));
+    box-shadow: var(--shadow-sm);
+}
+
+.panel-parametros-cotizador .param-card .card-header {
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--border-color, var(--gray-200));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.panel-parametros-cotizador .nav-tabs .nav-link {
+    color: var(--text-secondary, var(--gray-700));
+    min-height: 44px;
+}
+
+.panel-parametros-cotizador .nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.panel-parametros-cotizador .form-control {
+    min-height: 44px;
+}
+
+.panel-parametros-cotizador code {
+    color: var(--primary-color);
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .panel-parametros-cotizador .param-card {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .panel-parametros-cotizador .param-card .card-header {
+    background-color: #0f172a;
+    border-bottom-color: var(--border-color, #334155);
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .panel-parametros-cotizador .nav-tabs .nav-link.active {
+    color: var(--primary, #60a5fa);
+}
