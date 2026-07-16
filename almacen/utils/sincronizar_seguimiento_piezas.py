@@ -422,11 +422,9 @@ def _notificar_tecnico_pieza_recibida(orden, seguimiento) -> bool:
     Returns:
         bool: True si el email se envió correctamente.
     """
-    # Import diferido para no crear dependencia circular al cargar el módulo
-    from servicio_tecnico.views import (
-        _enviar_notificacion_pieza_recibida,
-        registrar_historial,
-    )
+    # Import diferido: notificación aún vive en views; historial ya está en services
+    from servicio_tecnico.services.historial import registrar_historial
+    from servicio_tecnico.views import _enviar_notificacion_pieza_recibida
 
     try:
         resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)

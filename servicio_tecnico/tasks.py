@@ -208,7 +208,8 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
         # EXPLICACIÓN: Importamos registrar_historial aquí (import local) para
         # evitar importaciones circulares entre tasks.py y views.py.
         try:
-            from .views import registrar_historial
+            # Import diferido: evita ciclos al cargar tasks ↔ views
+            from .services.historial import registrar_historial
 
             # Recuperar el usuario por ID si fue proporcionado
             usuario_empleado = None
@@ -1074,7 +1075,8 @@ def enviar_diagnostico_cliente_task(
         # PASO 7: REGISTRAR EN HISTORIAL
         # ===================================================================
         try:
-            from .views import registrar_historial
+            # Import diferido: evita ciclos al cargar tasks ↔ views
+            from .services.historial import registrar_historial
 
             usuario_empleado = None
             if usuario_id:
