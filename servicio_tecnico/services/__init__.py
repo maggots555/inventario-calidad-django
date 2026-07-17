@@ -9,9 +9,15 @@ sin depender del monolito views.py.
 
 from .historial import registrar_historial
 from .multimedia import comprimir_y_guardar_imagen, comprimir_y_guardar_video
+from .notificaciones_piezas import (
+    enviar_notificacion_pieza_recibida,
+    _enviar_notificacion_pieza_recibida,
+)
 
 __all__ = [
     'registrar_historial',
     'comprimir_y_guardar_imagen',
     'comprimir_y_guardar_video',
+    'enviar_notificacion_pieza_recibida',
+    '_enviar_notificacion_pieza_recibida',
 ]
