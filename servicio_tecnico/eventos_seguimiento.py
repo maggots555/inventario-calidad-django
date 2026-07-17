@@ -135,10 +135,8 @@ def calcular_embudo_enlaces(qs: QuerySet) -> dict:
     Returns:
         dict con total_enlaces, pasos (lista ordenada con totales y tasas %)
     """
-    # Import perezoso: views.py importa este módulo; evitamos ciclo al cargar.
-    from servicio_tecnico.views import _anotar_push_enlaces
-
-    qs = anotar_eventos_enlaces(_anotar_push_enlaces(qs))
+    # anotar_push_enlaces vive en este mismo módulo (antes estaba en views.py).
+    qs = anotar_eventos_enlaces(anotar_push_enlaces(qs))
     total = qs.count()
 
     def tasa(n: int) -> float:
@@ -172,3 +170,74 @@ def calcular_embudo_enlaces(qs: QuerySet) -> dict:
         'con_pdf_diagnostico': con_pdf_dx,
         'pdf_diagnostico_abiertos': pdf_dx,
     }
+
+
+# ---------------------------------------------------------------------------
+# Helpers de queryset para el dashboard de enlaces (movidos desde views.py)
+# ---------------------------------------------------------------------------
+
+def filtrar_enlaces_seguimiento(request):
+    """
+    Helper: construye queryset base de EnlaceSeguimientoCliente
+    aplicando los filtros GET comunes (fecha, responsable, sucursal, tipo_orden).
+    """
+    from .models import EnlaceSeguimientoCliente
+
+    qs = EnlaceSeguimientoCliente.objects.select_related(
+        'orden__responsable_seguimiento',
+        'orden__sucursal',
+        'orden__detalle_equipo',
+    )
+
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    responsable_id = request.GET.get('responsable_id')
+    sucursal_id = request.GET.get('sucursal_id')
+    tipo_orden = request.GET.get('tipo_orden')
+
+    if fecha_desde:
+        qs = qs.filter(fecha_creacion__date__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha_creacion__date__lte=fecha_hasta)
+    if responsable_id:
+        qs = qs.filter(orden__responsable_seguimiento_id=responsable_id)
+    if sucursal_id:
+        qs = qs.filter(orden__sucursal_id=sucursal_id)
+    if tipo_orden and tipo_orden in ('diagnostico', 'venta_mostrador'):
+        qs = qs.filter(orden__tipo_servicio=tipo_orden)
+
+    return qs
+
+# Alias con guion bajo: compatibilidad con código que aún use el nombre antiguo
+_filtrar_enlaces_seguimiento = filtrar_enlaces_seguimiento
+
+
+def anotar_push_enlaces(qs):
+    """
+    Anota un queryset de EnlaceSeguimientoCliente con métricas de push del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cada enlace puede tener cero o más PushSubscriptionCliente (un dispositivo/navegador).
+    Aquí calculamos en una sola consulta SQL si hay al menos una suscripción activa,
+    cuántos dispositivos activos hay y la fecha más reciente de suscripción.
+    """
+    from django.db.models import Count, Exists, Max, OuterRef, Q
+    from notificaciones.models import PushSubscriptionCliente
+
+    subs_activas = PushSubscriptionCliente.objects.filter(
+        enlace=OuterRef('pk'),
+        activa=True,
+    )
+    return qs.annotate(
+        push_activo=Exists(subs_activas),
+        push_dispositivos=Count(
+            'push_subscriptions',
+            filter=Q(push_subscriptions__activa=True),
+        ),
+        push_fecha=Max(
+            'push_subscriptions__fecha_creada',
+            filter=Q(push_subscriptions__activa=True),
+        ),
+    )
+
+_anotar_push_enlaces = anotar_push_enlaces
