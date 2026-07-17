@@ -64,17 +64,16 @@ class CompatibilidadFase2ReexportsTest(SimpleTestCase):
         )
         self.assertIs(st_views.perfil_empleado, views_perfil.perfil_empleado)
 
-    def test_chat_seguimiento_sigue_en_views_py(self):
+    def test_chat_seguimiento_no_esta_en_ia_diagnostico(self):
         """
-        chat_seguimiento_cliente NO se movió en Fase 2 (va en Fase 3).
+        chat_seguimiento_cliente NO pertenece a views_ia_diagnostico.
 
         EXPLICACIÓN PARA PRINCIPIANTES:
-        Estaba físicamente entre pulir y transcribir. Lo dejamos en el monolito
-        para no romper el portal público ni config/urls.py en este deploy.
+        En Fase 2 el chat seguía en el monolito (entre pulir y transcribir).
+        En Fase 3 se movió a views_seguimiento_cliente.py. En ambos casos
+        NO debe mezclarse con las vistas de pulir/transcribir diagnóstico.
         """
-        # Debe existir como función definida en views (no solo reexport)
         self.assertTrue(callable(st_views.chat_seguimiento_cliente))
-        # No debe vivir en el módulo de IA diagnóstico
         self.assertFalse(
             hasattr(views_ia_diagnostico, 'chat_seguimiento_cliente'),
             msg='chat_seguimiento_cliente no debe estar en views_ia_diagnostico',
