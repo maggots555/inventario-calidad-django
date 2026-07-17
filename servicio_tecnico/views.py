@@ -51,8 +51,18 @@ from .models import (
 # Reexportamos aquí para que urls.py (views.foo) e imports antiguos sigan igual.
 # Portal cliente / chat viven en views_seguimiento_cliente.py (reexport).
 # Dashboards encuestas/feedback/enlaces: Fase 4 (views_encuestas, etc.).
+# Multimedia (compressors + eliminar/descargar): Fase 5.
 from .decorators import cache_page_dashboard, permission_required_with_message
 from .services.historial import registrar_historial
+from .services.multimedia import (  # noqa: F401
+    comprimir_y_guardar_imagen,
+    comprimir_y_guardar_video,
+)
+from .views_multimedia import (  # noqa: F401
+    descargar_imagen_original,
+    eliminar_imagen,
+    eliminar_video,
+)
 from .views_sicser import consultar_sicser, importar_orden_sicser  # noqa: F401
 from .views_referencias_gama import (  # noqa: F401
     crear_referencia_gama,
@@ -3287,599 +3297,12 @@ def confirmar_envio_vigencia_vencida(request, orden_id):
 # ============================================================================
 
 
-def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
-    """
-    Comprime y guarda una imagen con la estructura de carpetas solicitada.
-
-    Args:
-        orden: OrdenServicio a la que pertenece la imagen
-        imagen_file: Archivo de imagen subido
-        tipo: Tipo de imagen (ingreso, egreso, etc.)
-        descripcion: Descripción opcional
-        empleado: Empleado que sube la imagen
-    
-    Returns:
-        ImagenOrden: Registro de imagen creado con ambas versiones
-    """
-    from django.core.files.base import ContentFile
-    from io import BytesIO
-    import time
-    
-    # Obtener número de serie del equipo
-    service_tag = orden.detalle_equipo.numero_serie
-    
-    # Crear timestamp único
-    timestamp = int(time.time() * 1000)  # Milisegundos
-    
-    # Extensión del archivo original
-    extension = os.path.splitext(imagen_file.name)[1].lower()
-    if not extension:
-        extension = '.jpg'
-    
-    # Nombre del archivo: {tipo}_{timestamp}{extension}
-    nombre_archivo = f"{tipo}_{timestamp}{extension}"
-    nombre_archivo_original = f"{tipo}_{timestamp}_original{extension}"
-    
-    # Abrir imagen con Pillow
-    img_original = Image.open(imagen_file)
-    
-    # Corregir rotación EXIF antes de cualquier procesamiento.
-    # Las fotos tomadas con celular incluyen un metadato EXIF que indica cómo
-    # rotarlas al mostrarlas. Sin esta corrección, Pillow guarda los píxeles
-    # en la orientación cruda del sensor (puede salir girada 90°).
-    # exif_transpose() aplica esa rotación y elimina el metadato para que
-    # cualquier visor (WhatsApp, Windows, etc.) la vea siempre derecha.
-    img_original = ImageOps.exif_transpose(img_original)
-    
-    # Convertir a RGB si es necesario (para JPG)
-    if img_original.mode in ('RGBA', 'LA', 'P'):
-        background = Image.new('RGB', img_original.size, (255, 255, 255))
-        background.paste(img_original, mask=img_original.split()[-1] if img_original.mode == 'RGBA' else None)
-        img_original = background
-    
-    # ========================================================================
-    # GUARDAR IMAGEN ORIGINAL (SIN COMPRIMIR - ALTA RESOLUCIÓN)
-    # ========================================================================
-    buffer_original = BytesIO()
-    img_original.save(buffer_original, format='JPEG', quality=95, optimize=False)
-    buffer_original.seek(0)
-    
-    # ========================================================================
-    # CREAR VERSIÓN COMPRIMIDA PARA GALERÍA
-    # ========================================================================
-    img_comprimida = img_original.copy()
-    max_size = (1920, 1920)
-    img_comprimida.thumbnail(max_size, Image.Resampling.LANCZOS)
-    
-    # Guardar versión comprimida en buffer
-    buffer_comprimido = BytesIO()
-    img_comprimida.save(buffer_comprimido, format='JPEG', quality=85, optimize=True)
-    buffer_comprimido.seek(0)
-    
-    # ========================================================================
-    # CREAR REGISTRO DE IMAGENORDEN
-    # ========================================================================
-    imagen_orden = ImagenOrden(
-        orden=orden,
-        tipo=tipo,
-        descripcion=descripcion,
-        subido_por=empleado
-    )
-    
-    # Guardar archivo comprimido (para galería)
-    imagen_orden.imagen.save(nombre_archivo, ContentFile(buffer_comprimido.getvalue()), save=False)
-    
-    # Guardar archivo original (para descargas)
-    imagen_orden.imagen_original.save(nombre_archivo_original, ContentFile(buffer_original.getvalue()), save=False)
-    
-    # Guardar el objeto (esto dispara el save() del modelo que crea el historial)
-    imagen_orden.save()
-    
-    return imagen_orden
-
-
 # ============================================================================
-# FUNCIÓN AUXILIAR: Comprimir y Guardar Video con FFmpeg
+# MULTIMEDIA (Fase 5):
+#   compressors → services/multimedia.py
+#   descargar/eliminar → views_multimedia.py (reexport al inicio)
+# detalle_orden importa comprimir_y_guardar_imagen desde services.multimedia
 # ============================================================================
-
-def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
-    """
-    Comprime un video usando FFmpeg y guarda el resultado junto a un thumbnail.
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    - Recibe el video crudo del formulario (puede ser .mp4, .mov, .avi, etc.)
-    - Lo comprime a H.264/AAC con FFmpeg al estándar acordado (máx 60 s, CRF 28)
-    - Extrae un thumbnail del segundo 1 del video comprimido
-    - Guarda el VideoOrden en la base de datos (el save() del modelo crea historial)
-
-    Args:
-        orden: OrdenServicio a la que pertenece el video
-        video_file: Archivo de video subido (InMemoryUploadedFile o TemporaryUploadedFile)
-        tipo: Tipo de video (ingreso, diagnostico, reparacion, egreso, autorizacion, packing)
-        descripcion: Descripción opcional del video
-        empleado: Empleado que sube el video
-
-    Returns:
-        VideoOrden: Registro creado con video comprimido y thumbnail
-    
-    Raises:
-        RuntimeError: Si FFmpeg no está disponible o falla la compresión
-    """
-    import subprocess
-    import tempfile
-    import time
-    from django.core.files.base import ContentFile
-    from pathlib import Path as PPath
-
-    # Número de serie del equipo para logging
-    service_tag = orden.detalle_equipo.numero_serie
-
-    # Timestamp único para nombres de archivo
-    timestamp = int(time.time() * 1000)
-
-    # Extensión de entrada (preservar para que FFmpeg detecte el codec de entrada)
-    extension_entrada = os.path.splitext(video_file.name)[1].lower()
-    if not extension_entrada:
-        extension_entrada = '.mp4'
-
-    # Nombre base del archivo de salida (siempre .mp4)
-    nombre_video = f"{tipo}_{timestamp}.mp4"
-    nombre_thumb = f"{tipo}_{timestamp}_thumb.jpg"
-
-    # =========================================================================
-    # ESCRIBIR ARCHIVO TEMPORAL DE ENTRADA
-    # =========================================================================
-    with tempfile.NamedTemporaryFile(suffix=extension_entrada, delete=False) as tmp_in:
-        for chunk in video_file.chunks():
-            tmp_in.write(chunk)
-        tmp_in_path = tmp_in.name
-
-    tmp_out_path = tmp_in_path + '_out.mp4'
-    tmp_thumb_path = tmp_in_path + '_thumb.jpg'
-
-    # Resolver ruta absoluta de ffmpeg igual que en ollama_client.py:
-    # Gunicorn corre con un PATH reducido que puede no incluir el directorio
-    # de ffmpeg. shutil.which() busca en el PATH del proceso; si no lo encuentra,
-    # cae al fallback de ruta absoluta conocida en producción.
-    import shutil
-    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
-
-    try:
-        # =====================================================================
-        # COMPRIMIR CON FFMPEG
-        # Comando acordado: H.264 + AAC, máx 1080p, CRF 23, fast
-        # El límite de duración es 600 s (10 min) como red de seguridad contra
-        # inputs maliciosos. El límite real de UX es 90 MB de tamaño de archivo,
-        # controlado en el frontend (auto-stop de MediaRecorder) y en el form
-        # de validación Django (forms.py).
-        # =====================================================================
-        cmd_compress = [
-            ffmpeg_bin,
-            '-protocol_whitelist', 'file,pipe,fd',
-            '-i', tmp_in_path,
-            '-vf', (
-                "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
-                "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
-                "unsharp=5:5:1.0:5:5:0.0"
-            ),
-            '-c:v', 'libx264',
-            '-crf', '23',
-            '-preset', 'fast',
-            '-pix_fmt', 'yuv420p',
-            '-profile:v', 'main',
-            '-level', '4.0',
-            '-c:a', 'aac',
-            '-b:a', '128k',    # Subido de 96k: evita distorsión al recodificar Opus→AAC
-            '-ar', '48000',    # Sample rate explícito — previene variación entre dispositivos
-            '-map', '0:v:0',
-            '-map', '0:a:0?',
-            '-movflags', '+faststart',
-            '-t', '600',  # Safety-limit: 10 min máx (el límite real de UX es 90 MB en el cliente)
-            '-map_metadata', '-1',
-            '-y',
-            tmp_out_path,
-        ]
-        resultado = subprocess.run(
-            cmd_compress,
-            capture_output=True,
-            text=True,
-            timeout=300,  # 5 minutos máximo
-        )
-        if resultado.returncode != 0:
-            raise RuntimeError(
-                f'FFmpeg falló (código {resultado.returncode}): {resultado.stderr[-500:]}'
-            )
-
-        # =====================================================================
-        # EXTRAER THUMBNAIL DEL SEGUNDO 1
-        # =====================================================================
-        cmd_thumb = [
-            ffmpeg_bin,
-            '-protocol_whitelist', 'file,pipe,fd',
-            '-i', tmp_out_path,
-            '-ss', '00:00:01',
-            '-vframes', '1',
-            '-q:v', '3',
-            '-y',
-            tmp_thumb_path,
-        ]
-        subprocess.run(cmd_thumb, capture_output=True, timeout=30)
-        # Si el thumbnail falla no es crítico; VideoOrden.thumbnail puede quedar vacío
-
-        # =====================================================================
-        # MEDIR DURACIÓN CON FFPROBE (antes de crear el registro)
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # ffprobe lee los metadatos del video comprimido para obtener su duración
-        # exacta en segundos. Si falla por cualquier motivo, simplemente guarda
-        # None — no es un error crítico.
-        # =====================================================================
-        duracion_segundos = None
-        try:
-            cmd_probe = [
-                'ffprobe', '-v', 'error',
-                '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1',
-                tmp_out_path,
-            ]
-            resultado_probe = subprocess.run(
-                cmd_probe, capture_output=True, text=True, timeout=10
-            )
-            if resultado_probe.returncode == 0:
-                duracion_segundos = int(float(resultado_probe.stdout.strip()))
-        except Exception:
-            pass  # No crítico — el video se guarda igualmente sin duración
-
-        # =====================================================================
-        # CREAR REGISTRO VideoOrden
-        # =====================================================================
-        tamano_original_mb = round(video_file.size / (1024 * 1024), 2)
-        tamano_final_mb    = round(os.path.getsize(tmp_out_path) / (1024 * 1024), 2)
-
-        video_orden = VideoOrden(
-            orden=orden,
-            tipo=tipo,
-            descripcion=descripcion,
-            subido_por=empleado,
-            tamano_original_mb=tamano_original_mb,
-            tamano_final_mb=tamano_final_mb,
-            duracion_segundos=duracion_segundos,
-        )
-
-        # Guardar video comprimido usando File() para no cargar todo en RAM
-        from django.core.files import File
-        with open(tmp_out_path, 'rb') as f_video:
-            video_orden.video.save(nombre_video, File(f_video), save=False)
-
-        # Guardar thumbnail (si se generó) — es pequeño, ContentFile está bien
-        if PPath(tmp_thumb_path).exists():
-            with open(tmp_thumb_path, 'rb') as f_thumb:
-                video_orden.thumbnail.save(nombre_thumb, ContentFile(f_thumb.read()), save=False)
-
-        # save() del modelo registra el historial automáticamente
-        video_orden.save()
-
-        return video_orden
-
-    finally:
-        # Limpiar archivos temporales siempre, aunque haya error
-        for tmp_path in [tmp_in_path, tmp_out_path, tmp_thumb_path]:
-            try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except Exception:
-                pass
-
-
-# ============================================================================
-# VISTA: Descargar Imagen Original
-# ============================================================================
-
-@login_required
-@permission_required_with_message('servicio_tecnico.view_imagenorden')
-def descargar_imagen_original(request, imagen_id):
-    """
-    Descarga la imagen original (alta resolución) de una orden.
-
-    Args:
-        request: Objeto HttpRequest
-        imagen_id: ID de la ImagenOrden
-    
-    Returns:
-        HttpResponse con el archivo de imagen para descargar
-    """
-    from django.http import FileResponse, Http404, HttpResponseForbidden
-    from pathlib import Path
-    
-    # Obtener la imagen o retornar 404
-    imagen = get_object_or_404(ImagenOrden, pk=imagen_id)
-    
-    # Verificar que el usuario tiene permiso (empleado activo)
-    try:
-        empleado = request.user.empleado
-        if not empleado.activo:
-            return HttpResponseForbidden("No tienes permisos para descargar imágenes.")
-    except:
-        return HttpResponseForbidden("Debes ser un empleado activo para descargar imágenes.")
-    
-    # Verificar que existe la imagen original
-    if not imagen.imagen_original:
-        messages.warning(
-            request,
-            '⚠️ Esta imagen no tiene versión original guardada. '
-            'Se descargará la versión comprimida.'
-        )
-        archivo_imagen = imagen.imagen
-    else:
-        archivo_imagen = imagen.imagen_original
-    
-    # Verificar que tenemos una ruta de archivo
-    if not archivo_imagen:
-        raise Http404("No hay archivo de imagen asociado.")
-    
-    # EXPLICACIÓN: Usar imagen.path que incluye automáticamente el prefijo del país
-    # Esto funciona tanto para imágenes antiguas como nuevas (compatibilidad multi-país)
-    try:
-        archivo_path = Path(archivo_imagen.path)
-        
-        # Verificar que el archivo existe físicamente
-        if not archivo_path.exists():
-            print(f"[DESCARGA] ❌ Archivo no existe: {archivo_path}")
-            raise Http404("El archivo de imagen no existe en el sistema de almacenamiento.")
-        
-        if not archivo_path.is_file():
-            print(f"[DESCARGA] ❌ La ruta no es un archivo: {archivo_path}")
-            raise Http404("La ruta de imagen no corresponde a un archivo válido.")
-        
-        print(f"[DESCARGA] ✅ Imagen encontrada: {archivo_path}")
-        
-    except Exception as e:
-        print(f"[DESCARGA] ❌ Error al acceder a la imagen: {e}")
-        raise Http404(f"Error al acceder a la imagen: {str(e)}")
-    
-    # Obtener el nombre del archivo original
-    nombre_archivo = os.path.basename(archivo_imagen.name)
-    
-    # Crear nombre descriptivo para descarga
-    tipo_texto = imagen.get_tipo_display()
-    orden_numero = imagen.orden.numero_orden_interno
-    service_tag = imagen.orden.detalle_equipo.numero_serie
-    nombre_descarga = f"{orden_numero}_{service_tag}_{tipo_texto}_{nombre_archivo}"
-    
-    # Abrir archivo desde la ruta encontrada y crear respuesta
-    # IMPORTANTE: Usamos archivo_path (Path object) en lugar de archivo_imagen.open()
-    # porque archivo_path ya contiene la ubicación correcta (disco principal o alterno)
-    archivo = archivo_path.open('rb')
-    response = FileResponse(archivo, content_type='image/jpeg')
-    response['Content-Disposition'] = f'attachment; filename="{nombre_descarga}"'
-    
-    return response
-
-
-# ============================================================================
-# VISTA: Eliminar Imagen de Orden
-# ============================================================================
-
-@login_required
-@permission_required_with_message('servicio_tecnico.delete_imagenorden')
-@require_http_methods(["POST"])
-def eliminar_imagen(request, imagen_id):
-    """
-    Elimina una imagen de una orden de servicio.
-
-    Args:
-        request: Objeto HttpRequest
-        imagen_id: ID de la ImagenOrden a eliminar
-    
-    Returns:
-        JsonResponse con éxito o error
-    """
-    # Verificar que el usuario es un empleado activo
-    try:
-        empleado_actual = request.user.empleado
-        if not empleado_actual.activo:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes permisos para eliminar imágenes.'
-            }, status=403)
-    except:
-        return JsonResponse({
-            'success': False,
-            'error': 'Debes ser un empleado activo para eliminar imágenes.'
-        }, status=403)
-    
-    # Obtener la imagen o retornar error 404
-    try:
-        imagen = ImagenOrden.objects.select_related('orden', 'subido_por').get(pk=imagen_id)
-    except ImagenOrden.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'La imagen no existe.'
-        }, status=404)
-    
-    try:
-        # Guardar información para el historial antes de eliminar
-        orden = imagen.orden
-        tipo_imagen = imagen.get_tipo_display()
-        descripcion_imagen = imagen.descripcion or imagen.nombre_archivo
-        
-        # Eliminar archivos físicos del sistema de archivos
-        # EXPLICACIÓN: Usar imagen.path que incluye el prefijo del país automáticamente
-        from pathlib import Path
-        
-        archivos_eliminados = []
-        
-        # Eliminar imagen comprimida
-        if imagen.imagen:
-            try:
-                archivo_path = Path(imagen.imagen.path)
-                
-                if archivo_path.exists() and archivo_path.is_file():
-                    os.remove(str(archivo_path))
-                    archivos_eliminados.append('imagen comprimida')
-                    print(f"[ELIMINAR] ✅ Imagen comprimida eliminada: {archivo_path.name}")
-                else:
-                    print(f"[ELIMINAR] ⚠️ Imagen comprimida no encontrada: {archivo_path}")
-                    
-            except Exception as e:
-                print(f"[ELIMINAR] ⚠️ Error al eliminar archivo comprimido: {str(e)}")
-        
-        # Eliminar imagen original
-        if imagen.imagen_original:
-            try:
-                archivo_path = Path(imagen.imagen_original.path)
-                
-                if archivo_path.exists() and archivo_path.is_file():
-                    os.remove(str(archivo_path))
-                    archivos_eliminados.append('imagen original')
-                    print(f"[ELIMINAR] ✅ Imagen original eliminada: {archivo_path.name}")
-                else:
-                    print(f"[ELIMINAR] ⚠️ Imagen original no encontrada: {archivo_path}")
-                    
-            except Exception as e:
-                print(f"[ELIMINAR] ⚠️ Error al eliminar archivo original: {str(e)}")
-        
-        # Eliminar registro de la base de datos
-        imagen.delete()
-        
-        # Registrar en historial
-        HistorialOrden.objects.create(
-            orden=orden,
-            tipo_evento='imagen',
-            comentario=f'Imagen {tipo_imagen} eliminada: {descripcion_imagen} (Eliminada por: {empleado_actual.nombre_completo})',
-            usuario=empleado_actual,
-            es_sistema=False
-        )
-        
-        # Mensaje de éxito
-        mensaje_archivos = f" ({', '.join(archivos_eliminados)})" if archivos_eliminados else ""
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'✅ Imagen {tipo_imagen} eliminada correctamente{mensaje_archivos}.',
-            'imagen_id': imagen_id
-        })
-        
-    except Exception as e:
-        # Capturar cualquier error inesperado
-        import traceback
-        error_detallado = traceback.format_exc()
-        print(f"❌ ERROR AL ELIMINAR IMAGEN: {error_detallado}")
-        
-        return JsonResponse({
-            'success': False,
-            'error': f'Error inesperado al eliminar la imagen: {str(e)}',
-            'error_type': type(e).__name__
-        }, status=500)
-
-
-# ============================================================================
-# VISTA: Eliminar Video de Orden
-# ============================================================================
-
-@login_required
-@permission_required_with_message('servicio_tecnico.delete_videoorden')
-@require_http_methods(["POST"])
-def eliminar_video(request, video_id):
-    """
-    Elimina un video de una orden de servicio.
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    - Solo acepta POST (nunca GET, para evitar borrados accidentales con links)
-    - Borra el archivo de video Y el thumbnail del sistema de archivos
-    - Registra el evento en el historial de la orden
-    - Devuelve JSON para que el frontend pueda actualizar la UI sin recargar
-
-    Args:
-        request: Objeto HttpRequest
-        video_id: ID del VideoOrden a eliminar
-    
-    Returns:
-        JsonResponse con éxito o error
-    """
-    # Verificar que el usuario es un empleado activo
-    try:
-        empleado_actual = request.user.empleado
-        if not empleado_actual.activo:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes permisos para eliminar videos.'
-            }, status=403)
-    except Exception:
-        return JsonResponse({
-            'success': False,
-            'error': 'Debes ser un empleado activo para eliminar videos.'
-        }, status=403)
-
-    # Obtener el video o retornar error 404
-    try:
-        video = VideoOrden.objects.select_related('orden', 'subido_por').get(pk=video_id)
-    except VideoOrden.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': 'El video no existe.'
-        }, status=404)
-
-    try:
-        from pathlib import Path
-
-        orden = video.orden
-        tipo_video = video.get_tipo_display()
-        descripcion_video = video.descripcion or video.nombre_archivo
-        archivos_eliminados = []
-
-        # Eliminar archivo de video comprimido
-        if video.video:
-            try:
-                archivo_path = Path(video.video.path)
-                if archivo_path.exists() and archivo_path.is_file():
-                    os.remove(str(archivo_path))
-                    archivos_eliminados.append('video')
-                    print(f"[ELIMINAR VIDEO] ✅ Video eliminado: {archivo_path.name}")
-                else:
-                    print(f"[ELIMINAR VIDEO] ⚠️ Video no encontrado: {archivo_path}")
-            except Exception as e:
-                print(f"[ELIMINAR VIDEO] ⚠️ Error al eliminar archivo de video: {str(e)}")
-
-        # Eliminar thumbnail
-        if video.thumbnail:
-            try:
-                thumb_path = Path(video.thumbnail.path)
-                if thumb_path.exists() and thumb_path.is_file():
-                    os.remove(str(thumb_path))
-                    archivos_eliminados.append('thumbnail')
-                    print(f"[ELIMINAR VIDEO] ✅ Thumbnail eliminado: {thumb_path.name}")
-                else:
-                    print(f"[ELIMINAR VIDEO] ⚠️ Thumbnail no encontrado: {thumb_path}")
-            except Exception as e:
-                print(f"[ELIMINAR VIDEO] ⚠️ Error al eliminar thumbnail: {str(e)}")
-
-        # Eliminar registro de base de datos
-        video.delete()
-
-        # Registrar en historial
-        HistorialOrden.objects.create(
-            orden=orden,
-            tipo_evento='video',
-            comentario=f'Video {tipo_video} eliminado: {descripcion_video} (Eliminado por: {empleado_actual.nombre_completo})',
-            usuario=empleado_actual,
-            es_sistema=False,
-        )
-
-        mensaje_archivos = f" ({', '.join(archivos_eliminados)})" if archivos_eliminados else ""
-        return JsonResponse({
-            'success': True,
-            'message': f'✅ Video {tipo_video} eliminado correctamente{mensaje_archivos}.',
-            'video_id': video_id,
-        })
-
-    except Exception as e:
-        import traceback
-        print(f"❌ ERROR AL ELIMINAR VIDEO: {traceback.format_exc()}")
-        return JsonResponse({
-            'success': False,
-            'error': f'Error inesperado al eliminar el video: {str(e)}',
-            'error_type': type(e).__name__,
-        }, status=500)
 
 
 # ============================================================================
@@ -13908,12 +13331,10 @@ def exportar_dashboard_seguimiento_piezas(request):
 # CONCENTRADO SEMANAL: vive en views_concentrado.py (reexport al inicio).
 # ============================================================================
 
-
 # ============================================================================
 # FEEDBACK SATISFACCIÓN (confirmar + formulario público):
 # vive en views_seguimiento_cliente.py (reexport al inicio).
 # ============================================================================
-
 
 # ============================================================================
 # DASHBOARDS FASE 4 (encuestas / feedback rechazo / enlaces):
@@ -13922,11 +13343,9 @@ def exportar_dashboard_seguimiento_piezas(request):
 # Helpers de push/filtro de enlaces: eventos_seguimiento.py
 # ============================================================================
 
-
 # ============================================================================
 # PERFIL / DIRECTORIO: viven en views_perfil.py (reexport al inicio).
 # ============================================================================
-
 
 # ============================================================================
 # IA DIAGNÓSTICO (pulir): vive en views_ia_diagnostico.py (reexport al inicio).
@@ -13936,16 +13355,13 @@ def exportar_dashboard_seguimiento_piezas(request):
 # CHAT SEGUIMIENTO CLIENTE: vive en views_seguimiento_cliente.py (reexport).
 # ============================================================================
 
-
 # ============================================================================
 # IA DIAGNÓSTICO (transcribir audio): vive en views_ia_diagnostico.py (reexport).
 # ============================================================================
 
-
 # ============================================================================
 # VIDEO RESUMEN: vive en views_video_resumen.py (reexport al inicio).
 # ============================================================================
-
 
 # ============================================================================
 # SICSER: consultar_sicser / importar_orden_sicser viven en views_sicser.py

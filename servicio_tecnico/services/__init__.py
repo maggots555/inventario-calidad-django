@@ -8,5 +8,10 @@ sin depender del monolito views.py.
 """
 
 from .historial import registrar_historial
+from .multimedia import comprimir_y_guardar_imagen, comprimir_y_guardar_video
 
-__all__ = ['registrar_historial']
+__all__ = [
+    'registrar_historial',
+    'comprimir_y_guardar_imagen',
+    'comprimir_y_guardar_video',
+]
