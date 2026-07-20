@@ -5012,25 +5012,50 @@ def enviar_formato_oow_email_task(
             return {'success': False, 'error': 'Sin PDF o email'}
 
         orden = formato.orden
-        asunto = (
-            f'Formato de Servicio OOW — '
-            f'{orden.detalle_equipo.orden_cliente or orden.numero_orden_interno}'
+        detalle = orden.detalle_equipo
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # En el correo mostramos la orden SICSER (folio / orden cliente),
+        # no el número interno ORD-… de SIGMA.
+        orden_sicser = (
+            detalle.folio_sicser
+            or detalle.orden_cliente
+            or orden.numero_orden_interno
         )
+        asunto = f'Formato de Servicio OOW — {orden_sicser}'
         cuerpo = (
             f'<p>Estimado(a) cliente,</p>'
             f'<p>Adjuntamos el <strong>Formato de Servicio Fuera de Garantía</strong> '
             f'correspondiente a su equipo.</p>'
-            f'<p>Orden: <b>{orden.numero_orden_interno}</b><br>'
-            f'Service Tag: <b>{orden.detalle_equipo.numero_serie}</b></p>'
+            f'<p>Orden: <b>{orden_sicser}</b><br>'
+            f'Service Tag: <b>{detalle.numero_serie or "—"}</b></p>'
             f'<p>SIC Comercialización y Servicios</p>'
         )
+
+        # Remitente de Servicio Técnico (no el de Score Card).
+        # Si SERVICIO_TECNICO_FROM_EMAIL no está en .env, reutilizamos la
+        # dirección de DEFAULT_FROM_EMAIL pero con el nombre correcto.
+        from email.utils import formataddr, parseaddr
+        from decouple import config
+
+        st_from = (config('SERVICIO_TECNICO_FROM_EMAIL', default='') or '').strip()
+        if st_from:
+            from_email = st_from
+        else:
+            _nombre, _addr = parseaddr(
+                getattr(settings, 'DEFAULT_FROM_EMAIL', '') or ''
+            )
+            from_email = (
+                formataddr(('Servicio Técnico System', _addr))
+                if _addr
+                else getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            )
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
         # EmailMessage.to acepta una lista: se envía el mismo PDF a todos (máx. 3).
         email_msg = EmailMessage(
             subject=asunto,
             body=cuerpo,
-            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+            from_email=from_email,
             to=destinatarios,
         )
         email_msg.content_subtype = 'html'
@@ -5041,7 +5066,7 @@ def enviar_formato_oow_email_task(
         pdf_mime.add_header(
             'Content-Disposition',
             'attachment',
-            filename=f'FormatoOOW_{orden.numero_orden_interno}.pdf',
+            filename=f'FormatoOOW_{orden_sicser}.pdf',
         )
         email_msg.attach(pdf_mime)
         email_msg.send()
