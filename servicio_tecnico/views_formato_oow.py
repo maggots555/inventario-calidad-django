@@ -102,6 +102,7 @@ def formato_oow_wizard(request, orden_id: int):
         'evidencias': evidencias,
         'url_guardar': reverse('servicio_tecnico:formato_oow_guardar', args=[orden.pk]),
         'url_finalizar': reverse('servicio_tecnico:formato_oow_finalizar', args=[orden.pk]),
+        'url_reenviar': reverse('servicio_tecnico:formato_oow_reenviar_email', args=[orden.pk]),
         'url_pdf': reverse('servicio_tecnico:formato_oow_pdf', args=[orden.pk]),
         'url_detalle': reverse('servicio_tecnico:detalle_orden', args=[orden.pk]),
     }
@@ -135,7 +136,13 @@ def formato_oow_guardar(request, orden_id: int):
 
     try:
         formato = obtener_o_crear_borrador(orden, usuario=request.user)
-        formato = aplicar_payload_borrador(formato, payload, usuario=request.user)
+        # Si ya está finalizado, igual se permiten ediciones (luego Regenerar PDF)
+        formato = aplicar_payload_borrador(
+            formato,
+            payload,
+            usuario=request.user,
+            permitir_finalizado=(formato.estado == 'finalizado'),
+        )
     except FormatoOOWError as exc:
         return _json_error(str(exc))
     except Exception as exc:
@@ -144,7 +151,11 @@ def formato_oow_guardar(request, orden_id: int):
 
     return JsonResponse({
         'success': True,
-        'mensaje': 'Borrador guardado',
+        'mensaje': (
+            'Datos guardados. Usa “Regenerar PDF” para actualizar el documento.'
+            if formato.estado == 'finalizado'
+            else 'Borrador guardado'
+        ),
         'formato': serializar_formato(formato),
     })
 
@@ -178,9 +189,19 @@ def formato_oow_finalizar(request, orden_id: int):
 
     try:
         formato = obtener_o_crear_borrador(orden, usuario=request.user)
+        # Regenerar / finalizar siempre puede volver a aplicar datos aunque
+        # el formato ya estuviera marcado como finalizado.
+        solo_regenerar = bool(payload.get('solo_regenerar'))
+        forzar = bool(payload.get('forzar_regenerar')) or solo_regenerar or (
+            formato.estado == 'finalizado'
+        )
         if payload:
-            formato = aplicar_payload_borrador(formato, payload, usuario=request.user)
-        forzar = bool(payload.get('forzar_regenerar'))
+            formato = aplicar_payload_borrador(
+                formato,
+                payload,
+                usuario=request.user,
+                permitir_finalizado=True,
+            )
         formato = finalizar_formato(
             formato,
             usuario=request.user,
@@ -192,10 +213,13 @@ def formato_oow_finalizar(request, orden_id: int):
         logger.exception('Error finalizando formato OOW: %s', exc)
         return _json_error(f'Error al finalizar: {exc}', status=500)
 
-    # Envío de correo opcional (hasta 3 destinatarios)
+    # Envío de correo opcional (hasta 3 destinatarios).
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # “Regenerar PDF” manda solo_regenerar=True y NUNCA reenvía el correo.
     from .services.formato_oow import lista_emails_envio
     emails = lista_emails_envio(formato)
-    if payload.get('enviar_email') and emails and formato.pdf:
+    enviar = bool(payload.get('enviar_email')) and not solo_regenerar
+    if enviar and emails and formato.pdf:
         try:
             from .tasks import enviar_formato_oow_email_task
             enviar_formato_oow_email_task.delay(
@@ -208,9 +232,88 @@ def formato_oow_finalizar(request, orden_id: int):
 
     return JsonResponse({
         'success': True,
-        'mensaje': 'Formato finalizado y PDF generado',
+        'mensaje': (
+            'PDF regenerado (sin reenviar correo)'
+            if solo_regenerar
+            else 'Formato finalizado y PDF generado'
+        ),
         'formato': serializar_formato(formato),
         'pdf_url': reverse('servicio_tecnico:formato_oow_pdf', args=[orden.pk]),
+    })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
+@require_http_methods(['POST'])
+def formato_oow_reenviar_email(request, orden_id: int):
+    """
+    Reenvía el PDF del formato OOW por correo (sin regenerar el PDF).
+
+    Body JSON opcional:
+        emails_envio: lista de hasta 3 correos (actualiza destinatarios antes)
+        email_envio: correo único (compatibilidad)
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Útil cuando el cliente no recibió el mail o hay que mandarlo a otra persona.
+    No vuelve a crear el PDF: usa el que ya está guardado.
+
+    Efectos secundarios:
+        Puede actualizar emails_envio; encola Celery con db_alias.
+    """
+    from config.paises_config import get_pais_actual
+    from .models import FormatoServicioOOW
+    from .services.formato_oow import (
+        aplicar_emails_al_formato,
+        lista_emails_envio,
+        serializar_formato,
+    )
+
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    try:
+        formato = FormatoServicioOOW.objects.get(orden=orden)
+    except FormatoServicioOOW.DoesNotExist:
+        return _json_error('No hay formato OOW para esta orden.')
+
+    if formato.estado != 'finalizado' or not formato.pdf:
+        return _json_error(
+            'Primero debes finalizar el formato y generar el PDF '
+            'antes de reenviar el correo.'
+        )
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return _json_error('JSON inválido')
+
+    # Actualizar destinatarios si el usuario cambió los campos de email
+    if 'emails_envio' in payload or 'email_envio' in payload:
+        raw = payload.get('emails_envio', payload.get('email_envio'))
+        aplicar_emails_al_formato(formato, raw)
+        formato.save(update_fields=['emails_envio', 'email_envio', 'fecha_actualizacion'])
+
+    emails = lista_emails_envio(formato)
+    if not emails:
+        return _json_error(
+            'Captura al menos un correo en “Email(s) para recibir el formato”.'
+        )
+
+    try:
+        from .tasks import enviar_formato_oow_email_task
+        enviar_formato_oow_email_task.delay(
+            formato_id=formato.pk,
+            usuario_id=request.user.pk,
+            db_alias=get_pais_actual()['db_alias'],
+        )
+    except Exception as exc:
+        logger.exception('No se pudo encolar reenvío formato OOW: %s', exc)
+        return _json_error(f'No se pudo encolar el correo: {exc}', status=500)
+
+    destinarios_txt = ', '.join(emails)
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Correo encolado para: {destinarios_txt}',
+        'emails': emails,
+        'formato': serializar_formato(formato),
     })
 
 

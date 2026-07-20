@@ -22,6 +22,7 @@ from servicio_tecnico import views as st_views
 from servicio_tecnico import views_formato_oow
 from servicio_tecnico.models import DetalleEquipo, FormatoServicioOOW, OrdenServicio
 from servicio_tecnico.services.formato_oow import (
+    FormatoOOWError,
     aplicar_payload_borrador,
     finalizar_formato,
     lista_emails_envio,
@@ -48,6 +49,7 @@ class FormatoOowReexportsTest(SimpleTestCase):
         self.assertIs(st_views.formato_oow_wizard, views_formato_oow.formato_oow_wizard)
         self.assertIs(st_views.formato_oow_guardar, views_formato_oow.formato_oow_guardar)
         self.assertIs(st_views.formato_oow_finalizar, views_formato_oow.formato_oow_finalizar)
+        self.assertIs(st_views.formato_oow_reenviar_email, views_formato_oow.formato_oow_reenviar_email)
         self.assertIs(st_views.formato_oow_pdf, views_formato_oow.formato_oow_pdf)
         self.assertIs(
             st_views.abrir_formato_oow_desde_sicser,
@@ -56,6 +58,11 @@ class FormatoOowReexportsTest(SimpleTestCase):
 
         match = resolve(reverse('servicio_tecnico:formato_oow_wizard', args=[1]))
         self.assertIs(match.func, views_formato_oow.formato_oow_wizard)
+
+        match_reenviar = resolve(
+            reverse('servicio_tecnico:formato_oow_reenviar_email', args=[1])
+        )
+        self.assertIs(match_reenviar.func, views_formato_oow.formato_oow_reenviar_email)
 
         match_abrir = resolve(reverse('servicio_tecnico:abrir_formato_oow_desde_sicser'))
         self.assertIs(match_abrir.func, views_formato_oow.abrir_formato_oow_desde_sicser)
@@ -168,6 +175,196 @@ class FormatoOowServiceTest(TestCase):
         self.assertTrue(final.pdf)
         self.assertTrue(final.pdf.size > 100)
         self.assertTrue(final.version_aviso_privacidad)
+
+    def test_pdf_muestra_accesorios_marcados(self):
+        """
+        Los checkboxes se guardan y el PDF se regenera sin fallar.
+        (Antes usaba ☑/☐ que Helvetica no dibuja; ahora SI/NO en tabla.)
+        """
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': True,
+                'accesorio_maletin': False,
+                'accesorio_mouse': True,
+                'accesorio_teclado': False,
+                'accesorio_monitor': False,
+                'accesorio_otros': True,
+                'accesorios_otros_detalle': 'Bolsa térmica',
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertTrue(formato.accesorio_cargador)
+        self.assertTrue(formato.accesorio_mouse)
+        self.assertFalse(formato.accesorio_maletin)
+        self.assertTrue(formato.accesorio_otros)
+        self.assertEqual(formato.accesorios_otros_detalle, 'Bolsa térmica')
+
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        final = finalizar_formato(formato, usuario=self.user, forzar_regenerar=True)
+        resultado = PDFFormatoServicioOOW(final).generar_pdf()
+        self.assertTrue(resultado['success'])
+        self.assertGreater(len(resultado['buffer'].getvalue()), 100)
+
+        # La sección construye pares SI/NO a partir de los booleans del modelo
+        pares_esperados = {
+            'Cargador': 'SI',
+            'Maletín': 'NO',
+            'Mouse': 'SI',
+            'Teclado': 'NO',
+            'Monitor': 'NO',
+            'Otros': 'SI',
+        }
+        f = final
+        pares_reales = {
+            'Cargador': 'SI' if f.accesorio_cargador else 'NO',
+            'Maletín': 'SI' if f.accesorio_maletin else 'NO',
+            'Mouse': 'SI' if f.accesorio_mouse else 'NO',
+            'Teclado': 'SI' if f.accesorio_teclado else 'NO',
+            'Monitor': 'SI' if f.accesorio_monitor else 'NO',
+            'Otros': 'SI' if f.accesorio_otros else 'NO',
+        }
+        self.assertEqual(pares_reales, pares_esperados)
+
+    def test_regenerar_pdf_ya_finalizado(self):
+        """
+        Tras finalizar, se pueden actualizar datos y regenerar el PDF
+        con permitir_finalizado / forzar_regenerar (sin error).
+        """
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': False,
+                'observaciones_tecnicas': 'Primera versión',
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        final = finalizar_formato(formato, usuario=self.user)
+        self.assertEqual(final.estado, 'finalizado')
+
+        # Sin el flag, no se debe poder editar
+        with self.assertRaises(FormatoOOWError):
+            aplicar_payload_borrador(
+                final,
+                {'accesorio_cargador': True},
+                usuario=self.user,
+            )
+
+        # Con permitir_finalizado: guarda y regenera
+        aplicar_payload_borrador(
+            final,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': True,
+                'observaciones_tecnicas': 'Segunda versión con cargador',
+            },
+            usuario=self.user,
+            permitir_finalizado=True,
+        )
+        final.refresh_from_db()
+        self.assertTrue(final.accesorio_cargador)
+        regenerado = finalizar_formato(
+            final,
+            usuario=self.user,
+            forzar_regenerar=True,
+        )
+        self.assertEqual(regenerado.estado, 'finalizado')
+        self.assertTrue(regenerado.pdf)
+        self.assertIn('cargador', regenerado.observaciones_tecnicas.lower())
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_reenviar_email_encola_task(self):
+        """
+        Reenviar por correo actualiza destinatarios y encola Celery (mock).
+        """
+        from unittest.mock import patch
+
+        from django.contrib.auth.models import Permission
+        from django.contrib.contenttypes.models import ContentType
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from django.test import RequestFactory
+
+        ct = ContentType.objects.get_for_model(OrdenServicio)
+        for codename in ('view_ordenservicio', 'change_ordenservicio'):
+            self.user.user_permissions.add(
+                Permission.objects.get(content_type=ct, codename=codename)
+            )
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'emails_envio': ['viejo@test.local'],
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        finalizar_formato(formato, usuario=self.user)
+        formato.refresh_from_db()
+
+        factory = RequestFactory()
+        request = factory.post(
+            reverse('servicio_tecnico:formato_oow_reenviar_email', args=[self.orden.pk]),
+            data='{"emails_envio":["nuevo1@test.local","nuevo2@test.local"]}',
+            content_type='application/json',
+        )
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        with patch(
+            'servicio_tecnico.tasks.enviar_formato_oow_email_task.delay'
+        ) as mock_delay:
+            resp = views_formato_oow.formato_oow_reenviar_email(
+                request, orden_id=self.orden.pk,
+            )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode('utf-8')
+        self.assertIn('nuevo1@test.local', body)
+        self.assertTrue(mock_delay.called)
+        formato.refresh_from_db()
+        self.assertEqual(
+            lista_emails_envio(formato),
+            ['nuevo1@test.local', 'nuevo2@test.local'],
+        )
 
 
 class FormatoOowVistaTest(TestCase):

@@ -154,6 +154,7 @@ from .views_formato_oow import (  # noqa: F401
     formato_oow_finalizar,
     formato_oow_guardar,
     formato_oow_pdf,
+    formato_oow_reenviar_email,
     formato_oow_subir_evidencia,
     formato_oow_wizard,
 )

@@ -12,6 +12,7 @@
      id="formatoOowApp"
      data-url-guardar="{{ url_guardar }}"
      data-url-finalizar="{{ url_finalizar }}"
+     data-url-reenviar="{{ url_reenviar }}"
      data-url-pdf="{{ url_pdf }}"
      data-url-detalle="{{ url_detalle }}"
      data-url-evidencia="{% url 'servicio_tecnico:formato_oow_subir_evidencia' orden.pk %}"
@@ -46,10 +47,13 @@
     </div>
 
     {% if formato.estado == 'finalizado' %}
-    <div class="alert alert-success" role="status">
-        Formato finalizado.
-        {% if formato.finalizado_en %}({{ formato.finalizado_en|date:"d/m/Y H:i" }}){% endif %}
-        Puedes regenerar el PDF con “Guardar y Finalizar”.
+    <div class="alert alert-info" role="status">
+        <strong>Formato finalizado</strong>
+        {% if formato.finalizado_en %}({{ formato.finalizado_en|date:"d/m/Y H:i" }}){% endif %}.
+        <ul class="mb-0 mt-2">
+            <li><strong>Regenerar PDF</strong> — actualiza el documento (no envía correo).</li>
+            <li><strong>Reenviar por correo</strong> — manda el PDF actual a los emails capturados.</li>
+        </ul>
     </div>
     {% endif %}
 
@@ -315,8 +319,10 @@
                     </div>
                 </div>
             </div>
-            <label class="formato-oow-check mt-3">
-                <input type="checkbox" id="enviarEmail" checked>
+            <label class="formato-oow-check mt-3" id="wrapEnviarEmail"
+                   {% if formato.estado == 'finalizado' %}hidden{% endif %}>
+                <input type="checkbox" id="enviarEmail" checked
+                       {% if formato.estado == 'finalizado' %}disabled{% endif %}>
                 <span>Enviar PDF por correo al finalizar (a los emails capturados, máx. 3)</span>
             </label>
         </div>
@@ -325,11 +331,26 @@
     <div class="formato-oow-actions sticky-bottom py-3">
         <div class="d-flex flex-wrap gap-2 justify-content-center">
             <button type="button" class="btn btn-outline-primary btn-lg" id="btnGuardarBorrador">
-                <i class="bi bi-save"></i> Guardar borrador
+                <i class="bi bi-save"></i>
+                {% if formato.estado == 'finalizado' %}Guardar cambios{% else %}Guardar borrador{% endif %}
             </button>
+            {% if formato.estado == 'finalizado' %}
+            <button type="button" class="btn btn-warning btn-lg" id="btnRegenerarPdf"
+                    title="Guarda los cambios y vuelve a generar el PDF. No envía correo.">
+                <i class="bi bi-arrow-repeat"></i> Regenerar PDF
+            </button>
+            <button type="button" class="btn btn-success btn-lg" id="btnReenviarEmail"
+                    title="Envía el PDF actual a los correos capturados (hasta 3). No regenera el PDF.">
+                <i class="bi bi-envelope"></i> Reenviar por correo
+            </button>
+            <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-success btn-lg" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-pdf"></i> Ver PDF actual
+            </a>
+            {% else %}
             <button type="button" class="btn btn-primary btn-lg" id="btnFinalizar">
                 <i class="bi bi-check2-circle"></i> Guardar y Finalizar
             </button>
+            {% endif %}
         </div>
         <div class="formato-oow-status-box mt-3" id="formatoOowStatusBox" hidden>
             <div class="formato-oow-status-inner" id="formatoOowStatusInner">

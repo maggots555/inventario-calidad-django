@@ -62,7 +62,7 @@ function setOverlay(visible, titulo, texto) {
     }
 }
 function setBotonesOcupados(ocupado) {
-    const ids = ['btnGuardarBorrador', 'btnFinalizar'];
+    const ids = ['btnGuardarBorrador', 'btnFinalizar', 'btnRegenerarPdf', 'btnReenviarEmail'];
     ids.forEach((id) => {
         const btn = byId(id);
         if (btn) {
@@ -491,13 +491,14 @@ function dibujarMarcoDiagrama(ctx, w, h, etiqueta, claveVista = '') {
     }
 }
 function inicializarFormatoOow() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
     const app = byId('formatoOowApp');
     if (!app) {
         return;
     }
     const urlGuardar = app.dataset.urlGuardar || '';
     const urlFinalizar = app.dataset.urlFinalizar || '';
+    const urlReenviar = app.dataset.urlReenviar || '';
     const urlPdf = app.dataset.urlPdf || '';
     const urlEvidencia = app.dataset.urlEvidencia || '';
     const dataEl = document.getElementById('formato-oow-data');
@@ -833,6 +834,64 @@ function inicializarFormatoOow() {
         }
         return payload;
     };
+    /**
+     * Flujo común: guardar datos + generar PDF (finalizar o regenerar).
+     */
+    const ejecutarGeneracionPdf = async (opciones) => {
+        const actions = byId('formatoOowStatusActions');
+        if (actions) {
+            actions.hidden = true;
+        }
+        if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
+            setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
+            return;
+        }
+        if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
+            setStatus('La firma del cliente es obligatoria.', true, false);
+            return;
+        }
+        setBotonesOcupados(true);
+        setOverlay(true, opciones.soloRegenerar ? 'Regenerando PDF…' : 'Generando PDF…', 'Estamos guardando el formato y creando el documento. Puede tardar unos segundos. No cierres ni bloquees la tablet.');
+        setStatus(opciones.soloRegenerar
+            ? '1/2 Guardando cambios…'
+            : '1/2 Guardando datos del formato…', false, true);
+        try {
+            await new Promise((resolve) => {
+                window.setTimeout(() => resolve(), 50);
+            });
+            setStatus(opciones.soloRegenerar ? '2/2 Regenerando PDF…' : '2/2 Generando PDF del formato…', false, true);
+            const payload = construirPayload(true);
+            if (opciones.soloRegenerar) {
+                // EXPLICACIÓN PARA PRINCIPIANTES:
+                // solo_regenerar = true → el servidor NO encola el correo.
+                payload.solo_regenerar = true;
+                payload.enviar_email = false;
+                payload.forzar_regenerar = true;
+            }
+            const data = await postJson(urlFinalizar, payload);
+            const pdfUrl = String(data.pdf_url || urlPdf) + '?inline=1';
+            setOverlay(false);
+            setStatus(opciones.mensajeExito, false, false);
+            if (actions) {
+                actions.hidden = false;
+            }
+            const linkPdf = byId('btnVerPdfGenerado');
+            if (linkPdf) {
+                linkPdf.href = pdfUrl;
+            }
+            const ventana = window.open(pdfUrl, '_blank');
+            if (!ventana) {
+                setStatus('PDF listo. El navegador bloqueó la ventana emergente: toca “Ver / descargar PDF”.', false, false);
+            }
+        }
+        catch (err) {
+            setOverlay(false);
+            setStatus(err instanceof Error ? err.message : 'Error al generar el PDF', true, false);
+        }
+        finally {
+            setBotonesOcupados(false);
+        }
+    };
     const postJson = async (url, body) => {
         const resp = await fetch(url, {
             method: 'POST',
@@ -855,7 +914,7 @@ function inicializarFormatoOow() {
             actions.hidden = true;
         }
         setBotonesOcupados(true);
-        setStatus('Guardando borrador…', false, true);
+        setStatus('Guardando…', false, true);
         try {
             const data = await postJson(urlGuardar, construirPayload(false));
             if (padFirmaCli.tieneTrazos) {
@@ -866,7 +925,8 @@ function inicializarFormatoOow() {
                 formatoInicial.firma_cliente_url = formatoResp.firma_cliente_url;
                 actualizarPreviewFirma(formatoResp.firma_cliente_url);
             }
-            setStatus('Borrador guardado correctamente.', false, false);
+            const mensaje = String(data.mensaje || 'Datos guardados.');
+            setStatus(mensaje, false, false);
         }
         catch (err) {
             setStatus(err instanceof Error ? err.message : 'Error al guardar', true, false);
@@ -875,48 +935,51 @@ function inicializarFormatoOow() {
             setBotonesOcupados(false);
         }
     });
-    (_j = byId('btnFinalizar')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', async () => {
+    (_j = byId('btnFinalizar')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => {
+        void ejecutarGeneracionPdf({
+            soloRegenerar: false,
+            mensajeExito: '¡Listo! Formato finalizado y PDF generado. Si no se abrió solo, usa el botón de abajo.',
+        });
+    });
+    // Botón solo visible cuando el formato ya está finalizado
+    (_k = byId('btnRegenerarPdf')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', () => {
+        void ejecutarGeneracionPdf({
+            soloRegenerar: true,
+            mensajeExito: 'PDF regenerado (sin reenviar correo). Si no se abrió solo, usa el botón de abajo.',
+        });
+    });
+    /**
+     * Reenvía el PDF actual por correo (no regenera el documento).
+     * Usa los emails del formulario (hasta 3).
+     */
+    (_l = byId('btnReenviarEmail')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', async () => {
+        const emails = leerEmailsEnvio();
+        if (emails.length === 0) {
+            setStatus('Captura al menos un correo en “Email(s) para recibir el formato”.', true, false);
+            return;
+        }
+        const confirmar = window.confirm(`¿Reenviar el PDF del formato a?\n\n${emails.join('\n')}\n\n`
+            + 'Esto no regenera el PDF; usa el documento actual.');
+        if (!confirmar) {
+            return;
+        }
         const actions = byId('formatoOowStatusActions');
         if (actions) {
             actions.hidden = true;
         }
-        if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
-            setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
-            return;
-        }
-        if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
-            setStatus('La firma del cliente es obligatoria.', true, false);
-            return;
-        }
         setBotonesOcupados(true);
-        setOverlay(true, 'Generando PDF…', 'Estamos guardando el formato y creando el documento. Puede tardar unos segundos. No cierres ni bloquees la tablet.');
-        setStatus('1/2 Guardando datos del formato…', false, true);
+        setStatus('Encolando reenvío por correo…', false, true);
         try {
-            // Pequeña pausa para que el overlay se pinte en pantalla (iPad)
-            await new Promise((resolve) => {
-                window.setTimeout(() => resolve(), 50);
+            // Solo mandamos los emails; el servidor actualiza destinatarios y encola Celery
+            const data = await postJson(urlReenviar, {
+                ...construirPayload(false),
+                emails_envio: emails,
+                email_envio: emails[0] || '',
             });
-            setStatus('2/2 Generando PDF del formato…', false, true);
-            const data = await postJson(urlFinalizar, construirPayload(true));
-            const pdfUrl = String(data.pdf_url || urlPdf) + '?inline=1';
-            setOverlay(false);
-            setStatus('¡Listo! Formato finalizado y PDF generado. Si no se abrió solo, usa el botón de abajo.', false, false);
-            if (actions) {
-                actions.hidden = false;
-            }
-            const linkPdf = byId('btnVerPdfGenerado');
-            if (linkPdf) {
-                linkPdf.href = pdfUrl;
-            }
-            // En iPad Safari window.open a veces se bloquea tras un await largo
-            const ventana = window.open(pdfUrl, '_blank');
-            if (!ventana) {
-                setStatus('PDF generado. El navegador bloqueó la ventana emergente: toca “Ver / descargar PDF”.', false, false);
-            }
+            setStatus(String(data.mensaje || 'Correo encolado.'), false, false);
         }
         catch (err) {
-            setOverlay(false);
-            setStatus(err instanceof Error ? err.message : 'Error al finalizar', true, false);
+            setStatus(err instanceof Error ? err.message : 'Error al reenviar', true, false);
         }
         finally {
             setBotonesOcupados(false);
@@ -964,11 +1027,11 @@ function inicializarFormatoOow() {
             setStatus(err instanceof Error ? err.message : 'Error al subir foto', true, false);
         }
     };
-    (_k = byId('fotoIdentificacion')) === null || _k === void 0 ? void 0 : _k.addEventListener('change', (ev) => {
+    (_m = byId('fotoIdentificacion')) === null || _m === void 0 ? void 0 : _m.addEventListener('change', (ev) => {
         const t = ev.target;
         void subirEvidencia(t, 'identificacion_oow');
     });
-    (_l = byId('fotoEscaneo')) === null || _l === void 0 ? void 0 : _l.addEventListener('change', (ev) => {
+    (_o = byId('fotoEscaneo')) === null || _o === void 0 ? void 0 : _o.addEventListener('change', (ev) => {
         const t = ev.target;
         void subirEvidencia(t, 'escaneo_oow');
     });

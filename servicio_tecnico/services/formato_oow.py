@@ -335,6 +335,7 @@ def aplicar_payload_borrador(
     formato: FormatoServicioOOW,
     payload: dict[str, Any],
     usuario=None,
+    permitir_finalizado: bool = False,
 ) -> FormatoServicioOOW:
     """
     Aplica un payload JSON del wizard al borrador (sin finalizar).
@@ -343,19 +344,26 @@ def aplicar_payload_borrador(
         formato: FormatoServicioOOW
         payload: Dict con campos del formulario + firmas/vistas en base64
         usuario: User opcional
+        permitir_finalizado: Si True, permite actualizar un formato ya
+            finalizado (necesario para regenerar el PDF desde la UI).
 
     Returns:
         FormatoServicioOOW actualizado
 
     Raises:
-        FormatoOOWError: si el formato ya está finalizado
+        FormatoOOWError: si el formato ya está finalizado y no se permite
 
     Efectos secundarios:
         UPDATE FormatoServicioOOW + upsert DanoEsteticoVista + archivos ImageField
     """
-    if formato.estado == 'finalizado':
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Tras finalizar, el PDF ya existe. Si el usuario quiere corregir datos,
+    # el botón “Regenerar PDF” manda permitir_finalizado=True para poder
+    # guardar otra vez y volver a generar el documento.
+    if formato.estado == 'finalizado' and not permitir_finalizado:
         raise FormatoOOWError(
-            'El formato ya está finalizado. Descarga el PDF o regenera desde la UI.'
+            'El formato ya está finalizado. Usa el botón “Regenerar PDF” '
+            'para guardar cambios y actualizar el documento (no reenvía correo).'
         )
 
     empleado = _empleado_desde_usuario(usuario)

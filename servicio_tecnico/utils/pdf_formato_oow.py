@@ -115,6 +115,9 @@ class PDFFormatoServicioOOW:
             elementos.append(Spacer(1, 4 * mm))
             elementos += self._construir_titulo()
             elementos.append(Spacer(1, 5 * mm))
+            # Orden de servicio justo debajo del título (mismo estilo que cliente)
+            elementos += self._envolver_seccion(self._construir_orden_servicio())
+            elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_datos_cliente())
             elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_datos_equipo())
@@ -291,7 +294,7 @@ class PDFFormatoServicioOOW:
             return None
 
     def _construir_header(self) -> List:
-        """Logo + empresa + fecha/folio."""
+        """Logo + nombre de empresa (sin caja de orden; esa va debajo del título)."""
         elementos: List = []
         logo = self._obtener_logo()
         empresa = self.pais_config.get(
@@ -312,34 +315,6 @@ class PDFFormatoServicioOOW:
         elementos.append(tabla)
         elementos.append(Spacer(1, 2 * mm))
         elementos.append(HRFlowable(width='100%', thickness=1, color=COLOR_GRIS_BORDE))
-        elementos.append(Spacer(1, 2 * mm))
-
-        hoy = date.today()
-        meses = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-        ]
-        fecha_txt = f'{hoy.day} de {meses[hoy.month - 1]} de {hoy.year}'
-        folio = (
-            self.detalle.folio_sicser
-            or self.detalle.orden_cliente
-            or self.orden.numero_orden_interno
-        )
-        meta = Table(
-            [[
-                Paragraph(f'<b>Fecha:</b> {self._esc(fecha_txt)}', self._estilos['CeldaValor']),
-                Paragraph(
-                    f'<b>Orden de servicio:</b> {self._esc(folio)}',
-                    self._estilos['CeldaValor'],
-                ),
-            ]],
-            colWidths=['50%', '50%'],
-        )
-        meta.setStyle(TableStyle([
-            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elementos.append(meta)
         return elementos
 
     def _construir_titulo(self) -> List:
@@ -347,6 +322,29 @@ class PDFFormatoServicioOOW:
         return [self._crear_header_seccion(
             'FORMATO DE SERVICIO FUERA DE GARANTÍA CON COSTO'
         )]
+
+    def _construir_orden_servicio(self) -> List:
+        """
+        Sección Orden de servicio (mismo layout que Datos del cliente).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Barra navy + tabla label|valor a todo el ancho, igual que el resto
+        de secciones de la página 1.
+        """
+        elementos = [self._crear_header_seccion('Orden de servicio'), Spacer(1, 2 * mm)]
+        hoy = date.today()
+        fecha_txt = hoy.strftime('%Y-%m-%d')
+        folio = (
+            self.detalle.folio_sicser
+            or self.detalle.orden_cliente
+            or self.orden.numero_orden_interno
+        )
+        pares = [
+            ('Fecha', fecha_txt),
+            ('Número de orden', folio),
+        ]
+        elementos.append(self._tabla_pares(pares))
+        return elementos
 
     def _fila_dato(self, label: str, valor: str) -> list:
         return [
@@ -406,34 +404,24 @@ class PDFFormatoServicioOOW:
         return elementos
 
     def _construir_accesorios(self) -> List:
-        elementos = [self._crear_header_seccion('Accesorios recibidos'), Spacer(1, 2 * mm)]
+        """
+        Accesorios entregados: tabla label|SI/NO (compatible con Helvetica).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ReportLab con fuente Helvetica NO dibuja bien los símbolos ☑ / ☐
+        (Unicode). Por eso usamos "SI" / "NO" en texto ASCII, visibles en el PDF.
+        """
+        elementos = [self._crear_header_seccion('Accesorios entregados'), Spacer(1, 2 * mm)]
         f = self.formato
-        checks = [
-            ('Cargador', f.accesorio_cargador),
-            ('Maletín', f.accesorio_maletin),
-            ('Mouse', f.accesorio_mouse),
-            ('Teclado', f.accesorio_teclado),
-            ('Monitor', f.accesorio_monitor),
-            ('Otros', f.accesorio_otros),
+        pares = [
+            ('Cargador', 'SI' if f.accesorio_cargador else 'NO'),
+            ('Maletín', 'SI' if f.accesorio_maletin else 'NO'),
+            ('Mouse', 'SI' if f.accesorio_mouse else 'NO'),
+            ('Teclado', 'SI' if f.accesorio_teclado else 'NO'),
+            ('Monitor', 'SI' if f.accesorio_monitor else 'NO'),
+            ('Otros', 'SI' if f.accesorio_otros else 'NO'),
         ]
-        celdas = []
-        for nombre, activo in checks:
-            marca = '☑' if activo else '☐'
-            celdas.append(Paragraph(f'{marca} {nombre}', self._estilos['CeldaValor']))
-        # 3 columnas
-        filas = []
-        for i in range(0, len(celdas), 3):
-            fila = celdas[i:i + 3]
-            while len(fila) < 3:
-                fila.append('')
-            filas.append(fila)
-        tabla = Table(filas, colWidths=['33%', '33%', '34%'])
-        tabla.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]))
-        elementos.append(tabla)
+        elementos.append(self._tabla_pares(pares))
         if f.accesorios_otros_detalle:
             elementos.append(Spacer(1, 2 * mm))
             elementos.append(Paragraph(
