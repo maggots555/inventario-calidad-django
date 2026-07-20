@@ -279,6 +279,54 @@ function inicializarFormatoOow(): void {
   padFirmaCli.ctx.strokeStyle = '#111827';
   padFirmaCli.ctx.lineWidth = 2.2;
 
+  /**
+   * Actualiza la miniatura de firma (igual que las previews de daños).
+   */
+  const actualizarPreviewFirma = (src: string): void => {
+    const wrap = byId('firmaClientePreviewWrap');
+    const img = byId('firmaClientePreviewImg') as HTMLImageElement | null;
+    if (!wrap || !img) {
+      return;
+    }
+    if (!src) {
+      wrap.hidden = true;
+      img.removeAttribute('src');
+      return;
+    }
+    img.src = src;
+    wrap.hidden = false;
+  };
+
+  /**
+   * Carga una firma ya guardada en el canvas para que el usuario la vea.
+   */
+  const cargarFirmaEnCanvas = (url: string): void => {
+    const img = new Image();
+    img.onload = (): void => {
+      padFirmaCli.ctx.fillStyle = '#ffffff';
+      padFirmaCli.ctx.fillRect(0, 0, canvasFirmaCli.width, canvasFirmaCli.height);
+      // Centrar la firma proporcionalmente en el canvas
+      const scale = Math.min(
+        canvasFirmaCli.width / img.width,
+        canvasFirmaCli.height / img.height,
+      );
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (canvasFirmaCli.width - w) / 2;
+      const y = (canvasFirmaCli.height - h) / 2;
+      padFirmaCli.ctx.drawImage(img, x, y, w, h);
+      padFirmaCli.ctx.strokeStyle = '#111827';
+      padFirmaCli.ctx.lineWidth = 2.2;
+      padFirmaCli.tieneTrazos = true;
+      actualizarPreviewFirma(url);
+    };
+    img.src = url;
+  };
+
+  if (formatoInicial.firma_cliente_url) {
+    cargarFirmaEnCanvas(formatoInicial.firma_cliente_url);
+  }
+
   const vistasGuardadas: Map<string, VistaDanoGuardada> = new Map();
   (formatoInicial.vistas_dano || []).forEach((v) => {
     vistasGuardadas.set(v.clave_vista, v);
@@ -370,7 +418,21 @@ function inicializarFormatoOow(): void {
     setStatus(`Vista “${clave}” guardada en memoria (se enviará al guardar).`);
   });
 
-  byId('btnLimpiarFirmaCli')?.addEventListener('click', () => limpiarPad(padFirmaCli));
+  // Al soltar el dedo/pluma en la firma, refrescar la miniatura preview
+  canvasFirmaCli.addEventListener('pointerup', () => {
+    if (padFirmaCli.tieneTrazos) {
+      actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
+    }
+  });
+
+  byId('btnLimpiarFirmaCli')?.addEventListener('click', () => {
+    limpiarPad(padFirmaCli);
+    padFirmaCli.ctx.strokeStyle = '#111827';
+    padFirmaCli.ctx.lineWidth = 2.2;
+    actualizarPreviewFirma('');
+    // Si borra, ya no cuenta la firma previa del servidor hasta que vuelva a firmar
+    formatoInicial.firma_cliente_url = undefined;
+  });
 
   byId('btnAceptarAvisoModal')?.addEventListener('click', () => {
     const cb = byId('aceptaPrivacidad') as HTMLInputElement | null;
@@ -432,7 +494,15 @@ function inicializarFormatoOow(): void {
     setBotonesOcupados(true);
     setStatus('Guardando borrador…', false, true);
     try {
-      await postJson(urlGuardar, construirPayload(false));
+      const data = await postJson(urlGuardar, construirPayload(false));
+      if (padFirmaCli.tieneTrazos) {
+        actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
+      }
+      const formatoResp = data.formato as { firma_cliente_url?: string } | undefined;
+      if (formatoResp && formatoResp.firma_cliente_url) {
+        formatoInicial.firma_cliente_url = formatoResp.firma_cliente_url;
+        actualizarPreviewFirma(formatoResp.firma_cliente_url);
+      }
       setStatus('Borrador guardado correctamente.', false, false);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Error al guardar', true, false);

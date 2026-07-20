@@ -220,12 +220,20 @@
             <div class="formato-oow-firma-wrap">
                 <canvas id="canvasFirmaCliente" width="640" height="200"></canvas>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="btnLimpiarFirmaCli">
-                Limpiar firma
-            </button>
-            {% if formato.firma_cliente %}
-            <p class="small text-success mt-2 mb-0">Ya hay una firma guardada (puedes sobrescribirla).</p>
-            {% endif %}
+            <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarFirmaCli">
+                    Limpiar firma
+                </button>
+            </div>
+            <div class="formato-oow-firma-preview mt-3" id="firmaClientePreviewWrap" {% if not formato.firma_cliente %}hidden{% endif %}>
+                <p class="small text-muted mb-1">Vista previa de la firma guardada:</p>
+                <div class="formato-oow-vista-thumb formato-oow-firma-thumb">
+                    <img id="firmaClientePreviewImg"
+                         src="{% if formato.firma_cliente %}{{ formato.firma_cliente.url }}{% endif %}"
+                         alt="Firma del cliente guardada">
+                    <span>Firma cliente</span>
+                </div>
+            </div>
             <label class="formato-oow-check mt-3">
                 <input type="checkbox" id="aceptaCondiciones" {% if formato.acepta_condiciones %}checked{% endif %}>
                 <span>ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO AL CENTRO DE SERVICIO</span>

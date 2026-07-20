@@ -124,6 +124,8 @@ class PDFFormatoServicioOOW:
             elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_danos()
             elementos.append(Spacer(1, 3 * mm))
+            elementos += self._construir_escaneo()
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_aceptacion_y_firmas()
             elementos += self._construir_aviso_privacidad()
 
@@ -478,6 +480,74 @@ class PDFFormatoServicioOOW:
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 2),
             ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elementos.append(tabla)
+        return elementos
+
+    def _construir_escaneo(self) -> List:
+        """
+        Sección con la(s) foto(s) del resultado de escaneo (PC Audit / similar).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Las fotos se guardan como ImagenOrden con tipo 'escaneo_oow'.
+        Aquí las embebemos en el PDF igual que las vistas de daños.
+        """
+        from servicio_tecnico.models import ImagenOrden
+
+        elementos = [
+            self._crear_header_seccion('Resultado del escaneo'),
+            Spacer(1, 2 * mm),
+        ]
+        imagenes = list(
+            ImagenOrden.objects.filter(
+                orden=self.orden,
+                tipo='escaneo_oow',
+            ).order_by('-fecha_subida')[:4]
+        )
+        if not imagenes:
+            elementos.append(Paragraph(
+                'Sin foto de resultado de escaneo adjunta.',
+                self._estilos['CeldaValor'],
+            ))
+            return elementos
+
+        celdas = []
+        for img_orden in imagenes:
+            try:
+                path = img_orden.imagen.path
+                rl_img = RLImage(path, width=80 * mm, height=100 * mm, kind='proportional')
+            except Exception:
+                rl_img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
+            etiqueta = img_orden.descripcion or 'Resultado del escaneo'
+            celdas.append([
+                Paragraph(f'<b>{self._esc(etiqueta)}</b>', self._estilos['CeldaLabel']),
+                rl_img,
+            ])
+
+        # Una o dos columnas según cantidad
+        if len(celdas) == 1:
+            tabla = Table(
+                [[
+                    Table([[celdas[0][0]], [celdas[0][1]]], colWidths=[letter[0] - 2 * MARGEN]),
+                ]],
+                colWidths=[letter[0] - 2 * MARGEN],
+            )
+        else:
+            filas = []
+            for i in range(0, len(celdas), 2):
+                izq = celdas[i]
+                der = celdas[i + 1] if i + 1 < len(celdas) else None
+                filas.append([
+                    Table([[izq[0]], [izq[1]]], colWidths=[85 * mm]),
+                    Table([[der[0]], [der[1]]], colWidths=[85 * mm]) if der else '',
+                ])
+            tabla = Table(filas, colWidths=['50%', '50%'])
+
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))

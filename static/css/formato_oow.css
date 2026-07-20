@@ -131,6 +131,16 @@
   background: #f1f5f9;
 }
 
+.formato-oow-firma-thumb {
+  width: 200px;
+}
+
+.formato-oow-firma-thumb img {
+  height: 80px;
+  object-fit: contain;
+  background: #fff;
+}
+
 .formato-oow-vista-thumb span,
 .formato-oow-thumb span {
   font-size: 0.7rem;
