@@ -158,6 +158,15 @@ from .views_formato_oow import (  # noqa: F401
     formato_oow_subir_evidencia,
     formato_oow_wizard,
 )
+from .views_formato_garantia import (  # noqa: F401
+    abrir_formato_garantia_desde_sicser,
+    formato_garantia_finalizar,
+    formato_garantia_guardar,
+    formato_garantia_pdf,
+    formato_garantia_reenviar_email,
+    formato_garantia_subir_evidencia,
+    formato_garantia_wizard,
+)
 from .views_referencias_gama import (  # noqa: F401
     crear_referencia_gama,
     editar_referencia_gama,
@@ -313,6 +322,7 @@ def detalle_orden(request, orden_id):
         Renderiza el template con todos los formularios y datos
     """
     
+    from .services.formato_garantia import orden_es_candidata_formato_garantia
     from .services.formato_oow import orden_es_candidata_formato_oow
 
     # Obtener la orden o mostrar error 404
@@ -1766,8 +1776,9 @@ def detalle_orden(request, orden_id):
     context = {
         'orden': orden,
         'detalle': orden.detalle_equipo,
-        # Botón Formato Digital OOW en el encabezado (órdenes fuera de garantía)
+        # Botones de formato digital en el encabezado
         'mostrar_formato_oow': orden_es_candidata_formato_oow(orden),
+        'mostrar_formato_garantia': orden_es_candidata_formato_garantia(orden),
         
         # Formularios
         'form_config': form_config,

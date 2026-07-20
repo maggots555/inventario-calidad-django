@@ -187,6 +187,11 @@ def extraer_falla_garantia(instrucciones_dell: str) -> str:
     """
     Extrae el texto de falla desde instrucciones_dell de la API de garantías.
 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El formato Dell imprime el bloque completo de SICSER en
+    “DESCRIPCIÓN DE LA FALLA INICIAL”. Por eso preferimos el texto íntegro
+    (hasta 4000 chars). Si viene vacío, usamos un mensaje por defecto.
+
     Args:
         instrucciones_dell: Bloque de texto de diagnóstico Dell.
 
@@ -196,11 +201,6 @@ def extraer_falla_garantia(instrucciones_dell: str) -> str:
     texto = (instrucciones_dell or '').strip()
     if not texto:
         return 'Orden importada desde SICSER (garantía Dell)'
-
-    match = re.search(r'Problema:\s*(.+?)(?:\s*Diagnóstico:|$)', texto, re.IGNORECASE | re.DOTALL)
-    if match:
-        return match.group(1).strip()[:4000]
-
     return texto[:4000]
 
 

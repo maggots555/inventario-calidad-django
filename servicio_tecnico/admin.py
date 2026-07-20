@@ -38,6 +38,9 @@ from .models import (
     # Formato Digital OOW
     FormatoServicioOOW,
     DanoEsteticoVista,
+    # Formato Digital Garantía Dell
+    FormatoServicioGarantia,
+    DanoEsteticoVistaGarantia,
 )
 
 
@@ -2309,6 +2312,48 @@ class FormatoServicioOOWAdmin(admin.ModelAdmin):
 @admin.register(DanoEsteticoVista)
 class DanoEsteticoVistaAdmin(admin.ModelAdmin):
     """Vistas anotadas de daños estéticos ligadas a un formato OOW."""
+
+    list_display = ('formato', 'clave_vista', 'etiqueta_dano', 'fecha_actualizacion')
+    list_filter = ('clave_vista',)
+    search_fields = (
+        'formato__orden__numero_orden_interno',
+        'clave_vista',
+        'etiqueta_dano',
+    )
+    raw_id_fields = ('formato',)
+
+
+@admin.register(FormatoServicioGarantia)
+class FormatoServicioGarantiaAdmin(admin.ModelAdmin):
+    """
+    Admin del Formato Digital Garantía Dell.
+
+    Objetivo: auditar borradores/finalizados, PDF y aceptaciones legales.
+    """
+
+    list_display = (
+        'orden',
+        'estado',
+        'acepta_privacidad',
+        'disclaimer_pc_audit',
+        'finalizado_en',
+        'fecha_actualizacion',
+    )
+    list_filter = ('estado', 'acepta_privacidad', 'disclaimer_pc_audit')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+        'orden__detalle_equipo__folio_sicser',
+        'email_envio',
+        'nombre_tecnico',
+    )
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'finalizado_en')
+    raw_id_fields = ('orden', 'creado_por', 'actualizado_por')
+
+
+@admin.register(DanoEsteticoVistaGarantia)
+class DanoEsteticoVistaGarantiaAdmin(admin.ModelAdmin):
+    """Vistas anotadas de daños estéticos ligadas a un formato Garantía."""
 
     list_display = ('formato', 'clave_vista', 'etiqueta_dano', 'fecha_actualizacion')
     list_filter = ('clave_vista',)

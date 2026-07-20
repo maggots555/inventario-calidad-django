@@ -1,13 +1,11 @@
 """
-Servicio de negocio para el Formato Digital OOW.
+Servicio de negocio para el Formato Digital de Garantía Dell.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 ------------------------------------------------
-Este módulo concentra la lógica que NO debe vivir en las vistas:
-crear/obtener borrador, prellenar datos desde DetalleEquipo, aplicar
-payloads AJAX y marcar el formato como finalizado tras generar el PDF.
-
-Las vistas solo reciben HTTP, llaman a estas funciones y responden.
+Espejo del servicio OOW, pero con accesorios Dell, número de cargador
+y candidatura por sicser_origen='garantia'. Las vistas HTTP solo llaman
+aquí; la lógica de negocio vive en este módulo.
 """
 
 from __future__ import annotations
@@ -22,19 +20,39 @@ from django.utils import timezone
 
 from config.constants import (
     AVISO_PRIVACIDAD_OOW_VERSION_MX,
-    COMO_ENTERASTE_OOW_CHOICES,
+    COMO_ENTERASTE_GARANTIA_CHOICES,
 )
 from config.paises_config import get_pais_actual
 from inventario.models import Empleado
 from servicio_tecnico.models import (
-    DanoEsteticoVista,
-    FormatoServicioOOW,
+    DanoEsteticoVistaGarantia,
+    FormatoServicioGarantia,
     OrdenServicio,
 )
 
 logger = logging.getLogger(__name__)
 
-MAX_EMAILS_ENVIO_OOW = 3
+MAX_EMAILS_ENVIO_GARANTIA = 3
+
+# Claves booleanas de accesorios Dell que llegan del front
+CAMPOS_ACCESORIOS_GARANTIA = (
+    'accesorio_cargador',
+    'accesorio_teclado',
+    'accesorio_pluma',
+    'accesorio_mouse',
+    'accesorio_monitor',
+    'accesorio_caja',
+    'accesorio_bateria',
+    'accesorio_docking',
+    'accesorio_microsd_sim',
+    'accesorio_otros',
+)
+
+COMO_ENTERASTE_VALIDOS = {valor for valor, _ in COMO_ENTERASTE_GARANTIA_CHOICES}
+
+
+class FormatoGarantiaError(Exception):
+    """Error de negocio al guardar o finalizar el formato Garantía Dell."""
 
 
 def normalizar_emails_envio(raw: Any) -> list[str]:
@@ -48,12 +66,9 @@ def normalizar_emails_envio(raw: Any) -> list[str]:
         Lista de hasta 3 emails (strip; sin duplicados por mayúsculas/minúsculas).
     """
     candidatos: list[str] = []
-    # EXPLICACIÓN PARA PRINCIPIANTES:
-    # El wizard puede mandar una lista JSON o, por compatibilidad, un solo string.
     if isinstance(raw, list):
         candidatos = [str(x) for x in raw]
     elif isinstance(raw, str) and raw.strip():
-        # También aceptamos "a@x.com, b@y.com" por si llega separado por comas
         candidatos = [p.strip() for p in raw.replace(';', ',').split(',')]
     elif raw is not None and raw != '':
         candidatos = [str(raw)]
@@ -69,12 +84,12 @@ def normalizar_emails_envio(raw: Any) -> list[str]:
             continue
         vistos.add(clave)
         limpios.append(email)
-        if len(limpios) >= MAX_EMAILS_ENVIO_OOW:
+        if len(limpios) >= MAX_EMAILS_ENVIO_GARANTIA:
             break
     return limpios
 
 
-def lista_emails_envio(formato: FormatoServicioOOW) -> list[str]:
+def lista_emails_envio(formato: FormatoServicioGarantia) -> list[str]:
     """
     Devuelve los correos de envío del formato (hasta 3).
 
@@ -88,9 +103,9 @@ def lista_emails_envio(formato: FormatoServicioOOW) -> list[str]:
     return []
 
 
-def aplicar_emails_al_formato(formato: FormatoServicioOOW, raw: Any) -> None:
+def aplicar_emails_al_formato(formato: FormatoServicioGarantia, raw: Any) -> None:
     """
-    Asigna emails_envio y sincroniza email_envio (primer correo) por compatibilidad.
+    Asigna emails_envio y sincroniza email_envio (primer correo).
 
     Efectos secundarios:
         Modifica formato en memoria (caller debe .save()).
@@ -98,23 +113,6 @@ def aplicar_emails_al_formato(formato: FormatoServicioOOW, raw: Any) -> None:
     emails = normalizar_emails_envio(raw)
     formato.emails_envio = emails
     formato.email_envio = emails[0] if emails else ''
-
-
-# Claves booleanas de accesorios que llegan del front
-CAMPOS_ACCESORIOS = (
-    'accesorio_cargador',
-    'accesorio_maletin',
-    'accesorio_mouse',
-    'accesorio_teclado',
-    'accesorio_monitor',
-    'accesorio_otros',
-)
-
-COMO_ENTERASTE_VALIDOS = {valor for valor, _ in COMO_ENTERASTE_OOW_CHOICES}
-
-
-class FormatoOOWError(Exception):
-    """Error de negocio al guardar o finalizar el formato OOW."""
 
 
 def _empleado_desde_usuario(usuario) -> Empleado | None:
@@ -135,15 +133,12 @@ def _empleado_desde_usuario(usuario) -> Empleado | None:
         return None
 
 
-def orden_es_candidata_formato_oow(orden: OrdenServicio) -> bool:
+def orden_es_candidata_formato_garantia(orden: OrdenServicio) -> bool:
     """
-    Indica si la orden puede abrir el Formato Digital OOW.
+    Indica si la orden puede abrir el Formato Digital Garantía Dell.
 
     Regla de negocio:
-        - NO aplica a órdenes de garantía Dell (tienen su propio formato)
-        - Órdenes de diagnóstico (fuera de garantía) o
-        - Órdenes importadas desde SICSER OOW o
-        - Órdenes cuyo orden_cliente empieza con OOW-
+        - Órdenes importadas desde SICSER con sicser_origen='garantia'
 
     Args:
         orden: OrdenServicio a evaluar
@@ -154,43 +149,29 @@ def orden_es_candidata_formato_oow(orden: OrdenServicio) -> bool:
     try:
         detalle = orden.detalle_equipo
     except Exception:
-        detalle = None
-
-    # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Las garantías Dell se importan con tipo_servicio='diagnostico', pero
-    # usan el Formato Garantía (no el OOW). Por eso las excluimos aquí.
-    if detalle is not None and (detalle.sicser_origen or '').lower() == 'garantia':
         return False
-
-    if orden.tipo_servicio == 'diagnostico':
-        return True
-    if detalle is None:
-        return False
-    if detalle.sicser_origen == 'oow':
-        return True
-    orden_cliente = (detalle.orden_cliente or '').strip().upper()
-    return orden_cliente.startswith('OOW-')
+    return (detalle.sicser_origen or '').lower() == 'garantia'
 
 
 def obtener_o_crear_borrador(
     orden: OrdenServicio,
     usuario=None,
-) -> FormatoServicioOOW:
+) -> FormatoServicioGarantia:
     """
-    Obtiene el formato OOW de la orden o crea uno en estado borrador.
+    Obtiene el formato Garantía de la orden o crea uno en estado borrador.
 
     Args:
         orden: OrdenServicio
         usuario: User opcional para auditar creado_por
 
     Returns:
-        FormatoServicioOOW (existente o nuevo)
+        FormatoServicioGarantia (existente o nuevo)
 
     Efectos secundarios:
-        Puede INSERTAR un FormatoServicioOOW y prellenar desde DetalleEquipo.
+        Puede INSERTAR un FormatoServicioGarantia y prellenar desde DetalleEquipo.
     """
     empleado = _empleado_desde_usuario(usuario)
-    formato, creado = FormatoServicioOOW.objects.get_or_create(
+    formato, creado = FormatoServicioGarantia.objects.get_or_create(
         orden=orden,
         defaults={
             'estado': 'borrador',
@@ -199,46 +180,43 @@ def obtener_o_crear_borrador(
         },
     )
     if creado:
-        # Prefill de accesorios/email/técnico desde datos ya conocidos en SIGMA
         _prefill_desde_detalle(formato)
         formato.save()
         logger.info(
-            'Formato OOW borrador creado para orden %s',
+            'Formato Garantía borrador creado para orden %s',
             orden.numero_orden_interno,
         )
     return formato
 
 
-def _prefill_desde_detalle(formato: FormatoServicioOOW) -> None:
+def _prefill_desde_detalle(formato: FormatoServicioGarantia) -> None:
     """
     Copia datos útiles de DetalleEquipo al borrador recién creado.
 
     Args:
-        formato: FormatoServicioOOW sin guardar aún (o recién creado)
+        formato: FormatoServicioGarantia sin guardar aún (o recién creado)
 
     Efectos secundarios:
         Modifica campos en memoria del formato (caller debe .save()).
     """
     detalle = formato.orden.detalle_equipo
     formato.accesorio_cargador = bool(detalle.tiene_cargador)
-    # Prefill: un solo correo del cliente; el usuario puede agregar hasta 2 más en la UI
     aplicar_emails_al_formato(formato, detalle.email_cliente or '')
-    # Tipo de diagrama según tipo de equipo
     tipo = (detalle.tipo_equipo or '').lower()
     if tipo in ('aio', 'all-in-one', 'all in one'):
         formato.tipo_diagrama = 'aio'
-    elif tipo in ('desktop', 'escritorio', 'pc'):
+    elif tipo in ('desktop', 'escritorio', 'pc', 'tower'):
         formato.tipo_diagrama = 'escritorio'
     else:
         formato.tipo_diagrama = 'laptop'
 
 
-def serializar_formato(formato: FormatoServicioOOW) -> dict[str, Any]:
+def serializar_formato(formato: FormatoServicioGarantia) -> dict[str, Any]:
     """
     Serializa el formato a un dict JSON-friendly para el wizard TS.
 
     Args:
-        formato: FormatoServicioOOW
+        formato: FormatoServicioGarantia
 
     Returns:
         dict con campos del formulario + URLs de firmas/vistas
@@ -256,13 +234,17 @@ def serializar_formato(formato: FormatoServicioOOW) -> dict[str, Any]:
         'estado': formato.estado,
         'tipo_diagrama': formato.tipo_diagrama,
         'accesorio_cargador': formato.accesorio_cargador,
-        'accesorio_maletin': formato.accesorio_maletin,
-        'accesorio_mouse': formato.accesorio_mouse,
         'accesorio_teclado': formato.accesorio_teclado,
+        'accesorio_pluma': formato.accesorio_pluma,
+        'accesorio_mouse': formato.accesorio_mouse,
         'accesorio_monitor': formato.accesorio_monitor,
+        'accesorio_caja': formato.accesorio_caja,
+        'accesorio_bateria': formato.accesorio_bateria,
+        'accesorio_docking': formato.accesorio_docking,
+        'accesorio_microsd_sim': formato.accesorio_microsd_sim,
         'accesorio_otros': formato.accesorio_otros,
         'accesorios_otros_detalle': formato.accesorios_otros_detalle,
-        'contrasena_equipo': formato.contrasena_equipo,
+        'numero_cargador': formato.numero_cargador,
         'observaciones_tecnicas': formato.observaciones_tecnicas,
         'disclaimer_pc_audit': formato.disclaimer_pc_audit,
         'acepta_condiciones': formato.acepta_condiciones,
@@ -286,7 +268,7 @@ def datos_orden_para_wizard(orden: OrdenServicio) -> dict[str, Any]:
         orden: OrdenServicio
 
     Returns:
-        dict con folio, cliente, equipo, falla, etc.
+        dict con DPS, cliente, equipo, falla, etc.
     """
     detalle = orden.detalle_equipo
     return {
@@ -308,6 +290,7 @@ def datos_orden_para_wizard(orden: OrdenServicio) -> dict[str, Any]:
         'tiene_cargador': detalle.tiene_cargador,
         'equipo_enciende': detalle.equipo_enciende,
         'sicser_cis': detalle.sicser_cis or '',
+        'sicser_origen': detalle.sicser_origen or '',
     }
 
 
@@ -326,7 +309,6 @@ def _decode_data_url(data_url: str) -> ContentFile | None:
     texto = data_url.strip()
     if not texto:
         return None
-    # Paso 1: separar cabecera del payload base64
     if ',' in texto and texto.startswith('data:'):
         _, b64 = texto.split(',', 1)
     else:
@@ -334,7 +316,7 @@ def _decode_data_url(data_url: str) -> ContentFile | None:
     try:
         raw = base64.b64decode(b64)
     except Exception:
-        logger.warning('No se pudo decodificar data URL de imagen OOW')
+        logger.warning('No se pudo decodificar data URL de imagen Garantía')
         return None
     if not raw:
         return None
@@ -342,36 +324,31 @@ def _decode_data_url(data_url: str) -> ContentFile | None:
 
 
 def aplicar_payload_borrador(
-    formato: FormatoServicioOOW,
+    formato: FormatoServicioGarantia,
     payload: dict[str, Any],
     usuario=None,
     permitir_finalizado: bool = False,
-) -> FormatoServicioOOW:
+) -> FormatoServicioGarantia:
     """
     Aplica un payload JSON del wizard al borrador (sin finalizar).
 
     Args:
-        formato: FormatoServicioOOW
+        formato: FormatoServicioGarantia
         payload: Dict con campos del formulario + firmas/vistas en base64
         usuario: User opcional
-        permitir_finalizado: Si True, permite actualizar un formato ya
-            finalizado (necesario para regenerar el PDF desde la UI).
+        permitir_finalizado: Si True, permite actualizar un formato ya finalizado
 
     Returns:
-        FormatoServicioOOW actualizado
+        FormatoServicioGarantia actualizado
 
     Raises:
-        FormatoOOWError: si el formato ya está finalizado y no se permite
+        FormatoGarantiaError: si el formato ya está finalizado y no se permite
 
     Efectos secundarios:
-        UPDATE FormatoServicioOOW + upsert DanoEsteticoVista + archivos ImageField
+        UPDATE FormatoServicioGarantia + upsert DanoEsteticoVistaGarantia
     """
-    # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Tras finalizar, el PDF ya existe. Si el usuario quiere corregir datos,
-    # el botón “Regenerar PDF” manda permitir_finalizado=True para poder
-    # guardar otra vez y volver a generar el documento.
     if formato.estado == 'finalizado' and not permitir_finalizado:
-        raise FormatoOOWError(
+        raise FormatoGarantiaError(
             'El formato ya está finalizado. Usa el botón “Regenerar PDF” '
             'para guardar cambios y actualizar el documento (no reenvía correo).'
         )
@@ -379,26 +356,29 @@ def aplicar_payload_borrador(
     empleado = _empleado_desde_usuario(usuario)
 
     with transaction.atomic():
-        # --- Campos simples ---
-        for campo in CAMPOS_ACCESORIOS:
+        for campo in CAMPOS_ACCESORIOS_GARANTIA:
             if campo in payload:
                 setattr(formato, campo, bool(payload[campo]))
 
         for campo in (
             'accesorios_otros_detalle',
-            'contrasena_equipo',
+            'numero_cargador',
             'observaciones_tecnicas',
         ):
             if campo in payload and payload[campo] is not None:
-                setattr(formato, campo, str(payload[campo])[:500 if campo != 'observaciones_tecnicas' else 5000])
+                limite = 5000 if campo == 'observaciones_tecnicas' else 200
+                if campo == 'numero_cargador':
+                    limite = 100
+                setattr(formato, campo, str(payload[campo])[:limite])
 
-        # Emails: preferir lista emails_envio; si no viene, aceptar email_envio único
         if 'emails_envio' in payload:
             aplicar_emails_al_formato(formato, payload.get('emails_envio'))
         elif 'email_envio' in payload and payload['email_envio'] is not None:
             aplicar_emails_al_formato(formato, payload.get('email_envio'))
 
-        if 'tipo_diagrama' in payload and payload['tipo_diagrama'] in ('laptop', 'escritorio', 'aio'):
+        if 'tipo_diagrama' in payload and payload['tipo_diagrama'] in (
+            'laptop', 'escritorio', 'aio',
+        ):
             formato.tipo_diagrama = payload['tipo_diagrama']
 
         if 'disclaimer_pc_audit' in payload:
@@ -412,7 +392,6 @@ def aplicar_payload_borrador(
         if como in COMO_ENTERASTE_VALIDOS or como == '':
             formato.como_enteraste = como
 
-        # --- Firmas (data URLs) ---
         firma_cliente = _decode_data_url(payload.get('firma_cliente_data') or '')
         if firma_cliente is not None:
             formato.firma_cliente.save(
@@ -424,7 +403,6 @@ def aplicar_payload_borrador(
         formato.actualizado_por = empleado
         formato.save()
 
-        # --- Vistas de daño anotadas ---
         vistas = payload.get('vistas_dano') or []
         if isinstance(vistas, list):
             for item in vistas:
@@ -434,7 +412,7 @@ def aplicar_payload_borrador(
                 if not clave:
                     continue
                 etiqueta = str(item.get('etiqueta_dano') or '')[:80]
-                vista, _ = DanoEsteticoVista.objects.get_or_create(
+                vista, _ = DanoEsteticoVistaGarantia.objects.get_or_create(
                     formato=formato,
                     clave_vista=clave,
                     defaults={'etiqueta_dano': etiqueta},
@@ -469,23 +447,23 @@ def texto_aviso_privacidad_actual() -> tuple[str, str]:
 
 
 def finalizar_formato(
-    formato: FormatoServicioOOW,
+    formato: FormatoServicioGarantia,
     usuario=None,
     forzar_regenerar: bool = False,
-) -> FormatoServicioOOW:
+) -> FormatoServicioGarantia:
     """
-    Valida, genera PDF estilo cotización y marca el formato como finalizado.
+    Valida, genera PDF estilo plantilla Dell y marca el formato como finalizado.
 
     Args:
-        formato: FormatoServicioOOW en borrador (o finalizado si forzar_regenerar)
+        formato: FormatoServicioGarantia en borrador (o finalizado si forzar_regenerar)
         usuario: User opcional
         forzar_regenerar: Si True, regenera PDF aunque ya esté finalizado
 
     Returns:
-        FormatoServicioOOW finalizado con pdf guardado
+        FormatoServicioGarantia finalizado con pdf guardado
 
     Raises:
-        FormatoOOWError: si faltan aceptaciones o falló el PDF
+        FormatoGarantiaError: si faltan aceptaciones o falló el PDF
 
     Efectos secundarios:
         Genera PDF, guarda FileField, actualiza estado y finalizado_en.
@@ -493,35 +471,33 @@ def finalizar_formato(
     if formato.estado == 'finalizado' and not forzar_regenerar:
         if formato.pdf:
             return formato
-        # Finalizado sin PDF: regenerar
 
     if not formato.acepta_condiciones:
-        raise FormatoOOWError(
+        raise FormatoGarantiaError(
             'Debes marcar la aceptación de las condiciones de entrega del equipo.'
         )
     if not formato.acepta_privacidad:
-        raise FormatoOOWError(
+        raise FormatoGarantiaError(
             'Debes aceptar el Aviso de Privacidad para finalizar el formato.'
         )
     if not formato.firma_cliente:
-        raise FormatoOOWError('La firma del cliente es obligatoria.')
+        raise FormatoGarantiaError('La firma del cliente es obligatoria.')
 
     version, _texto = texto_aviso_privacidad_actual()
     formato.version_aviso_privacidad = version
 
-    # Generar PDF (import diferido para evitar ciclos)
-    from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+    from servicio_tecnico.utils.pdf_formato_garantia import PDFFormatoServicioGarantia
 
-    generador = PDFFormatoServicioOOW(formato)
+    generador = PDFFormatoServicioGarantia(formato)
     resultado = generador.generar_pdf()
     if not resultado.get('success') or not resultado.get('buffer'):
-        raise FormatoOOWError(
-            resultado.get('error') or 'No se pudo generar el PDF del formato OOW.'
+        raise FormatoGarantiaError(
+            resultado.get('error') or 'No se pudo generar el PDF del formato Garantía.'
         )
 
     empleado = _empleado_desde_usuario(usuario)
     nombre_archivo = resultado.get('nombre_archivo') or (
-        f"FormatoOOW_{formato.orden.numero_orden_interno}.pdf"
+        f"FormatoGarantia_{formato.orden.numero_orden_interno}.pdf"
     )
     pdf_bytes = resultado['buffer'].getvalue()
 
@@ -533,7 +509,7 @@ def finalizar_formato(
         formato.save()
 
     logger.info(
-        'Formato OOW finalizado orden=%s pdf=%s',
+        'Formato Garantía finalizado orden=%s pdf=%s',
         formato.orden.numero_orden_interno,
         nombre_archivo,
     )

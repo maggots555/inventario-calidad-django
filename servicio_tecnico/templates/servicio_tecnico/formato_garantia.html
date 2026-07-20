@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+{# Reutilizamos estilos del wizard OOW (misma estructura de tarjetas/canvas) #}
+<link rel="stylesheet" href="{% static 'css/formato_oow.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid formato-oow-page py-3"
+     id="formatoGarantiaApp"
+     data-url-guardar="{{ url_guardar }}"
+     data-url-finalizar="{{ url_finalizar }}"
+     data-url-reenviar="{{ url_reenviar }}"
+     data-url-pdf="{{ url_pdf }}"
+     data-url-detalle="{{ url_detalle }}"
+     data-url-evidencia="{% url 'servicio_tecnico:formato_garantia_subir_evidencia' orden.pk %}"
+     data-aviso-version="{{ aviso_privacidad_version }}"
+     data-estado="{{ formato.estado }}">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="formato-oow-titulo h3 mb-1">
+                <i class="bi bi-file-earmark-pdf"></i> Formato Digital Garantía Dell
+            </h1>
+            <p class="text-muted mb-0">
+                {{ orden.numero_orden_interno }}
+                {% if orden.detalle_equipo.orden_cliente %}
+                    · DPS {{ orden.detalle_equipo.orden_cliente }}
+                {% endif %}
+                {% if orden.detalle_equipo.folio_sicser %}
+                    · Folio SICSER: {{ orden.detalle_equipo.folio_sicser }}
+                {% endif %}
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_detalle }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver a la orden
+            </a>
+            {% if formato.estado == 'finalizado' and formato.pdf %}
+            <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-primary" target="_blank" rel="noopener">
+                <i class="bi bi-eye"></i> Ver PDF
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if formato.estado == 'finalizado' %}
+    <div class="alert alert-info" role="status">
+        <strong>Formato finalizado</strong>
+        {% if formato.finalizado_en %}({{ formato.finalizado_en|date:"d/m/Y H:i" }}){% endif %}.
+        <ul class="mb-0 mt-2">
+            <li><strong>Regenerar PDF</strong> — actualiza el documento (no envía correo).</li>
+            <li><strong>Reenviar por correo</strong> — manda el PDF actual a los emails capturados.</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    {# --- Resumen datos orden (solo lectura) --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Datos de la orden (SICSER / SIGMA)</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <h2 class="h6 text-uppercase text-muted">Cliente</h2>
+                    <dl class="row mb-0 formato-oow-dl">
+                        <dt class="col-5">Nombre</dt><dd class="col-7">{{ orden.detalle_equipo.nombre_cliente|default:"—" }}</dd>
+                        <dt class="col-5">RFC</dt><dd class="col-7">{{ orden.detalle_equipo.rfc_cliente|default:"—" }}</dd>
+                        <dt class="col-5">Email</dt><dd class="col-7">{{ orden.detalle_equipo.email_cliente|default:"—" }}</dd>
+                        <dt class="col-5">Teléfono</dt><dd class="col-7">{{ orden.detalle_equipo.telefono_cliente|default:"—" }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <h2 class="h6 text-uppercase text-muted">Equipo</h2>
+                    <dl class="row mb-0 formato-oow-dl">
+                        <dt class="col-5">Marca / Modelo</dt>
+                        <dd class="col-7">{{ orden.detalle_equipo.marca }} {{ orden.detalle_equipo.modelo }}</dd>
+                        <dt class="col-5">Service Tag</dt><dd class="col-7">{{ orden.detalle_equipo.numero_serie }}</dd>
+                        <dt class="col-5">Falla inicial</dt>
+                        <dd class="col-7 formato-oow-falla">{{ orden.detalle_equipo.falla_principal|truncatechars:220 }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# --- Accesorios Dell --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Accesorios entregados</div>
+        <div class="card-body">
+            <!--
+              EXPLICACIÓN PARA PRINCIPIANTES:
+              Misma lista del formato papel Dell: Cargador, Teclado, Pluma, etc.
+            -->
+            <div class="row g-2 formato-oow-checks">
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accCargador" {% if formato.accesorio_cargador %}checked{% endif %}>
+                        <span>Cargador</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accTeclado" {% if formato.accesorio_teclado %}checked{% endif %}>
+                        <span>Teclado</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accPluma" {% if formato.accesorio_pluma %}checked{% endif %}>
+                        <span>Pluma</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accMouse" {% if formato.accesorio_mouse %}checked{% endif %}>
+                        <span>Mouse</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accMonitor" {% if formato.accesorio_monitor %}checked{% endif %}>
+                        <span>Monitor</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accCaja" {% if formato.accesorio_caja %}checked{% endif %}>
+                        <span>Caja</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accBateria" {% if formato.accesorio_bateria %}checked{% endif %}>
+                        <span>Batería</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accDocking" {% if formato.accesorio_docking %}checked{% endif %}>
+                        <span>Docking</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accMicrosdSim" {% if formato.accesorio_microsd_sim %}checked{% endif %}>
+                        <span>MicroSD / SIM</span>
+                    </label>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <label class="formato-oow-check">
+                        <input type="checkbox" id="accOtros" {% if formato.accesorio_otros %}checked{% endif %}>
+                        <span>Otros</span>
+                    </label>
+                </div>
+            </div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label" for="numeroCargador">Número del cargador</label>
+                    <input type="text" class="form-control" id="numeroCargador"
+                           value="{{ formato.numero_cargador }}"
+                           placeholder="No. serie / descripción del cargador">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="accOtrosDetalle">Detalle de “Otros”</label>
+                    <input type="text" class="form-control" id="accOtrosDetalle"
+                           value="{{ formato.accesorios_otros_detalle }}">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# --- Daños estéticos (igual OOW) --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Define los daños estéticos</div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="tipoDiagrama">Tipo de equipo</label>
+                    <select id="tipoDiagrama" class="form-select">
+                        <option value="laptop" {% if formato.tipo_diagrama == 'laptop' %}selected{% endif %}>Laptop</option>
+                        <option value="escritorio" {% if formato.tipo_diagrama == 'escritorio' %}selected{% endif %}>Escritorio</option>
+                        <option value="aio" {% if formato.tipo_diagrama == 'aio' %}selected{% endif %}>All in One</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="etiquetaDano">Tipo de daño</label>
+                    <select id="etiquetaDano" class="form-select">
+                        <option value="Rayado">Rayado</option>
+                        <option value="Golpe">Golpe</option>
+                        <option value="Mancha">Mancha</option>
+                        <option value="Roto">Roto / Abierto</option>
+                        <option value="Desgaste">Desgaste</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="vistaActiva">Vista a marcar</label>
+                    <select id="vistaActiva" class="form-select">
+                        {% for clave, label in vistas_laptop %}
+                        <option value="{{ clave }}" data-grupo="laptop">{{ label }}</option>
+                        {% endfor %}
+                        {% for clave, label in vistas_escritorio %}
+                        <option value="{{ clave }}" data-grupo="escritorio">{{ label }}</option>
+                        {% endfor %}
+                        {% for clave, label in vistas_aio %}
+                        <option value="{{ clave }}" data-grupo="aio">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-2">
+                Marca el daño con el dedo o Apple Pencil sobre el diagrama. Luego pulsa
+                <strong>Guardar vista</strong>. En el PDF irán a la página 2
+                (Estado del equipo recibido).
+            </p>
+
+            <div class="formato-oow-canvas-wrap">
+                <canvas id="canvasDano" width="640" height="400" aria-label="Lienzo para marcar daños"></canvas>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-primary" id="btnGuardarVista">
+                    <i class="bi bi-check2"></i> Guardar vista
+                </button>
+                <button type="button" class="btn btn-outline-danger" id="btnLimpiarVista">
+                    <i class="bi bi-eraser"></i> Limpiar trazos
+                </button>
+            </div>
+
+            <div class="formato-oow-vistas-guardadas mt-3" id="vistasGuardadas">
+                {# Rellenado por TS #}
+            </div>
+        </div>
+    </section>
+
+    {# --- Observaciones --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Observaciones técnicas</div>
+        <div class="card-body">
+            <label class="form-label" for="observacionesTecnicas">Detalle (rayones, manchas, golpes, etc.)</label>
+            <textarea class="form-control" id="observacionesTecnicas" rows="4">{{ formato.observaciones_tecnicas }}</textarea>
+        </div>
+    </section>
+
+    {# --- Firma del cliente --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Firma del cliente</div>
+        <div class="card-body">
+            <p class="form-label mb-1">Firma cliente <span class="text-danger">*</span></p>
+            <div class="formato-oow-firma-wrap">
+                <canvas id="canvasFirmaCliente" width="640" height="200"></canvas>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarFirmaCli">
+                    Limpiar firma
+                </button>
+            </div>
+            <div class="formato-oow-firma-preview mt-3" id="firmaClientePreviewWrap" {% if not formato.firma_cliente %}hidden{% endif %}>
+                <p class="small text-muted mb-1">Vista previa de la firma guardada:</p>
+                <div class="formato-oow-vista-thumb formato-oow-firma-thumb">
+                    <img id="firmaClientePreviewImg"
+                         src="{% if formato.firma_cliente %}{{ formato.firma_cliente.url }}{% endif %}"
+                         alt="Firma del cliente guardada">
+                    <span>Firma cliente</span>
+                </div>
+            </div>
+            <label class="formato-oow-check mt-3">
+                <input type="checkbox" id="aceptaCondiciones" {% if formato.acepta_condiciones %}checked{% endif %}>
+                <span>ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO AL CENTRO DE SERVICIO</span>
+            </label>
+        </div>
+    </section>
+
+    {# --- Fotos: solo PC Audit (sin INE) --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Fotos de escaneo (PC Audit)</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label" for="fotoEscaneo">Resultado del escaneo (PC Audit)</label>
+                    <input type="file" class="form-control" id="fotoEscaneo"
+                           accept="image/*" capture="environment">
+                    <p class="form-text small mb-2">
+                        Foto del resultado de PC Audit u otra herramienta de diagnóstico.
+                    </p>
+                    <!--
+                      EXPLICACIÓN PARA PRINCIPIANTES:
+                      Si no se pudo escanear, se marca aquí.
+                      En el PDF página 2 aparece el aviso amarillo.
+                    -->
+                    <label class="formato-oow-check mt-1">
+                        <input type="checkbox" id="disclaimerPcAudit"
+                               {% if formato.disclaimer_pc_audit %}checked{% endif %}>
+                        <span>
+                            No se pudo usar PC AUDIT (equipo no enciende / sin Windows / falla impide la herramienta)
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="formato-oow-evidencias mt-3 d-flex flex-wrap gap-2" id="listaEvidencias">
+                {% for img in evidencias %}
+                <a href="{{ img.imagen.url }}" target="_blank" rel="noopener" class="formato-oow-thumb">
+                    <img src="{{ img.imagen.url }}" alt="{{ img.get_tipo_display }}">
+                    <span>{{ img.get_tipo_display }}</span>
+                </a>
+                {% empty %}
+                <p class="text-muted small mb-0" id="evidenciasVacias">Sin evidencias aún.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {# --- Privacidad + email + cómo te enteraste --- #}
+    <section class="card formato-oow-card mb-3">
+        <div class="card-header formato-oow-section-header">Aviso de privacidad y envío</div>
+        <div class="card-body">
+            <button type="button" class="btn btn-outline-primary mb-2" data-bs-toggle="modal"
+                    data-bs-target="#modalAvisoPrivacidad">
+                <i class="bi bi-shield-lock"></i> Leer aviso de privacidad
+            </button>
+            <div class="formato-oow-aviso-preview mb-3" tabindex="0">
+                {{ aviso_privacidad_texto|truncatechars:400 }}
+            </div>
+            <label class="formato-oow-check mb-3">
+                <input type="checkbox" id="aceptaPrivacidad" {% if formato.acepta_privacidad %}checked{% endif %}>
+                <span>He leído y acepto el Aviso de Privacidad de SIC (versión {{ aviso_privacidad_version }})</span>
+            </label>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Email(s) para recibir el formato</label>
+                    <p class="form-text small mt-0 mb-2">Puedes agregar hasta 3 correos.</p>
+                    <div id="emailsEnvioLista" class="formato-oow-emails-lista">
+                        {# Rellenado por JS #}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="btnAgregarEmail">
+                        <i class="bi bi-plus-lg"></i> Agregar otro correo
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label d-block">¿Cómo te enteraste?</label>
+                    <div class="formato-oow-radios">
+                        {% for valor, label in como_enteraste_choices %}
+                        <label class="formato-oow-radio">
+                            <input type="radio" name="comoEnteraste" value="{{ valor }}"
+                                   {% if formato.como_enteraste == valor %}checked{% endif %}>
+                            <span>{{ label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <label class="formato-oow-check mt-3" id="wrapEnviarEmail"
+                   {% if formato.estado == 'finalizado' %}hidden{% endif %}>
+                <input type="checkbox" id="enviarEmail" checked
+                       {% if formato.estado == 'finalizado' %}disabled{% endif %}>
+                <span>Enviar PDF por correo al finalizar (a los emails capturados, máx. 3)</span>
+            </label>
+        </div>
+    </section>
+
+    <div class="formato-oow-actions sticky-bottom py-3">
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+            <button type="button" class="btn btn-outline-primary btn-lg" id="btnGuardarBorrador">
+                <i class="bi bi-save"></i>
+                {% if formato.estado == 'finalizado' %}Guardar cambios{% else %}Guardar borrador{% endif %}
+            </button>
+            {% if formato.estado == 'finalizado' %}
+            <button type="button" class="btn btn-warning btn-lg" id="btnRegenerarPdf"
+                    title="Guarda los cambios y vuelve a generar el PDF. No envía correo.">
+                <i class="bi bi-arrow-repeat"></i> Regenerar PDF
+            </button>
+            <button type="button" class="btn btn-success btn-lg" id="btnReenviarEmail"
+                    title="Envía el PDF actual a los correos capturados (hasta 3). No regenera el PDF.">
+                <i class="bi bi-envelope"></i> Reenviar por correo
+            </button>
+            <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-success btn-lg" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-pdf"></i> Ver PDF actual
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-primary btn-lg" id="btnFinalizar">
+                <i class="bi bi-check2-circle"></i> Guardar y Finalizar
+            </button>
+            {% endif %}
+        </div>
+        <div class="formato-oow-status-box mt-3" id="formatoGarantiaStatusBox" hidden>
+            <div class="formato-oow-status-inner" id="formatoGarantiaStatusInner">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status" id="formatoGarantiaSpinner" hidden>
+                    <span class="visually-hidden">Cargando…</span>
+                </div>
+                <p class="mb-0" id="formatoGarantiaStatus" aria-live="polite"></p>
+            </div>
+            <div class="mt-2" id="formatoGarantiaStatusActions" hidden>
+                <a href="{{ url_pdf }}?inline=1" class="btn btn-success btn-sm" id="btnVerPdfGenerado"
+                   target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark-pdf"></i> Ver / descargar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="formato-oow-overlay" id="formatoGarantiaOverlay" hidden aria-hidden="true">
+    <div class="formato-oow-overlay-card">
+        <div class="spinner-border text-light mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Generando…</span>
+        </div>
+        <p class="mb-1 fw-semibold" id="formatoGarantiaOverlayTitulo">Generando PDF…</p>
+        <p class="mb-0 small opacity-75" id="formatoGarantiaOverlayTexto">
+            Esto puede tardar unos segundos. No cierres la tablet.
+        </p>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAvisoPrivacidad" tabindex="-1" aria-labelledby="modalAvisoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="modalAvisoLabel">Aviso de privacidad</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body formato-oow-aviso-modal">
+                <pre class="formato-oow-aviso-texto">{{ aviso_privacidad_texto }}</pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
+                        id="btnAceptarAvisoModal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ formato_json|json_script:"formato-garantia-data" }}
+{{ orden_json|json_script:"orden-garantia-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/formato_garantia.js' %}" defer></script>
+{% endblock %}

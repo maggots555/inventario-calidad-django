@@ -345,6 +345,9 @@ urlpatterns = [
     path('sicser/abrir-formato-oow/',
          views.abrir_formato_oow_desde_sicser,
          name='abrir_formato_oow_desde_sicser'),
+    path('sicser/abrir-formato-garantia/',
+         views.abrir_formato_garantia_desde_sicser,
+         name='abrir_formato_garantia_desde_sicser'),
 
     # Formato Digital OOW (wizard iPad + PDF propio SIGMA)
     path('orden/<int:orden_id>/formato-oow/',
@@ -365,6 +368,26 @@ urlpatterns = [
     path('orden/<int:orden_id>/formato-oow/subir-evidencia/',
          views.formato_oow_subir_evidencia,
          name='formato_oow_subir_evidencia'),
+
+    # Formato Digital Garantía Dell (wizard iPad + PDF plantilla Dell)
+    path('orden/<int:orden_id>/formato-garantia/',
+         views.formato_garantia_wizard,
+         name='formato_garantia_wizard'),
+    path('orden/<int:orden_id>/formato-garantia/guardar/',
+         views.formato_garantia_guardar,
+         name='formato_garantia_guardar'),
+    path('orden/<int:orden_id>/formato-garantia/finalizar/',
+         views.formato_garantia_finalizar,
+         name='formato_garantia_finalizar'),
+    path('orden/<int:orden_id>/formato-garantia/reenviar-email/',
+         views.formato_garantia_reenviar_email,
+         name='formato_garantia_reenviar_email'),
+    path('orden/<int:orden_id>/formato-garantia/pdf/',
+         views.formato_garantia_pdf,
+         name='formato_garantia_pdf'),
+    path('orden/<int:orden_id>/formato-garantia/subir-evidencia/',
+         views.formato_garantia_subir_evidencia,
+         name='formato_garantia_subir_evidencia'),
 
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

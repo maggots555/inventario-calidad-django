@@ -284,11 +284,28 @@
                                     <i class="bi bi-eye"></i>
                                     <span class="d-none d-lg-inline">Ver orden</span>
                                 </a>
+                                <a href="{% url 'servicio_tecnico:formato_garantia_wizard' sigma.orden_id %}"
+                                   class="btn btn-sm btn-success"
+                                   title="Formato Digital Garantía Dell (SIGMA)">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                                {% elif puede_importar %}
+                                <form method="post" action="{% url 'servicio_tecnico:abrir_formato_garantia_desde_sicser' %}"
+                                      class="d-inline sicser-import-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="id_externo" value="{{ orden.numero_dps }}">
+                                    <input type="hidden" name="q" value="{{ texto_busqueda }}">
+                                    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
+                                    <button type="submit" class="btn btn-sm btn-success"
+                                            title="Importar (si falta) y abrir Formato Garantía en SIGMA">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </button>
+                                </form>
                                 {% endif %}
                                 <a href="{{ orden.url_formato_digital }}"
-                                   class="btn btn-sm btn-outline-success"
+                                   class="btn btn-sm btn-outline-secondary"
                                    target="_blank" rel="noopener noreferrer"
-                                   title="Formato digital SICSER">
+                                   title="Abrir formato en SICSER (externo)">
                                     <i class="bi bi-box-arrow-up-right"></i>
                                 </a>
                                 {% if puede_importar and not sigma %}
@@ -393,6 +410,13 @@
                                    class="btn btn-sm btn-success"
                                    title="Formato Digital OOW (SIGMA)"
                                    aria-label="Formato Digital OOW">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                                {% elif fila.origen == 'garantia' %}
+                                <a href="{% url 'servicio_tecnico:formato_garantia_wizard' fila.orden_id %}"
+                                   class="btn btn-sm btn-success"
+                                   title="Formato Digital Garantía Dell (SIGMA)"
+                                   aria-label="Formato Digital Garantía Dell">
                                     <i class="bi bi-file-earmark-pdf"></i>
                                 </a>
                                 {% endif %}

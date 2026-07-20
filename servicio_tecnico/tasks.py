@@ -5098,3 +5098,140 @@ def enviar_formato_oow_email_task(
     except Exception as exc:
         logger.error('[FORMATO_OOW] Error email: %s', exc, exc_info=True)
         raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='servicio_tecnico.enviar_formato_garantia_email',
+)
+def enviar_formato_garantia_email_task(
+    self,
+    formato_id,
+    usuario_id=None,
+    db_alias='default',
+):
+    """
+    Envía por correo el PDF del Formato Digital Garantía Dell al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Celery no pasa por PaisMiddleware; db_alias encola el tenant correcto
+    (México=default, argentina, chile, colombia).
+
+    Args:
+        formato_id: PK de FormatoServicioGarantia
+        usuario_id: User que disparó el envío (auditoría)
+        db_alias: Alias de BD del país
+
+    Efectos secundarios:
+        Envía EmailMessage con PDF adjunto; registra historial en la orden.
+    """
+    from django.conf import settings
+    from django.core.mail import EmailMessage
+    from email.mime.application import MIMEApplication
+
+    from .models import FormatoServicioGarantia, HistorialOrden
+    from inventario.models import Empleado
+
+    try:
+        formato = FormatoServicioGarantia.objects.select_related(
+            'orden', 'orden__detalle_equipo',
+        ).get(pk=formato_id)
+
+        if not formato.pdf:
+            logger.warning(
+                '[FORMATO_GARANTIA] Sin PDF — formato_id=%s',
+                formato_id,
+            )
+            return {'success': False, 'error': 'Sin PDF'}
+
+        from .services.formato_garantia import lista_emails_envio
+        destinatarios = lista_emails_envio(formato)
+        if not destinatarios:
+            logger.warning(
+                '[FORMATO_GARANTIA] Sin email — formato_id=%s',
+                formato_id,
+            )
+            return {'success': False, 'error': 'Sin PDF o email'}
+
+        orden = formato.orden
+        detalle = orden.detalle_equipo
+        # En el correo mostramos el DPS SICSER, no el número interno ORD-…
+        orden_sicser = (
+            detalle.orden_cliente
+            or detalle.folio_sicser
+            or orden.numero_orden_interno
+        )
+        asunto = f'Formato de Servicio Garantía Dell — {orden_sicser}'
+        cuerpo = (
+            f'<p>Estimado(a) cliente,</p>'
+            f'<p>Adjuntamos el <strong>Formato de Servicio en Garantía Dell</strong> '
+            f'correspondiente a su equipo.</p>'
+            f'<p>Orden (DPS): <b>{orden_sicser}</b><br>'
+            f'Service Tag: <b>{detalle.numero_serie or "—"}</b></p>'
+            f'<p>SIC Comercialización y Servicios</p>'
+        )
+
+        from email.utils import formataddr, parseaddr
+        from decouple import config
+
+        st_from = (config('SERVICIO_TECNICO_FROM_EMAIL', default='') or '').strip()
+        if st_from:
+            from_email = st_from
+        else:
+            _nombre, _addr = parseaddr(
+                getattr(settings, 'DEFAULT_FROM_EMAIL', '') or ''
+            )
+            from_email = (
+                formataddr(('Servicio Técnico System', _addr))
+                if _addr
+                else getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+            )
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=cuerpo,
+            from_email=from_email,
+            to=destinatarios,
+        )
+        email_msg.content_subtype = 'html'
+
+        with formato.pdf.open('rb') as fh:
+            pdf_bytes = fh.read()
+        pdf_mime = MIMEApplication(pdf_bytes, _subtype='pdf')
+        pdf_mime.add_header(
+            'Content-Disposition',
+            'attachment',
+            filename=f'FormatoGarantia_{orden_sicser}.pdf',
+        )
+        email_msg.attach(pdf_mime)
+        email_msg.send()
+
+        usuario_empleado = None
+        if usuario_id:
+            try:
+                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
+            except Empleado.DoesNotExist:
+                usuario_empleado = None
+
+        destinarios_txt = ', '.join(destinatarios)
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f'Formato Digital Garantía Dell enviado a {destinarios_txt}'
+            ),
+            usuario=usuario_empleado,
+            es_sistema=False,
+        )
+        logger.info(
+            '[FORMATO_GARANTIA] Email enviado a %s orden=%s',
+            destinarios_txt,
+            orden.numero_orden_interno,
+        )
+        return {'success': True}
+
+    except Exception as exc:
+        logger.error('[FORMATO_GARANTIA] Error email: %s', exc, exc_info=True)
+        raise self.retry(exc=exc, countdown=60)

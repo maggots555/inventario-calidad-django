@@ -39,6 +39,12 @@
                         <i class="bi bi-file-earmark-pdf"></i> Formato Digital OOW
                     </a>
                     {% endif %}
+                    {% if mostrar_formato_garantia %}
+                    <a href="{% url 'servicio_tecnico:formato_garantia_wizard' orden.pk %}"
+                       class="btn btn-success">
+                        <i class="bi bi-file-earmark-pdf"></i> Formato Digital Garantía Dell
+                    </a>
+                    {% endif %}
                     <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Volver
                     </a>

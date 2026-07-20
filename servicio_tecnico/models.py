@@ -34,6 +34,9 @@ from config.constants import (
     ESTADO_FORMATO_OOW_CHOICES,
     TIPO_DIAGRAMA_OOW_CHOICES,
     COMO_ENTERASTE_OOW_CHOICES,
+    ESTADO_FORMATO_GARANTIA_CHOICES,
+    TIPO_DIAGRAMA_GARANTIA_CHOICES,
+    COMO_ENTERASTE_GARANTIA_CHOICES,
 )
 
 
@@ -4048,6 +4051,266 @@ class DanoEsteticoVista(models.Model):
     class Meta:
         verbose_name = 'Vista de daño estético OOW'
         verbose_name_plural = 'Vistas de daño estético OOW'
+        unique_together = [('formato', 'clave_vista')]
+        ordering = ['clave_vista']
+
+
+def formato_garantia_firma_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para firmas del formato Garantía Dell.
+
+    Args:
+        instance: FormatoServicioGarantia
+        filename: Nombre del archivo (ej. firma_cliente.png)
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_garantia/{orden_ref}/firmas/{filename}'
+
+
+def formato_garantia_pdf_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para el PDF generado del formato Garantía Dell.
+
+    Args:
+        instance: FormatoServicioGarantia
+        filename: Nombre del PDF
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_garantia/{orden_ref}/pdf/{filename}'
+
+
+def dano_estetico_garantia_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para capturas anotadas de daños (Garantía Dell).
+
+    Args:
+        instance: DanoEsteticoVistaGarantia
+        filename: PNG del canvas compuesto
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.formato.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_garantia/{orden_ref}/danos/{filename}'
+
+
+class FormatoServicioGarantia(models.Model):
+    """
+    Formato digital de servicio en garantía Dell generado en SIGMA.
+
+    Objetivo de negocio:
+        Wizard PWA/iPad que completa la plantilla estilo Dell/SICSER
+        (accesorios Dell, daños estéticos, firma, PC Audit) y genera un PDF
+        con layout de Orden de Servicio + aviso de privacidad México.
+
+    Relación:
+        OneToOne con OrdenServicio (una orden = un formato).
+
+    Efectos secundarios:
+        Al finalizar se genera y guarda un PDF; opcionalmente se encola
+        un correo Celery con el adjunto.
+    """
+
+    orden = models.OneToOneField(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='formato_garantia',
+        help_text='Orden de servicio a la que pertenece este formato',
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_FORMATO_GARANTIA_CHOICES,
+        default='borrador',
+        help_text='Borrador editable o finalizado (PDF generado)',
+    )
+    tipo_diagrama = models.CharField(
+        max_length=20,
+        choices=TIPO_DIAGRAMA_GARANTIA_CHOICES,
+        default='laptop',
+        help_text='Tipo de esquema para marcar daños estéticos',
+    )
+
+    # Accesorios Dell (misma lista del formato papel)
+    accesorio_cargador = models.BooleanField(default=False)
+    accesorio_teclado = models.BooleanField(default=False)
+    accesorio_pluma = models.BooleanField(default=False)
+    accesorio_mouse = models.BooleanField(default=False)
+    accesorio_monitor = models.BooleanField(default=False)
+    accesorio_caja = models.BooleanField(default=False)
+    accesorio_bateria = models.BooleanField(default=False)
+    accesorio_docking = models.BooleanField(default=False)
+    accesorio_microsd_sim = models.BooleanField(default=False)
+    accesorio_otros = models.BooleanField(default=False)
+    accesorios_otros_detalle = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='Detalle cuando se marca “Otros”',
+    )
+    numero_cargador = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie / descripción del cargador',
+    )
+
+    observaciones_tecnicas = models.TextField(
+        blank=True,
+        help_text='Observaciones técnicas y detalle de daños estéticos',
+    )
+    disclaimer_pc_audit = models.BooleanField(
+        default=False,
+        help_text=(
+            'PC AUDIT no pudo usarse (equipo no enciende / sin Windows / falla impide herramienta)'
+        ),
+    )
+
+    acepta_condiciones = models.BooleanField(
+        default=False,
+        help_text='Cliente acepta las condiciones en que entrega el equipo',
+    )
+    acepta_privacidad = models.BooleanField(
+        default=False,
+        help_text='Cliente aceptó el aviso de privacidad vigente',
+    )
+    version_aviso_privacidad = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        help_text='Versión del aviso aceptado (ej. mx-2016-09-06)',
+    )
+
+    email_envio = models.EmailField(
+        blank=True,
+        help_text='Correo principal al que se enviará el PDF (compatibilidad; ver emails_envio)',
+    )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Lista JSON de hasta 3 correos, ej. ["a@x.com", "b@y.com"].
+    emails_envio = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Lista de hasta 3 correos para enviar el PDF del formato',
+    )
+    como_enteraste = models.CharField(
+        max_length=30,
+        choices=COMO_ENTERASTE_GARANTIA_CHOICES,
+        blank=True,
+        help_text='¿Cómo se enteró el cliente de SIC?',
+    )
+
+    nombre_tecnico = models.CharField(
+        max_length=150,
+        blank=True,
+        help_text='Nombre del técnico que diagnostica y repara',
+    )
+    firma_cliente = models.ImageField(
+        upload_to=formato_garantia_firma_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Firma digital del cliente (PNG del canvas)',
+    )
+    firma_tecnico = models.ImageField(
+        upload_to=formato_garantia_firma_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Firma digital del técnico (opcional)',
+    )
+
+    pdf = models.FileField(
+        upload_to=formato_garantia_pdf_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text='PDF generado al finalizar el formato',
+    )
+    finalizado_en = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Fecha/hora en que se finalizó el formato',
+    )
+
+    creado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='formatos_garantia_creados',
+        help_text='Empleado que inició el formato',
+    )
+    actualizado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='formatos_garantia_actualizados',
+        help_text='Último empleado que guardó el formato',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Formato Garantía {self.orden.numero_orden_interno} ({self.estado})"
+
+    class Meta:
+        verbose_name = 'Formato de Servicio Garantía Dell'
+        verbose_name_plural = 'Formatos de Servicio Garantía Dell'
+        ordering = ['-fecha_actualizacion']
+
+
+class DanoEsteticoVistaGarantia(models.Model):
+    """
+    Captura anotada de una vista del equipo para el formato Garantía Dell.
+
+    Objetivo de negocio:
+        Guardar el PNG compuesto (diagrama base + trazos del técnico) para
+        embeberlo en la página 2 del PDF (ESTADO DEL EQUIPO RECIBIDO).
+
+    Args/campos:
+        formato: FormatoServicioGarantia padre
+        clave_vista: Identificador estable (pantalla, top_cover, …)
+        etiqueta_dano: Tipo de daño seleccionado (Rayado, Golpe, …)
+        imagen_anotada: PNG del canvas
+    """
+
+    formato = models.ForeignKey(
+        FormatoServicioGarantia,
+        on_delete=models.CASCADE,
+        related_name='vistas_dano',
+        help_text='Formato Garantía al que pertenece esta vista',
+    )
+    clave_vista = models.CharField(
+        max_length=40,
+        help_text='Clave de la vista (pantalla, top_cover, palm, …)',
+    )
+    etiqueta_dano = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Etiqueta del tipo de daño (ej. Rayado)',
+    )
+    imagen_anotada = models.ImageField(
+        upload_to=dano_estetico_garantia_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Imagen del diagrama con anotaciones del técnico',
+    )
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.clave_vista} — {self.formato.orden.numero_orden_interno}"
+
+    class Meta:
+        verbose_name = 'Vista de daño estético Garantía'
+        verbose_name_plural = 'Vistas de daño estético Garantía'
         unique_together = [('formato', 'clave_vista')]
         ordering = ['clave_vista']
 

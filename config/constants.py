@@ -267,6 +267,8 @@ TIPO_IMAGEN_CHOICES = [
     # Formato Digital OOW (identificación oficial + escaneo PC Audit)
     ('identificacion_oow', 'Identificación oficial — Formato OOW'),
     ('escaneo_oow', 'Resultado de escaneo — Formato OOW'),
+    # Formato Digital Garantía Dell (solo escaneo PC Audit; sin INE)
+    ('escaneo_garantia', 'Resultado de escaneo — Formato Garantía Dell'),
 ]
 
 # ============================================================================
@@ -1181,3 +1183,60 @@ TIPO_DIAGRAMA_OOW_CHOICES = [
     ('escritorio', 'Escritorio'),
     ('aio', 'All in One'),
 ]
+
+# Reutilizamos las mismas opciones de estado/diagrama/cómo te enteraste
+# para el Formato Digital de Garantía Dell (mismo flujo wizard).
+ESTADO_FORMATO_GARANTIA_CHOICES = ESTADO_FORMATO_OOW_CHOICES
+TIPO_DIAGRAMA_GARANTIA_CHOICES = TIPO_DIAGRAMA_OOW_CHOICES
+COMO_ENTERASTE_GARANTIA_CHOICES = COMO_ENTERASTE_OOW_CHOICES
+
+# Accesorios del formato papel Dell / SICSER garantías.
+ACCESORIOS_FORMATO_GARANTIA = [
+    ('accesorio_cargador', 'Cargador'),
+    ('accesorio_teclado', 'Teclado'),
+    ('accesorio_pluma', 'Pluma'),
+    ('accesorio_mouse', 'Mouse'),
+    ('accesorio_monitor', 'Monitor'),
+    ('accesorio_caja', 'Caja'),
+    ('accesorio_bateria', 'Batería'),
+    ('accesorio_docking', 'Docking'),
+    ('accesorio_microsd_sim', 'MicroSD / SIM'),
+    ('accesorio_otros', 'Otros'),
+]
+
+# Textos legales fijos de la página 1 del formato Dell (plantilla SIGMA).
+TEXTOS_LEGALES_FORMATO_GARANTIA = [
+    (
+        '*Recuperación/pérdida de datos no está cubierto bajo la garantía DELL'
+    ),
+    (
+        '*Baterías poseen garantía limitada de 1 año'
+    ),
+    (
+        '* Luego de reinstalación de OS y controladores no se instalan '
+        'Aplicaciones / Software'
+    ),
+    (
+        '* Los daños accidentales requieren cobertura Complete Care'
+    ),
+]
+
+TEXTO_TIEMPO_RESPUESTA_GARANTIA = (
+    'Tiempo de Respuesta: Una vez que el computador se haya recibido en nuestro '
+    'centro de servicio, el tiempo estimado de reparación está sujeto a la '
+    'disponibilidad en país de piezas requeridas para la reparación, en el caso '
+    'de requerir partes. En este caso se solicitará la parte(s) a nuestro almacén '
+    'en el extranjero por lo cual la llegada de las partes al país puede '
+    'extenderse un numero indefinido de días ya que las partes son fabricadas '
+    'en el extranjero lo que implica un tiempo de tránsito, y deben pasar '
+    'aduanas, al recibirse en nuestro centro de servicio se procederá a la '
+    'reparación. Siempre haremos el mejor esfuerzo en completar el proceso de '
+    'diagnóstico y reparación a la brevedad posible, pero estamos dependientes '
+    'de situaciones ajenas a nuestro control.'
+)
+
+TEXTO_PC_AUDIT_FORMATO_GARANTIA = (
+    'NO SE UTILIZÓ EL APLICATIVO PC AUDIT PARA IDENTIFICAR LAS CARACTERÍSTICAS '
+    'DEL HARDWARE Y SOFTWARE INSTALADO DEBIDO A QUE EL EQUIPO NO ENCIENDE, NO '
+    'TIENE SISTEMA OPERATIVO WINDOWS O SU FALLA NO PERMITE UTILIZAR LA HERRAMIENTA.'
+)
