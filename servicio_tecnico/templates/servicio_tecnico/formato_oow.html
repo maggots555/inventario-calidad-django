@@ -211,12 +211,6 @@
         <div class="card-body">
             <label class="form-label" for="observacionesTecnicas">Detalle (rayones, manchas, golpes, etc.)</label>
             <textarea class="form-control" id="observacionesTecnicas" rows="4">{{ formato.observaciones_tecnicas }}</textarea>
-            <label class="formato-oow-check mt-3">
-                <input type="checkbox" id="disclaimerPcAudit" {% if formato.disclaimer_pc_audit %}checked{% endif %}>
-                <span>
-                    No se pudo usar PC AUDIT (equipo no enciende / sin Windows / falla impide la herramienta)
-                </span>
-            </label>
         </div>
     </section>
 
@@ -264,6 +258,21 @@
                     <label class="form-label" for="fotoEscaneo">Resultado del escaneo</label>
                     <input type="file" class="form-control" id="fotoEscaneo"
                            accept="image/*" capture="environment">
+                    <p class="form-text small mb-2">
+                        Foto del resultado de PC Audit u otra herramienta de diagnóstico.
+                    </p>
+                    <!--
+                      EXPLICACIÓN PARA PRINCIPIANTES:
+                      Si no se pudo escanear, se marca aquí.
+                      En el PDF aparece el aviso amarillo junto a las observaciones.
+                    -->
+                    <label class="formato-oow-check mt-1">
+                        <input type="checkbox" id="disclaimerPcAudit"
+                               {% if formato.disclaimer_pc_audit %}checked{% endif %}>
+                        <span>
+                            No se pudo usar PC AUDIT (equipo no enciende / sin Windows / falla impide la herramienta)
+                        </span>
+                    </label>
                 </div>
             </div>
             <div class="formato-oow-evidencias mt-3 d-flex flex-wrap gap-2" id="listaEvidencias">
