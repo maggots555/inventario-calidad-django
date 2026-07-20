@@ -8,7 +8,7 @@ No renderizamos Plotly ni generamos Excel reales en CI. Solo confirmamos:
 2) views.py reexporta (compatibilidad).
 3) Helpers de venta mostrador viven en services/.
 4) Imports críticos existen (regresión NameError).
-5) detalle_orden / inicio siguen en el monolito (Fases 9–10).
+5) detalle_orden sigue en el monolito (Fase 10).
 """
 
 from django.test import SimpleTestCase
@@ -163,21 +163,17 @@ class CompatibilidadDashboardsFase8Test(SimpleTestCase):
                 match = resolve(url)
                 self.assertIs(match.func, expected, msg=f'Fallo en {name}')
 
-    def test_fases_posteriores_siguen_en_monolito(self):
-        """inicio/listas/detalle_orden aún no se movieron (Fases 9–10)."""
-        for attr in (
-            'inicio',
-            'seleccionar_tipo_orden',
-            'crear_orden',
-            'lista_ordenes_activas',
-            'detalle_orden',
-        ):
-            with self.subTest(attr=attr):
-                self.assertEqual(
-                    getattr(st_views, attr).__module__,
-                    'servicio_tecnico.views',
-                    msg=f'{attr} no debería haberse movido en Fase 8',
-                )
+    def test_detalle_orden_sigue_en_monolito(self):
+        """Fase 10: detalle_orden aún no se movió (inicio/listas ya son Fase 9)."""
+        self.assertEqual(
+            st_views.detalle_orden.__module__,
+            'servicio_tecnico.views',
+        )
+        # Fase 9 movió inicio/listas a views_ordenes
+        self.assertEqual(
+            st_views.inicio.__module__,
+            'servicio_tecnico.views_ordenes',
+        )
 
     def test_imports_criticos_modulos(self):
         """Regresión NameError en headers de cada dashboard."""
