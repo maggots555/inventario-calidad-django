@@ -61,7 +61,34 @@ tsc                # Direct TypeScript compilation
 ```
 
 ### Testing
-Hay **suite formal en `almacen/tests/`** (profit, sync componente, compras sin orden, reacondicionado, totales) más scripts manuales en `scripts/testing/`:
+Hay **suite formal en `almacen/tests/`** (profit, sync componente, compras sin orden, reacondicionado, totales), **humo en `servicio_tecnico/tests/`** (modularización) y scripts manuales en `scripts/testing/`.
+
+#### Política: tests con cada cambio que aporte comportamiento nuevo
+
+**CRITICAL para agentes:** si el trabajo introduce o cambia comportamiento verificable, **debe incluirse al menos un test** (o ampliar uno existente). No dejar “solo checklist manual” cuando se pueda automatizar de forma razonable.
+
+```
+✅ SÍ aplica (hay que escribir/actualizar test):
+   - Nueva vista / API / URL
+   - Nueva regla de negocio en models/services/utils
+   - Cambio en sync Almacén ↔ ST, profit, cotizaciones, Celery que toque BD
+   - Extracción/modularización (reexport + resolve como mínimo)
+   - Bugfix con causa conocida (test de regresión)
+
+❌ NO hace falta inventar suite pesada cuando:
+   - Solo docs (AGENTS.md, comentarios)
+   - Solo CSS cosmético sin lógica
+   - Rename/refactor puro sin cambiar comportamiento (opcional: smoke de import)
+   - El usuario pide explícitamente no testear aún
+
+Nivel mínimo aceptable:
+   - Humo: reverse/resolve, reexport, import del módulo, status code 200/302/403
+   - Mejor: 1 caso feliz + 1 borde (permiso, validación, sin orden, etc.)
+   - No enviar correos/PDF/FFmpeg reales en CI — mockear .delay() / IO
+```
+
+**Dónde ponerlos:** `almacen/tests/` o `servicio_tecnico/tests/` (preferir suite formal; no scripts sueltos salvo herramientas manuales en `scripts/testing/`).
+
 ```bash
 # Suite Django de Almacén (preferir al tocar cotizaciones / sync ST)
 python manage.py test almacen
@@ -83,6 +110,9 @@ python scripts/testing/test_dynamic_storage.py
 python manage.py test                           # All tests
 python manage.py test inventario                # App-specific
 python manage.py test inventario.tests.MyTest   # Single test
+
+# Suite humo modularización Servicio Técnico (reexports / resolve URLs)
+python manage.py test servicio_tecnico.tests
 ```
 
 ### Data Management
@@ -317,6 +347,11 @@ inventario-calidad-django/
 │   └── middleware.py         # ForcePasswordChangeMiddleware (tras PaisMiddleware)
 ├── servicio_tecnico/         # App: Service orders (MAIN)
 │   ├── models.py            # ~23 models (OrdenServicio, EnlaceSeguimientoCliente, etc.)
+│   ├── views.py             # Reexports + detalle_orden (NO volver a monolito ~19k LOC)
+│   ├── views_*.py           # Vistas por dominio (ordenes, rhitso, dashboards, etc.)
+│   ├── services/            # Helpers de dominio (historial, multimedia, notifs, analytics)
+│   ├── decorators.py        # permission_required_with_message, cache_page_dashboard
+│   ├── tests/               # Suite humo modularización + smoke por fase
 │   ├── plotly_visualizations.py  # ~4600 lines of charts
 │   ├── ml_predictor.py      # ML predictions
 │   ├── ml_advanced/         # Advanced ML modules
@@ -436,6 +471,47 @@ Settings automatically optimize based on `DB_ENGINE` value.
 - Django-Axes enabled for brute-force protection
 - CSRF protection always active (`CSRF_COOKIE_NAME = 'sigma_csrftoken'` en producción)
 - HSTS enabled in production (`DEBUG=False`)
+
+#### Modularidad de vistas — no re-inflar monolitos (Julio 2026)
+
+**Contexto:** `servicio_tecnico/views.py` llegó a ~19 000 líneas. Se modularizó en fases (hermanos `views_*.py` + `services/` + reexports). Hoy `views.py` es principalmente **reexports** y aún contiene `detalle_orden` (pendiente opcional de extraer). El objetivo ya se cumplió: archivos navegables y escalables.
+
+**Regla para agentes — aplicar en TODAS las apps (ST, Almacén, etc.):**
+
+```
+❌ NUNCA agregar features nuevas grandes dentro de un views.py ya denso
+❌ NUNCA “aprovechar” el monolito residual para meter dashboards/AJAX/APIs nuevas
+❌ NUNCA editar urls.py para apuntar al módulo nuevo si views.py ya reexporta
+   (salvo que el usuario pida cambiar el cableado)
+❌ NUNCA mover lógica de negocio a templates; helpers → services/ o utils/
+
+✅ SIEMPRE crear un módulo hermano por dominio cuando la feature sea nueva o crezca:
+   views_mi_feature.py  |  services/mi_helper.py  |  tests/test_...
+✅ SIEMPRE reexportar desde views.py si urls.py usa views.foo (compatibilidad)
+✅ SIEMPRE preferir archivos < ~800–1000 LOC de lógica; si un módulo se dispara,
+   partir por dominio ANTES de seguir sumando
+✅ SIEMPRE al tocar imports relativos dentro de services/: usar
+   from servicio_tecnico.models import ...  (NO from .models — eso busca services/models)
+✅ SIEMPRE añadir test de humo (resolve/reexport) si se extrae o crea un views_*.py
+✅ SIEMPRE, si hay comportamiento nuevo o cambiado, incluir o ampliar un test
+   (ver Sección 1 → Política de tests). No entregar feature “a ciegas” solo con checklist.
+```
+
+**Mapa actual de `servicio_tecnico` (orientativo):**
+
+| Módulo | Dominio |
+|--------|---------|
+| `views_ordenes.py` | inicio, crear, listas, cerrar |
+| `views_rhitso.py` / `views_envios_cliente.py` | RHITSO por orden + envíos al cliente |
+| `views_dashboard_*.py` | Dashboards Plotly/Excel |
+| `views_piezas_cotizadas.py`, `views_seguimiento_piezas_ajax.py`, `views_venta_mostrador_ajax.py` | AJAX piezas / VM |
+| `views_multimedia.py`, `views_seguimiento_cliente.py`, `views_encuestas.py`, … | Multimedia, portal, APIs dash |
+| `services/` | historial, multimedia, notificaciones_piezas, ventas_mostrador_analytics |
+| `views.py` | reexports + `detalle_orden` (no volver a concentrar todo aquí) |
+
+**Pendiente consciente (no urgente):** mover `detalle_orden` a `views_detalle_orden.py` sin partir handlers; luego (otro PR) handlers por `form_type`. No bloquear features nuevas por eso: las features nuevas van a módulos propios.
+
+**Misma filosofía fuera de vistas:** TypeScript en `static/ts/` ya es modular — no crear un único `.ts` gigante; CSS por página/componente, no CSS inline masivo en templates enormes (`detalle_orden.html` es otro candidato a no hinchar más).
 
 ---
 
@@ -907,8 +983,10 @@ df = pd.DataFrame(list(queryset.values()))
 
 ### Current Approach
 - **Unit / integration tests (Almacén)**: suite formal en `almacen/tests/` (profit, sync componente, compras sin orden, reacondicionado, totales)
+- **Humo modularización ST**: `servicio_tecnico/tests/` (reexports, resolve URLs por fase)
 - **Scripts manuales**: `scripts/testing/` (email, PDF RHITSO, ML, storage)
 - **Otras apps**: cobertura aún mínima en `tests.py` por defecto
+- **Política**: todo cambio con comportamiento nuevo/cambiado debe traer test (o ampliar uno). Ver Sección 1 → Testing.
 
 ### Running Tests
 ```bash
@@ -919,6 +997,9 @@ python manage.py test almacen.tests.test_sincronizar_componente_st
 python manage.py test almacen.tests.test_generar_compras_sin_orden
 python manage.py test almacen.tests.test_costeo_reacondicionado
 python manage.py test almacen.tests.test_totales_cotizacion
+
+# Suite ST (modularización + humo)
+python manage.py test servicio_tecnico.tests
 
 # Scripts manuales
 python scripts/testing/test_email_config.py
@@ -962,6 +1043,8 @@ Consider adding:
 20. **Don't inventar writes a SICSER** — Fase 1 es solo lectura + import a SIGMA.
 21. **Don't asumir que todo cambio de estado dispara push** — solo estados en `ESTADOS_PUSH_TECNICO` / `ESTADOS_PUSH_CLIENTE`.
 22. **Don't usar cookie CSRF default** — en producción la cookie se llama `sigma_csrftoken`.
+23. **Don't re-inflar monolitos de vistas** — no agregar features grandes a `views.py` densos; usar `views_*.py` + `services/` + reexports. Ver Sección 4 → Modularidad de vistas. En `services/`, no usar `from .models` (rompe con `services.models`).
+24. **Don't entregar comportamiento nuevo sin test** — si aplica (vista, API, regla de negocio, bugfix, sync), añadir o ampliar un test en la suite de la app. Ver Sección 1 → Política de tests. Excepción: docs/CSS cosmético o pedido explícito del usuario.
 
 ---
 
@@ -978,6 +1061,7 @@ Consider adding:
 | Watch TypeScript | `pnpm run watch` |
 | Run tests | `python manage.py test` |
 | Run Almacén tests | `python manage.py test almacen` |
+| Run ST modularización tests | `python manage.py test servicio_tecnico.tests` |
 | Seed data | `python scripts/poblado/poblar_sistema.py` |
 
 ---
