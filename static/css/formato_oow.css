@@ -78,6 +78,10 @@
   border-radius: 0.5rem;
   overflow: hidden;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .formato-oow-canvas-wrap canvas,
@@ -88,6 +92,10 @@
   max-height: 420px;
   touch-action: none;
   cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 [data-bs-theme="dark"] .formato-oow-canvas-wrap,
@@ -167,6 +175,50 @@
 .formato-oow-actions .btn {
   min-height: 48px;
   min-width: 160px;
+}
+
+.formato-oow-status-box {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--card-bg, #f8fafc);
+  text-align: center;
+}
+
+.formato-oow-status-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+[data-bs-theme="dark"] .formato-oow-status-box {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.formato-oow-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 1.5rem;
+}
+
+.formato-oow-overlay[hidden] {
+  display: none !important;
+}
+
+.formato-oow-overlay-card {
+  max-width: 360px;
+  text-align: center;
+  color: #f8fafc;
+  padding: 1.5rem;
 }
 
 @media (max-width: 576px) {

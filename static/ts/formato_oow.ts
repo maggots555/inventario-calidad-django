@@ -67,14 +67,48 @@ function checked(id: string): boolean {
   return Boolean(el && el.checked);
 }
 
-function setStatus(mensaje: string, esError: boolean = false): void {
+function setStatus(mensaje: string, esError: boolean = false, cargando: boolean = false): void {
+  const box = byId('formatoOowStatusBox');
   const el = byId('formatoOowStatus');
-  if (!el) {
+  const spinner = byId('formatoOowSpinner');
+  if (!el || !box) {
     return;
   }
+  box.hidden = mensaje.length === 0;
   el.textContent = mensaje;
   el.classList.toggle('text-danger', esError);
-  el.classList.toggle('text-success', !esError && mensaje.length > 0);
+  el.classList.toggle('text-success', !esError && !cargando && mensaje.length > 0);
+  el.classList.toggle('text-primary', cargando);
+  if (spinner) {
+    spinner.hidden = !cargando;
+  }
+}
+
+function setOverlay(visible: boolean, titulo?: string, texto?: string): void {
+  const overlay = byId('formatoOowOverlay');
+  if (!overlay) {
+    return;
+  }
+  overlay.hidden = !visible;
+  overlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  const t = byId('formatoOowOverlayTitulo');
+  const d = byId('formatoOowOverlayTexto');
+  if (t && titulo) {
+    t.textContent = titulo;
+  }
+  if (d && texto) {
+    d.textContent = texto;
+  }
+}
+
+function setBotonesOcupados(ocupado: boolean): void {
+  const ids = ['btnGuardarBorrador', 'btnFinalizar'];
+  ids.forEach((id) => {
+    const btn = byId(id) as HTMLButtonElement | null;
+    if (btn) {
+      btn.disabled = ocupado;
+    }
+  });
 }
 
 function crearPad(canvas: HTMLCanvasElement): PadState {
@@ -107,9 +141,27 @@ function crearPad(canvas: HTMLCanvasElement): PadState {
     };
   };
 
+  // EXPLICACIÓN PARA PRINCIPIANTES:
+  // En iPad, mantener el dedo provoca menú de selección de texto / callout.
+  // Desactivamos selección, callout y gestos del navegador sobre el canvas.
   canvas.style.touchAction = 'none';
+  canvas.style.userSelect = 'none';
+  (canvas.style as CSSStyleDeclaration & { webkitUserSelect?: string }).webkitUserSelect = 'none';
+  (canvas.style as CSSStyleDeclaration & { webkitTouchCallout?: string }).webkitTouchCallout = 'none';
+  canvas.setAttribute('draggable', 'false');
+
+  const bloquearGesto = (ev: Event): void => {
+    ev.preventDefault();
+  };
+  canvas.addEventListener('contextmenu', bloquearGesto);
+  canvas.addEventListener('selectstart', bloquearGesto);
+  canvas.addEventListener('dragstart', bloquearGesto);
+  // touchstart con passive:false permite preventDefault en Safari/iPadOS
+  canvas.addEventListener('touchstart', bloquearGesto, { passive: false });
+  canvas.addEventListener('touchmove', bloquearGesto, { passive: false });
 
   canvas.addEventListener('pointerdown', (ev: PointerEvent) => {
+    ev.preventDefault();
     pad.dibujando = true;
     canvas.setPointerCapture(ev.pointerId);
     const p = pos(ev);
@@ -121,6 +173,7 @@ function crearPad(canvas: HTMLCanvasElement): PadState {
     if (!pad.dibujando) {
       return;
     }
+    ev.preventDefault();
     const p = pos(ev);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
@@ -131,6 +184,7 @@ function crearPad(canvas: HTMLCanvasElement): PadState {
     if (!pad.dibujando) {
       return;
     }
+    ev.preventDefault();
     pad.dibujando = false;
     try {
       canvas.releasePointerCapture(ev.pointerId);
@@ -140,6 +194,12 @@ function crearPad(canvas: HTMLCanvasElement): PadState {
   };
   canvas.addEventListener('pointerup', fin);
   canvas.addEventListener('pointercancel', fin);
+  canvas.addEventListener('pointerleave', (ev: PointerEvent) => {
+    // Si el dedo sale del canvas sin soltar, terminamos el trazo
+    if (pad.dibujando) {
+      fin(ev);
+    }
+  });
 
   return pad;
 }
@@ -365,32 +425,81 @@ function inicializarFormatoOow(): void {
   };
 
   byId('btnGuardarBorrador')?.addEventListener('click', async () => {
-    setStatus('Guardando borrador…');
+    const actions = byId('formatoOowStatusActions');
+    if (actions) {
+      actions.hidden = true;
+    }
+    setBotonesOcupados(true);
+    setStatus('Guardando borrador…', false, true);
     try {
       await postJson(urlGuardar, construirPayload(false));
-      setStatus('Borrador guardado correctamente.');
+      setStatus('Borrador guardado correctamente.', false, false);
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Error al guardar', true);
+      setStatus(err instanceof Error ? err.message : 'Error al guardar', true, false);
+    } finally {
+      setBotonesOcupados(false);
     }
   });
 
   byId('btnFinalizar')?.addEventListener('click', async () => {
+    const actions = byId('formatoOowStatusActions');
+    if (actions) {
+      actions.hidden = true;
+    }
     if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
-      setStatus('Debes aceptar condiciones y aviso de privacidad.', true);
+      setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
       return;
     }
     if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
-      setStatus('La firma del cliente es obligatoria.', true);
+      setStatus('La firma del cliente es obligatoria.', true, false);
       return;
     }
-    setStatus('Finalizando y generando PDF…');
+
+    setBotonesOcupados(true);
+    setOverlay(
+      true,
+      'Generando PDF…',
+      'Estamos guardando el formato y creando el documento. Puede tardar unos segundos. No cierres ni bloquees la tablet.',
+    );
+    setStatus('1/2 Guardando datos del formato…', false, true);
+
     try {
+      // Pequeña pausa para que el overlay se pinte en pantalla (iPad)
+      await new Promise<void>((resolve) => {
+        window.setTimeout(() => resolve(), 50);
+      });
+      setStatus('2/2 Generando PDF del formato…', false, true);
       const data = await postJson(urlFinalizar, construirPayload(true));
-      setStatus('Formato finalizado. Abriendo PDF…');
-      const pdfUrl = String(data.pdf_url || urlPdf);
-      window.open(pdfUrl + '?inline=1', '_blank');
+      const pdfUrl = String(data.pdf_url || urlPdf) + '?inline=1';
+
+      setOverlay(false);
+      setStatus(
+        '¡Listo! Formato finalizado y PDF generado. Si no se abrió solo, usa el botón de abajo.',
+        false,
+        false,
+      );
+      if (actions) {
+        actions.hidden = false;
+      }
+      const linkPdf = byId('btnVerPdfGenerado') as HTMLAnchorElement | null;
+      if (linkPdf) {
+        linkPdf.href = pdfUrl;
+      }
+
+      // En iPad Safari window.open a veces se bloquea tras un await largo
+      const ventana = window.open(pdfUrl, '_blank');
+      if (!ventana) {
+        setStatus(
+          'PDF generado. El navegador bloqueó la ventana emergente: toca “Ver / descargar PDF”.',
+          false,
+          false,
+        );
+      }
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Error al finalizar', true);
+      setOverlay(false);
+      setStatus(err instanceof Error ? err.message : 'Error al finalizar', true, false);
+    } finally {
+      setBotonesOcupados(false);
     }
   });
 
@@ -403,7 +512,7 @@ function inicializarFormatoOow(): void {
     fd.append('tipo', tipo);
     fd.append('imagen', file);
       fd.append('descripcion', tipo === 'escaneo_oow' ? 'Escaneo OOW' : 'Identificación oficial OOW');
-    setStatus('Subiendo foto…');
+    setStatus('Subiendo foto…', false, true);
     try {
       const resp = await fetch(urlEvidencia, {
         method: 'POST',
@@ -433,10 +542,10 @@ function inicializarFormatoOow(): void {
         a.innerHTML = `<img src="${data.imagen.url}" alt="${tipo}"><span>${tipo}</span>`;
         lista.prepend(a);
       }
-      setStatus('Foto guardada.');
+      setStatus('Foto guardada.', false, false);
       input.value = '';
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Error al subir foto', true);
+      setStatus(err instanceof Error ? err.message : 'Error al subir foto', true, false);
     }
   };
 
