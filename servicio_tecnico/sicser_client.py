@@ -221,6 +221,12 @@ def parsear_codigo_cis_para_url(folio: str, cis: str | None = None) -> str:
 
     Returns:
         str: Código corto aceptado por SICSER (DROP, SAT, MTR, etc.).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En México el folio a veces pega el número de sitio a la ciudad:
+    MX_CIS_MX_MONTERREY1_02821 → segmento "MONTERREY1" (no "MONTERREY").
+    Si solo buscamos coincidencia exacta, no lo encuentra y cae a SAT (Satélite).
+    Por eso, si falla el match exacto, quitamos dígitos al final y reintentamos.
     """
     candidatos: list[str] = []
 
@@ -236,6 +242,12 @@ def parsear_codigo_cis_para_url(folio: str, cis: str | None = None) -> str:
     for candidato in candidatos:
         if candidato in SEGMENTO_CIS_A_CODIGO_URL:
             return SEGMENTO_CIS_A_CODIGO_URL[candidato]
+
+    # Segundo intento: MONTERREY1 / GUADALAJARA2 → MONTERREY / GUADALAJARA
+    for candidato in candidatos:
+        base = candidato.rstrip('0123456789')
+        if base and base != candidato and base in SEGMENTO_CIS_A_CODIGO_URL:
+            return SEGMENTO_CIS_A_CODIGO_URL[base]
 
     return 'SAT'
 
