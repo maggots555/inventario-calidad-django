@@ -510,6 +510,26 @@ class PDFFormatoServicioOOW:
             ))
             return elementos
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Orden fijo del PDF (laptop): Pantalla → Top Cover → Palm → Bottom →
+        # Lateral izq → Lateral der. Si el usuario guardó las vistas en otro
+        # orden, aquí las reordenamos según el catálogo del tipo de diagrama.
+        tipo = (self.formato.tipo_diagrama or 'laptop').lower()
+        if tipo == 'escritorio':
+            catalogo_orden = VISTAS_DANO_ESTETICO_ESCRITORIO
+        elif tipo == 'aio':
+            catalogo_orden = VISTAS_DANO_ESTETICO_AIO
+        else:
+            catalogo_orden = VISTAS_DANO_ESTETICO_LAPTOP
+
+        orden_claves = {clave: idx for idx, (clave, _etiqueta) in enumerate(catalogo_orden)}
+        vistas.sort(
+            key=lambda v: (
+                orden_claves.get(v.clave_vista, 999),
+                v.clave_vista or '',
+            )
+        )
+
         # Mapa etiqueta amigable
         labels = dict(
             VISTAS_DANO_ESTETICO_LAPTOP
