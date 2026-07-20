@@ -34,6 +34,72 @@ from servicio_tecnico.models import (
 
 logger = logging.getLogger(__name__)
 
+MAX_EMAILS_ENVIO_OOW = 3
+
+
+def normalizar_emails_envio(raw: Any) -> list[str]:
+    """
+    Limpia y limita a máximo 3 correos únicos (sin vacíos).
+
+    Args:
+        raw: lista, string único, o None
+
+    Returns:
+        Lista de hasta 3 emails (strip; sin duplicados por mayúsculas/minúsculas).
+    """
+    candidatos: list[str] = []
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El wizard puede mandar una lista JSON o, por compatibilidad, un solo string.
+    if isinstance(raw, list):
+        candidatos = [str(x) for x in raw]
+    elif isinstance(raw, str) and raw.strip():
+        # También aceptamos "a@x.com, b@y.com" por si llega separado por comas
+        candidatos = [p.strip() for p in raw.replace(';', ',').split(',')]
+    elif raw is not None and raw != '':
+        candidatos = [str(raw)]
+
+    limpios: list[str] = []
+    vistos: set[str] = set()
+    for correo in candidatos:
+        email = (correo or '').strip()
+        if not email:
+            continue
+        clave = email.lower()
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        limpios.append(email)
+        if len(limpios) >= MAX_EMAILS_ENVIO_OOW:
+            break
+    return limpios
+
+
+def lista_emails_envio(formato: FormatoServicioOOW) -> list[str]:
+    """
+    Devuelve los correos de envío del formato (hasta 3).
+
+    Preferencia: campo JSON emails_envio; si está vacío, usa email_envio (legacy).
+    """
+    emails = normalizar_emails_envio(getattr(formato, 'emails_envio', None))
+    if emails:
+        return emails
+    if formato.email_envio:
+        return [formato.email_envio.strip()]
+    return []
+
+
+def aplicar_emails_al_formato(formato: FormatoServicioOOW, raw: Any) -> None:
+    """
+    Asigna emails_envio y sincroniza email_envio (primer correo) por compatibilidad.
+
+    Efectos secundarios:
+        Modifica formato en memoria (caller debe .save()).
+    """
+    emails = normalizar_emails_envio(raw)
+    formato.emails_envio = emails
+    formato.email_envio = emails[0] if emails else ''
+
+
 # Claves booleanas de accesorios que llegan del front
 CAMPOS_ACCESORIOS = (
     'accesorio_cargador',
@@ -145,10 +211,13 @@ def _prefill_desde_detalle(formato: FormatoServicioOOW) -> None:
     """
     detalle = formato.orden.detalle_equipo
     formato.accesorio_cargador = bool(detalle.tiene_cargador)
-    formato.email_envio = detalle.email_cliente or ''
+    # Prefill: un solo correo del cliente; el usuario puede agregar hasta 2 más en la UI
+    aplicar_emails_al_formato(formato, detalle.email_cliente or '')
     # Tipo de diagrama según tipo de equipo
     tipo = (detalle.tipo_equipo or '').lower()
-    if tipo in ('desktop', 'escritorio', 'aio', 'all-in-one'):
+    if tipo in ('aio', 'all-in-one', 'all in one'):
+        formato.tipo_diagrama = 'aio'
+    elif tipo in ('desktop', 'escritorio', 'pc'):
         formato.tipo_diagrama = 'escritorio'
     else:
         formato.tipo_diagrama = 'laptop'
@@ -190,6 +259,7 @@ def serializar_formato(formato: FormatoServicioOOW) -> dict[str, Any]:
         'acepta_privacidad': formato.acepta_privacidad,
         'version_aviso_privacidad': formato.version_aviso_privacidad,
         'email_envio': formato.email_envio,
+        'emails_envio': lista_emails_envio(formato),
         'como_enteraste': formato.como_enteraste,
         'firma_cliente_url': formato.firma_cliente.url if formato.firma_cliente else '',
         'pdf_url': formato.pdf.url if formato.pdf else '',
@@ -300,12 +370,17 @@ def aplicar_payload_borrador(
             'accesorios_otros_detalle',
             'contrasena_equipo',
             'observaciones_tecnicas',
-            'email_envio',
         ):
             if campo in payload and payload[campo] is not None:
                 setattr(formato, campo, str(payload[campo])[:500 if campo != 'observaciones_tecnicas' else 5000])
 
-        if 'tipo_diagrama' in payload and payload['tipo_diagrama'] in ('laptop', 'escritorio'):
+        # Emails: preferir lista emails_envio; si no viene, aceptar email_envio único
+        if 'emails_envio' in payload:
+            aplicar_emails_al_formato(formato, payload.get('emails_envio'))
+        elif 'email_envio' in payload and payload['email_envio'] is not None:
+            aplicar_emails_al_formato(formato, payload.get('email_envio'))
+
+        if 'tipo_diagrama' in payload and payload['tipo_diagrama'] in ('laptop', 'escritorio', 'aio'):
             formato.tipo_diagrama = payload['tipo_diagrama']
 
         if 'disclaimer_pc_audit' in payload:

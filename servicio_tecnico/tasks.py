@@ -4995,9 +4995,18 @@ def enviar_formato_oow_email_task(
             'orden', 'orden__detalle_equipo',
         ).get(pk=formato_id)
 
-        if not formato.pdf or not formato.email_envio:
+        if not formato.pdf:
             logger.warning(
-                '[FORMATO_OOW] Sin PDF o email — formato_id=%s',
+                '[FORMATO_OOW] Sin PDF — formato_id=%s',
+                formato_id,
+            )
+            return {'success': False, 'error': 'Sin PDF'}
+
+        from .services.formato_oow import lista_emails_envio
+        destinatarios = lista_emails_envio(formato)
+        if not destinatarios:
+            logger.warning(
+                '[FORMATO_OOW] Sin email — formato_id=%s',
                 formato_id,
             )
             return {'success': False, 'error': 'Sin PDF o email'}
@@ -5016,11 +5025,13 @@ def enviar_formato_oow_email_task(
             f'<p>SIC Comercialización y Servicios</p>'
         )
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # EmailMessage.to acepta una lista: se envía el mismo PDF a todos (máx. 3).
         email_msg = EmailMessage(
             subject=asunto,
             body=cuerpo,
             from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
-            to=[formato.email_envio],
+            to=destinatarios,
         )
         email_msg.content_subtype = 'html'
 
@@ -5042,18 +5053,19 @@ def enviar_formato_oow_email_task(
             except Empleado.DoesNotExist:
                 usuario_empleado = None
 
+        destinarios_txt = ', '.join(destinatarios)
         HistorialOrden.objects.create(
             orden=orden,
             tipo_evento='email',
             comentario=(
-                f'Formato Digital OOW enviado a {formato.email_envio}'
+                f'Formato Digital OOW enviado a {destinarios_txt}'
             ),
             usuario=usuario_empleado,
             es_sistema=False,
         )
         logger.info(
             '[FORMATO_OOW] Email enviado a %s orden=%s',
-            formato.email_envio,
+            destinarios_txt,
             orden.numero_orden_interno,
         )
         return {'success': True}

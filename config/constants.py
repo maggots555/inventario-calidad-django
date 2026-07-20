@@ -1153,6 +1153,15 @@ VISTAS_DANO_ESTETICO_ESCRITORIO = [
     ('superior', 'Superior'),
 ]
 
+# All-in-One: monitor integrado (frente/pantalla, trasera, laterales y base).
+VISTAS_DANO_ESTETICO_AIO = [
+    ('aio_pantalla', 'Pantalla / Frente'),
+    ('aio_trasera', 'Trasera'),
+    ('aio_lat_izq', 'Lateral Izquierdo'),
+    ('aio_lat_der', 'Lateral Derecho'),
+    ('aio_base', 'Base / Soporte'),
+]
+
 COMO_ENTERASTE_OOW_CHOICES = [
     ('google', 'Google'),
     ('facebook', 'Facebook'),
@@ -1170,4 +1179,5 @@ ESTADO_FORMATO_OOW_CHOICES = [
 TIPO_DIAGRAMA_OOW_CHOICES = [
     ('laptop', 'Laptop'),
     ('escritorio', 'Escritorio'),
+    ('aio', 'All in One'),
 ]

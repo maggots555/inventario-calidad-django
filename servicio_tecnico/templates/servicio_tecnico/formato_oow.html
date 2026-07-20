@@ -148,6 +148,7 @@
                     <select id="tipoDiagrama" class="form-select">
                         <option value="laptop" {% if formato.tipo_diagrama == 'laptop' %}selected{% endif %}>Laptop</option>
                         <option value="escritorio" {% if formato.tipo_diagrama == 'escritorio' %}selected{% endif %}>Escritorio</option>
+                        <option value="aio" {% if formato.tipo_diagrama == 'aio' %}selected{% endif %}>All in One</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -169,6 +170,9 @@
                         {% endfor %}
                         {% for clave, label in vistas_escritorio %}
                         <option value="{{ clave }}" data-grupo="escritorio">{{ label }}</option>
+                        {% endfor %}
+                        {% for clave, label in vistas_aio %}
+                        <option value="{{ clave }}" data-grupo="aio">{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -289,9 +293,14 @@
 
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label" for="emailEnvio">Email para recibir el formato</label>
-                    <input type="email" class="form-control" id="emailEnvio"
-                           value="{{ formato.email_envio }}">
+                    <label class="form-label">Email(s) para recibir el formato</label>
+                    <p class="form-text small mt-0 mb-2">Puedes agregar hasta 3 correos.</p>
+                    <div id="emailsEnvioLista" class="formato-oow-emails-lista">
+                        {# Rellenado por JS; el primero usa el valor guardado #}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="btnAgregarEmail">
+                        <i class="bi bi-plus-lg"></i> Agregar otro correo
+                    </button>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label d-block">¿Cómo te enteraste?</label>
@@ -308,7 +317,7 @@
             </div>
             <label class="formato-oow-check mt-3">
                 <input type="checkbox" id="enviarEmail" checked>
-                <span>Enviar PDF por correo al finalizar (si hay email)</span>
+                <span>Enviar PDF por correo al finalizar (a los emails capturados, máx. 3)</span>
             </label>
         </div>
     </section>

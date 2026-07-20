@@ -231,6 +231,30 @@
   padding: 1.5rem;
 }
 
+/* Lista de hasta 3 correos para compartir el PDF */
+.formato-oow-emails-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formato-oow-email-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.formato-oow-email-row .form-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.formato-oow-email-quitar {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+}
+
 @media (max-width: 576px) {
   .formato-oow-actions .btn {
     width: 100%;

@@ -48,6 +48,7 @@ def formato_oow_wizard(request, orden_id: int):
     """
     from config.constants import (
         COMO_ENTERASTE_OOW_CHOICES,
+        VISTAS_DANO_ESTETICO_AIO,
         VISTAS_DANO_ESTETICO_ESCRITORIO,
         VISTAS_DANO_ESTETICO_LAPTOP,
     )
@@ -97,6 +98,7 @@ def formato_oow_wizard(request, orden_id: int):
         'como_enteraste_choices': COMO_ENTERASTE_OOW_CHOICES,
         'vistas_laptop': VISTAS_DANO_ESTETICO_LAPTOP,
         'vistas_escritorio': VISTAS_DANO_ESTETICO_ESCRITORIO,
+        'vistas_aio': VISTAS_DANO_ESTETICO_AIO,
         'evidencias': evidencias,
         'url_guardar': reverse('servicio_tecnico:formato_oow_guardar', args=[orden.pk]),
         'url_finalizar': reverse('servicio_tecnico:formato_oow_finalizar', args=[orden.pk]),
@@ -190,8 +192,10 @@ def formato_oow_finalizar(request, orden_id: int):
         logger.exception('Error finalizando formato OOW: %s', exc)
         return _json_error(f'Error al finalizar: {exc}', status=500)
 
-    # Envío de correo opcional
-    if payload.get('enviar_email') and formato.email_envio and formato.pdf:
+    # Envío de correo opcional (hasta 3 destinatarios)
+    from .services.formato_oow import lista_emails_envio
+    emails = lista_emails_envio(formato)
+    if payload.get('enviar_email') and emails and formato.pdf:
         try:
             from .tasks import enviar_formato_oow_email_task
             enviar_formato_oow_email_task.delay(

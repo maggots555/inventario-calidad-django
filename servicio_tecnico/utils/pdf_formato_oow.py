@@ -9,14 +9,12 @@ visual que las cotizaciones al cliente (Platypus + headers navy #003366).
 NO usa el layout “papel” de RHITSO (canvas manual). Usa tablas y párrafos
 como PDFCotizacionCliente.
 
-Estructura:
-1. Header logo + empresa + fecha/folio
-2. Título del formato
-3. Datos cliente / equipo
-4. Accesorios + observaciones
-5. Daños estéticos (imágenes anotadas)
-6. Firmas
-7. Página(s) Aviso de Privacidad México
+Estructura (páginas bien separadas, sin encimar):
+1. Página 1 — Header + título + cliente + equipo + accesorios + observaciones
+2. Página siguiente — Registro de daños estéticos (diagramas anotados)
+3. Página siguiente — Resultado del escaneo (si hay fotos)
+4. Página siguiente — Aceptación y firma del cliente
+5. Página(s) finales — Aviso de Privacidad México
 """
 
 from __future__ import annotations
@@ -35,6 +33,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import (
     HRFlowable,
     Image as RLImage,
+    KeepTogether,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -47,6 +46,7 @@ from config.constants import (
     AVISO_PRIVACIDAD_OOW_MX,
     AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS,
     AVISO_PRIVACIDAD_OOW_VERSION_MX,
+    VISTAS_DANO_ESTETICO_AIO,
     VISTAS_DANO_ESTETICO_ESCRITORIO,
     VISTAS_DANO_ESTETICO_LAPTOP,
 )
@@ -110,23 +110,33 @@ class PDFFormatoServicioOOW:
             )
 
             elementos: List = []
+            # --- Página 1: datos generales (secciones con espacio claro) ---
             elementos += self._construir_header()
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 4 * mm))
             elementos += self._construir_titulo()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_datos_cliente()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_datos_equipo()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_accesorios()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_observaciones()
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 5 * mm))
+            elementos += self._envolver_seccion(self._construir_datos_cliente())
+            elementos.append(Spacer(1, 5 * mm))
+            elementos += self._envolver_seccion(self._construir_datos_equipo())
+            elementos.append(Spacer(1, 5 * mm))
+            elementos += self._envolver_seccion(self._construir_accesorios())
+            elementos.append(Spacer(1, 5 * mm))
+            elementos += self._envolver_seccion(self._construir_observaciones())
+
+            # --- Página nueva: daños estéticos (nunca se mezcla con lo anterior) ---
+            elementos.append(PageBreak())
             elementos += self._construir_danos()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_escaneo()
-            elementos.append(Spacer(1, 3 * mm))
+
+            # --- Escaneo: página propia solo si hay fotos (evita hoja casi vacía) ---
+            if self._tiene_fotos_escaneo():
+                elementos.append(PageBreak())
+                elementos += self._construir_escaneo()
+
+            # --- Página nueva: firma del cliente ---
+            elementos.append(PageBreak())
             elementos += self._construir_aceptacion_y_firmas()
+
+            # --- Aviso de privacidad (ya trae su PageBreak interno) ---
             elementos += self._construir_aviso_privacidad()
 
             doc.build(elementos)
@@ -209,6 +219,27 @@ class PDFFormatoServicioOOW:
             alignment=TA_CENTER,
         ))
 
+    def _tiene_fotos_escaneo(self) -> bool:
+        """True si la orden tiene al menos una foto de escaneo OOW."""
+        from servicio_tecnico.models import ImagenOrden
+        return ImagenOrden.objects.filter(
+            orden=self.orden,
+            tipo='escaneo_oow',
+        ).exists()
+
+    def _envolver_seccion(self, partes: List) -> List:
+        """
+        Agrupa header + contenido de una sección para que no se partan
+        de forma fea (título en una página y tabla en otra).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        KeepTogether pide a ReportLab que intente mantener juntos estos
+        bloques. Si no caben en lo que queda de página, salta a la siguiente.
+        """
+        if not partes:
+            return []
+        return [KeepTogether(partes)]
+
     def _crear_header_seccion(self, titulo: str) -> Table:
         """
         Barra navy de sección (igual que cotizaciones).
@@ -228,8 +259,8 @@ class PDFFormatoServicioOOW:
             ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('LEFTPADDING', (0, 0), (-1, -1), 4),
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         ]))
@@ -344,12 +375,14 @@ class PDFFormatoServicioOOW:
     def _construir_datos_cliente(self) -> List:
         elementos = [self._crear_header_seccion('Datos del cliente'), Spacer(1, 2 * mm)]
         d = self.detalle
+        # Import diferido para evitar ciclo con services.formato_oow → este PDF
+        from servicio_tecnico.services.formato_oow import lista_emails_envio
         pares = [
             ('Nombre / Razón social', d.nombre_cliente),
             ('RFC', d.rfc_cliente),
             ('Email de contacto', d.email_cliente),
             ('Teléfono(s)', d.telefono_cliente),
-            ('Email envío formato', self.formato.email_envio),
+            ('Email envío formato', ', '.join(lista_emails_envio(self.formato)) or '—'),
         ]
         elementos.append(self._tabla_pares(pares))
         return elementos
@@ -436,11 +469,26 @@ class PDFFormatoServicioOOW:
         return elementos
 
     def _construir_danos(self) -> List:
+        """
+        Página dedicada al registro de daños estéticos.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Cada par de diagramas va en un KeepTogether para que una imagen
+        no se corte a la mitad ni se encime con el título de otra.
+        """
         elementos = [
             self._crear_header_seccion('Registro de daños estéticos'),
-            Spacer(1, 2 * mm),
+            Spacer(1, 4 * mm),
+            Paragraph(
+                'A continuación se muestran las vistas del equipo con las '
+                'anotaciones de daños capturadas en el Formato Digital OOW.',
+                self._estilos['CuerpoNormal'],
+            ),
+            Spacer(1, 4 * mm),
         ]
-        vistas = list(self.formato.vistas_dano.exclude(imagen_anotada='').exclude(imagen_anotada=None))
+        vistas = list(
+            self.formato.vistas_dano.exclude(imagen_anotada='').exclude(imagen_anotada=None)
+        )
         if not vistas:
             elementos.append(Paragraph(
                 'Sin anotaciones de daños en diagramas.',
@@ -449,41 +497,59 @@ class PDFFormatoServicioOOW:
             return elementos
 
         # Mapa etiqueta amigable
-        labels = dict(VISTAS_DANO_ESTETICO_LAPTOP + VISTAS_DANO_ESTETICO_ESCRITORIO)
-        celdas_img = []
+        labels = dict(
+            VISTAS_DANO_ESTETICO_LAPTOP
+            + VISTAS_DANO_ESTETICO_ESCRITORIO
+            + VISTAS_DANO_ESTETICO_AIO
+        )
+        bloques_vista = []
         for vista in vistas:
             try:
                 path = vista.imagen_anotada.path
-                img = RLImage(path, width=55 * mm, height=40 * mm, kind='proportional')
+                # Un poco más chicas para que quepan 2 por fila sin apretarse
+                img = RLImage(path, width=80 * mm, height=55 * mm, kind='proportional')
             except Exception:
                 img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
             titulo = labels.get(vista.clave_vista, vista.clave_vista)
             if vista.etiqueta_dano:
                 titulo = f'{titulo} — {vista.etiqueta_dano}'
-            celdas_img.append([
-                Paragraph(f'<b>{self._esc(titulo)}</b>', self._estilos['CeldaLabel']),
-                img,
-            ])
+            # Tarjeta con borde: título + imagen (no se mezcla con la de al lado)
+            tarjeta = Table(
+                [
+                    [Paragraph(f'<b>{self._esc(titulo)}</b>', self._estilos['CeldaLabel'])],
+                    [img],
+                ],
+                colWidths=[85 * mm],
+            )
+            tarjeta.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 0.6, COLOR_GRIS_BORDE),
+                ('BACKGROUND', (0, 0), (-1, 0), COLOR_GRIS_ALT),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            bloques_vista.append(tarjeta)
 
-        # 2 columnas
-        filas = []
-        for i in range(0, len(celdas_img), 2):
-            izq = celdas_img[i]
-            der = celdas_img[i + 1] if i + 1 < len(celdas_img) else ['', '']
-            filas.append([
-                Table([[izq[0]], [izq[1]]], colWidths=[85 * mm]),
-                Table([[der[0]], [der[1]]], colWidths=[85 * mm]) if der[0] else '',
-            ])
+        # Filas de 2 columnas; cada fila KeepTogether para no partir una imagen
+        for i in range(0, len(bloques_vista), 2):
+            izq = bloques_vista[i]
+            der = bloques_vista[i + 1] if i + 1 < len(bloques_vista) else ''
+            fila = Table(
+                [[izq, der]],
+                colWidths=['50%', '50%'],
+            )
+            fila.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ]))
+            elementos.append(KeepTogether([fila, Spacer(1, 5 * mm)]))
 
-        tabla = Table(filas, colWidths=['50%', '50%'])
-        tabla.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elementos.append(tabla)
         return elementos
 
     def _construir_escaneo(self) -> List:
@@ -492,13 +558,13 @@ class PDFFormatoServicioOOW:
 
         EXPLICACIÓN PARA PRINCIPIANTES:
         Las fotos se guardan como ImagenOrden con tipo 'escaneo_oow'.
-        Aquí las embebemos en el PDF igual que las vistas de daños.
+        Van en su propia página para no encimarse con daños ni firmas.
         """
         from servicio_tecnico.models import ImagenOrden
 
         elementos = [
             self._crear_header_seccion('Resultado del escaneo'),
-            Spacer(1, 2 * mm),
+            Spacer(1, 4 * mm),
         ]
         imagenes = list(
             ImagenOrden.objects.filter(
@@ -513,57 +579,45 @@ class PDFFormatoServicioOOW:
             ))
             return elementos
 
-        celdas = []
         for img_orden in imagenes:
             try:
                 path = img_orden.imagen.path
-                rl_img = RLImage(path, width=80 * mm, height=100 * mm, kind='proportional')
+                rl_img = RLImage(path, width=140 * mm, height=160 * mm, kind='proportional')
             except Exception:
                 rl_img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
             etiqueta = img_orden.descripcion or 'Resultado del escaneo'
-            celdas.append([
-                Paragraph(f'<b>{self._esc(etiqueta)}</b>', self._estilos['CeldaLabel']),
-                rl_img,
-            ])
-
-        # Una o dos columnas según cantidad
-        if len(celdas) == 1:
-            tabla = Table(
-                [[
-                    Table([[celdas[0][0]], [celdas[0][1]]], colWidths=[letter[0] - 2 * MARGEN]),
-                ]],
+            tarjeta = Table(
+                [
+                    [Paragraph(f'<b>{self._esc(etiqueta)}</b>', self._estilos['CeldaLabel'])],
+                    [rl_img],
+                ],
                 colWidths=[letter[0] - 2 * MARGEN],
             )
-        else:
-            filas = []
-            for i in range(0, len(celdas), 2):
-                izq = celdas[i]
-                der = celdas[i + 1] if i + 1 < len(celdas) else None
-                filas.append([
-                    Table([[izq[0]], [izq[1]]], colWidths=[85 * mm]),
-                    Table([[der[0]], [der[1]]], colWidths=[85 * mm]) if der else '',
-                ])
-            tabla = Table(filas, colWidths=['50%', '50%'])
+            tarjeta.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 0.6, COLOR_GRIS_BORDE),
+                ('BACKGROUND', (0, 0), (-1, 0), COLOR_GRIS_ALT),
+                ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            # Una foto por bloque: si no cabe, pasa sola a la siguiente página
+            elementos.append(KeepTogether([tarjeta, Spacer(1, 5 * mm)]))
 
-        tabla.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elementos.append(tabla)
         return elementos
 
     def _construir_aceptacion_y_firmas(self) -> List:
         elementos = [
             self._crear_header_seccion('Aceptación y firma del cliente'),
-            Spacer(1, 2 * mm),
+            Spacer(1, 4 * mm),
         ]
         elementos.append(Paragraph(
             'ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO AL CENTRO DE SERVICIO.',
             self._estilos['CeldaLabel'],
         ))
-        elementos.append(Spacer(1, 3 * mm))
+        elementos.append(Spacer(1, 8 * mm))
 
         # Solo firma del cliente (no se registra técnico en este formato)
         firma_cli = self._imagen_firma(self.formato.firma_cliente)
@@ -579,11 +633,14 @@ class PDFFormatoServicioOOW:
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOX', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
         ]))
-        elementos.append(tabla)
+        elementos.append(KeepTogether([tabla]))
 
         if self.formato.como_enteraste:
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 6 * mm))
             elementos.append(Paragraph(
                 f'<b>¿Cómo se enteró?</b> {self._esc(self.formato.get_como_enteraste_display())}',
                 self._estilos['CeldaValor'],

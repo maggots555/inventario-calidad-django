@@ -3922,7 +3922,15 @@ class FormatoServicioOOW(models.Model):
 
     email_envio = models.EmailField(
         blank=True,
-        help_text='Correo al que se enviará el PDF del formato',
+        help_text='Correo principal al que se enviará el PDF (compatibilidad; ver emails_envio)',
+    )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Lista JSON de hasta 3 correos, ej. ["a@x.com", "b@y.com"].
+    # Se usa para compartir el PDF con varias personas.
+    emails_envio = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Lista de hasta 3 correos para enviar el PDF del formato',
     )
     como_enteraste = models.CharField(
         max_length=30,

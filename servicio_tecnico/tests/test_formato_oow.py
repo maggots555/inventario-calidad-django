@@ -24,6 +24,8 @@ from servicio_tecnico.models import DetalleEquipo, FormatoServicioOOW, OrdenServ
 from servicio_tecnico.services.formato_oow import (
     aplicar_payload_borrador,
     finalizar_formato,
+    lista_emails_envio,
+    normalizar_emails_envio,
     obtener_o_crear_borrador,
     orden_es_candidata_formato_oow,
 )
@@ -110,8 +112,38 @@ class FormatoOowServiceTest(TestCase):
         self.assertEqual(formato.estado, 'borrador')
         self.assertTrue(formato.accesorio_cargador)
         self.assertEqual(formato.email_envio, 'cliente@test.local')
+        self.assertEqual(lista_emails_envio(formato), ['cliente@test.local'])
         mismo = obtener_o_crear_borrador(self.orden, usuario=self.user)
         self.assertEqual(formato.pk, mismo.pk)
+
+    def test_guardar_hasta_tres_emails(self):
+        """
+        Se pueden guardar hasta 3 correos; el primero sincroniza email_envio.
+        """
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'emails_envio': [
+                    'uno@test.local',
+                    'dos@test.local',
+                    'tres@test.local',
+                    'cuarto-ignorado@test.local',
+                ],
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertEqual(
+            lista_emails_envio(formato),
+            ['uno@test.local', 'dos@test.local', 'tres@test.local'],
+        )
+        self.assertEqual(formato.email_envio, 'uno@test.local')
+        # Duplicados y vacíos se limpian
+        self.assertEqual(
+            normalizar_emails_envio(['A@x.com', '', 'a@x.com', 'b@y.com']),
+            ['A@x.com', 'b@y.com'],
+        )
 
     def test_finalizar_genera_pdf(self):
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)

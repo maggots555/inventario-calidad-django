@@ -6,6 +6,8 @@
  * Este archivo se edita en static/ts/ y se compila a static/js/ con pnpm run build.
  * No edites el .js generado.
  */
+/** Máximo de correos para compartir el PDF del formato OOW */
+const MAX_EMAILS_ENVIO = 3;
 function leerCookieCsrf() {
     const cookieNames = ['sigma_csrftoken', 'csrftoken'];
     for (const name of cookieNames) {
@@ -160,43 +162,336 @@ function limpiarPad(pad) {
     pad.ctx.lineWidth = 2.5;
     pad.tieneTrazos = false;
 }
-function dibujarMarcoDiagrama(ctx, w, h, etiqueta) {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, w, h);
+/**
+ * Dibuja un puerto USB-A (rectángulo con muesca).
+ */
+function dibujarPuertoUsb(ctx, x, y, ancho, alto) {
+    ctx.strokeRect(x, y, ancho, alto);
+    ctx.beginPath();
+    ctx.moveTo(x + 3, y + alto * 0.35);
+    ctx.lineTo(x + ancho - 3, y + alto * 0.35);
+    ctx.stroke();
+}
+/**
+ * Dibuja un jack de audio (círculo).
+ */
+function dibujarJackAudio(ctx, cx, cy, radio) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radio * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+}
+/**
+ * Dibuja el perfil lateral de un equipo (laptop / AIO / torre) con puertos.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * En lugar de un cuadro genérico, dibujamos un chasis delgado horizontal
+ * (como si vieras el costado del equipo) y varios tipos de puertos.
+ */
+function dibujarPerfilLateral(ctx, w, h, m, esIzquierdo) {
+    // Chasis: franja horizontal al centro (perfil delgado)
+    const chasisY = h * 0.38;
+    const chasisAlto = Math.max(42, h * 0.18);
+    const chasisX = m + 28;
+    const chasisAncho = w - m * 2 - 56;
+    ctx.lineWidth = 2.2;
     ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 3;
-    const m = 24;
-    ctx.strokeRect(m, m, w - m * 2, h - m * 2);
-    // Líneas guía internas según vista (esquema simple)
+    // Cuerpo principal redondeado visualmente con rectángulo
+    ctx.strokeRect(chasisX, chasisY, chasisAncho, chasisAlto);
+    // Bisagras / engrosamiento del lado de la pantalla (laptop)
+    const bisagraAncho = 18;
+    if (esIzquierdo) {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(chasisX, chasisY - 6, bisagraAncho, chasisAlto + 12);
+        ctx.strokeRect(chasisX, chasisY - 6, bisagraAncho, chasisAlto + 12);
+    }
+    else {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(chasisX + chasisAncho - bisagraAncho, chasisY - 6, bisagraAncho, chasisAlto + 12);
+        ctx.strokeRect(chasisX + chasisAncho - bisagraAncho, chasisY - 6, bisagraAncho, chasisAlto + 12);
+    }
+    // Línea de ranura del chasis
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 1.5;
-    if (etiqueta.includes('pantalla') || etiqueta.includes('frente')) {
-        ctx.strokeRect(m + 20, m + 20, w - m * 2 - 40, h - m * 2 - 40);
-    }
-    else if (etiqueta.includes('palm')) {
-        ctx.strokeRect(m + 30, m + 40, w - m * 2 - 60, 80);
-        ctx.strokeRect(w / 2 - 40, h - m - 70, 80, 40);
-    }
-    else if (etiqueta.includes('bottom') || etiqueta.includes('trasera')) {
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(chasisX + 8, chasisY + chasisAlto / 2);
+    ctx.lineTo(chasisX + chasisAncho - 8, chasisY + chasisAlto / 2);
+    ctx.stroke();
+    // Zona de puertos a lo largo del perfil
+    const puertoY = chasisY + chasisAlto * 0.22;
+    const puertoAlto = chasisAlto * 0.55;
+    let x = chasisX + (esIzquierdo ? 36 : 28);
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1.6;
+    // Orden típico: lado izq → DC, USB, HDMI, USB-C, audio
+    // lado der → USB, SD, USB-C, Kensington
+    const dibujarEtiquetaMini = (texto, px) => {
+        ctx.save();
+        ctx.fillStyle = '#64748b';
+        ctx.font = '9px Helvetica, Arial, sans-serif';
+        ctx.fillText(texto, px, chasisY + chasisAlto + 16);
+        ctx.restore();
+    };
+    if (esIzquierdo) {
+        // Power / DC barrel
         ctx.beginPath();
-        ctx.arc(m + 50, m + 50, 18, 0, Math.PI * 2);
-        ctx.arc(w - m - 50, m + 50, 18, 0, Math.PI * 2);
-        ctx.arc(m + 50, h - m - 50, 18, 0, Math.PI * 2);
-        ctx.arc(w - m - 50, h - m - 50, 18, 0, Math.PI * 2);
+        ctx.arc(x + 8, puertoY + puertoAlto / 2, puertoAlto * 0.38, 0, Math.PI * 2);
+        ctx.stroke();
+        dibujarEtiquetaMini('DC', x);
+        x += 28;
+        // USB-A
+        dibujarPuertoUsb(ctx, x, puertoY, 22, puertoAlto);
+        dibujarEtiquetaMini('USB', x);
+        x += 32;
+        // HDMI (rectángulo más ancho)
+        ctx.strokeRect(x, puertoY + 2, 28, puertoAlto - 4);
+        ctx.beginPath();
+        ctx.moveTo(x + 4, puertoY + puertoAlto - 6);
+        ctx.lineTo(x + 24, puertoY + puertoAlto - 6);
+        ctx.stroke();
+        dibujarEtiquetaMini('HDMI', x);
+        x += 38;
+        // USB-C (ranura delgada)
+        ctx.strokeRect(x, puertoY + puertoAlto * 0.25, 18, puertoAlto * 0.5);
+        dibujarEtiquetaMini('USB-C', x - 2);
+        x += 30;
+        // Audio jack
+        dibujarJackAudio(ctx, x + 8, puertoY + puertoAlto / 2, puertoAlto * 0.32);
+        dibujarEtiquetaMini('Audio', x);
+    }
+    else {
+        // USB-A
+        dibujarPuertoUsb(ctx, x, puertoY, 22, puertoAlto);
+        dibujarEtiquetaMini('USB', x);
+        x += 32;
+        // Lector SD (ranura ancha baja)
+        ctx.strokeRect(x, puertoY + puertoAlto * 0.35, 34, puertoAlto * 0.4);
+        dibujarEtiquetaMini('SD', x + 8);
+        x += 44;
+        // USB-C
+        ctx.strokeRect(x, puertoY + puertoAlto * 0.25, 18, puertoAlto * 0.5);
+        dibujarEtiquetaMini('USB-C', x - 2);
+        x += 30;
+        // USB-A segundo
+        dibujarPuertoUsb(ctx, x, puertoY, 22, puertoAlto);
+        dibujarEtiquetaMini('USB', x);
+        x += 32;
+        // Kensington lock (círculo pequeño)
+        ctx.beginPath();
+        ctx.arc(x + 7, puertoY + puertoAlto / 2, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        dibujarEtiquetaMini('Lock', x);
+    }
+    // Patas del equipo debajo del chasis
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    const pataY = chasisY + chasisAlto;
+    ctx.strokeRect(chasisX + 20, pataY, 14, 10);
+    ctx.strokeRect(chasisX + chasisAncho - 34, pataY, 14, 10);
+}
+/**
+ * Lateral de torre/PC: chasis vertical con bahías y panel trasero esquemático.
+ */
+function dibujarLateralPcTorre(ctx, w, h, m) {
+    const cajaX = w * 0.28;
+    const cajaY = m + 28;
+    const cajaAncho = w * 0.44;
+    const cajaAlto = h - m * 2 - 40;
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2.4;
+    ctx.strokeRect(cajaX, cajaY, cajaAncho, cajaAlto);
+    // Panel frontal (izquierda del lateral tipico)
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillRect(cajaX, cajaY, 22, cajaAlto);
+    ctx.strokeRect(cajaX, cajaY, 22, cajaAlto);
+    // Bahía óptica / drive
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cajaX + 28, cajaY + 24, cajaAncho - 40, 28);
+    ctx.beginPath();
+    ctx.moveTo(cajaX + 36, cajaY + 38);
+    ctx.lineTo(cajaX + cajaAncho - 20, cajaY + 38);
+    ctx.stroke();
+    // Botón power + LED
+    ctx.beginPath();
+    ctx.arc(cajaX + 11, cajaY + cajaAlto * 0.55, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cajaX + 11, cajaY + cajaAlto * 0.55 + 18, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#22c55e';
+    ctx.fill();
+    // Rejilla de ventilación
+    ctx.strokeStyle = '#94a3b8';
+    for (let i = 0; i < 8; i++) {
+        const y = cajaY + cajaAlto * 0.62 + i * 10;
+        ctx.beginPath();
+        ctx.moveTo(cajaX + 32, y);
+        ctx.lineTo(cajaX + cajaAncho - 16, y);
         ctx.stroke();
     }
-    else if (etiqueta.includes('lat')) {
-        for (let i = 0; i < 5; i++) {
-            const y = m + 40 + i * 40;
-            ctx.strokeRect(m + 30, y, 40, 18);
+    // Patas
+    ctx.strokeStyle = '#64748b';
+    ctx.strokeRect(cajaX + 8, cajaY + cajaAlto, 16, 8);
+    ctx.strokeRect(cajaX + cajaAncho - 24, cajaY + cajaAlto, 16, 8);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Helvetica, Arial, sans-serif';
+    ctx.fillText('Torre / PC', cajaX, cajaY + cajaAlto + 22);
+}
+/**
+ * Lateral de All in One: perfil delgado vertical (monitor) + pie.
+ */
+function dibujarLateralAio(ctx, w, h, m, esIzquierdo) {
+    // Perfil delgado del panel (como ver el AIO de costado)
+    const panelAncho = Math.max(28, w * 0.07);
+    const panelX = w / 2 - panelAncho / 2;
+    const panelY = m + 30;
+    const panelAlto = h * 0.55;
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2.4;
+    ctx.strokeRect(panelX, panelY, panelAncho, panelAlto);
+    // Pantalla (cara frontal sutil)
+    if (esIzquierdo) {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(panelX - 6, panelY + 8, 6, panelAlto - 16);
+        ctx.strokeRect(panelX - 6, panelY + 8, 6, panelAlto - 16);
+    }
+    else {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(panelX + panelAncho, panelY + 8, 6, panelAlto - 16);
+        ctx.strokeRect(panelX + panelAncho, panelY + 8, 6, panelAlto - 16);
+    }
+    // Cuello / soporte
+    const cuelloAncho = 14;
+    const cuelloX = w / 2 - cuelloAncho / 2;
+    const cuelloY = panelY + panelAlto;
+    const cuelloAlto = h * 0.14;
+    ctx.strokeRect(cuelloX, cuelloY, cuelloAncho, cuelloAlto);
+    // Base
+    const baseAncho = w * 0.35;
+    const baseX = w / 2 - baseAncho / 2;
+    const baseY = cuelloY + cuelloAlto;
+    ctx.strokeRect(baseX, baseY, baseAncho, 16);
+    // Puertos en el canto inferior/trasero del panel (no como laptop)
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1.4;
+    const puertoBaseY = panelY + panelAlto - 36;
+    const ladoPuertos = esIzquierdo ? panelX + panelAncho + 10 : panelX - 40;
+    // HDMI
+    ctx.strokeRect(ladoPuertos, puertoBaseY, 26, 12);
+    // USB
+    ctx.strokeRect(ladoPuertos, puertoBaseY + 16, 18, 10);
+    // DC
+    ctx.beginPath();
+    ctx.arc(ladoPuertos + 10, puertoBaseY + 38, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px Helvetica, Arial, sans-serif';
+    ctx.fillText('HDMI', ladoPuertos, puertoBaseY - 4);
+    ctx.fillText('USB', ladoPuertos, puertoBaseY + 14);
+    ctx.fillText('DC', ladoPuertos, puertoBaseY + 52);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Helvetica, Arial, sans-serif';
+    ctx.fillText('All in One (perfil)', baseX, baseY + 30);
+}
+function dibujarMarcoDiagrama(ctx, w, h, etiqueta, claveVista = '') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    const m = 24;
+    const etiquetaNorm = etiqueta.toLowerCase();
+    const clave = (claveVista || '').toLowerCase();
+    // Título de la vista
+    ctx.fillStyle = '#003366';
+    ctx.font = 'bold 15px Helvetica, Arial, sans-serif';
+    ctx.fillText(etiqueta.toUpperCase(), m, 18);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    // --- Laterales: distinto esquema según laptop / PC / AIO ---
+    // Laptop: lat_izq / lat_der → perfil horizontal con puertos
+    if (clave === 'lat_izq' || clave === 'lat_der') {
+        dibujarPerfilLateral(ctx, w, h, m, clave === 'lat_izq');
+        return;
+    }
+    // PC escritorio: clave "lateral" → torre vertical
+    if (clave === 'lateral') {
+        dibujarLateralPcTorre(ctx, w, h, m);
+        return;
+    }
+    // All in One: aio_lat_* → perfil delgado de monitor + pie
+    if (clave === 'aio_lat_izq' || clave === 'aio_lat_der') {
+        dibujarLateralAio(ctx, w, h, m, clave === 'aio_lat_izq');
+        return;
+    }
+    // Marco exterior para el resto de vistas
+    ctx.lineWidth = 3;
+    ctx.strokeRect(m, m + 8, w - m * 2, h - m * 2 - 8);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.5;
+    if (etiquetaNorm.includes('pantalla') || etiquetaNorm.includes('frente')) {
+        // Marco tipo pantalla (laptop / AIO / monitor)
+        ctx.strokeRect(m + 20, m + 28, w - m * 2 - 40, h - m * 2 - 58);
+        // Bisel inferior
+        ctx.beginPath();
+        ctx.moveTo(m + 20, h - m - 28);
+        ctx.lineTo(w - m - 20, h - m - 28);
+        ctx.stroke();
+        // Cámara / notch superior
+        ctx.beginPath();
+        ctx.arc(w / 2, m + 40, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fill();
+        // Pie AIO solo en pantalla de AIO
+        if (clave.startsWith('aio_')) {
+            ctx.strokeStyle = '#64748b';
+            ctx.strokeRect(w / 2 - 12, h - m - 22, 24, 14);
+            ctx.strokeRect(w / 2 - 50, h - m - 10, 100, 8);
         }
     }
-    ctx.fillStyle = '#003366';
-    ctx.font = 'bold 16px Helvetica, Arial, sans-serif';
-    ctx.fillText(etiqueta.toUpperCase(), m + 8, m - 6 > 14 ? m - 6 : 18);
+    else if (etiquetaNorm.includes('top cover') || (etiquetaNorm.includes('top') && !etiquetaNorm.includes('laptop'))) {
+        // Tapa superior laptop
+        ctx.strokeRect(m + 30, m + 40, w - m * 2 - 60, h - m * 2 - 70);
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, 22, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    else if (etiquetaNorm.includes('palm') || etiquetaNorm.includes('teclado')) {
+        // Zona teclado
+        ctx.strokeRect(m + 30, m + 40, w - m * 2 - 60, h * 0.38);
+        for (let fila = 0; fila < 4; fila++) {
+            const y = m + 55 + fila * 22;
+            for (let col = 0; col < 10; col++) {
+                const x = m + 45 + col * ((w - m * 2 - 100) / 10);
+                ctx.strokeRect(x, y, 14, 14);
+            }
+        }
+        ctx.strokeRect(w / 2 - 50, h - m - 85, 100, 55);
+    }
+    else if (etiquetaNorm.includes('bottom') || etiquetaNorm.includes('trasera')) {
+        ctx.beginPath();
+        ctx.arc(m + 50, m + 55, 16, 0, Math.PI * 2);
+        ctx.arc(w - m - 50, m + 55, 16, 0, Math.PI * 2);
+        ctx.arc(m + 50, h - m - 45, 16, 0, Math.PI * 2);
+        ctx.arc(w - m - 50, h - m - 45, 16, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let i = 0; i < 6; i++) {
+            const y = m + 90 + i * 14;
+            ctx.beginPath();
+            ctx.moveTo(m + 90, y);
+            ctx.lineTo(w - m - 90, y);
+            ctx.stroke();
+        }
+    }
+    else if (etiquetaNorm.includes('superior')) {
+        ctx.strokeRect(m + 40, m + 40, w - m * 2 - 80, h - m * 2 - 60);
+    }
+    else if (etiquetaNorm.includes('base') || etiquetaNorm.includes('soporte')) {
+        ctx.strokeRect(m + 80, m + 50, w - m * 2 - 160, 28);
+        ctx.strokeRect(w / 2 - 55, m + 90, 110, h - m * 2 - 110);
+    }
 }
 function inicializarFormatoOow() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     const app = byId('formatoOowApp');
     if (!app) {
         return;
@@ -215,6 +510,116 @@ function inicializarFormatoOow() {
             formatoInicial = {};
         }
     }
+    /**
+     * Lee los correos escritos en los inputs dinámicos (máx. 3).
+     */
+    const leerEmailsEnvio = () => {
+        const lista = byId('emailsEnvioLista');
+        if (!lista) {
+            return [];
+        }
+        const valores = [];
+        const vistos = new Set();
+        lista.querySelectorAll('input[type="email"]').forEach((input) => {
+            const email = input.value.trim();
+            if (!email) {
+                return;
+            }
+            const clave = email.toLowerCase();
+            if (vistos.has(clave)) {
+                return;
+            }
+            vistos.add(clave);
+            valores.push(email);
+        });
+        return valores.slice(0, MAX_EMAILS_ENVIO);
+    };
+    /**
+     * Actualiza el botón "Agregar otro correo" según cuántos campos hay.
+     */
+    const actualizarBtnAgregarEmail = () => {
+        const lista = byId('emailsEnvioLista');
+        const btn = byId('btnAgregarEmail');
+        if (!lista || !btn) {
+            return;
+        }
+        const cantidad = lista.querySelectorAll('.formato-oow-email-row').length;
+        btn.disabled = cantidad >= MAX_EMAILS_ENVIO;
+        btn.title = cantidad >= MAX_EMAILS_ENVIO
+            ? 'Máximo 3 correos'
+            : 'Agregar otro destinatario';
+    };
+    /**
+     * Crea una fila de email (input + botón quitar si no es el primero).
+     */
+    const crearFilaEmail = (valor, indice) => {
+        const row = document.createElement('div');
+        row.className = 'formato-oow-email-row';
+        const input = document.createElement('input');
+        input.type = 'email';
+        input.className = 'form-control';
+        input.placeholder = indice === 0
+            ? 'correo@cliente.com'
+            : `correo adicional ${indice + 1}`;
+        input.value = valor;
+        input.autocomplete = 'email';
+        input.setAttribute('aria-label', `Correo ${indice + 1} para recibir el formato`);
+        row.appendChild(input);
+        // El primero no se quita (siempre hay al menos un campo); los demás sí
+        if (indice > 0) {
+            const btnQuitar = document.createElement('button');
+            btnQuitar.type = 'button';
+            btnQuitar.className = 'btn btn-outline-danger btn-sm formato-oow-email-quitar';
+            btnQuitar.setAttribute('aria-label', 'Quitar este correo');
+            btnQuitar.innerHTML = '<i class="bi bi-trash"></i>';
+            btnQuitar.addEventListener('click', () => {
+                row.remove();
+                actualizarBtnAgregarEmail();
+            });
+            row.appendChild(btnQuitar);
+        }
+        return row;
+    };
+    /**
+     * Inicializa 1–3 campos de email desde el borrador guardado.
+     */
+    const inicializarEmailsEnvio = () => {
+        const lista = byId('emailsEnvioLista');
+        if (!lista) {
+            return;
+        }
+        lista.innerHTML = '';
+        // Preferir lista JSON; si no, el email_envio legacy
+        let iniciales = (formatoInicial.emails_envio || []).filter((e) => Boolean(e && e.trim()));
+        if (iniciales.length === 0 && formatoInicial.email_envio) {
+            iniciales = [formatoInicial.email_envio];
+        }
+        if (iniciales.length === 0) {
+            iniciales = [''];
+        }
+        iniciales.slice(0, MAX_EMAILS_ENVIO).forEach((email, i) => {
+            lista.appendChild(crearFilaEmail(email, i));
+        });
+        actualizarBtnAgregarEmail();
+    };
+    inicializarEmailsEnvio();
+    (_a = byId('btnAgregarEmail')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => {
+        const lista = byId('emailsEnvioLista');
+        if (!lista) {
+            return;
+        }
+        const cantidad = lista.querySelectorAll('.formato-oow-email-row').length;
+        if (cantidad >= MAX_EMAILS_ENVIO) {
+            return;
+        }
+        lista.appendChild(crearFilaEmail('', cantidad));
+        actualizarBtnAgregarEmail();
+        const inputs = lista.querySelectorAll('input[type="email"]');
+        const ultimo = inputs[inputs.length - 1];
+        if (ultimo) {
+            ultimo.focus();
+        }
+    });
     const canvasDano = byId('canvasDano');
     const canvasFirmaCli = byId('canvasFirmaCliente');
     if (!canvasDano || !canvasFirmaCli) {
@@ -271,13 +676,24 @@ function inicializarFormatoOow() {
     (formatoInicial.vistas_dano || []).forEach((v) => {
         vistasGuardadas.set(v.clave_vista, v);
     });
+    const catalogoVistas = (() => {
+        const selInit = byId('vistaActiva');
+        if (!selInit) {
+            return [];
+        }
+        return Array.from(selInit.options).map((opt) => ({
+            value: opt.value,
+            label: opt.textContent || opt.value,
+            grupo: opt.getAttribute('data-grupo') || '',
+        }));
+    })();
     const refrescarDiagrama = () => {
         const vistaSel = byId('vistaActiva');
         const clave = vistaSel ? vistaSel.value : 'pantalla';
         const label = vistaSel && vistaSel.selectedOptions[0]
             ? vistaSel.selectedOptions[0].text
             : clave;
-        dibujarMarcoDiagrama(padDano.ctx, canvasDano.width, canvasDano.height, label);
+        dibujarMarcoDiagrama(padDano.ctx, canvasDano.width, canvasDano.height, label, clave);
         padDano.ctx.strokeStyle = '#c00000';
         padDano.ctx.lineWidth = 3;
         padDano.tieneTrazos = false;
@@ -292,6 +708,15 @@ function inicializarFormatoOow() {
             };
             img.src = previa.imagen_url;
         }
+        else if (previa && previa.imagen_data) {
+            const img = new Image();
+            img.onload = () => {
+                padDano.ctx.drawImage(img, 0, 0, canvasDano.width, canvasDano.height);
+                padDano.ctx.strokeStyle = '#c00000';
+                padDano.ctx.lineWidth = 3;
+            };
+            img.src = previa.imagen_data;
+        }
     };
     const filtrarVistasPorTipo = () => {
         const tipo = valorInput('tipoDiagrama');
@@ -299,13 +724,24 @@ function inicializarFormatoOow() {
         if (!sel) {
             return;
         }
-        Array.from(sel.options).forEach((opt) => {
-            const grupo = opt.getAttribute('data-grupo') || '';
-            opt.hidden = grupo !== tipo;
+        const valorAnterior = sel.value;
+        const delTipo = catalogoVistas.filter((v) => v.grupo === tipo);
+        // Vaciar y recrear opciones (compatible con iPad)
+        sel.innerHTML = '';
+        delTipo.forEach((v) => {
+            const opt = document.createElement('option');
+            opt.value = v.value;
+            opt.textContent = v.label;
+            opt.setAttribute('data-grupo', v.grupo);
+            sel.appendChild(opt);
         });
-        const visible = Array.from(sel.options).find((o) => !o.hidden);
-        if (visible) {
-            sel.value = visible.value;
+        // Conservar la vista si sigue siendo válida para este tipo
+        const sigueValida = delTipo.some((v) => v.value === valorAnterior);
+        if (sigueValida) {
+            sel.value = valorAnterior;
+        }
+        else if (delTipo.length > 0) {
+            sel.value = delTipo[0].value;
         }
         refrescarDiagrama();
     };
@@ -332,12 +768,12 @@ function inicializarFormatoOow() {
     };
     filtrarVistasPorTipo();
     renderThumbsVistas();
-    (_a = byId('tipoDiagrama')) === null || _a === void 0 ? void 0 : _a.addEventListener('change', filtrarVistasPorTipo);
-    (_b = byId('vistaActiva')) === null || _b === void 0 ? void 0 : _b.addEventListener('change', refrescarDiagrama);
-    (_c = byId('btnLimpiarVista')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', () => {
+    (_b = byId('tipoDiagrama')) === null || _b === void 0 ? void 0 : _b.addEventListener('change', filtrarVistasPorTipo);
+    (_c = byId('vistaActiva')) === null || _c === void 0 ? void 0 : _c.addEventListener('change', refrescarDiagrama);
+    (_d = byId('btnLimpiarVista')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
         refrescarDiagrama();
     });
-    (_d = byId('btnGuardarVista')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+    (_e = byId('btnGuardarVista')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
         const clave = valorInput('vistaActiva');
         const etiqueta = valorInput('etiquetaDano');
         const dataUrl = canvasDano.toDataURL('image/png');
@@ -355,7 +791,7 @@ function inicializarFormatoOow() {
             actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
         }
     });
-    (_e = byId('btnLimpiarFirmaCli')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+    (_f = byId('btnLimpiarFirmaCli')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
         limpiarPad(padFirmaCli);
         padFirmaCli.ctx.strokeStyle = '#111827';
         padFirmaCli.ctx.lineWidth = 2.2;
@@ -363,7 +799,7 @@ function inicializarFormatoOow() {
         // Si borra, ya no cuenta la firma previa del servidor hasta que vuelva a firmar
         formatoInicial.firma_cliente_url = undefined;
     });
-    (_f = byId('btnAceptarAvisoModal')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+    (_g = byId('btnAceptarAvisoModal')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
         const cb = byId('aceptaPrivacidad');
         if (cb) {
             cb.checked = true;
@@ -385,7 +821,8 @@ function inicializarFormatoOow() {
             disclaimer_pc_audit: checked('disclaimerPcAudit'),
             acepta_condiciones: checked('aceptaCondiciones'),
             acepta_privacidad: checked('aceptaPrivacidad'),
-            email_envio: valorInput('emailEnvio'),
+            email_envio: leerEmailsEnvio()[0] || '',
+            emails_envio: leerEmailsEnvio(),
             como_enteraste: radio ? radio.value : '',
             firma_cliente_data: padFirmaCli.tieneTrazos ? canvasFirmaCli.toDataURL('image/png') : '',
             vistas_dano: Array.from(vistasGuardadas.values()),
@@ -412,7 +849,7 @@ function inicializarFormatoOow() {
         }
         return data;
     };
-    (_g = byId('btnGuardarBorrador')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', async () => {
+    (_h = byId('btnGuardarBorrador')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', async () => {
         const actions = byId('formatoOowStatusActions');
         if (actions) {
             actions.hidden = true;
@@ -438,7 +875,7 @@ function inicializarFormatoOow() {
             setBotonesOcupados(false);
         }
     });
-    (_h = byId('btnFinalizar')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', async () => {
+    (_j = byId('btnFinalizar')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', async () => {
         const actions = byId('formatoOowStatusActions');
         if (actions) {
             actions.hidden = true;
@@ -527,11 +964,11 @@ function inicializarFormatoOow() {
             setStatus(err instanceof Error ? err.message : 'Error al subir foto', true, false);
         }
     };
-    (_j = byId('fotoIdentificacion')) === null || _j === void 0 ? void 0 : _j.addEventListener('change', (ev) => {
+    (_k = byId('fotoIdentificacion')) === null || _k === void 0 ? void 0 : _k.addEventListener('change', (ev) => {
         const t = ev.target;
         void subirEvidencia(t, 'identificacion_oow');
     });
-    (_k = byId('fotoEscaneo')) === null || _k === void 0 ? void 0 : _k.addEventListener('change', (ev) => {
+    (_l = byId('fotoEscaneo')) === null || _l === void 0 ? void 0 : _l.addEventListener('change', (ev) => {
         const t = ev.target;
         void subirEvidencia(t, 'escaneo_oow');
     });

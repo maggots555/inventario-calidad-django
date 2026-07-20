@@ -2290,6 +2290,7 @@ class FormatoServicioOOWAdmin(admin.ModelAdmin):
         'acepta_privacidad',
         'acepta_condiciones',
         'email_envio',
+        'emails_envio',
         'finalizado_en',
         'fecha_actualizacion',
     )
