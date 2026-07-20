@@ -32,7 +32,13 @@
                         Ingreso: {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
                     </p>
                 </div>
-                <div class="text-end">
+                <div class="text-end d-flex flex-wrap gap-2 justify-content-end">
+                    {% if mostrar_formato_oow %}
+                    <a href="{% url 'servicio_tecnico:formato_oow_wizard' orden.pk %}"
+                       class="btn btn-success">
+                        <i class="bi bi-file-earmark-pdf"></i> Formato Digital OOW
+                    </a>
+                    {% endif %}
                     <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Volver
                     </a>

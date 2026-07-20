@@ -35,6 +35,9 @@ from .models import (
     BannerPromocional,
     # NUEVO - ANÁLISIS DE SENTIMIENTO IA (Abril 2026)
     AnalisisSentimientoEncuesta,
+    # Formato Digital OOW
+    FormatoServicioOOW,
+    DanoEsteticoVista,
 )
 
 
@@ -2272,4 +2275,46 @@ class AnalisisSentimientoEncuestaAdmin(admin.ModelAdmin):
         """Solo lectura — los resultados de IA no se editan manualmente."""
         return False
 
+
+@admin.register(FormatoServicioOOW)
+class FormatoServicioOOWAdmin(admin.ModelAdmin):
+    """
+    Admin del Formato Digital OOW.
+
+    Objetivo: auditar borradores/finalizados, PDF y aceptaciones legales.
+    """
+
+    list_display = (
+        'orden',
+        'estado',
+        'acepta_privacidad',
+        'acepta_condiciones',
+        'email_envio',
+        'finalizado_en',
+        'fecha_actualizacion',
+    )
+    list_filter = ('estado', 'acepta_privacidad', 'tipo_diagrama')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+        'orden__detalle_equipo__folio_sicser',
+        'email_envio',
+        'nombre_tecnico',
+    )
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'finalizado_en')
+    raw_id_fields = ('orden', 'creado_por', 'actualizado_por')
+
+
+@admin.register(DanoEsteticoVista)
+class DanoEsteticoVistaAdmin(admin.ModelAdmin):
+    """Vistas anotadas de daños estéticos ligadas a un formato OOW."""
+
+    list_display = ('formato', 'clave_vista', 'etiqueta_dano', 'fecha_actualizacion')
+    list_filter = ('clave_vista',)
+    search_fields = (
+        'formato__orden__numero_orden_interno',
+        'clave_vista',
+        'etiqueta_dano',
+    )
+    raw_id_fields = ('formato',)
 

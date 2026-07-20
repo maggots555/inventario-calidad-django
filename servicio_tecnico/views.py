@@ -149,6 +149,14 @@ from .views_ordenes import (  # noqa: F401
     seleccionar_tipo_orden,
 )
 from .views_sicser import consultar_sicser, importar_orden_sicser  # noqa: F401
+from .views_formato_oow import (  # noqa: F401
+    abrir_formato_oow_desde_sicser,
+    formato_oow_finalizar,
+    formato_oow_guardar,
+    formato_oow_pdf,
+    formato_oow_subir_evidencia,
+    formato_oow_wizard,
+)
 from .views_referencias_gama import (  # noqa: F401
     crear_referencia_gama,
     editar_referencia_gama,
@@ -304,6 +312,8 @@ def detalle_orden(request, orden_id):
         Renderiza el template con todos los formularios y datos
     """
     
+    from .services.formato_oow import orden_es_candidata_formato_oow
+
     # Obtener la orden o mostrar error 404
     orden = get_object_or_404(
         OrdenServicio.objects.select_related(
@@ -1755,6 +1765,8 @@ def detalle_orden(request, orden_id):
     context = {
         'orden': orden,
         'detalle': orden.detalle_equipo,
+        # Botón Formato Digital OOW en el encabezado (órdenes fuera de garantía)
+        'mostrar_formato_oow': orden_es_candidata_formato_oow(orden),
         
         # Formularios
         'form_config': form_config,

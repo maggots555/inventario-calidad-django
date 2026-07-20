@@ -4954,3 +4954,110 @@ def enviar_evidencia_video_task(
         except Exception:
             pass
         raise self.retry(exc=exc, countdown=60)
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='servicio_tecnico.enviar_formato_oow_email',
+)
+def enviar_formato_oow_email_task(
+    self,
+    formato_id,
+    usuario_id=None,
+    db_alias='default',
+):
+    """
+    Envía por correo el PDF del Formato Digital OOW al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Celery no pasa por PaisMiddleware; db_alias encola el tenant correcto
+    (México=default, argentina, chile, colombia).
+
+    Args:
+        formato_id: PK de FormatoServicioOOW
+        usuario_id: User que disparó el envío (auditoría)
+        db_alias: Alias de BD del país
+
+    Efectos secundarios:
+        Envía EmailMessage con PDF adjunto; registra historial en la orden.
+    """
+    from django.conf import settings
+    from django.core.mail import EmailMessage
+    from email.mime.application import MIMEApplication
+
+    from .models import FormatoServicioOOW, HistorialOrden
+    from inventario.models import Empleado
+
+    try:
+        formato = FormatoServicioOOW.objects.select_related(
+            'orden', 'orden__detalle_equipo',
+        ).get(pk=formato_id)
+
+        if not formato.pdf or not formato.email_envio:
+            logger.warning(
+                '[FORMATO_OOW] Sin PDF o email — formato_id=%s',
+                formato_id,
+            )
+            return {'success': False, 'error': 'Sin PDF o email'}
+
+        orden = formato.orden
+        asunto = (
+            f'Formato de Servicio OOW — '
+            f'{orden.detalle_equipo.orden_cliente or orden.numero_orden_interno}'
+        )
+        cuerpo = (
+            f'<p>Estimado(a) cliente,</p>'
+            f'<p>Adjuntamos el <strong>Formato de Servicio Fuera de Garantía</strong> '
+            f'correspondiente a su equipo.</p>'
+            f'<p>Orden: <b>{orden.numero_orden_interno}</b><br>'
+            f'Service Tag: <b>{orden.detalle_equipo.numero_serie}</b></p>'
+            f'<p>SIC Comercialización y Servicios</p>'
+        )
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=cuerpo,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+            to=[formato.email_envio],
+        )
+        email_msg.content_subtype = 'html'
+
+        with formato.pdf.open('rb') as fh:
+            pdf_bytes = fh.read()
+        pdf_mime = MIMEApplication(pdf_bytes, _subtype='pdf')
+        pdf_mime.add_header(
+            'Content-Disposition',
+            'attachment',
+            filename=f'FormatoOOW_{orden.numero_orden_interno}.pdf',
+        )
+        email_msg.attach(pdf_mime)
+        email_msg.send()
+
+        usuario_empleado = None
+        if usuario_id:
+            try:
+                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
+            except Empleado.DoesNotExist:
+                usuario_empleado = None
+
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f'Formato Digital OOW enviado a {formato.email_envio}'
+            ),
+            usuario=usuario_empleado,
+            es_sistema=False,
+        )
+        logger.info(
+            '[FORMATO_OOW] Email enviado a %s orden=%s',
+            formato.email_envio,
+            orden.numero_orden_interno,
+        )
+        return {'success': True}
+
+    except Exception as exc:
+        logger.error('[FORMATO_OOW] Error email: %s', exc, exc_info=True)
+        raise self.retry(exc=exc, countdown=60)

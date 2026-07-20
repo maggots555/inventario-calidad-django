@@ -342,6 +342,26 @@ urlpatterns = [
     path('sicser/importar/',
          views.importar_orden_sicser,
          name='importar_orden_sicser'),
+    path('sicser/abrir-formato-oow/',
+         views.abrir_formato_oow_desde_sicser,
+         name='abrir_formato_oow_desde_sicser'),
+
+    # Formato Digital OOW (wizard iPad + PDF propio SIGMA)
+    path('orden/<int:orden_id>/formato-oow/',
+         views.formato_oow_wizard,
+         name='formato_oow_wizard'),
+    path('orden/<int:orden_id>/formato-oow/guardar/',
+         views.formato_oow_guardar,
+         name='formato_oow_guardar'),
+    path('orden/<int:orden_id>/formato-oow/finalizar/',
+         views.formato_oow_finalizar,
+         name='formato_oow_finalizar'),
+    path('orden/<int:orden_id>/formato-oow/pdf/',
+         views.formato_oow_pdf,
+         name='formato_oow_pdf'),
+    path('orden/<int:orden_id>/formato-oow/subir-evidencia/',
+         views.formato_oow_subir_evidencia,
+         name='formato_oow_subir_evidencia'),
 
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

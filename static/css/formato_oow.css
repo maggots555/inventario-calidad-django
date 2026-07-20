@@ -1,0 +1,176 @@
+/*
+ * Formato Digital OOW — estilos wizard iPad / PWA
+ * Compatible con dark mode (variables de base.css + overrides).
+ */
+
+.formato-oow-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.formato-oow-titulo {
+  color: var(--text-primary, #1e293b);
+}
+
+.formato-oow-card {
+  background-color: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 0.5rem;
+}
+
+.formato-oow-section-header {
+  background-color: #003366;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+}
+
+[data-bs-theme="dark"] .formato-oow-section-header {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.formato-oow-dl dt {
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  font-size: 0.85rem;
+}
+
+.formato-oow-dl dd {
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.formato-oow-falla {
+  white-space: pre-wrap;
+}
+
+.formato-oow-check,
+.formato-oow-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.formato-oow-check input,
+.formato-oow-radio input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.formato-oow-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.formato-oow-canvas-wrap,
+.formato-oow-firma-wrap {
+  background: #fff;
+  border: 2px dashed var(--border-color, #94a3b8);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.formato-oow-canvas-wrap canvas,
+.formato-oow-firma-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+[data-bs-theme="dark"] .formato-oow-canvas-wrap,
+[data-bs-theme="dark"] .formato-oow-firma-wrap {
+  background: #f8fafc;
+  border-color: #64748b;
+}
+
+.formato-oow-vistas-guardadas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.formato-oow-vista-thumb,
+.formato-oow-thumb {
+  display: flex;
+  flex-direction: column;
+  width: 120px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 0.4rem;
+  overflow: hidden;
+  background: var(--card-bg, #fff);
+}
+
+.formato-oow-vista-thumb img,
+.formato-oow-thumb img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+
+.formato-oow-vista-thumb span,
+.formato-oow-thumb span {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.35rem;
+  text-align: center;
+}
+
+.formato-oow-aviso-preview {
+  max-height: 6rem;
+  overflow: auto;
+  padding: 0.75rem;
+  background: var(--gray-50, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #475569);
+}
+
+[data-bs-theme="dark"] .formato-oow-aviso-preview {
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+.formato-oow-aviso-texto {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.formato-oow-actions {
+  background: var(--body-bg, #fff);
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  z-index: 10;
+}
+
+[data-bs-theme="dark"] .formato-oow-actions {
+  background: var(--body-bg, #0f172a);
+}
+
+.formato-oow-actions .btn {
+  min-height: 48px;
+  min-width: 160px;
+}
+
+@media (max-width: 576px) {
+  .formato-oow-actions .btn {
+    width: 100%;
+  }
+}

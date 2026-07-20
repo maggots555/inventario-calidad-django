@@ -31,6 +31,9 @@ from config.constants import (
     IMPACTO_CLIENTE_CHOICES,
     PRIORIDAD_CHOICES,
     TIPO_CONFIG_CHOICES,
+    ESTADO_FORMATO_OOW_CHOICES,
+    TIPO_DIAGRAMA_OOW_CHOICES,
+    COMO_ENTERASTE_OOW_CHOICES,
 )
 
 
@@ -2028,9 +2031,9 @@ class ImagenOrden(models.Model):
     
     # TIPO DE IMAGEN
     tipo = models.CharField(
-        max_length=15,
+        max_length=40,
         choices=TIPO_IMAGEN_CHOICES,
-        help_text="Tipo de imagen (ingreso, egreso, diagnóstico, etc.)"
+        help_text="Tipo de imagen (ingreso, egreso, diagnóstico, evidencia OOW, etc.)"
     )
     
     # IMAGEN Y DESCRIPCIÓN
@@ -3778,4 +3781,265 @@ class VideoOrden(models.Model):
         verbose_name = "Video de Orden"
         verbose_name_plural = "Videos de Órdenes"
 
+
+# ============================================================================
+# FORMATO DIGITAL OOW — Ingreso fuera de garantía (firma + daños + PDF)
+# ============================================================================
+
+def formato_oow_firma_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para firmas del formato OOW.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Agrupamos firmas por número de orden interno para que sea fácil
+    respaldar o borrar evidencias de una sola orden.
+
+    Args:
+        instance: FormatoServicioOOW
+        filename: Nombre del archivo (ej. firma_cliente.png)
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_oow/{orden_ref}/firmas/{filename}'
+
+
+def formato_oow_pdf_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para el PDF generado del formato OOW.
+
+    Args:
+        instance: FormatoServicioOOW
+        filename: Nombre del PDF
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_oow/{orden_ref}/pdf/{filename}'
+
+
+def dano_estetico_upload_path(instance, filename):
+    """
+    Ruta de almacenamiento para capturas anotadas de daños estéticos.
+
+    Args:
+        instance: DanoEsteticoVista
+        filename: PNG del canvas compuesto (diagrama + trazos)
+
+    Returns:
+        str: Ruta relativa bajo MEDIA_ROOT
+    """
+    orden_ref = instance.formato.orden.numero_orden_interno
+    return f'servicio_tecnico/formato_oow/{orden_ref}/danos/{filename}'
+
+
+class FormatoServicioOOW(models.Model):
+    """
+    Formato digital de servicio fuera de garantía (OOW) generado en SIGMA.
+
+    Objetivo de negocio:
+        Sustituir el formulario externo de SICSER por un wizard PWA/iPad
+        que captura accesorios, daños estéticos, firmas y genera un PDF
+        estilo cotización con aviso de privacidad México.
+
+    Relación:
+        OneToOne con OrdenServicio (una orden = un formato).
+
+    Efectos secundarios:
+        Al finalizar se genera y guarda un PDF; opcionalmente se encola
+        un correo Celery con el adjunto.
+    """
+
+    orden = models.OneToOneField(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='formato_oow',
+        help_text='Orden de servicio a la que pertenece este formato',
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_FORMATO_OOW_CHOICES,
+        default='borrador',
+        help_text='Borrador editable o finalizado (PDF generado)',
+    )
+    tipo_diagrama = models.CharField(
+        max_length=20,
+        choices=TIPO_DIAGRAMA_OOW_CHOICES,
+        default='laptop',
+        help_text='Tipo de esquema para marcar daños estéticos',
+    )
+
+    # Accesorios entregados por el cliente
+    accesorio_cargador = models.BooleanField(default=False)
+    accesorio_maletin = models.BooleanField(default=False)
+    accesorio_mouse = models.BooleanField(default=False)
+    accesorio_teclado = models.BooleanField(default=False)
+    accesorio_monitor = models.BooleanField(default=False)
+    accesorio_otros = models.BooleanField(default=False)
+    accesorios_otros_detalle = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='Detalle cuando se marca “Otros”',
+    )
+    detalle_equipo = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text='Notas cortas del equipo / accesorios',
+    )
+    contrasena_equipo = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Contraseña del equipo (si el cliente la proporciona)',
+    )
+
+    observaciones_tecnicas = models.TextField(
+        blank=True,
+        help_text='Observaciones técnicas y detalle de daños estéticos',
+    )
+    disclaimer_pc_audit = models.BooleanField(
+        default=False,
+        help_text=(
+            'PC AUDIT no pudo usarse (equipo no enciende / sin Windows / falla impide herramienta)'
+        ),
+    )
+
+    acepta_condiciones = models.BooleanField(
+        default=False,
+        help_text='Cliente acepta las condiciones en que entrega el equipo',
+    )
+    acepta_privacidad = models.BooleanField(
+        default=False,
+        help_text='Cliente aceptó el aviso de privacidad vigente',
+    )
+    version_aviso_privacidad = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        help_text='Versión del aviso aceptado (ej. mx-2016-09-06)',
+    )
+
+    email_envio = models.EmailField(
+        blank=True,
+        help_text='Correo al que se enviará el PDF del formato',
+    )
+    como_enteraste = models.CharField(
+        max_length=30,
+        choices=COMO_ENTERASTE_OOW_CHOICES,
+        blank=True,
+        help_text='¿Cómo se enteró el cliente de SIC?',
+    )
+
+    nombre_tecnico = models.CharField(
+        max_length=150,
+        blank=True,
+        help_text='Nombre del técnico que diagnostica y repara',
+    )
+    firma_cliente = models.ImageField(
+        upload_to=formato_oow_firma_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Firma digital del cliente (PNG del canvas)',
+    )
+    firma_tecnico = models.ImageField(
+        upload_to=formato_oow_firma_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Firma digital del técnico (opcional)',
+    )
+
+    pdf = models.FileField(
+        upload_to=formato_oow_pdf_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text='PDF generado al finalizar el formato',
+    )
+    finalizado_en = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Fecha/hora en que se finalizó el formato',
+    )
+
+    creado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='formatos_oow_creados',
+        help_text='Empleado que inició el formato',
+    )
+    actualizado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='formatos_oow_actualizados',
+        help_text='Último empleado que guardó el formato',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Formato OOW {self.orden.numero_orden_interno} ({self.estado})"
+
+    class Meta:
+        verbose_name = 'Formato de Servicio OOW'
+        verbose_name_plural = 'Formatos de Servicio OOW'
+        ordering = ['-fecha_actualizacion']
+
+
+class DanoEsteticoVista(models.Model):
+    """
+    Captura anotada de una vista del equipo (pantalla, top cover, etc.).
+
+    Objetivo de negocio:
+        Guardar el PNG compuesto (diagrama base + trazos del técnico) para
+        embeberlo en el PDF del formato OOW.
+
+    Args/campos:
+        formato: FormatoServicioOOW padre
+        clave_vista: Identificador estable (pantalla, top_cover, …)
+        etiqueta_dano: Tipo de daño seleccionado (Rayado, Golpe, …)
+        imagen_anotada: PNG del canvas
+    """
+
+    formato = models.ForeignKey(
+        FormatoServicioOOW,
+        on_delete=models.CASCADE,
+        related_name='vistas_dano',
+        help_text='Formato OOW al que pertenece esta vista',
+    )
+    clave_vista = models.CharField(
+        max_length=40,
+        help_text='Clave de la vista (pantalla, top_cover, palm, …)',
+    )
+    etiqueta_dano = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Etiqueta del tipo de daño (ej. Rayado)',
+    )
+    imagen_anotada = models.ImageField(
+        upload_to=dano_estetico_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        validators=[FileExtensionValidator(['png', 'jpg', 'jpeg'])],
+        help_text='Imagen del diagrama con anotaciones del técnico',
+    )
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.clave_vista} — {self.formato.orden.numero_orden_interno}"
+
+    class Meta:
+        verbose_name = 'Vista de daño estético OOW'
+        verbose_name_plural = 'Vistas de daño estético OOW'
+        unique_together = [('formato', 'clave_vista')]
+        ordering = ['clave_vista']
 

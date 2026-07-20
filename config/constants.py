@@ -264,6 +264,9 @@ TIPO_IMAGEN_CHOICES = [
     ('egreso', 'Egreso - Estado Final'),
     ('autorizacion', 'Autorización/Pass - RHITSO'),
     ('packing', 'Imágenes Packing'),
+    # Formato Digital OOW (identificación oficial + escaneo PC Audit)
+    ('identificacion_oow', 'Identificación oficial — Formato OOW'),
+    ('escaneo_oow', 'Resultado de escaneo — Formato OOW'),
 ]
 
 # ============================================================================
@@ -1056,3 +1059,115 @@ def _resolver_fuente_ffmpeg() -> str:
 
 # Ruta resuelta al iniciar. Se evalúa una sola vez al importar constants.py.
 FFMPEG_DRAWTEXT_FONT = _resolver_fuente_ffmpeg()
+
+
+# ============================================================================
+# FORMATO DIGITAL OOW — Aviso de privacidad México
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Este texto legal se muestra en el wizard del Formato Digital OOW (iPad) y se
+# imprime íntegro en la(s) última(s) página(s) del PDF. La versión permite
+# auditar qué texto aceptó el cliente si el aviso cambia en el futuro.
+
+AVISO_PRIVACIDAD_OOW_VERSION_MX = 'mx-2016-09-06'
+
+AVISO_PRIVACIDAD_OOW_MX = """
+Aviso de privacidad
+SIC COMERCIALIZACIÓN Y SERVICIOS.
+
+RESPONSABLE
+
+SIC COMERCIALIZACIÓN Y SERVICIOS como responsable en el tratamiento de sus datos personales, le informa que es una persona moral con residencia en Naucalpan de Juárez, con domicilio ubicado en Cto. Economistas 15 A, Ciudad Satélite, Naucalpan de Juárez. Edo. Mex. 53100, Estado de México lugar donde de manera totalmente profesional se resguardan los datos personales, sensibles, que se recaben a través de nuestro personal o bien en la base de datos de la página de internet que usted ha accesado puede ser contactada al teléfono (52-55) 53660900, en donde con gusto nuestra área de administración quien también puede ser contactado a través de correo electrónico en : atencionaclientes@sic.com.mx le atenderá para mayor información con relación a nuestro aviso de privacidad. Una de las prioridades en SIC COMERCIALIZACIÓN Y SERVICIOS, en adelante, “SIC” es respetar la privacidad y confidencialidad de sus usuarios así como mantener segura la información y los datos personales que recolecta a fin de no ser transmitidos a terceros a excepción de mandamientos judiciales o su autorización para tal efecto.
+
+El presente Aviso tiene como finalidad que usted esté en posibilidad de conocer los alcances de este, y oponerse al uso, tratamiento y/o transferencia de datos.
+
+La información recabada por “SIC”, corresponde principalmente a los datos recabados con motivo del ingreso de equipo de su propiedad a servicio “fuera de garantía”, diagnóstico y cualquier otro esquema de servicio que la propia empresa requiera al ingresar el equipo.
+
+La información personal recabada por “SIC” será utilizada para los siguientes propósitos: con fines publicitarios, hacer llegar novedades y promociones, proveer los servicios y productos que usted ha solicitado, informarle sobre cambios en los mismos, evaluar la calidad del servicio que le brindamos, procurar un servicio eficiente, informar sobre nuevos productos o servicios que estén relacionados con el contratado o adquirido por el cliente, dar cumplimiento a obligaciones contraídas con nuestros clientes, informar sobre cambios de nuestros productos o servicios, proveer una mejor atención al usuario, procesar solicitudes de pago electrónico, ofrecerle prórrogas o beneficios adicionales a los contratados con “SIC”, dar cumplimiento a requerimientos legales así como realizar análisis estadísticos dentro de “SIC”, mantener actualizados nuestros registros para poder responder eficientemente a sus necesidades, gestión de cobranza, requerimientos de pago, y otras campañas que en beneficio de usted se puedan realizar, muy independientemente de que en caso de ser requerido “SIC” por autoridades judiciales sobre su información personal, en términos de ley esta información se proporcionará de manera directa al órgano jurisdiccional que lo solicite. Para las finalidades antes mencionadas, requerimos obtener de usted datos personales que los usuarios de este sitio capturan de manera voluntaria en nuestros formularios de captura. DATOS PERSONALES: En el sitio de internet usted proporciona información desde varias áreas de nuestros propios sitios web. Para cada uno de estos sitios, la información que se solicita es distinta y se almacena en bases de datos separadas dentro de la misma empresa sin ser proporcionados a terceros. La información que usted proporciona, deberá ser veraz y completa, por lo cual usted responderá en todo momento por los datos proporcionados y en ningún caso “SIC” será responsable de los mismos. Entre la información solicitada a usted podría incluirse:
+
+Datos de Cliente:
+• Nombre de cliente o empresa
+• RFC
+• Correo electrónico
+• Teléfono
+
+Datos del equipo de cómputo:
+• Nombre de cliente o empresa
+• Marca
+• Modelo
+• Service Tag
+• Contraseña del equipo de cómputo
+• Firma electrónica y Fotografía del INE
+
+QUÉ SON LOS COOKIES Y CÓMO SE UTILIZAN
+Algunos de nuestros sitios podrían utilizar herramientas como los cookies, web beacons o similares que son pequeñas piezas de información que son transmitidas por el sitio Web y se utilizan para determinar sus preferencias cuando se conecta a los servicios de nuestros sitios, así como para rastrear determinados comportamientos o actividades llevadas a cabo por usted dentro de nuestros sitios. En algunas secciones de nuestro sitio requerimos que el cliente tenga habilitados los cookies ya que algunas de las funcionalidades requieren de éstas para trabajar. Los cookies nos permiten: a) reconocerlo al momento de entrar a nuestros sitios y ofrecerle de una experiencia personalizada, b) conocer la configuración personal del sitio especificada por usted, por ejemplo, los cookies nos permiten determinar el ancho de banda que usted ha seleccionado al momento de ingresar al home page de nuestros sitios, de tal forma que podremos sugerir qué tipo de información es aconsejable descargar, c) calcular el tamaño de nuestra audiencia y medir algunos parámetros de tráfico, pues cada navegador que obtiene acceso a nuestros sitios adquiere un cookie que se usa para determinar la frecuencia de uso y las secciones de los sitios visitadas, reflejando así sus hábitos y preferencias, información que nos es útil para mejorar el contenido, los titulares y las promociones para los usuarios. Los cookies también nos ayudan a determinar algunas actividades, por ejemplo, en algunas de las encuestas que lanzamos en línea, podemos utilizar cookies para determinar si el usuario ya ha llenado la encuesta y evitar desplegarla nuevamente, en caso de que lo haya hecho. Las cookies le permitirán tomar ventaja de las características más benéficas que le ofrecemos, por lo que le recomendamos que las deje activadas. La utilización de cookies no será utilizada para identificar a los usuarios, con excepción de los casos en que se investiguen posibles actividades fraudulentas así como por mandamiento judicial o ministerial.
+
+USO DE LA INFORMACIÓN
+La información solicitada permite a “SIC” contactar a los usuarios cuando sea necesario así como completar los datos necesarios para proveerles acceso restringido a ciertas secciones de información de nuestros sitios, en los casos de sitios en donde hacemos venta en línea, algunos de estos datos permiten identificar al usuario/comprador para enviar sus datos hacia la entidad que procesa el pago, como puede ser un banco nacional o un servicio de pago en línea como Paypal aclarando que dicha información no se resguarda en ningún sitio pues usted es quien la proporciona a momento de realizar el pago.
+
+LIMITACIÓN DE USO Y DIVULGACIÓN DE INFORMACIÓN
+En nuestro programa de notificación de promociones, ofertas y servicios a través de correo electrónico, sólo “SIC” tiene acceso a la información recabada la cual no es compartida con ninguna entidad externa a la empresa. Cuando llegamos a enviar mensajes promocionales por correo electrónico, sólo serán enviados a usted y a aquellos contactos registrados para tal propósito, esta indicación podrá usted modificarla en cualquier momento. En los correos electrónicos enviados, pueden incluirse ofertas de terceras partes que sean nuestros socios comerciales. En el caso de empleo de cookies, el botón de “ayuda” que se encuentra en la barra de herramientas de la mayoría de los navegadores, le dirá cómo evitar aceptar nuevos cookies, cómo hacer que el navegador le notifique cuando recibe un nuevo cookie o cómo deshabilitar todos los cookies.
+
+DERECHOS ARCO (ACCESO, RECTIFICACIÓN, CANCELACIÓN Y OPOSICIÓN)
+Los datos personales proporcionados por usted formarán parte de un archivo que contendrá su perfil. El usuario puede acceder o modificar su perfil en cualquier momento utilizando su número de usuario/socio o enviándonos un correo a atencionaclientes@sic.com.mx. Asimismo podrá notificarnos la cancelación del tratamiento de información y la cancelación de su expediente, por medio escrito ya sea impreso en nuestras oficinas o bien por correo electrónico el cual deberá ser enviado desde el mismo correo que usted proporcionó, toda vez que la cancelación requiere de un medio escrito e identificación oficial, “SIC” por el mismo medio le dará respuesta a su solicitud en el término establecido en la Ley para la Protección de Datos Personales en Posesión de Particulares o bien cuando los mismos datos proporcionados se actualicen o éstos sufran alguna modificación, ya que esto permitirá brindarle un servicio más personalizado.
+
+TRANSFERENCIAS DE INFORMACIÓN CON TERCEROS y PROTECCIÓN
+“SIC” únicamente realiza transferencias de información con las empresas de procesamiento de pagos como bancos o procesadores independientes como Paypal y únicamente lo hace en los sitios que tienen una opción para compra en línea y bajo los estándares de seguridad establecidos por las instituciones financieras. La seguridad y la confidencialidad de los datos que los usuarios proporcionen al contratar un servicio o comprar un producto en línea estarán protegidos por un servidor seguro bajo el protocolo Secure Socket Layer (SSL), de tal forma que los datos enviados se transmitirán encriptados para asegurar su resguardo. Para verificar que se encuentra en un entorno protegido asegúrese de que aparezca una S en la barra de navegación. Ejemplo: https://. En los sitios en los que no se incluye una opción de cobro en línea de ningún servicio, no existe tal transferencia de información.
+
+CAMBIOS EN EL AVISO DE PRIVACIDAD
+“SIC” se reserva el derecho de efectuar en cualquier momento modificaciones o actualizaciones al presente aviso de privacidad, para la atención de novedades legislativas o jurisprudenciales, políticas internas, nuevos requerimientos para la prestación u ofrecimiento de nuestros servicios o productos y prácticas del mercado. Estas modificaciones estarán disponibles al público a través de esta página de Internet en la sección de privacidad. La fecha de la última actualización al presente aviso de privacidad: 06 de Septiembre de 2016.
+
+ACEPTACIÓN DE LOS TÉRMINOS
+El presente Aviso de Privacidad está sujeto a los términos y condiciones de todos los sitios web de “SIC”, lo cual constituye un acuerdo legal entre el usuario y “SIC” en su aceptación tácita.
+
+Al aceptar el usuario los términos y condiciones a que está sujeto el Aviso de privacidad, acepta que el proveedor del servicio pueda enviar vía correo electrónico o mediante cualquier otro medio de comunicación, información del servicio, publicidad relacionada con este, promoción, difusión o actualización que el proveedor considere importante para mantener informado al usuario sobre la innovación y prestación del servicio que haga más eficaz la interacción entre ambos.
+
+Respecto a lo considerado anteriormente, y cuando sea voluntad del usuario dejar de recibir la información por parte del proveedor, lo hará saber por medio de correo electrónico para que a su vez el proveedor cancele el envío de publicidad y la misma será enviada cuando de nueva cuenta el usuario reciba un servicio y acepte nuevamente los términos y condiciones de este. Si el usuario utiliza los servicios en cualquiera de los sitios de “SIC” significa que ha leído, entendido y acordado los términos antes expuestos. Si no está de acuerdo con ellos, el usuario no deberá proporcionar ninguna información personal, ni utilizar los servicios de los sitios de “SIC”. De conformidad con lo previsto en los artículos 8, 9, 13 y 36 de la Ley para la Protección de Datos Personales en Posesión de Particulares, por medio del presente exteriorizó que he leído y entendido el contenido, los alcances del Aviso de Privacidad de “SIC” y autorizo de manera expresa a “SIC” a recabar y tratar mis datos personales para los fines establecidos.
+
+Por otra parte informamos a usted, que sus datos personales no serán compartidos con ninguna autoridad, empresa, organización o persona distinta a “SIC” y serán utilizados exclusivamente para los fines señalados.
+
+Usted tiene en todo momento el derecho a conocer qué datos personales tenemos de usted, para que los utilizamos y las condiciones de uso que les damos. Asimismo es su derecho solicitar la corrección de su información personal en caso de que esté desactualizada, sea inexacta o incompleta; de alguna manera, tiene derecho a que su información se elimine de nuestros registros o bases de datos cuando considere que la misma no está siendo utilizada adecuadamente; así como también oponerse al uso de sus datos personales para fines específicos.
+""".strip()
+
+# Texto corto para tenants que aún no tienen aviso local (AR/CL/CO).
+AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS = (
+    'Consulte el aviso de privacidad vigente de su centro de servicio SIC. '
+    'Al marcar la casilla de aceptación, confirma que ha leído y acepta el '
+    'tratamiento de sus datos personales conforme a la normativa local aplicable.'
+)
+
+# Vistas del diagrama de daños estéticos (laptop).
+VISTAS_DANO_ESTETICO_LAPTOP = [
+    ('pantalla', 'Pantalla'),
+    ('top_cover', 'Top Cover'),
+    ('palm', 'Palm / Teclado'),
+    ('bottom', 'Bottom Case'),
+    ('lat_izq', 'Lateral Izquierdo'),
+    ('lat_der', 'Lateral Derecho'),
+]
+
+VISTAS_DANO_ESTETICO_ESCRITORIO = [
+    ('frente', 'Frente'),
+    ('trasera', 'Trasera'),
+    ('lateral', 'Lateral'),
+    ('superior', 'Superior'),
+]
+
+COMO_ENTERASTE_OOW_CHOICES = [
+    ('google', 'Google'),
+    ('facebook', 'Facebook'),
+    ('instagram', 'Instagram'),
+    ('referencia', 'Referencia personal'),
+    ('dell', 'DELL'),
+    ('ventas', 'Ventas'),
+]
+
+ESTADO_FORMATO_OOW_CHOICES = [
+    ('borrador', 'Borrador'),
+    ('finalizado', 'Finalizado'),
+]
+
+TIPO_DIAGRAMA_OOW_CHOICES = [
+    ('laptop', 'Laptop'),
+    ('escritorio', 'Escritorio'),
+]
