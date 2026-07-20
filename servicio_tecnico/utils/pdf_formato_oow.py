@@ -10,11 +10,11 @@ NO usa el layout “papel” de RHITSO (canvas manual). Usa tablas y párrafos
 como PDFCotizacionCliente.
 
 Estructura (páginas bien separadas, sin encimar):
-1. Página 1 — Header + título + cliente + equipo + accesorios + observaciones
-2. Página siguiente — Registro de daños estéticos (diagramas anotados)
-3. Página siguiente — Resultado del escaneo (si hay fotos)
-4. Página siguiente — Aceptación y firma del cliente
-5. Página(s) finales — Aviso de Privacidad México
+1. Página 1 — Header + título + orden + cliente + equipo + accesorios
+2. Página siguiente — Daños estéticos + observaciones técnicas + firma cliente
+   (si no hay foto de escaneo, muestra aviso PC Audit en observaciones)
+3. Página siguiente — Resultado del escaneo (solo si hay fotos)
+4. Página(s) finales — Aviso de Privacidad México
 """
 
 from __future__ import annotations
@@ -110,12 +110,11 @@ class PDFFormatoServicioOOW:
             )
 
             elementos: List = []
-            # --- Página 1: datos generales (secciones con espacio claro) ---
+            # --- Página 1: datos generales ---
             elementos += self._construir_header()
             elementos.append(Spacer(1, 4 * mm))
             elementos += self._construir_titulo()
             elementos.append(Spacer(1, 5 * mm))
-            # Orden de servicio justo debajo del título (mismo estilo que cliente)
             elementos += self._envolver_seccion(self._construir_orden_servicio())
             elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_datos_cliente())
@@ -123,23 +122,20 @@ class PDFFormatoServicioOOW:
             elementos += self._envolver_seccion(self._construir_datos_equipo())
             elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_accesorios())
-            elementos.append(Spacer(1, 5 * mm))
-            elementos += self._envolver_seccion(self._construir_observaciones())
 
-            # --- Página nueva: daños estéticos (nunca se mezcla con lo anterior) ---
+            # --- Página de daños + observaciones + firma (como el formato papel) ---
             elementos.append(PageBreak())
             elementos += self._construir_danos()
+            elementos.append(Spacer(1, 4 * mm))
+            # KeepTogether: observaciones y firma intentan ir juntas al pie
+            elementos.append(KeepTogether(self._construir_observaciones_y_firma()))
 
-            # --- Escaneo: página propia solo si hay fotos (evita hoja casi vacía) ---
+            # --- Escaneo: solo si hay fotos ---
             if self._tiene_fotos_escaneo():
                 elementos.append(PageBreak())
                 elementos += self._construir_escaneo()
 
-            # --- Página nueva: firma del cliente ---
-            elementos.append(PageBreak())
-            elementos += self._construir_aceptacion_y_firmas()
-
-            # --- Aviso de privacidad (ya trae su PageBreak interno) ---
+            # --- Aviso de privacidad ---
             elementos += self._construir_aviso_privacidad()
 
             doc.build(elementos)
@@ -430,30 +426,66 @@ class PDFFormatoServicioOOW:
             ))
         return elementos
 
+    def _texto_aviso_pc_audit(self) -> str:
+        """Texto del aviso cuando no se pudo usar / no hay escaneo PC Audit."""
+        return (
+            'NO SE UTILIZÓ EL APLICATIVO PC AUDIT PARA IDENTIFICAR LAS '
+            'CARACTERÍSTICAS DEL HARDWARE Y SOFTWARE INSTALADO DEBIDO A QUE '
+            'EL EQUIPO NO ENCIENDE, NO TIENE SISTEMA OPERATIVO WINDOWS O SU '
+            'FALLA NO PERMITE UTILIZAR LA HERRAMIENTA.'
+        )
+
     def _construir_observaciones(self) -> List:
-        elementos = [self._crear_header_seccion('Observaciones técnicas'), Spacer(1, 2 * mm)]
-        obs = self.formato.observaciones_tecnicas or '—'
-        elementos.append(Paragraph(self._esc(obs), self._estilos['CuerpoNormal']))
-        if self.formato.disclaimer_pc_audit:
+        """Compatibilidad: delega al bloque de observaciones."""
+        return self._construir_bloque_observaciones()
+
+    def _construir_bloque_observaciones(self) -> List:
+        """
+        Observaciones técnicas + aviso PC Audit si aplica.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Si NO hay foto de “Resultado del escaneo”, se muestra el aviso amarillo
+        (como en el formato papel). También si el técnico marcó disclaimer_pc_audit.
+        """
+        elementos = [
+            self._crear_header_seccion('Observaciones técnicas'),
+            Spacer(1, 2 * mm),
+        ]
+        obs = (self.formato.observaciones_tecnicas or '').strip()
+        elementos.append(Paragraph(
+            self._esc(obs) if obs else '—',
+            self._estilos['CuerpoChico'],
+        ))
+
+        sin_escaneo = not self._tiene_fotos_escaneo()
+        mostrar_aviso = sin_escaneo or bool(self.formato.disclaimer_pc_audit)
+        if mostrar_aviso:
             elementos.append(Spacer(1, 2 * mm))
-            aviso = (
-                'NO SE PUDO UTILIZAR LA HERRAMIENTA DE DIAGNÓSTICO (PC AUDIT) DEBIDO A QUE '
-                'EL EQUIPO NO ENCIENDE, NO CUENTA CON SISTEMA OPERATIVO WINDOWS O SU FALLA '
-                'IMPOSIBILITA EL USO DE DICHA HERRAMIENTA.'
-            )
             bloque = Table(
-                [[Paragraph(aviso, self._estilos['CeldaValor'])]],
+                [[Paragraph(self._texto_aviso_pc_audit(), self._estilos['CuerpoChico'])]],
                 colWidths=[letter[0] - 2 * MARGEN],
             )
             bloque.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), COLOR_AMARILLO_BG),
                 ('BOX', (0, 0), (-1, -1), 0.8, COLOR_NAVY),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ]))
             elementos.append(bloque)
+        return elementos
+
+    def _construir_observaciones_y_firma(self) -> List:
+        """
+        Pie del registro de daños: observaciones + aceptación + firma cliente.
+
+        Objetivo: que quepa junto a los diagramas, como en el formato papel SICSER.
+        """
+        elementos: List = []
+        elementos += self._construir_bloque_observaciones()
+        elementos.append(Spacer(1, 3 * mm))
+        elementos += self._construir_aceptacion_y_firmas(compacto=True)
         return elementos
 
     def _construir_danos(self) -> List:
@@ -466,13 +498,7 @@ class PDFFormatoServicioOOW:
         """
         elementos = [
             self._crear_header_seccion('Registro de daños estéticos'),
-            Spacer(1, 4 * mm),
-            Paragraph(
-                'A continuación se muestran las vistas del equipo con las '
-                'anotaciones de daños capturadas en el Formato Digital OOW.',
-                self._estilos['CuerpoNormal'],
-            ),
-            Spacer(1, 4 * mm),
+            Spacer(1, 2 * mm),
         ]
         vistas = list(
             self.formato.vistas_dano.exclude(imagen_anotada='').exclude(imagen_anotada=None)
@@ -494,8 +520,8 @@ class PDFFormatoServicioOOW:
         for vista in vistas:
             try:
                 path = vista.imagen_anotada.path
-                # Un poco más chicas para que quepan 2 por fila sin apretarse
-                img = RLImage(path, width=80 * mm, height=55 * mm, kind='proportional')
+                # Compactas para dejar espacio a observaciones + firma en la misma hoja
+                img = RLImage(path, width=72 * mm, height=42 * mm, kind='proportional')
             except Exception:
                 img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
             titulo = labels.get(vista.clave_vista, vista.clave_vista)
@@ -514,10 +540,10 @@ class PDFFormatoServicioOOW:
                 ('BACKGROUND', (0, 0), (-1, 0), COLOR_GRIS_ALT),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ]))
             bloques_vista.append(tarjeta)
 
@@ -536,7 +562,7 @@ class PDFFormatoServicioOOW:
                 ('TOPPADDING', (0, 0), (-1, -1), 0),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ]))
-            elementos.append(KeepTogether([fila, Spacer(1, 5 * mm)]))
+            elementos.append(KeepTogether([fila, Spacer(1, 2 * mm)]))
 
         return elementos
 
@@ -596,24 +622,49 @@ class PDFFormatoServicioOOW:
 
         return elementos
 
-    def _construir_aceptacion_y_firmas(self) -> List:
+    def _construir_aceptacion_y_firmas(self, compacto: bool = False) -> List:
+        """
+        Aceptación de condiciones + firma del cliente.
+
+        Args:
+            compacto: True cuando va al pie de la página de daños (menos padding).
+        """
         elementos = [
             self._crear_header_seccion('Aceptación y firma del cliente'),
-            Spacer(1, 4 * mm),
+            Spacer(1, 2 * mm if compacto else 4 * mm),
         ]
+        estilo_acepta = ParagraphStyle(
+            'AceptaCondicionesOow',
+            parent=self._estilos['CeldaLabel'],
+            alignment=TA_CENTER,
+            fontSize=8 if compacto else 9,
+            leading=10,
+        )
         elementos.append(Paragraph(
             'ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO AL CENTRO DE SERVICIO.',
-            self._estilos['CeldaLabel'],
+            estilo_acepta,
         ))
-        elementos.append(Spacer(1, 8 * mm))
+        elementos.append(Spacer(1, 4 * mm if compacto else 8 * mm))
 
         # Solo firma del cliente (no se registra técnico en este formato)
-        firma_cli = self._imagen_firma(self.formato.firma_cliente)
+        firma_cli = None
+        if self.formato.firma_cliente:
+            try:
+                firma_cli = RLImage(
+                    self.formato.firma_cliente.path,
+                    width=45 * mm if compacto else 50 * mm,
+                    height=18 * mm if compacto else 22 * mm,
+                    kind='proportional',
+                )
+            except Exception:
+                firma_cli = self._imagen_firma(self.formato.firma_cliente)
+
         col_cli = [
             [firma_cli or Paragraph(' ', self._estilos['CeldaValor'])],
             [HRFlowable(width='60%', thickness=0.6, color=COLOR_NEGRO)],
             [Paragraph('<b>FIRMA CLIENTE</b>', self._estilos['FirmaLabel'])],
         ]
+        pad = 6 if compacto else 10
         tabla = Table(
             [[Table(col_cli, colWidths=[100 * mm])]],
             colWidths=[letter[0] - 2 * MARGEN],
@@ -622,13 +673,13 @@ class PDFFormatoServicioOOW:
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('BOX', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), pad),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
         ]))
-        elementos.append(KeepTogether([tabla]))
+        elementos.append(tabla)
 
         if self.formato.como_enteraste:
-            elementos.append(Spacer(1, 6 * mm))
+            elementos.append(Spacer(1, 3 * mm if compacto else 6 * mm))
             elementos.append(Paragraph(
                 f'<b>¿Cómo se enteró?</b> {self._esc(self.formato.get_como_enteraste_display())}',
                 self._estilos['CeldaValor'],
