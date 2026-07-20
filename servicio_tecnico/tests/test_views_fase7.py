@@ -191,11 +191,21 @@ class CompatibilidadRhitsoEnviosReexportsTest(SimpleTestCase):
                 match = resolve(url)
                 self.assertIs(match.func, expected, msg=f'Fallo en {name}')
 
-    def test_dashboard_rhitso_sigue_en_monolito(self):
-        """Fase 8: dashboard_rhitso aún no se movió."""
+    def test_dashboard_rhitso_ya_no_esta_en_views_rhitso(self):
+        """
+        Dashboard consolidado es Fase 8 (views_dashboard_rhitso), no Fase 7.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        views_rhitso.py = gestión por orden. El dashboard de candidatos
+        vive en otro módulo para no mezclar pantallas distintas.
+        """
+        self.assertNotEqual(
+            st_views.dashboard_rhitso.__module__,
+            'servicio_tecnico.views_rhitso',
+        )
         self.assertEqual(
             st_views.dashboard_rhitso.__module__,
-            'servicio_tecnico.views',
+            'servicio_tecnico.views_dashboard_rhitso',
         )
 
     def test_imports_criticos_rhitso(self):

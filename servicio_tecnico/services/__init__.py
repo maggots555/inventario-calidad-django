@@ -13,6 +13,10 @@ from .notificaciones_piezas import (
     enviar_notificacion_pieza_recibida,
     _enviar_notificacion_pieza_recibida,
 )
+from .ventas_mostrador_analytics import (
+    determinar_categoria_venta,
+    obtener_top_productos_vendidos,
+)
 
 __all__ = [
     'registrar_historial',
@@ -20,4 +24,6 @@ __all__ = [
     'comprimir_y_guardar_video',
     'enviar_notificacion_pieza_recibida',
     '_enviar_notificacion_pieza_recibida',
+    'determinar_categoria_venta',
+    'obtener_top_productos_vendidos',
 ]
