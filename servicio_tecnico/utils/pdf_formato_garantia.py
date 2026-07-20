@@ -48,7 +48,8 @@ from config.constants import (
     AVISO_PRIVACIDAD_OOW_VERSION_MX,
     TEXTO_PC_AUDIT_FORMATO_GARANTIA,
     TEXTO_TIEMPO_RESPUESTA_GARANTIA,
-    TEXTOS_LEGALES_FORMATO_GARANTIA,
+    TEXTOS_LEGALES_FORMATO_GARANTIA_DER,
+    TEXTOS_LEGALES_FORMATO_GARANTIA_IZQ,
     VISTAS_DANO_ESTETICO_AIO,
     VISTAS_DANO_ESTETICO_ESCRITORIO,
     VISTAS_DANO_ESTETICO_LAPTOP,
@@ -57,14 +58,17 @@ from config.paises_config import get_pais_actual
 
 logger = logging.getLogger('servicio_tecnico')
 
+# Colores del formato papel Dell/SICSER (barras grises, no navy cotización)
 COLOR_NAVY = colors.HexColor('#003366')
+COLOR_GRIS_HEADER = colors.HexColor('#6E6E6E')
 COLOR_GRIS_ALT = colors.HexColor('#F2F2F2')
 COLOR_GRIS_BORDE = colors.HexColor('#CCCCCC')
 COLOR_AMARILLO_BG = colors.HexColor('#FFF2CC')
 COLOR_BLANCO = colors.white
 COLOR_NEGRO = colors.black
 
-MARGEN = 12 * mm
+MARGEN = 10 * mm
+ANCHO_UTIL = letter[0] - (2 * MARGEN)
 
 
 class PDFFormatoServicioGarantia:
@@ -109,25 +113,23 @@ class PDFFormatoServicioGarantia:
             )
 
             elementos: List = []
-            # --- Página 1: plantilla Dell ingreso ---
+            # --- Página 1: plantilla Dell (layout papel 1:1) ---
             elementos += self._construir_header()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_titulo()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_cabecera_orden()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_datos_cliente()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_datos_equipo()
-            elementos.append(Spacer(1, 3 * mm))
-            elementos += self._construir_accesorios()
             elementos.append(Spacer(1, 2 * mm))
+            elementos += self._construir_cabecera_orden()
+            elementos.append(Spacer(1, 2.5 * mm))
+            elementos += self._construir_datos_cliente()
+            elementos.append(Spacer(1, 2 * mm))
+            elementos += self._construir_datos_equipo()
+            elementos.append(Spacer(1, 2 * mm))
+            elementos += self._construir_accesorios()
+            elementos.append(Spacer(1, 1.5 * mm))
             elementos += self._construir_legales()
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 2 * mm))
             elementos += self._construir_falla_inicial()
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 2 * mm))
             elementos += self._construir_diagnostico_y_piezas()
-            elementos.append(Spacer(1, 4 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_firma_aceptacion()
 
             # --- Página 2: estado estético ---
@@ -163,28 +165,28 @@ class PDFFormatoServicioGarantia:
     def _crear_estilos(self) -> None:
         """Registra ParagraphStyles reutilizados en el documento."""
         self._estilos.add(ParagraphStyle(
-            'EmpresaHeader',
+            'TituloBanner',
             fontName='Helvetica-Bold',
-            fontSize=10,
-            textColor=COLOR_NAVY,
+            fontSize=12,
+            textColor=COLOR_BLANCO,
             alignment=TA_CENTER,
-            leading=12,
+            leading=14,
         ))
         self._estilos.add(ParagraphStyle(
             'TituloOrden',
             fontName='Helvetica-Bold',
-            fontSize=14,
+            fontSize=12,
             textColor=COLOR_NEGRO,
             alignment=TA_CENTER,
-            leading=17,
+            leading=14,
         ))
         self._estilos.add(ParagraphStyle(
             'TituloSeccion',
             fontName='Helvetica-Bold',
-            fontSize=9,
+            fontSize=8.5,
             textColor=COLOR_BLANCO,
             alignment=TA_CENTER,
-            leading=11,
+            leading=10,
         ))
         self._estilos.add(ParagraphStyle(
             'CeldaLabel',
@@ -201,20 +203,27 @@ class PDFFormatoServicioGarantia:
             leading=10,
         ))
         self._estilos.add(ParagraphStyle(
-            'CuerpoNormal',
+            'CampoInline',
             fontName='Helvetica',
             fontSize=8,
             textColor=COLOR_NEGRO,
-            alignment=TA_JUSTIFY,
             leading=10,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'CuerpoNormal',
+            fontName='Helvetica',
+            fontSize=7.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_JUSTIFY,
+            leading=9.5,
         ))
         self._estilos.add(ParagraphStyle(
             'CuerpoChico',
             fontName='Helvetica',
-            fontSize=6.5,
+            fontSize=6.2,
             textColor=COLOR_NEGRO,
             alignment=TA_JUSTIFY,
-            leading=8.5,
+            leading=8,
             spaceAfter=1,
         ))
         self._estilos.add(ParagraphStyle(
@@ -227,7 +236,7 @@ class PDFFormatoServicioGarantia:
         ))
         self._estilos.add(ParagraphStyle(
             'FirmaLabel',
-            fontName='Helvetica',
+            fontName='Helvetica-Bold',
             fontSize=8,
             textColor=COLOR_NEGRO,
             alignment=TA_CENTER,
@@ -261,54 +270,75 @@ class PDFFormatoServicioGarantia:
         ).exists()
 
     def _crear_header_seccion(self, titulo: str) -> Table:
-        """Barra navy de sección centrada (estilo plantilla Dell/SIC)."""
-        ancho = letter[0] - (2 * MARGEN)
+        """
+        Barra gris de sección centrada (igual al papel Dell).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El formato Dell usa encabezados gris medio (#6E6E6E) con texto blanco,
+        no las barras navy de las cotizaciones SIGMA.
+        """
         tabla = Table(
             [[Paragraph(titulo, self._estilos['TituloSeccion'])]],
-            colWidths=[ancho],
+            colWidths=[ANCHO_UTIL],
         )
         tabla.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY),
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_GRIS_HEADER),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5),
         ]))
         return tabla
 
-    def _obtener_logo(self) -> Optional[RLImage]:
-        """Carga logo SIC PNG desde static si existe."""
-        ruta = finders.find('images/logos/logo_sic.png')
+    def _cargar_logo(self, nombre_static: str, ancho_mm: float, alto_mm: float) -> Optional[RLImage]:
+        """Carga un logo PNG desde static/images/logos/."""
+        ruta = finders.find(f'images/logos/{nombre_static}')
         if not ruta:
             return None
         try:
-            return RLImage(ruta, width=40 * mm, height=16 * mm)
+            return RLImage(ruta, width=ancho_mm * mm, height=alto_mm * mm, kind='proportional')
         except Exception:
             return None
 
     def _construir_header(self) -> List:
-        """Logo centrado + nombre empresa."""
-        elementos: List = []
-        logo = self._obtener_logo()
-        empresa = self.pais_config.get(
-            'empresa_nombre',
-            'SIC Comercialización y Servicios de México SC',
-        )
-        if logo:
-            tabla = Table([[logo]], colWidths=[letter[0] - 2 * MARGEN])
-            tabla.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ]))
-            elementos.append(tabla)
-        elementos.append(Paragraph(self._esc(empresa), self._estilos['EmpresaHeader']))
-        elementos.append(Spacer(1, 1 * mm))
-        elementos.append(HRFlowable(width='100%', thickness=0.8, color=COLOR_GRIS_BORDE))
-        return elementos
+        """
+        Cabecera Dell | ORDEN DE SERVICIO | SIC (como el papel).
 
-    def _construir_titulo(self) -> List:
-        """Título principal ORDEN DE SERVICIO."""
-        return [Paragraph('ORDEN DE SERVICIO', self._estilos['TituloOrden'])]
+        Layout: logo Dell izq + banner gris título + logo SIC der.
+        """
+        logo_dell = self._cargar_logo('logo_dell.png', 18, 18)
+        logo_sic = (
+            self._cargar_logo('logo_sic_formato.png', 28, 10)
+            or self._cargar_logo('logo_sic.png', 28, 11)
+        )
+
+        banner = Table(
+            [[Paragraph('ORDEN DE SERVICIO', self._estilos['TituloBanner'])]],
+            colWidths=[95 * mm],
+        )
+        banner.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_GRIS_HEADER),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        ]))
+
+        izq = logo_dell or Paragraph('<b>Dell</b>', self._estilos['CeldaLabel'])
+        der = logo_sic or Paragraph('<b>SIC</b>', self._estilos['CeldaLabel'])
+        fila = Table(
+            [[izq, banner, der]],
+            colWidths=[28 * mm, 95 * mm, 40 * mm],
+        )
+        fila.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        return [fila]
 
     def _dps(self) -> str:
         """Número DPS / orden cliente SICSER."""
@@ -317,6 +347,14 @@ class PDFFormatoServicioGarantia:
             or self.detalle.folio_sicser
             or self.orden.numero_orden_interno
             or '—'
+        )
+
+    def _campo_inline(self, label: str, valor: str) -> Paragraph:
+        """Campo estilo papel: <b>Label</b> valor (sin rejilla)."""
+        v = (valor or '').strip()
+        return Paragraph(
+            f'<b>{self._esc(label)}</b> {self._esc(v)}',
+            self._estilos['CampoInline'],
         )
 
     def _construir_cabecera_orden(self) -> List:
@@ -328,115 +366,48 @@ class PDFFormatoServicioGarantia:
             else hoy
         )
         data = [[
-            Paragraph(
-                f'<b>Orden (DPS)</b> {self._esc(self._dps())}',
-                self._estilos['CeldaValor'],
-            ),
-            Paragraph(
-                f'<b>Fecha Creación</b> {self._esc(hoy)}',
-                self._estilos['CeldaValor'],
-            ),
-            Paragraph(
-                f'<b>Fecha Ingreso</b> {self._esc(fecha_ingreso)}',
-                self._estilos['CeldaValor'],
-            ),
-            Paragraph('<b>Fecha salida</b>', self._estilos['CeldaValor']),
+            self._campo_inline('Orden (DPS)', self._dps()),
+            self._campo_inline('Fecha Creación', hoy),
+            self._campo_inline('Fecha Ingreso', fecha_ingreso),
+            self._campo_inline('Fecha salida', ''),
         ]]
-        tabla = Table(data, colWidths=['28%', '24%', '24%', '24%'])
+        tabla = Table(data, colWidths=['27%', '25%', '25%', '23%'])
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('LEFTPADDING', (0, 0), (-1, -1), 1),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         return [tabla]
 
-    def _tabla_pares(self, pares: List[tuple], col_label_mm: float = 35) -> Table:
-        """Tabla 2 columnas label|valor."""
-        data = [
-            [
-                Paragraph(self._esc(label), self._estilos['CeldaLabel']),
-                Paragraph(self._esc(valor or '—'), self._estilos['CeldaValor']),
-            ]
-            for label, valor in pares
-        ]
-        tabla = Table(data, colWidths=[col_label_mm * mm, None])
-        estilos = [
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('GRID', (0, 0), (-1, -1), 0.35, COLOR_GRIS_BORDE),
-            ('LEFTPADDING', (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]
-        for i in range(len(data)):
-            if i % 2 == 0:
-                estilos.append(('BACKGROUND', (0, i), (-1, i), COLOR_GRIS_ALT))
-        tabla.setStyle(TableStyle(estilos))
-        return tabla
-
     def _construir_datos_cliente(self) -> List:
-        """Sección INFORMACIÓN DEL CLIENTE."""
+        """
+        INFORMACIÓN DEL CLIENTE — 2 filas × 3 columnas (como el papel Dell).
+
+        Fila 1: Nombre | Teléfono | Móvil
+        Fila 2: Dirección | Ciudad | Email
+        """
         d = self.detalle
+        # No hay dirección/móvil en DetalleEquipo; ciudad viene de SICSER si existe
+        ciudad = (getattr(d, 'sicser_ciudad', None) or '').strip()
         elementos = [
             self._crear_header_seccion('INFORMACIÓN DEL CLIENTE'),
-            Spacer(1, 2 * mm),
-            self._tabla_pares([
-                ('Nombre', d.nombre_cliente),
-                ('Teléfono', d.telefono_cliente),
-                ('Email', d.email_cliente),
-                ('RFC', d.rfc_cliente),
-            ]),
+            Spacer(1, 1.5 * mm),
         ]
-        return elementos
-
-    def _construir_datos_equipo(self) -> List:
-        """Sección INFORMACIÓN DEL EQUIPO."""
-        d = self.detalle
-        elementos = [
-            self._crear_header_seccion('INFORMACIÓN DEL EQUIPO'),
-            Spacer(1, 2 * mm),
-            self._tabla_pares([
-                ('Modelo', d.modelo),
-                ('Tipo', d.tipo_equipo),
-                ('Service Tag', d.numero_serie),
-                ('Marca', d.marca or 'Dell'),
-            ]),
+        data = [
+            [
+                self._campo_inline('Nombre', d.nombre_cliente or ''),
+                self._campo_inline('Teléfono', d.telefono_cliente or ''),
+                self._campo_inline('Móvil', ''),
+            ],
+            [
+                self._campo_inline('Dirección', ''),
+                self._campo_inline('Ciudad', ciudad),
+                self._campo_inline('Email', d.email_cliente or ''),
+            ],
         ]
-        return elementos
-
-    def _marcar_check(self, activo: bool) -> str:
-        """Marca ASCII compatible con Helvetica (SI/NO del formato)."""
-        return '[X]' if activo else '[ ]'
-
-    def _construir_accesorios(self) -> List:
-        """
-        Accesorios Dell en fila de checks + número de cargador.
-
-        EXPLICACIÓN PARA PRINCIPIANTES:
-        Helvetica no dibuja bien ☑ Unicode; usamos [X] / [ ] como el papel.
-        """
-        f = self.formato
-        elementos = [
-            self._crear_header_seccion('ACCESORIOS RECIBIDOS / ENTREGADOS'),
-            Spacer(1, 2 * mm),
-        ]
-        celdas = []
-        for campo, etiqueta in ACCESORIOS_FORMATO_GARANTIA:
-            marcado = bool(getattr(f, campo, False))
-            celdas.append(Paragraph(
-                f'{self._marcar_check(marcado)} {self._esc(etiqueta)}',
-                self._estilos['CheckAcc'],
-            ))
-
-        # Filas de 5 columnas
-        filas = []
-        for i in range(0, len(celdas), 5):
-            fila = celdas[i:i + 5]
-            while len(fila) < 5:
-                fila.append('')
-            filas.append(fila)
-
-        tabla = Table(filas, colWidths=['20%'] * 5)
+        tabla = Table(data, colWidths=['40%', '30%', '30%'])
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 1),
@@ -445,57 +416,151 @@ class PDFFormatoServicioGarantia:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
         elementos.append(tabla)
-        elementos.append(Spacer(1, 2 * mm))
+        return elementos
 
-        # Número de cargador / descripción
-        num = (f.numero_cargador or '').strip()
-        otros = (f.accesorios_otros_detalle or '').strip()
-        desc = num or otros or 'NA'
+    def _construir_datos_equipo(self) -> List:
+        """INFORMACIÓN DEL EQUIPO — Modelo | Tipo | Service Tag."""
+        d = self.detalle
+        elementos = [
+            self._crear_header_seccion('INFORMACIÓN DEL EQUIPO'),
+            Spacer(1, 1.5 * mm),
+        ]
+        data = [[
+            self._campo_inline('Modelo', d.modelo or ''),
+            self._campo_inline('Tipo', d.tipo_equipo or ''),
+            self._campo_inline('Service Tag', d.numero_serie or ''),
+        ]]
+        tabla = Table(data, colWidths=['40%', '30%', '30%'])
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 1),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        elementos.append(tabla)
+        return elementos
+
+    def _marcar_check(self, activo: bool) -> str:
+        """
+        Marca del papel Dell: 'x' marcado, '_' vacío.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        En el PDF de referencia se ve `_ Cargador` o `x Otros`.
+        """
+        return 'x' if activo else '_'
+
+    def _construir_accesorios(self) -> List:
+        """
+        Accesorios en una sola línea + No. Serie / Descripción (número cargador).
+
+        Lo remarcado en amarillo del papel:
+        - checks de accesorios (y “SIN ACCESORIOS” si no hay ninguno / va en Otros)
+        - No. Serie / Descripción ← campo numero_cargador del wizard
+        """
+        f = self.formato
+        elementos = [
+            self._crear_header_seccion('ACCESORIOS RECIBIDOS / ENTREGADOS'),
+            Spacer(1, 1.5 * mm),
+        ]
+
+        # Paso 1: ¿hay algún accesorio marcado? (para “SIN ACCESORIOS”)
+        algun_accesorio = any(
+            bool(getattr(f, campo, False))
+            for campo, _etiqueta in ACCESORIOS_FORMATO_GARANTIA
+        )
+        detalle_otros = (f.accesorios_otros_detalle or '').strip()
+
+        # Paso 2: una sola línea como el papel: _ Cargador _ Teclado x Otros …
+        partes: list[str] = []
+        for campo, etiqueta in ACCESORIOS_FORMATO_GARANTIA:
+            marcado = bool(getattr(f, campo, False))
+            marca = self._marcar_check(marcado)
+            if campo == 'accesorio_otros':
+                # Papel Dell: si no hay accesorios → "x Otros SIN ACCESORIOS"
+                if not algun_accesorio:
+                    partes.append('x Otros SIN ACCESORIOS')
+                elif marcado and detalle_otros:
+                    partes.append(f'{marca} Otros {self._esc(detalle_otros)}')
+                else:
+                    partes.append(f'{marca} Otros')
+            else:
+                partes.append(f'{marca} {self._esc(etiqueta)}')
+
+        elementos.append(Paragraph(' '.join(partes), self._estilos['CheckAcc']))
+        elementos.append(Spacer(1, 1.5 * mm))
+
+        # Número del cargador / descripción (campo del wizard)
+        num = (f.numero_cargador or '').strip() or 'NA'
         elementos.append(Paragraph(
-            f'<b>No. Serie / Descripción:</b> {self._esc(desc)}',
+            f'<b>No. Serie / Descripción:</b> {self._esc(num)}',
             self._estilos['CeldaValor'],
         ))
         return elementos
 
     def _construir_legales(self) -> List:
-        """Avisos legales fijos + tiempo de respuesta Dell."""
-        elementos: List = []
-        for texto in TEXTOS_LEGALES_FORMATO_GARANTIA:
-            elementos.append(Paragraph(self._esc(texto), self._estilos['CuerpoChico']))
-        elementos.append(Spacer(1, 1 * mm))
-        elementos.append(Paragraph(
-            self._esc(TEXTO_TIEMPO_RESPUESTA_GARANTIA),
-            self._estilos['CuerpoChico'],
-        ))
+        """Avisos legales en 2 columnas + párrafo Tiempo de Respuesta."""
+        izq = [
+            Paragraph(self._esc(t), self._estilos['CuerpoChico'])
+            for t in TEXTOS_LEGALES_FORMATO_GARANTIA_IZQ
+        ]
+        der = [
+            Paragraph(self._esc(t), self._estilos['CuerpoChico'])
+            for t in TEXTOS_LEGALES_FORMATO_GARANTIA_DER
+        ]
+        # Emparejar filas
+        filas = []
+        max_len = max(len(izq), len(der))
+        for i in range(max_len):
+            filas.append([
+                izq[i] if i < len(izq) else '',
+                der[i] if i < len(der) else '',
+            ])
+        tabla = Table(filas, colWidths=['55%', '45%'])
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 0.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0.5),
+        ]))
+        elementos: List = [tabla, Spacer(1, 1.5 * mm)]
+        # “Tiempo de Respuesta” en negrita al inicio del párrafo
+        tr = TEXTO_TIEMPO_RESPUESTA_GARANTIA
+        if tr.startswith('Tiempo de Respuesta:'):
+            resto = tr[len('Tiempo de Respuesta:'):].strip()
+            elementos.append(Paragraph(
+                f'<b>Tiempo de Respuesta:</b> {self._esc(resto)}',
+                self._estilos['CuerpoChico'],
+            ))
+        else:
+            elementos.append(Paragraph(self._esc(tr), self._estilos['CuerpoChico']))
         return elementos
 
     def _construir_falla_inicial(self) -> List:
         """
-        DESCRIPCIÓN DE LA FALLA INICIAL = falla_principal (SICSER / SIGMA).
+        DESCRIPCIÓN DE LA FALLA INICIAL = falla_principal (SICSER).
 
-        EXPLICACIÓN PARA PRINCIPIANTES:
-        Al importar garantía, instrucciones_dell se guarda en falla_principal.
-        Aquí la imprimimos completa (o truncada visualmente por el PDF).
+        Es el bloque amarillo del papel con instrucciones Dell / Issue Summary.
         """
         elementos = [
             self._crear_header_seccion('DESCRIPCIÓN DE LA FALLA INICIAL'),
-            Spacer(1, 2 * mm),
+            Spacer(1, 1.5 * mm),
         ]
         falla = (self.detalle.falla_principal or '').strip()
         elementos.append(Paragraph(
-            self._esc(falla) if falla else '—',
+            self._esc(falla) if falla else '',
             self._estilos['CuerpoNormal'],
         ))
         return elementos
 
     def _construir_diagnostico_y_piezas(self) -> List:
-        """Diagnóstico técnico vacío + líneas de piezas (como el papel)."""
+        """Diagnóstico vacío + tabla de piezas (líneas en blanco como el papel)."""
         elementos = [
             self._crear_header_seccion('DIAGNÓSTICO TÉCNICO REALIZADO'),
-            Spacer(1, 8 * mm),
-            Paragraph(
-                '<b>NOMBRE DE LA PARTE Y/O WIP PIEZAS / REMPLAZO No.de Serie</b>',
-                self._estilos['CeldaLabel'],
+            Spacer(1, 10 * mm),
+            self._crear_header_seccion(
+                'NOMBRE DE LA PARTE Y/O WIP PIEZAS / REMPLAZO No.de Serie'
             ),
             Spacer(1, 2 * mm),
         ]
@@ -512,15 +577,17 @@ class PDFFormatoServicioGarantia:
         tabla = Table(lineas, colWidths=['50%', '50%'])
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ]))
         elementos.append(tabla)
 
-        # Observaciones técnicas del wizard (si las hay) bajo diagnóstico
+        # Observaciones del wizard: no las metemos en pág.1 del papel Dell;
+        # si existen, van en un renglón chico bajo piezas para no perderlas.
         obs = (self.formato.observaciones_tecnicas or '').strip()
         if obs:
-            elementos.append(Spacer(1, 3 * mm))
+            elementos.append(Spacer(1, 2 * mm))
             elementos.append(Paragraph(
                 f'<b>Observaciones técnicas:</b> {self._esc(obs)}',
                 self._estilos['CuerpoChico'],
@@ -581,17 +648,13 @@ class PDFFormatoServicioGarantia:
         En el PDF papel Dell aquí van Pantalla / Top Cover / Palm.
         Nosotros embebemos las vistas anotadas del canvas del wizard.
         """
-        elementos = [
-            Paragraph('ORDEN DE SERVICIO', self._estilos['TituloOrden']),
-            Spacer(1, 2 * mm),
-            Paragraph(
-                f'<b>Orden (DPS)</b> {self._esc(self._dps())}',
-                self._estilos['CeldaValor'],
-            ),
-            Spacer(1, 3 * mm),
-            self._crear_header_seccion('ESTADO DEL EQUIPO RECIBIDO'),
-            Spacer(1, 3 * mm),
-        ]
+        elementos = []
+        elementos += self._construir_header()
+        elementos.append(Spacer(1, 2 * mm))
+        elementos.append(self._campo_inline('Orden (DPS)', self._dps()))
+        elementos.append(Spacer(1, 3 * mm))
+        elementos.append(self._crear_header_seccion('ESTADO DEL EQUIPO RECIBIDO'))
+        elementos.append(Spacer(1, 3 * mm))
         elementos += self._construir_danos()
         elementos.append(Spacer(1, 3 * mm))
 

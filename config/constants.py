@@ -1205,21 +1205,19 @@ ACCESORIOS_FORMATO_GARANTIA = [
 ]
 
 # Textos legales fijos de la página 1 del formato Dell (plantilla SIGMA).
-TEXTOS_LEGALES_FORMATO_GARANTIA = [
-    (
-        '*Recuperación/pérdida de datos no está cubierto bajo la garantía DELL'
-    ),
-    (
-        '*Baterías poseen garantía limitada de 1 año'
-    ),
-    (
-        '* Luego de reinstalación de OS y controladores no se instalan '
-        'Aplicaciones / Software'
-    ),
-    (
-        '* Los daños accidentales requieren cobertura Complete Care'
-    ),
+# Se muestran en 2 columnas como el papel Dell/SICSER.
+TEXTOS_LEGALES_FORMATO_GARANTIA_IZQ = [
+    '*Recuperación/pérdida de datos no está cubierto bajo la garantía DELL',
+    '* Luego de reinstalación de OS y controladores no se instalan Aplicaciones / Software ___',
 ]
+TEXTOS_LEGALES_FORMATO_GARANTIA_DER = [
+    '*Baterías poseen garantía limitada de 1 año ___',
+    '* Los daños accidentales requieren cobertura Complete Care ___',
+]
+# Compatibilidad: lista plana por si algún código aún la importa.
+TEXTOS_LEGALES_FORMATO_GARANTIA = (
+    TEXTOS_LEGALES_FORMATO_GARANTIA_IZQ + TEXTOS_LEGALES_FORMATO_GARANTIA_DER
+)
 
 TEXTO_TIEMPO_RESPUESTA_GARANTIA = (
     'Tiempo de Respuesta: Una vez que el computador se haya recibido en nuestro '
