@@ -66,6 +66,11 @@
             var theme = localStorage.getItem('theme');
             if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 document.documentElement.setAttribute('data-bs-theme', 'dark');
+                // PWA: alinear barra de estado con el tema (si no, cada navegación vuelve a #1f6391)
+                var metaTheme = document.querySelector('meta[name="theme-color"]');
+                if (metaTheme) {
+                    metaTheme.setAttribute('content', '#0f172a');
+                }
             }
         })();
         // Aplicar estado colapsado ANTES de que la página se renderice
