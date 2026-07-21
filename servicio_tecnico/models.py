@@ -929,6 +929,15 @@ class DetalleEquipo(models.Model):
         blank=True,
         help_text="Teléfono de contacto del cliente (opcional)"
     )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Dirección de contacto del cliente. En órdenes garantía Dell suele venir
+    # de SICSER; también se puede capturar/editar en “Datos adicionales”.
+    # Se usa en el PDF Formato Garantía (INFORMACIÓN DEL CLIENTE).
+    direccion_cliente = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="Dirección del cliente (calle, colonia, C.P.; opcional)"
+    )
     
     # GAMA DEL EQUIPO
     gama = models.CharField(
@@ -4107,7 +4116,8 @@ class FormatoServicioGarantia(models.Model):
     Objetivo de negocio:
         Wizard PWA/iPad que completa la plantilla estilo Dell/SICSER
         (accesorios Dell, daños estéticos, firma, PC Audit) y genera un PDF
-        con layout de Orden de Servicio + aviso de privacidad México.
+        con layout de Orden de Servicio + página SERVICIO FINAL Dell
+        (exclusiones de garantía y checklist del auditor; sin aviso SIC).
 
     Relación:
         OneToOne con OrdenServicio (una orden = un formato).

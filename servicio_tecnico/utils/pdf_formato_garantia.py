@@ -13,7 +13,9 @@ Estructura:
    piezas vacías, firma ingreso
 2. Página 2 — ESTADO DEL EQUIPO RECIBIDO: daños anotados + PC Audit + firma
 3. Página opcional — foto escaneo PC Audit
-4. Páginas finales — Aviso de Privacidad México
+4. Página final — SERVICIO FINAL Dell (exclusiones de garantía + checklist
+   del auditor + pie WhatsApp). NO lleva el aviso de privacidad SIC
+   (ese es solo del formato OOW / fuera de garantía).
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from django.contrib.staticfiles import finders
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -43,9 +45,8 @@ from reportlab.platypus import (
 
 from config.constants import (
     ACCESORIOS_FORMATO_GARANTIA,
-    AVISO_PRIVACIDAD_OOW_MX,
-    AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS,
-    AVISO_PRIVACIDAD_OOW_VERSION_MX,
+    ACTIVIDADES_NO_INCLUIDAS_GARANTIA_DELL,
+    CHECKLIST_AUDITOR_GARANTIA_DELL,
     TEXTO_PC_AUDIT_FORMATO_GARANTIA,
     TEXTO_TIEMPO_RESPUESTA_GARANTIA,
     TEXTOS_LEGALES_FORMATO_GARANTIA_DER,
@@ -53,6 +54,8 @@ from config.constants import (
     VISTAS_DANO_ESTETICO_AIO,
     VISTAS_DANO_ESTETICO_ESCRITORIO,
     VISTAS_DANO_ESTETICO_LAPTOP,
+    WHATSAPP_FORMATO_GARANTIA_NUMEROS,
+    WHATSAPP_FORMATO_GARANTIA_TEXTO,
 )
 from config.paises_config import get_pais_actual
 
@@ -64,6 +67,7 @@ COLOR_GRIS_HEADER = colors.HexColor('#6E6E6E')
 COLOR_GRIS_ALT = colors.HexColor('#F2F2F2')
 COLOR_GRIS_BORDE = colors.HexColor('#CCCCCC')
 COLOR_AMARILLO_BG = colors.HexColor('#FFF2CC')
+COLOR_WHATSAPP = colors.HexColor('#25D366')
 COLOR_BLANCO = colors.white
 COLOR_NEGRO = colors.black
 
@@ -141,8 +145,9 @@ class PDFFormatoServicioGarantia:
                 elementos.append(PageBreak())
                 elementos += self._construir_escaneo()
 
-            # --- Aviso de privacidad ---
-            elementos += self._construir_aviso_privacidad()
+            # --- SERVICIO FINAL Dell (exclusiones + checklist; sin aviso SIC) ---
+            elementos.append(PageBreak())
+            elementos += self._construir_pagina_servicio_final()
 
             doc.build(elementos)
             buffer.seek(0)
@@ -249,6 +254,84 @@ class PDFFormatoServicioGarantia:
             leading=9,
             alignment=TA_LEFT,
         ))
+        # --- Estilos página SERVICIO FINAL (fuentes chicas para caber en 1 hoja) ---
+        self._estilos.add(ParagraphStyle(
+            'ServicioFinalTitulo',
+            fontName='Helvetica-Bold',
+            fontSize=11,
+            textColor=COLOR_NEGRO,
+            alignment=TA_CENTER,
+            leading=13,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ServicioFinalAcepto',
+            fontName='Helvetica-Oblique',
+            fontSize=6.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_RIGHT,
+            leading=8,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ServicioFinalCampo',
+            fontName='Helvetica',
+            fontSize=7,
+            textColor=COLOR_NEGRO,
+            leading=9,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ExclusionesTitulo',
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            textColor=COLOR_NEGRO,
+            alignment=TA_CENTER,
+            leading=10,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ExclusionItem',
+            fontName='Helvetica',
+            fontSize=5.2,
+            textColor=COLOR_NEGRO,
+            alignment=TA_JUSTIFY,
+            leading=6.4,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ChecklistMini',
+            fontName='Helvetica',
+            fontSize=5,
+            textColor=COLOR_NEGRO,
+            leading=6,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'ChecklistMiniBold',
+            fontName='Helvetica-Bold',
+            fontSize=5,
+            textColor=COLOR_NEGRO,
+            leading=6,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'AuditorNota',
+            fontName='Helvetica',
+            fontSize=5.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_JUSTIFY,
+            leading=6.8,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'WhatsAppPie',
+            fontName='Helvetica',
+            fontSize=6.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_LEFT,
+            leading=8,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'HeaderTipoServicio',
+            fontName='Helvetica',
+            fontSize=6,
+            textColor=COLOR_BLANCO,
+            leading=7,
+            alignment=TA_LEFT,
+        ))
 
     def _esc(self, texto: Any) -> str:
         """Escapa texto para Paragraph XML-ish de ReportLab."""
@@ -302,9 +385,9 @@ class PDFFormatoServicioGarantia:
 
     def _construir_header(self) -> List:
         """
-        Cabecera Dell | ORDEN DE SERVICIO | SIC (como el papel).
+        Cabecera Dell | ORDEN DE SERVICIO + tipos CIS/WIS/OOW/ON SITE | SIC.
 
-        Layout: logo Dell izq + banner gris título + logo SIC der.
+        En garantía Dell marcamos CIS (como el papel del centro de servicio).
         """
         logo_dell = self._cargar_logo('logo_dell.png', 18, 18)
         logo_sic = (
@@ -312,16 +395,30 @@ class PDFFormatoServicioGarantia:
             or self._cargar_logo('logo_sic.png', 28, 11)
         )
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # En el papel Dell hay 4 casillas. Para órdenes de garantía importadas
+        # desde SICSER, el tipo correcto es CIS (no OOW).
+        # Usamos [X]/[ ] porque Helvetica no dibuja bien ☑/☐ (Unicode).
+        tipos = Paragraph(
+            '<b>CIS</b> [X] &nbsp;&nbsp; WIS [ ] &nbsp;&nbsp; OOW [ ] &nbsp;&nbsp; ON SITE [ ]',
+            self._estilos['HeaderTipoServicio'],
+        )
         banner = Table(
-            [[Paragraph('ORDEN DE SERVICIO', self._estilos['TituloBanner'])]],
+            [
+                [Paragraph('ORDEN DE SERVICIO', self._estilos['TituloBanner'])],
+                [tipos],
+            ],
             colWidths=[95 * mm],
         )
         banner.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), COLOR_GRIS_HEADER),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+            ('TOPPADDING', (0, 0), (-1, 0), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 1),
+            ('TOPPADDING', (0, 1), (-1, 1), 0),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 3),
         ]))
 
         izq = logo_dell or Paragraph('<b>Dell</b>', self._estilos['CeldaLabel'])
@@ -402,7 +499,7 @@ class PDFFormatoServicioGarantia:
                 self._campo_inline('Móvil', ''),
             ],
             [
-                self._campo_inline('Dirección', ''),
+                self._campo_inline('Dirección', d.direccion_cliente or ''),
                 self._campo_inline('Ciudad', ciudad),
                 self._campo_inline('Email', d.email_cliente or ''),
             ],
@@ -555,89 +652,125 @@ class PDFFormatoServicioGarantia:
         return elementos
 
     def _construir_diagnostico_y_piezas(self) -> List:
-        """Diagnóstico vacío + tabla de piezas (líneas en blanco como el papel)."""
+        """
+        Diagnóstico vacío (espacio a mano) + tabla de piezas más grande.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        En el papel Dell el técnico escribe a mano el diagnóstico; por eso
+        dejamos espacio en blanco (Spacer). Las líneas de piezas van grandes
+        para poder rellenarlas a mano o leerlas fácil.
+        """
+        # Dos saltos de línea extra ≈ +2 × ~5 mm sobre el espacio base
         elementos = [
             self._crear_header_seccion('DIAGNÓSTICO TÉCNICO REALIZADO'),
-            Spacer(1, 10 * mm),
+            Spacer(1, 20 * mm),
             self._crear_header_seccion(
                 'NOMBRE DE LA PARTE Y/O WIP PIEZAS / REMPLAZO No.de Serie'
             ),
-            Spacer(1, 2 * mm),
+            Spacer(1, 4 * mm),
         ]
+        # Líneas más largas y tipografía un poco mayor (estilo papel Dell)
+        estilo_pieza = ParagraphStyle(
+            'LineaPiezaGar',
+            parent=self._estilos['CeldaValor'],
+            fontSize=10,
+            leading=14,
+            alignment=TA_CENTER,
+        )
         lineas = [
             [
-                Paragraph('1. ___________________________', self._estilos['CeldaValor']),
-                Paragraph('2. ___________________________', self._estilos['CeldaValor']),
+                Paragraph('1. ________________________________', estilo_pieza),
+                Paragraph('2. ________________________________', estilo_pieza),
             ],
             [
-                Paragraph('#. ___________________________', self._estilos['CeldaValor']),
-                Paragraph('#. ___________________________', self._estilos['CeldaValor']),
+                Paragraph('#. ________________________________', estilo_pieza),
+                Paragraph('#. ________________________________', estilo_pieza),
             ],
         ]
         tabla = Table(lineas, colWidths=['50%', '50%'])
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ]))
         elementos.append(tabla)
-
-        # Observaciones del wizard: no las metemos en pág.1 del papel Dell;
-        # si existen, van en un renglón chico bajo piezas para no perderlas.
-        obs = (self.formato.observaciones_tecnicas or '').strip()
-        if obs:
-            elementos.append(Spacer(1, 2 * mm))
-            elementos.append(Paragraph(
-                f'<b>Observaciones técnicas:</b> {self._esc(obs)}',
-                self._estilos['CuerpoChico'],
-            ))
+        # Sin “Observaciones técnicas” en el PDF (el papel Dell no las trae aquí)
         return elementos
 
     def _construir_firma_aceptacion(self, compacto: bool = False) -> List:
-        """Bloque ACEPTO + firma del cliente."""
+        """
+        Bloque ACEPTO + firma del cliente, todo centrado en la página.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El papel Dell centra el texto de aceptación, la firma y el label
+        “FIRMA CLIENTE”. Cada celda de la tabla interna va alineada al centro.
+        """
+        estilo_acepta = ParagraphStyle(
+            'AceptaGar',
+            parent=self._estilos['CeldaLabel'],
+            alignment=TA_CENTER,
+            fontSize=9 if not compacto else 8,
+            leading=11,
+        )
         elementos = [
             Paragraph(
                 'ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO '
                 'AL CENTRO DE SERVICIO',
-                ParagraphStyle(
-                    'AceptaGar',
-                    parent=self._estilos['CeldaLabel'],
-                    alignment=TA_CENTER,
-                    fontSize=8,
-                    leading=10,
-                ),
+                estilo_acepta,
             ),
-            Spacer(1, 4 * mm if compacto else 6 * mm),
+            Spacer(1, 5 * mm if compacto else 8 * mm),
         ]
+
         firma_cli = None
         if self.formato.firma_cliente:
             try:
                 firma_cli = RLImage(
                     self.formato.firma_cliente.path,
-                    width=45 * mm,
-                    height=18 * mm,
+                    width=50 * mm if not compacto else 42 * mm,
+                    height=20 * mm if not compacto else 16 * mm,
                     kind='proportional',
                 )
             except Exception:
                 firma_cli = None
 
-        col_cli = [
-            [firma_cli or Paragraph(' ', self._estilos['CeldaValor'])],
-            [HRFlowable(width='55%', thickness=0.6, color=COLOR_NEGRO)],
-            [Paragraph('<b>FIRMA CLIENTE</b>', self._estilos['FirmaLabel'])],
-        ]
-        tabla = Table(
-            [[Table(col_cli, colWidths=[90 * mm])]],
-            colWidths=[letter[0] - 2 * MARGEN],
+        # Columna única centrada: imagen + línea + etiqueta
+        ancho_firma = 70 * mm
+        celda_firma = firma_cli if firma_cli is not None else Paragraph(
+            '<br/>', self._estilos['CeldaValor'],
         )
-        tabla.setStyle(TableStyle([
+        col_cli = Table(
+            [
+                [celda_firma],
+                [HRFlowable(
+                    width=ancho_firma,
+                    thickness=0.8,
+                    color=COLOR_NEGRO,
+                    spaceBefore=1,
+                    spaceAfter=1,
+                )],
+                [Paragraph('<b>FIRMA CLIENTE</b>', self._estilos['FirmaLabel'])],
+            ],
+            colWidths=[ancho_firma],
+        )
+        col_cli.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+
+        # Tabla exterior a todo el ancho para centrar el bloque
+        envoltorio = Table([[col_cli]], colWidths=[ANCHO_UTIL])
+        envoltorio.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ]))
-        elementos.append(tabla)
+        elementos.append(envoltorio)
         return elementos
 
     def _construir_pagina_estado_equipo(self) -> List:
@@ -805,43 +938,386 @@ class PDFFormatoServicioGarantia:
             elementos.append(KeepTogether([tarjeta, Spacer(1, 5 * mm)]))
         return elementos
 
-    def _construir_aviso_privacidad(self) -> List:
-        """Página(s) finales con el aviso de privacidad (igual OOW)."""
-        elementos: List = [PageBreak()]
-        empresa = self.pais_config.get(
-            'empresa_nombre',
-            'SIC COMERCIALIZACIÓN Y SERVICIOS MÉXICO SC',
+    def _nombre_tecnico(self) -> str:
+        """Nombre del técnico asignado a la orden (o vacío si no hay)."""
+        tecnico = getattr(self.orden, 'tecnico_asignado_actual', None)
+        if tecnico and getattr(tecnico, 'nombre_completo', None):
+            return tecnico.nombre_completo
+        return ''
+
+    def _tipo_dispositivo_checks(self) -> str:
+        """
+        Casillas NOTEBOOK / TABLET / PC / AIO según DetalleEquipo.tipo_equipo.
+
+        Returns:
+            str: HTML con la casilla correcta marcada.
+        """
+        tipo = (getattr(self.detalle, 'tipo_equipo', '') or '').strip().lower()
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # En SIGMA usamos Laptop/PC/AIO; en el papel Dell dice NOTEBOOK/TABLET/PC/AIO.
+        mapa = {
+            'laptop': 'NOTEBOOK',
+            'notebook': 'NOTEBOOK',
+            'tablet': 'TABLET',
+            'pc': 'PC',
+            'escritorio': 'PC',
+            'aio': 'AIO',
+        }
+        activo = mapa.get(tipo, '')
+        partes = []
+        for etiqueta in ('NOTEBOOK', 'TABLET', 'PC', 'AIO'):
+            # ASCII [X]/[ ] — Helvetica no soporta bien los glifos Unicode de casilla
+            marca = '[X]' if etiqueta == activo else '[ ]'
+            partes.append(f'{marca} {etiqueta}')
+        return ' &nbsp;&nbsp; '.join(partes)
+
+    def _generar_qr_whatsapp(self, lado_mm: float = 22) -> Optional[RLImage]:
+        """
+        Genera un QR hacia el primer WhatsApp del pie Dell.
+
+        Args:
+            lado_mm: tamaño del cuadrado en milímetros.
+
+        Returns:
+            RLImage o None si falla la librería qrcode.
+        """
+        try:
+            import qrcode
+        except ImportError:
+            logger.warning('[PDF_FORMATO_GARANTIA] qrcode no disponible; se omite QR')
+            return None
+
+        # wa.me espera dígitos internacionales (México = 52)
+        digitos = ''.join(c for c in WHATSAPP_FORMATO_GARANTIA_NUMEROS[0] if c.isdigit())
+        url = f'https://wa.me/52{digitos}'
+        try:
+            qr = qrcode.QRCode(version=1, box_size=4, border=1)
+            qr.add_data(url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color='black', back_color='white')
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # RLImage de ReportLab pide una ruta de archivo (o file-like BytesIO
+            # en algunas versiones). Guardamos el PNG en BytesIO y lo pasamos
+            # directo; si falla, caemos a archivo temporal.
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            buf.seek(0)
+            try:
+                return RLImage(buf, width=lado_mm * mm, height=lado_mm * mm)
+            except Exception:
+                import tempfile
+                import os
+                fd, ruta = tempfile.mkstemp(suffix='.png')
+                os.close(fd)
+                with open(ruta, 'wb') as fh:
+                    fh.write(buf.getvalue())
+                # Guardamos la ruta para no perder el archivo antes de build()
+                if not hasattr(self, '_qr_temp_paths'):
+                    self._qr_temp_paths = []
+                self._qr_temp_paths.append(ruta)
+                return RLImage(ruta, width=lado_mm * mm, height=lado_mm * mm)
+        except Exception as exc:
+            logger.warning('[PDF_FORMATO_GARANTIA] No se pudo generar QR: %s', exc)
+            return None
+
+    def _construir_pagina_servicio_final(self) -> List:
+        """
+        Última página estilo papel Dell «SERVICIO FINAL».
+
+        Objetivo de negocio:
+            Sustituye el aviso de privacidad SIC (solo aplica a OOW). Aquí van
+            las exclusiones Dell (1–15), firma ENTERADO Y ACEPTADO, checklist
+            del auditor de calidad y el pie de WhatsApp.
+
+        Efectos secundarios:
+            Ninguno sobre BD; solo construye flowables ReportLab.
+        """
+        elementos: List = []
+        elementos += self._construir_header()
+        elementos.append(Spacer(1, 1.5 * mm))
+
+        # --- Título SERVICIO FINAL + frase de aceptación ---
+        elementos.append(self._crear_header_seccion('SERVICIO FINAL'))
+        elementos.append(Paragraph(
+            'Acepto las condiciones y estado en el que recibo el equipo del CIS',
+            self._estilos['ServicioFinalAcepto'],
+        ))
+        elementos.append(Spacer(1, 1.2 * mm))
+
+        tecnico = self._nombre_tecnico()
+        linea_tec = (
+            f'<b>Técnico que repara:</b> {self._esc(tecnico) or "__________________________"}'
         )
-        elementos.append(Paragraph(self._esc(empresa.upper()), self._estilos['AvisoTitulo']))
-        elementos.append(Paragraph(
-            'NO OLVIDE CONSULTAR NUESTRO AVISO DE PRIVACIDAD EN '
-            '<font color="#003366"><b>WWW.SIC.COM.MX</b></font>',
+        linea_entrega = (
+            '<b>Persona que entrega el equipo:</b> __________________________'
+        )
+        linea_pruebas = (
+            '<b>Se realizan pruebas frente al usuario</b> &nbsp; Si [ ] &nbsp; No [ ]'
+        )
+        firma_cli = Paragraph(
+            '________________________________________<br/>'
+            '<font size="5.5">Nombre Cliente - Fecha - Firma</font>',
             self._estilos['FirmaLabel'],
-        ))
-        elementos.append(Spacer(1, 3 * mm))
-        elementos.append(self._crear_header_seccion('Aviso de privacidad'))
-        elementos.append(Spacer(1, 3 * mm))
+        )
+        bloque_izq = Table(
+            [
+                [Paragraph(linea_tec, self._estilos['ServicioFinalCampo'])],
+                [Paragraph(linea_entrega, self._estilos['ServicioFinalCampo'])],
+                [Paragraph(linea_pruebas, self._estilos['ServicioFinalCampo'])],
+            ],
+            colWidths=[110 * mm],
+        )
+        bloque_izq.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        fila_entrega = Table(
+            [[bloque_izq, firma_cli]],
+            colWidths=[115 * mm, ANCHO_UTIL - 115 * mm],
+        )
+        fila_entrega.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elementos.append(fila_entrega)
+        elementos.append(Spacer(1, 1.2 * mm))
 
-        codigo = (self.pais_config.get('codigo') or 'MX').upper()
-        if codigo == 'MX':
-            texto = AVISO_PRIVACIDAD_OOW_MX
-            version = self.formato.version_aviso_privacidad or AVISO_PRIVACIDAD_OOW_VERSION_MX
-        else:
-            texto = AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS
-            version = self.formato.version_aviso_privacidad or f'{codigo.lower()}-placeholder'
-
-        for bloque in texto.split('\n\n'):
-            limpio = ' '.join(bloque.split())
-            if not limpio:
-                continue
-            elementos.append(Paragraph(self._esc(limpio), self._estilos['CuerpoChico']))
-            elementos.append(Spacer(1, 1.5 * mm))
-
-        elementos.append(Spacer(1, 3 * mm))
         elementos.append(Paragraph(
-            f'<b>Versión del aviso aceptada:</b> {self._esc(version)}. '
-            'El cliente aceptó este aviso digitalmente al finalizar el '
-            'Formato Garantía Dell en SIGMA.',
-            self._estilos['CeldaValor'],
+            '¿Cuál es su nivel de satisfaccion del servicio recibido? '
+            '&nbsp;&nbsp; <b>Insatisfecho</b> [ ] &nbsp;&nbsp;&nbsp; <b>Satisfecho</b> [ ]',
+            self._estilos['ServicioFinalCampo'],
         ))
+        elementos.append(Spacer(1, 0.8 * mm))
+        elementos.append(Paragraph(
+            '<b>Observaciones cliente:</b> '
+            '___________________________________________________________________________',
+            self._estilos['ServicioFinalCampo'],
+        ))
+        elementos.append(Spacer(1, 2 * mm))
+
+        # --- Exclusiones Dell 1–15 ---
+        elementos.append(Paragraph(
+            'ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTIA',
+            self._estilos['ExclusionesTitulo'],
+        ))
+        elementos.append(Spacer(1, 1 * mm))
+        for i, texto in enumerate(ACTIVIDADES_NO_INCLUIDAS_GARANTIA_DELL, start=1):
+            elementos.append(Paragraph(
+                f'<b>{i}.</b> {self._esc(texto)}',
+                self._estilos['ExclusionItem'],
+            ))
+        elementos.append(Spacer(1, 2.5 * mm))
+
+        # --- Firma ENTERADO Y ACEPTADO + QR ---
+        qr_img = self._generar_qr_whatsapp(20)
+        firma_bloque = Table(
+            [
+                [Paragraph('NOMBRE Y FIRMA DEL CLIENTE', self._estilos['FirmaLabel'])],
+                [Paragraph('_____________________________________', self._estilos['FirmaLabel'])],
+                [Paragraph('<b>ENTERADO Y ACEPTADO</b>', self._estilos['FirmaLabel'])],
+            ],
+            colWidths=[90 * mm],
+        )
+        firma_bloque.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        celda_qr = qr_img if qr_img is not None else Paragraph('', self._estilos['CeldaValor'])
+        fila_firma_qr = Table(
+            [[firma_bloque, celda_qr]],
+            colWidths=[ANCHO_UTIL - 28 * mm, 28 * mm],
+        )
+        fila_firma_qr.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elementos.append(fila_firma_qr)
+        elementos.append(Spacer(1, 2 * mm))
+
+        # --- Checklist auditor ---
+        elementos += self._construir_checklist_auditor()
+        elementos.append(Spacer(1, 1.5 * mm))
+
+        # Daños cosméticos + DPS / Revisa / Fecha / Técnico
+        obs = (self.formato.observaciones_tecnicas or '').strip()
+        desc_dano = self._esc(obs[:180]) if obs else '_______________________________'
+        elementos.append(Paragraph(
+            f"<b>Seleccione con una 'X' los daños cosméticos que tiene el equipo</b>"
+            f'&nbsp;&nbsp;&nbsp; <b>Descripción:</b> {desc_dano}',
+            self._estilos['ChecklistMini'],
+        ))
+        elementos.append(Spacer(1, 1.2 * mm))
+
+        pie_datos = Table(
+            [[
+                Paragraph(
+                    f'<b>Número de DPS:</b> {self._esc(self._dps())}',
+                    self._estilos['ServicioFinalCampo'],
+                ),
+                Paragraph(
+                    '<b>Revisa:</b> ______________________',
+                    self._estilos['ServicioFinalCampo'],
+                ),
+            ], [
+                Paragraph(
+                    '<b>Fecha:</b> _______________',
+                    self._estilos['ServicioFinalCampo'],
+                ),
+                Paragraph(
+                    f'<b>Técnico a cargo:</b> {self._esc(tecnico) or "_____________________________"}',
+                    self._estilos['ServicioFinalCampo'],
+                ),
+            ]],
+            colWidths=['50%', '50%'],
+        )
+        pie_datos.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elementos.append(pie_datos)
+        elementos.append(Spacer(1, 2 * mm))
+
+        # --- Pie WhatsApp ---
+        icono = Table(
+            [[Paragraph('<b>WA</b>', ParagraphStyle(
+                'WAIcon',
+                fontName='Helvetica-Bold',
+                fontSize=8,
+                textColor=COLOR_BLANCO,
+                alignment=TA_CENTER,
+                leading=10,
+            ))]],
+            colWidths=[10 * mm],
+            rowHeights=[10 * mm],
+        )
+        icono.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_WHATSAPP),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOX', (0, 0), (-1, -1), 0.5, COLOR_WHATSAPP),
+        ]))
+        texto_wa = Paragraph(
+            self._esc(WHATSAPP_FORMATO_GARANTIA_TEXTO),
+            self._estilos['WhatsAppPie'],
+        )
+        pie_wa = Table(
+            [[icono, texto_wa]],
+            colWidths=[12 * mm, ANCHO_UTIL - 12 * mm],
+        )
+        pie_wa.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.8, COLOR_GRIS_BORDE),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_GRIS_ALT),
+        ]))
+        elementos.append(pie_wa)
+        return elementos
+
+    def _construir_checklist_auditor(self) -> List:
+        """
+        Tabla del auditor de calidad (Si/No + observaciones).
+
+        Returns:
+            list: flowables (marca/tipo + nota + tabla checklist).
+        """
+        elementos: List = []
+        marca = getattr(self.detalle, 'marca', '') or ''
+        cabecera = Table(
+            [[
+                Paragraph(
+                    f'<b>Marca</b> {self._esc(marca)}',
+                    self._estilos['ChecklistMiniBold'],
+                ),
+                Paragraph(
+                    f'<b>Tipo de dispositivo</b> &nbsp; {self._tipo_dispositivo_checks()}',
+                    self._estilos['ChecklistMini'],
+                ),
+            ]],
+            colWidths=['28%', '72%'],
+        )
+        cabecera.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_GRIS_ALT),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        elementos.append(cabecera)
+        elementos.append(Spacer(1, 0.8 * mm))
+        elementos.append(Paragraph(
+            'Estimado Auditor de Calidad, por favor llena todos los campos del checklist, '
+            'en caso de tener más de 2 NO devolver al técnico encargado de la reparación, '
+            'recuerda que tu participación es muy importante antes de entregar un equipo.',
+            self._estilos['AuditorNota'],
+        ))
+        elementos.append(Spacer(1, 0.8 * mm))
+
+        # Encabezado de columnas
+        data: List[List] = [[
+            Paragraph('<b></b>', self._estilos['ChecklistMiniBold']),
+            Paragraph('<b></b>', self._estilos['ChecklistMiniBold']),
+            Paragraph('<b>Funciona</b>', self._estilos['ChecklistMiniBold']),
+            Paragraph('', self._estilos['ChecklistMini']),
+            Paragraph('<b>Observaciones</b>', self._estilos['ChecklistMiniBold']),
+        ], [
+            Paragraph('', self._estilos['ChecklistMini']),
+            Paragraph('', self._estilos['ChecklistMini']),
+            Paragraph('<b>SI</b>', self._estilos['ChecklistMiniBold']),
+            Paragraph('<b>NO</b>', self._estilos['ChecklistMiniBold']),
+            Paragraph('', self._estilos['ChecklistMini']),
+        ]]
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si la categoría viene vacía, repetimos la anterior visualmente
+        # solo en la primera fila del grupo (como el papel: celda fusionada).
+        categoria_actual = ''
+        for categoria, item in CHECKLIST_AUDITOR_GARANTIA_DELL:
+            if categoria:
+                categoria_actual = categoria
+                cat_txt = categoria_actual
+            else:
+                cat_txt = ''
+            data.append([
+                Paragraph(self._esc(cat_txt), self._estilos['ChecklistMiniBold']),
+                Paragraph(self._esc(item), self._estilos['ChecklistMini']),
+                # &#160; = espacio que ReportLab no comprime (así se ve "[ ]" y no "[]")
+                Paragraph('[&#160;]', self._estilos['ChecklistMini']),
+                Paragraph('[&#160;]', self._estilos['ChecklistMini']),
+                Paragraph('', self._estilos['ChecklistMini']),
+            ])
+
+        col_w = [32 * mm, 38 * mm, 12 * mm, 12 * mm, ANCHO_UTIL - 94 * mm]
+        tabla = Table(data, colWidths=col_w)
+        estilo = TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.5, COLOR_NEGRO),
+            ('INNERGRID', (0, 0), (-1, -1), 0.3, COLOR_GRIS_BORDE),
+            ('BACKGROUND', (0, 0), (-1, 1), COLOR_GRIS_ALT),
+            ('SPAN', (2, 0), (3, 0)),  # "Funciona" abarca SI/NO
+            ('ALIGN', (2, 0), (3, 1), 'CENTER'),
+            ('ALIGN', (2, 2), (3, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 0.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0.5),
+        ])
+        # Filas alternas suaves para leer mejor
+        for fila_idx in range(2, len(data)):
+            if fila_idx % 2 == 0:
+                estilo.add('BACKGROUND', (0, fila_idx), (-1, fila_idx), colors.HexColor('#FAFAFA'))
+        tabla.setStyle(estilo)
+        elementos.append(tabla)
         return elementos

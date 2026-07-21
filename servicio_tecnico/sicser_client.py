@@ -150,6 +150,7 @@ class OrdenGarantiaSicser:
         empresa: Razón social o empresa.
         telefono: Teléfono principal.
         email_contacto: Correo de contacto.
+        direccion: Dirección / domicilio reportado (si la API lo envía).
         especificaciones: Modelo / especificaciones (ej. Latitude 7430).
         instrucciones_dell: Texto de diagnóstico Dell.
         nombre_grupo: Tipo de ingreso (Carry In, Mail In, etc.).
@@ -169,6 +170,7 @@ class OrdenGarantiaSicser:
     empresa: str
     telefono: str
     email_contacto: str
+    direccion: str
     especificaciones: str
     instrucciones_dell: str
     nombre_grupo: str
@@ -466,6 +468,33 @@ def _normalizar_registro_oow(item: dict[str, Any]) -> OrdenOOWSicser:
     )
 
 
+def _extraer_direccion_garantia(item: dict[str, Any]) -> str:
+    """
+    Obtiene la dirección del cliente desde un dict crudo de la API de garantías.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    SICSER puede mandar la dirección con distintos nombres de campo.
+    Probamos varios y nos quedamos con el primero que tenga texto.
+
+    Args:
+        item: Registro crudo del listado de garantías.
+
+    Returns:
+        str: Dirección limpia o cadena vacía.
+    """
+    for clave in (
+        'direccion',
+        'direccion_cliente',
+        'domicilio',
+        'address',
+        'dir',
+    ):
+        valor = str(item.get(clave) or '').strip()
+        if valor:
+            return valor
+    return ''
+
+
 def _normalizar_registro_garantia(item: dict[str, Any]) -> OrdenGarantiaSicser:
     """Transforma un dict crudo de la API de garantías en OrdenGarantiaSicser."""
     numero_dps = int(item.get('numero_dps') or 0)
@@ -481,6 +510,7 @@ def _normalizar_registro_garantia(item: dict[str, Any]) -> OrdenGarantiaSicser:
         empresa=str(item.get('empresa') or '').strip(),
         telefono=str(item.get('telefono') or '').strip(),
         email_contacto=str(item.get('email_contacto') or '').strip().lower(),
+        direccion=_extraer_direccion_garantia(item),
         especificaciones=str(item.get('especificaciones') or '').strip(),
         instrucciones_dell=str(item.get('instrucciones_dell') or '').strip(),
         nombre_grupo=str(item.get('nombre_grupo') or '').strip(),

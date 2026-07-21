@@ -10,6 +10,8 @@ y antes caía incorrectamente a Satélite (SAT).
 from django.test import SimpleTestCase
 
 from servicio_tecnico.sicser_client import (
+    _extraer_direccion_garantia,
+    _normalizar_registro_garantia,
     etiqueta_cis_legible,
     parsear_codigo_cis_para_url,
 )
@@ -37,3 +39,32 @@ class ParsearCodigoCisUrlTest(SimpleTestCase):
     def test_monterrey_sin_digito(self):
         codigo = parsear_codigo_cis_para_url('MX_CIS_MX_MONTERREY_02821')
         self.assertEqual(codigo, 'MTR')
+
+
+class DireccionGarantiaSicserTest(SimpleTestCase):
+    """Extracción de dirección desde el dict crudo de garantías SICSER."""
+
+    def test_extrae_direccion_clave_estandar(self):
+        self.assertEqual(
+            _extraer_direccion_garantia({'direccion': 'Calle 1 Colonia Centro'}),
+            'Calle 1 Colonia Centro',
+        )
+
+    def test_extrae_domicilio_como_fallback(self):
+        self.assertEqual(
+            _extraer_direccion_garantia({'domicilio': 'Av. Reforma 100'}),
+            'Av. Reforma 100',
+        )
+
+    def test_normalizar_incluye_direccion(self):
+        reg = _normalizar_registro_garantia({
+            'numero_dps': 123,
+            'service_tag': 'ABC123',
+            'contacto': 'Juan',
+            'direccion': 'Circuito Economistas 15-A',
+            'ciudad': 'tecamachalco',
+            'estado': 'México',
+            'pais': 'México',
+        })
+        self.assertEqual(reg.direccion, 'Circuito Economistas 15-A')
+        self.assertEqual(reg.ciudad, 'tecamachalco')

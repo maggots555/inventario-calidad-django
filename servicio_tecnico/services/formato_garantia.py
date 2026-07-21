@@ -281,6 +281,7 @@ def datos_orden_para_wizard(orden: OrdenServicio) -> dict[str, Any]:
         'rfc_cliente': detalle.rfc_cliente or '',
         'email_cliente': detalle.email_cliente or '',
         'telefono_cliente': detalle.telefono_cliente or '',
+        'direccion_cliente': detalle.direccion_cliente or '',
         'marca': detalle.marca or '',
         'modelo': detalle.modelo or '',
         'numero_serie': detalle.numero_serie or '',

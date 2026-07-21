@@ -581,6 +581,7 @@ def importar_orden_garantia_desde_sicser(
         email_cliente=email,
         nombre_cliente=nombre_cliente,
         telefono_cliente=(registro.telefono or '')[:20],
+        direccion_cliente=(registro.direccion or '')[:300],
         falla_principal=extraer_falla_garantia(registro.instrucciones_dell),
         gama=_calcular_gama('Dell', modelo),
         equipo_enciende=True,

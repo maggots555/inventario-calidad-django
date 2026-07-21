@@ -119,6 +119,8 @@ class FormatoGarantiaServiceTest(TestCase):
             numero_serie='39J8FZ3',
             email_cliente='cliente.garantia@test.local',
             nombre_cliente='Olivia Zayas',
+            telefono_cliente='5541430017',
+            direccion_cliente='Circuito Economistas 15-A Colonia Satelite C.P. 53100',
             falla_principal=self.falla,
             gama='alta',
             tiene_cargador=True,
@@ -204,9 +206,44 @@ class FormatoGarantiaServiceTest(TestCase):
         self.assertTrue(resultado['success'])
         pdf_bytes = resultado['buffer'].getvalue()
         self.assertGreater(len(pdf_bytes), 100)
-        # El PDF debe mencionar la falla / DPS (texto extraíble)
-        # ReportLab a veces comprime; al menos validamos generación ok.
+
+        # El contenido textual del PDF va comprimido: usamos pdftotext para leerlo.
+        # Así verificamos que YA NO va el aviso SIC y SÍ van exclusiones Dell.
+        import os
+        import subprocess
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            ruta_pdf = tmp.name
+        try:
+            texto = subprocess.check_output(
+                ['pdftotext', '-layout', ruta_pdf, '-'],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+        finally:
+            os.unlink(ruta_pdf)
+
+        self.assertNotIn('WWW.SIC.COM.MX', texto)
+        self.assertNotIn('Aviso de privacidad', texto)
+        self.assertIn('ACTIVIDADES NO INCLUIDAS', texto)
+        self.assertIn('SERVICIO FINAL', texto)
+        self.assertIn('55 1133 1295', texto)
+        self.assertIn('ENTERADO Y ACEPTADO', texto)
+        # Dirección del cliente debe estar en DetalleEquipo (fuente del PDF)
+        self.assertIn(
+            'Circuito Economistas',
+            self.orden.detalle_equipo.direccion_cliente,
+        )
         self.assertIsInstance(FormatoServicioGarantia.objects.get(pk=final.pk), FormatoServicioGarantia)
+
+    def test_datos_orden_incluye_direccion(self):
+        from servicio_tecnico.services.formato_garantia import datos_orden_para_wizard
+
+        datos = datos_orden_para_wizard(self.orden)
+        self.assertIn('direccion_cliente', datos)
+        self.assertIn('Circuito Economistas', datos['direccion_cliente'])
 
     def test_finalizar_exige_firma(self):
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)

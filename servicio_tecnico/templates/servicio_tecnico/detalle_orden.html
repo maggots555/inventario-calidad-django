@@ -299,7 +299,7 @@
                         </div>
                         
                         <!-- ✅ NUEVO: Datos adicionales del cliente (Junio 2026) -->
-                        {% if detalle.nombre_cliente or detalle.rfc_cliente or detalle.telefono_cliente %}
+                        {% if detalle.nombre_cliente or detalle.rfc_cliente or detalle.telefono_cliente or detalle.direccion_cliente %}
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">
                                 <i class="bi bi-person-vcard-fill text-info"></i> Datos del Cliente
@@ -313,7 +313,10 @@
                                 {% endif %}
                                 {% if detalle.telefono_cliente %}
                                     <i class="bi bi-telephone"></i> 
-                                    <a href="tel:{{ detalle.telefono_cliente }}" class="text-decoration-none">{{ detalle.telefono_cliente }}</a>
+                                    <a href="tel:{{ detalle.telefono_cliente }}" class="text-decoration-none">{{ detalle.telefono_cliente }}</a><br>
+                                {% endif %}
+                                {% if detalle.direccion_cliente %}
+                                    <i class="bi bi-geo-alt"></i> {{ detalle.direccion_cliente }}
                                 {% endif %}
                             </p>
                         </div>
@@ -3229,6 +3232,23 @@
                                 <small class="text-muted d-block mt-1">
                                     <i class="bi bi-info-circle"></i>
                                     {{ form_editar_info.telefono_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+
+                        <!-- Dirección del Cliente (Formato Garantía Dell / facturación) -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.direccion_cliente.errors }}
+                            <label for="{{ form_editar_info.direccion_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-geo-alt-fill text-danger"></i>
+                                {{ form_editar_info.direccion_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.direccion_cliente }}
+                            {% if form_editar_info.direccion_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.direccion_cliente.help_text }}
                                 </small>
                             {% endif %}
                         </div>

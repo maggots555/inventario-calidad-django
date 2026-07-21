@@ -1238,3 +1238,104 @@ TEXTO_PC_AUDIT_FORMATO_GARANTIA = (
     'DEL HARDWARE Y SOFTWARE INSTALADO DEBIDO A QUE EL EQUIPO NO ENCIENDE, NO '
     'TIENE SISTEMA OPERATIVO WINDOWS O SU FALLA NO PERMITE UTILIZAR LA HERRAMIENTA.'
 )
+
+# Página final Dell: ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTÍA
+# (sustituye el aviso de privacidad SIC en el PDF de garantía).
+ACTIVIDADES_NO_INCLUIDAS_GARANTIA_DELL = [
+    'Servidores y equipos de almacenamiento.',
+    (
+        'Equipos enviados por paquetería o mensajería hacia el Centro de Servicio. '
+        'Desinstalación o reinstalación de productos y/o aplicaciones que no haya '
+        'estado instalada cuando se compró el equipo.'
+    ),
+    (
+        'El cliente acepta eximirnos de responsabilidad por la pérdida de información '
+        'contenida en el disco duro y acepta que es su responsabilidad única respaldar '
+        'su información personal contenida en el disco duro antes de entregarnos el '
+        'equipo para diagnóstico y reparación.'
+    ),
+    'Recuperación de particiones en caso de cambio de Disco Duro.',
+    'Ayuda o servicio de garantía para equipos/sistemas de terceros.',
+    (
+        'Análisis de fallas a nivel de Software de Microsoft o de Linux, '
+        'compatibilidad de aplicaciones, o eliminación de virus/spyware.'
+    ),
+    'Configuración de servidores, impresoras, o Routers.',
+    (
+        'Configuración de usuarios finales de MS - Windows o Linux, incluyendo '
+        'iconos del escritorio, carpetas y la configuración de cualquier aplicación.'
+    ),
+    'Cualquier actividad que no específicamente indicada en esta descripción de servicio de garantía.',
+    (
+        'Almacenaje del equipo en nuestras instalaciones por más de 5 días hábiles '
+        'después de haber sido reparado y el cliente notificado.'
+    ),
+    (
+        'Instalación y configuración de Sistema(s) Operativo(s) diferente al de fábrica. '
+        'Así como no serán soportadas las actualizaciones a otros Sistema(s) Operativo(s) '
+        'que hayan sido realizadas posteriormente.'
+    ),
+    (
+        'Las baterías tienen una garantía limitada de hardware de 1 año de base cuando '
+        'están incluidas como parte de una configuración portátil estándar, '
+        'independientemente de la duración de la garantía aplicable al Producto cubierto.'
+    ),
+    (
+        'Reparación de los Productos cubiertos que tengan daños o defectos estéticos '
+        'y que no afecten el funcionamiento del equipo.'
+    ),
+    (
+        'Soporte de equipos dañados por eventos causados por eventos de la naturaleza '
+        '(relámpagos, inundaciones, tornados, terremotos y huracanes, entre otros), '
+        'uso indebido, accidentes, maltrato del Producto cubierto o de sus componentes, '
+        'traslado indebido del Producto, extracción o alteración del equipo o de las '
+        'etiquetas de identificación de las piezas, o fallas causadas por un producto '
+        'del que Dell no es responsable.'
+    ),
+    (
+        'Los equipos con plaga (cucarachas, hormigas, arañas, etc.) de acuerdo a las '
+        'políticas de fabricante, se inhabilita la garantía; para los casos fuera de '
+        'garantía, de igual forma nos reservamos el derecho de admisión.'
+    ),
+]
+
+# Checklist del auditor de calidad (página SERVICIO FINAL).
+# Tuplas: (categoría, ítem). Categoría vacía = misma categoría que la fila anterior.
+CHECKLIST_AUDITOR_GARANTIA_DELL = [
+    ('Pruebas básicas', 'Prueba de encendido'),
+    ('', '¿Falla reportada?'),
+    ('Sistema Operativo', '¿Versión de Fábrica?'),
+    ('', '¿Actualizado?'),
+    ('Capacidades básicas', '¿Disco duro?'),
+    ('', '¿Pantalla?'),
+    ('', '¿Touch screen?'),
+    ('', '¿Touch pad?'),
+    ('', '¿Mouse?'),
+    ('Energía', 'Batería'),
+    ('', '¿AC Adapter?'),
+    ('Conectividad', 'Wireless'),
+    ('', 'Bluetooth'),
+    ('', 'RJ45'),
+    ('Drivers / Lectores / Extras', 'CD / DVD / ODD'),
+    ('', 'SD / SIM'),
+    ('', "USB's"),
+    ('', '¿VGA?'),
+    ('', 'Audífono'),
+    ('', 'Pluma / Tablets'),
+    ('', 'Teclado Externo'),
+    ('', 'Mouse Externo'),
+    ('', 'Bocinas'),
+    ('Funcionalidades', 'Hibernación'),
+    ('', 'Suspensión'),
+]
+
+# Pie de página WhatsApp (formato Dell SERVICIO FINAL).
+WHATSAPP_FORMATO_GARANTIA_NUMEROS = ('55 1133 1295', '55 1137 5629')
+WHATSAPP_FORMATO_GARANTIA_TEXTO = (
+    'Estimado Usuario, cualquier duda referente a la reparación o seguimiento '
+    'de su equipo estamos para servirle y ayudarle por Whatsapp en los números '
+    '{n1} y {n2}'
+).format(
+    n1=WHATSAPP_FORMATO_GARANTIA_NUMEROS[0],
+    n2=WHATSAPP_FORMATO_GARANTIA_NUMEROS[1],
+)

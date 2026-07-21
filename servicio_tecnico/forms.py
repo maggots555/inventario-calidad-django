@@ -1344,6 +1344,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'nombre_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'rfc_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'telefono_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
+            'direccion_cliente',  # Dirección (garantía Dell / facturación)
             'equipo_enciende',
             'es_mis',
             'tiene_cargador',
@@ -1403,6 +1404,11 @@ class EditarInformacionEquipoForm(forms.ModelForm):
                 'placeholder': 'Ej: 33 1234 5678 (opcional)',
                 'autocomplete': 'tel',
             }),
+            'direccion_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Calle, número, colonia, C.P. (opcional)',
+                'autocomplete': 'street-address',
+            }),
             'equipo_enciende': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
             }),
@@ -1430,10 +1436,11 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo': 'Modelo',
             'numero_serie': 'Número de Serie',
             'orden_cliente': 'Orden del Cliente',
-            'email_cliente': '📧 Email del Cliente',  # ✅ NUEVO
             'nombre_cliente': 'Nombre Completo del Cliente',  # ✅ NUEVO (Junio 2026)
             'rfc_cliente': 'RFC del Cliente',  # ✅ NUEVO (Junio 2026)
             'telefono_cliente': 'Teléfono del Cliente',  # ✅ NUEVO (Junio 2026)
+            'direccion_cliente': 'Dirección del Cliente',
+            'email_cliente': '📧 Email del Cliente',  # ✅ NUEVO
             'equipo_enciende': '¿El equipo enciende?',
             'es_mis': '¿Es MIS? (Mail-In Service)',
             'tiene_cargador': '¿Incluye cargador?',
@@ -1451,6 +1458,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'nombre_cliente': 'Nombre completo del cliente para facturación (opcional)',  # ✅ NUEVO (Junio 2026)
             'rfc_cliente': 'RFC del cliente — Genérico: XAXX010101000 (opcional, 13 caracteres)',  # ✅ NUEVO (Junio 2026)
             'telefono_cliente': 'Teléfono de contacto del cliente (opcional)',  # ✅ NUEVO (Junio 2026)
+            'direccion_cliente': 'Calle, número, colonia y C.P. (opcional; se usa en el Formato Garantía Dell)',
             'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
             'es_mis': 'Marca si el equipo llegó por paquetería (Mail-In Service)',
             'tiene_cargador': 'Marca si el equipo incluye cargador',
