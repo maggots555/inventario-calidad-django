@@ -98,6 +98,9 @@ class AvisoRecepcionEquipoListoTest(TestCase):
             falla_principal='No enciende',
             gama='media',
         )
+        # DetalleEquipo.save() marca es_fuera_garantia por prefijo OOW-
+        self.orden.refresh_from_db()
+        self.assertTrue(self.orden.es_fuera_garantia)
 
     @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
     def test_aviso_por_egreso_y_omite_finalizado(self, _mock_push):
@@ -115,7 +118,7 @@ class AvisoRecepcionEquipoListoTest(TestCase):
         avisos = HistorialOrden.objects.filter(
             orden=self.orden,
             tipo_evento='sistema',
-            comentario__icontains='Aviso a recepción',
+            comentario__icontains='equipo listo para notificar recolección',
         )
         self.assertEqual(avisos.count(), 1)
 
@@ -140,6 +143,132 @@ class AvisoRecepcionEquipoListoTest(TestCase):
             Notificacion.objects.filter(usuario=self.user_resp).count(),
             1,
         )
+
+
+class DestinatariosGarantiaOowTest(TestCase):
+    """
+    OOW → recepción; garantía → dispatchers.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Creamos un recepcionista y un dispatcher. Según es_fuera_garantia,
+    solo uno de los dos debe recibir la campanita.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Destinatarios',
+            ciudad='CDMX',
+        )
+        self.user_recep = User.objects.create_user(
+            username='recep_dest',
+            password='testpass123',
+        )
+        self.recepcionista = Empleado.objects.create(
+            nombre_completo='Recepcion Dest',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep.dest@test.local',
+            sucursal=self.sucursal,
+            user=self.user_recep,
+            rol='recepcionista',
+        )
+        self.user_disp = User.objects.create_user(
+            username='disp_dest',
+            password='testpass123',
+        )
+        self.dispatcher = Empleado.objects.create(
+            nombre_completo='Dispatcher Dest',
+            cargo='Dispatcher',
+            area='Operaciones',
+            email='disp.dest@test.local',
+            sucursal=self.sucursal,
+            user=self.user_disp,
+            rol='dispatcher',
+        )
+        self.user_tec = User.objects.create_user(
+            username='tec_dest',
+            password='testpass123',
+        )
+        self.tecnico = Empleado.objects.create(
+            nombre_completo='Tecnico Dest',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tec.dest@test.local',
+            sucursal=self.sucursal,
+            user=self.user_tec,
+            rol='tecnico',
+        )
+
+    def _crear_orden(self, folio: str, responsable=None) -> OrdenServicio:
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='control_calidad',
+            tecnico_asignado_actual=self.tecnico,
+            responsable_seguimiento=responsable,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=folio,
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='XPS',
+            numero_serie=f'ST-{folio}',
+            email_cliente='cliente.dest@test.local',
+            nombre_cliente='Cliente Dest',
+            falla_principal='Falla test',
+            gama='media',
+        )
+        orden.refresh_from_db()
+        return orden
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_oow_notifica_recepcion_no_dispatcher(self, _mock_push):
+        """Fuera de garantía: campanita al responsable (recepcionista)."""
+        orden = self._crear_orden('OOW-DEST-01', responsable=self.recepcionista)
+        self.assertTrue(orden.es_fuera_garantia)
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='egreso')
+        self.assertTrue(ok)
+
+        self.assertGreaterEqual(
+            Notificacion.objects.filter(usuario=self.user_recep).count(),
+            1,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_disp).count(),
+            0,
+        )
+        historial = HistorialOrden.objects.filter(
+            orden=orden,
+            comentario__icontains='Aviso a recepción',
+        )
+        self.assertEqual(historial.count(), 1)
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_notifica_dispatcher_no_recepcion(self, _mock_push):
+        """En garantía: campanita a dispatchers, no a recepción."""
+        orden = self._crear_orden('SIC-DEST-99', responsable=self.recepcionista)
+        self.assertFalse(orden.es_fuera_garantia)
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
+        self.assertTrue(ok)
+
+        self.assertGreaterEqual(
+            Notificacion.objects.filter(usuario=self.user_disp).count(),
+            1,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_recep).count(),
+            0,
+        )
+        historial = HistorialOrden.objects.filter(
+            orden=orden,
+            comentario__icontains='Aviso a dispatchers',
+        )
+        self.assertEqual(historial.count(), 1)
 
 
 class NotificarEquipoDisponibleVistaTest(TestCase):

@@ -1,10 +1,17 @@
 """
-Aviso a recepción cuando el equipo está listo para recolección.
+Aviso staff cuando el equipo está listo para recolección.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 ================================
-Cuando se suben fotos de egreso o la orden pasa a "finalizado", recepción
-debe enterarse para poder avisar al cliente (botón "Notificar equipo disponible").
+Cuando se suben fotos de egreso o la orden pasa a "finalizado", alguien del
+staff debe enterarse para poder avisar al cliente (botón
+"Notificar equipo disponible").
+
+¿A quién le llega?
+  - Fuera de garantía (OOW/FL, es_fuera_garantia=True):
+      responsable_seguimiento, o todos los rol=recepcionista.
+  - En garantía (es_fuera_garantia=False):
+      todos los empleados con rol=dispatcher.
 
 Hay DOS disparadores posibles (egreso y cambio a finalizado). Para no spamear,
 usamos el flag `orden.aviso_recepcion_listo_enviado`: la primera llamada gana;
@@ -13,9 +20,6 @@ la segunda se omite (viceversa).
 Canales:
   - Campanita in-app (`notificar_info`)
   - Web Push (`enviar_push_a_usuario`)
-
-Destinatario preferido: `orden.responsable_seguimiento`.
-Si no hay responsable: todos los empleados con rol `recepcionista` activos.
 
 Efectos secundarios:
   - Crea Notificacion(es) + push
@@ -38,7 +42,11 @@ MotivoAviso = Literal['egreso', 'finalizado']
 
 def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') -> bool:
     """
-    Avisa a recepción de que el equipo está listo para recolectar.
+    Avisa al staff correcto de que el equipo está listo para recolectar.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El nombre histórico dice "recepcion", pero el destinatario depende de
+    si la orden es OOW (recepción) o garantía (dispatchers).
 
     Args:
         orden: instancia de OrdenServicio (debe tener pk).
@@ -50,10 +58,9 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
         destinatarios / falló de forma controlada.
     """
     # Import local: evita ciclos al cargar apps (models ↔ services ↔ notificaciones).
-    from inventario.models import Empleado
     from notificaciones.push_service import enviar_push_a_usuario
     from notificaciones.utils import notificar_info
-    from servicio_tecnico.models import HistorialOrden, OrdenServicio
+    from servicio_tecnico.models import OrdenServicio
 
     if not orden or not getattr(orden, 'pk', None):
         return False
@@ -70,7 +77,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
 
     if filas == 0:
         logger.info(
-            '[AVISO-RECEPCION] Orden %s ya avisada — omitiendo (motivo=%s)',
+            '[AVISO-EQUIPO-LISTO] Orden %s ya avisada — omitiendo (motivo=%s)',
             orden.pk,
             motivo,
         )
@@ -79,14 +86,16 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
     # Mantener la instancia en memoria alineada con la BD.
     orden.aviso_recepcion_listo_enviado = True
 
-    destinatarios = _resolver_destinatarios_recepcion(orden)
+    audiencia = _etiqueta_audiencia(orden)
+    destinatarios = _resolver_destinatarios_aviso(orden)
     if not destinatarios:
         logger.warning(
-            '[AVISO-RECEPCION] Orden %s sin responsable ni recepcionistas activos',
+            '[AVISO-EQUIPO-LISTO] Orden %s sin destinatarios (%s)',
             orden.pk,
+            audiencia,
         )
         # El flag ya quedó en True para no reintentar en bucle; historial igual.
-        _registrar_historial_aviso(orden, motivo, enviados=0)
+        _registrar_historial_aviso(orden, motivo, enviados=0, audiencia=audiencia)
         return False
 
     url_orden = reverse(
@@ -117,7 +126,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
             )
         except Exception as exc:
             logger.warning(
-                '[AVISO-RECEPCION] Campanita falló para %s: %s',
+                '[AVISO-EQUIPO-LISTO] Campanita falló para %s: %s',
                 usuario.username,
                 exc,
             )
@@ -131,43 +140,64 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
             )
         except Exception as exc:
             logger.warning(
-                '[AVISO-RECEPCION] Push falló para %s: %s',
+                '[AVISO-EQUIPO-LISTO] Push falló para %s: %s',
                 usuario.username,
                 exc,
             )
 
         enviados += 1
 
-    _registrar_historial_aviso(orden, motivo, enviados=enviados)
+    _registrar_historial_aviso(orden, motivo, enviados=enviados, audiencia=audiencia)
     logger.info(
-        '[AVISO-RECEPCION] Orden %s avisada (motivo=%s, destinatarios=%s)',
+        '[AVISO-EQUIPO-LISTO] Orden %s avisada (motivo=%s, audiencia=%s, destinatarios=%s)',
         orden.pk,
         motivo,
+        audiencia,
         enviados,
     )
     return enviados > 0
 
 
-def _resolver_destinatarios_recepcion(orden) -> list:
+def _etiqueta_audiencia(orden) -> str:
+    """Texto corto para logs/historial según tipo de orden."""
+    if getattr(orden, 'es_fuera_garantia', False):
+        return 'recepción'
+    return 'dispatchers'
+
+
+def _resolver_destinatarios_aviso(orden) -> list:
     """
-    Preferir responsable_seguimiento; si no hay, recepcionistas activos.
+    Elige a quién avisar según garantía vs OOW.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - OOW (fuera de garantía): el responsable de seguimiento (suele ser
+      recepcionista). Si no hay, todos los recepcionistas activos.
+    - Garantía: todos los dispatchers activos (mismo criterio que otros
+      avisos de "orden lista" del sistema).
 
     Returns:
         Lista de Empleado con user cargado (select_related).
     """
     from inventario.models import Empleado
 
+    # ------------------------------------------------------------------
+    # GARANTÍA → dispatchers
+    # ------------------------------------------------------------------
+    if not getattr(orden, 'es_fuera_garantia', False):
+        return list(
+            Empleado.objects.filter(
+                rol='dispatcher',
+                user__is_active=True,
+            ).select_related('user')
+        )
+
+    # ------------------------------------------------------------------
+    # OOW / FL → responsable o recepcionistas
+    # ------------------------------------------------------------------
     responsable = getattr(orden, 'responsable_seguimiento', None)
     if responsable is not None:
         # Puede venir sin select_related; recargar con user si hace falta.
-        if not hasattr(responsable, 'user') or responsable.user_id is None:
-            try:
-                responsable = Empleado.objects.select_related('user').get(
-                    pk=responsable.pk
-                )
-            except Empleado.DoesNotExist:
-                responsable = None
-        elif getattr(responsable, 'user', None) is None:
+        if responsable.user_id is None or getattr(responsable, 'user', None) is None:
             try:
                 responsable = Empleado.objects.select_related('user').get(
                     pk=responsable.pk
@@ -198,8 +228,13 @@ def _etiqueta_orden(orden) -> tuple[str, str]:
     return etiqueta, service_tag
 
 
-def _registrar_historial_aviso(orden, motivo: MotivoAviso, enviados: int) -> None:
-    """Escribe en el timeline de la orden el aviso a recepción."""
+def _registrar_historial_aviso(
+    orden,
+    motivo: MotivoAviso,
+    enviados: int,
+    audiencia: str,
+) -> None:
+    """Escribe en el timeline de la orden el aviso al staff correcto."""
     from servicio_tecnico.models import HistorialOrden
 
     etiqueta_motivo = (
@@ -208,7 +243,7 @@ def _registrar_historial_aviso(orden, motivo: MotivoAviso, enviados: int) -> Non
         else 'cambio a Finalizado / Listo para Entrega'
     )
     comentario = (
-        f'Aviso a recepción: equipo listo para notificar recolección '
+        f'Aviso a {audiencia}: equipo listo para notificar recolección '
         f'(disparador: {etiqueta_motivo}; destinatarios: {enviados})'
     )
 
@@ -223,7 +258,7 @@ def _registrar_historial_aviso(orden, motivo: MotivoAviso, enviados: int) -> Non
             )
     except Exception as exc:
         logger.warning(
-            '[AVISO-RECEPCION] No se pudo escribir historial orden %s: %s',
+            '[AVISO-EQUIPO-LISTO] No se pudo escribir historial orden %s: %s',
             orden.pk,
             exc,
         )
