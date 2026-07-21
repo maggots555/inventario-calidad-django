@@ -1151,7 +1151,8 @@ VISTAS_DANO_ESTETICO_LAPTOP = [
 VISTAS_DANO_ESTETICO_ESCRITORIO = [
     ('frente', 'Frente'),
     ('trasera', 'Trasera'),
-    ('lateral', 'Lateral'),
+    ('esc_lat_izq', 'Lateral Izquierdo'),
+    ('esc_lat_der', 'Lateral Derecho'),
     ('superior', 'Superior'),
 ]
 

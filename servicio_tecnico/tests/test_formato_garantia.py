@@ -90,6 +90,18 @@ class FormatoGarantiaReexportsTest(SimpleTestCase):
             views_formato_garantia.formato_garantia_eliminar_evidencia,
         )
 
+    def test_vistas_escritorio_tienen_laterales_izq_der(self):
+        """PC escritorio: laterales separados (no un solo 'lateral')."""
+        from config.constants import VISTAS_DANO_ESTETICO_ESCRITORIO
+
+        claves = [c for c, _ in VISTAS_DANO_ESTETICO_ESCRITORIO]
+        self.assertIn('esc_lat_izq', claves)
+        self.assertIn('esc_lat_der', claves)
+        self.assertNotIn('lateral', claves)
+        labels = dict(VISTAS_DANO_ESTETICO_ESCRITORIO)
+        self.assertEqual(labels['esc_lat_izq'], 'Lateral Izquierdo')
+        self.assertEqual(labels['esc_lat_der'], 'Lateral Derecho')
+
 
 class FormatoGarantiaServiceTest(TestCase):
     """Pruebas de negocio: borrador, candidata garantía y finalizar con PDF."""

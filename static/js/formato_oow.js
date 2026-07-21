@@ -293,8 +293,10 @@ function dibujarPerfilLateral(ctx, w, h, m, esIzquierdo) {
 }
 /**
  * Lateral de torre/PC: chasis vertical con bahías y panel trasero esquemático.
+ *
+ * @param esIzquierdo - true = lateral izquierdo; false = derecho; undefined = genérico (legacy)
  */
-function dibujarLateralPcTorre(ctx, w, h, m) {
+function dibujarLateralPcTorre(ctx, w, h, m, esIzquierdo) {
     const cajaX = w * 0.28;
     const cajaY = m + 28;
     const cajaAncho = w * 0.44;
@@ -337,7 +339,16 @@ function dibujarLateralPcTorre(ctx, w, h, m) {
     ctx.strokeRect(cajaX + cajaAncho - 24, cajaY + cajaAlto, 16, 8);
     ctx.fillStyle = '#64748b';
     ctx.font = '10px Helvetica, Arial, sans-serif';
-    ctx.fillText('Torre / PC', cajaX, cajaY + cajaAlto + 22);
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Texto bajo la torre: indica si es lateral izq./der. o genérico (vistas viejas).
+    let leyenda = 'Torre / PC';
+    if (esIzquierdo === true) {
+        leyenda = 'Torre / PC — LATERAL IZQ.';
+    }
+    else if (esIzquierdo === false) {
+        leyenda = 'Torre / PC — LATERAL DER.';
+    }
+    ctx.fillText(leyenda, cajaX, cajaY + cajaAlto + 22);
 }
 /**
  * Lateral de All in One: perfil delgado vertical (monitor) + pie.
@@ -413,9 +424,10 @@ function dibujarMarcoDiagrama(ctx, w, h, etiqueta, claveVista = '') {
         dibujarPerfilLateral(ctx, w, h, m, clave === 'lat_izq');
         return;
     }
-    // PC escritorio: clave "lateral" → torre vertical
-    if (clave === 'lateral') {
-        dibujarLateralPcTorre(ctx, w, h, m);
+    // PC escritorio: laterales izq/der (y "lateral" legacy) → torre vertical
+    if (clave === 'esc_lat_izq' || clave === 'esc_lat_der' || clave === 'lateral') {
+        const esIzq = clave === 'esc_lat_izq' ? true : clave === 'esc_lat_der' ? false : undefined;
+        dibujarLateralPcTorre(ctx, w, h, m, esIzq);
         return;
     }
     // All in One: aio_lat_* → perfil delgado de monitor + pie
