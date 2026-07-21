@@ -4974,6 +4974,8 @@ def enviar_formato_oow_email_task(
     EXPLICACIÓN PARA PRINCIPIANTES:
     Celery no pasa por PaisMiddleware; db_alias encola el tenant correcto
     (México=default, argentina, chile, colombia).
+    El HTML se arma con el template profesional (mismo header/footer que
+    diagnóstico); el asunto NO cambia respecto a la versión anterior.
 
     Args:
         formato_id: PK de FormatoServicioOOW
@@ -4981,14 +4983,25 @@ def enviar_formato_oow_email_task(
         db_alias: Alias de BD del país
 
     Efectos secundarios:
-        Envía EmailMessage con PDF adjunto; registra historial en la orden.
+        Envía EmailMessage con PDF adjunto + logo/iconos CID;
+        registra historial en la orden.
     """
     from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
     from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
     from email.mime.application import MIMEApplication
+    from email.mime.image import MIMEImage
+    from email.utils import formataddr, parseaddr
+
+    from decouple import config
+
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    from inventario.models import Empleado
 
     from .models import FormatoServicioOOW, HistorialOrden
-    from inventario.models import Empleado
 
     try:
         formato = FormatoServicioOOW.objects.select_related(
@@ -5021,22 +5034,55 @@ def enviar_formato_oow_email_task(
             or detalle.orden_cliente
             or orden.numero_orden_interno
         )
+        # Asunto histórico: no cambiar el texto (solo el cuerpo HTML).
         asunto = f'Formato de Servicio OOW — {orden_sicser}'
-        cuerpo = (
-            f'<p>Estimado(a) cliente,</p>'
-            f'<p>Adjuntamos el <strong>Formato de Servicio Fuera de Garantía</strong> '
-            f'correspondiente a su equipo.</p>'
-            f'<p>Orden: <b>{orden_sicser}</b><br>'
-            f'Service Tag: <b>{detalle.numero_serie or "—"}</b></p>'
-            f'<p>SIC Comercialización y Servicios</p>'
+
+        # Datos del empleado y país (mismo patrón que diagnóstico).
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        email_empleado = ''
+        nombre_empleado = ''
+        whatsapp_empleado = ''
+        usuario_empleado = None
+        if usuario_id:
+            try:
+                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
+                email_empleado = usuario_empleado.email or ''
+                nombre_empleado = usuario_empleado.nombre_completo or ''
+                if usuario_empleado.numero_whatsapp:
+                    codigo_tel = _pais_email.get('codigo_telefonico', '')
+                    whatsapp_empleado = (
+                        f"{codigo_tel}{usuario_empleado.numero_whatsapp}"
+                    )
+            except Empleado.DoesNotExist:
+                User = get_user_model()
+                try:
+                    usuario = User.objects.get(pk=usuario_id)
+                    email_empleado = usuario.email or ''
+                    nombre_empleado = (
+                        usuario.get_full_name() or usuario.username or ''
+                    )
+                except User.DoesNotExist:
+                    pass
+
+        context_email = {
+            'orden': orden,
+            'detalle': detalle,
+            'orden_sicser': orden_sicser,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'email_empleado': email_empleado,
+            'nombre_empleado': nombre_empleado,
+            'whatsapp_empleado': whatsapp_empleado,
+        }
+        html_content = render_to_string(
+            'servicio_tecnico/emails/formato_oow_cliente.html',
+            context_email,
         )
 
         # Remitente de Servicio Técnico (no el de Score Card).
-        # Si SERVICIO_TECNICO_FROM_EMAIL no está en .env, reutilizamos la
-        # dirección de DEFAULT_FROM_EMAIL pero con el nombre correcto.
-        from email.utils import formataddr, parseaddr
-        from decouple import config
-
         st_from = (config('SERVICIO_TECNICO_FROM_EMAIL', default='') or '').strip()
         if st_from:
             from_email = st_from
@@ -5054,11 +5100,47 @@ def enviar_formato_oow_email_task(
         # EmailMessage.to acepta una lista: se envía el mismo PDF a todos (máx. 3).
         email_msg = EmailMessage(
             subject=asunto,
-            body=cuerpo,
+            body=html_content,
             from_email=from_email,
             to=destinatarios,
         )
         email_msg.content_subtype = 'html'
+
+        # Logo e iconos inline (CID) — mismos assets que diagnóstico.
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header(
+                        'Content-Disposition', 'inline', filename='logo_sic.png',
+                    )
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning('[FORMATO_OOW] Error al adjuntar logo: %s', e)
+
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header(
+                            'Content-Disposition',
+                            'inline',
+                            filename=f'{cid_name}.png',
+                        )
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning('[FORMATO_OOW] Error al adjuntar iconos: %s', e)
 
         with formato.pdf.open('rb') as fh:
             pdf_bytes = fh.read()
@@ -5070,13 +5152,6 @@ def enviar_formato_oow_email_task(
         )
         email_msg.attach(pdf_mime)
         email_msg.send()
-
-        usuario_empleado = None
-        if usuario_id:
-            try:
-                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
-            except Empleado.DoesNotExist:
-                usuario_empleado = None
 
         destinarios_txt = ', '.join(destinatarios)
         HistorialOrden.objects.create(
@@ -5118,6 +5193,8 @@ def enviar_formato_garantia_email_task(
     EXPLICACIÓN PARA PRINCIPIANTES:
     Celery no pasa por PaisMiddleware; db_alias encola el tenant correcto
     (México=default, argentina, chile, colombia).
+    El HTML se arma con el template profesional (mismo header/footer que
+    diagnóstico); el asunto NO cambia respecto a la versión anterior.
 
     Args:
         formato_id: PK de FormatoServicioGarantia
@@ -5125,14 +5202,25 @@ def enviar_formato_garantia_email_task(
         db_alias: Alias de BD del país
 
     Efectos secundarios:
-        Envía EmailMessage con PDF adjunto; registra historial en la orden.
+        Envía EmailMessage con PDF adjunto + logo/iconos CID;
+        registra historial en la orden.
     """
     from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
     from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
     from email.mime.application import MIMEApplication
+    from email.mime.image import MIMEImage
+    from email.utils import formataddr, parseaddr
+
+    from decouple import config
+
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    from inventario.models import Empleado
 
     from .models import FormatoServicioGarantia, HistorialOrden
-    from inventario.models import Empleado
 
     try:
         formato = FormatoServicioGarantia.objects.select_related(
@@ -5163,18 +5251,52 @@ def enviar_formato_garantia_email_task(
             or detalle.folio_sicser
             or orden.numero_orden_interno
         )
+        # Asunto histórico: no cambiar el texto (solo el cuerpo HTML).
         asunto = f'Formato de Servicio Garantía Dell — {orden_sicser}'
-        cuerpo = (
-            f'<p>Estimado(a) cliente,</p>'
-            f'<p>Adjuntamos el <strong>Formato de Servicio en Garantía Dell</strong> '
-            f'correspondiente a su equipo.</p>'
-            f'<p>Orden (DPS): <b>{orden_sicser}</b><br>'
-            f'Service Tag: <b>{detalle.numero_serie or "—"}</b></p>'
-            f'<p>SIC Comercialización y Servicios</p>'
-        )
 
-        from email.utils import formataddr, parseaddr
-        from decouple import config
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        email_empleado = ''
+        nombre_empleado = ''
+        whatsapp_empleado = ''
+        usuario_empleado = None
+        if usuario_id:
+            try:
+                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
+                email_empleado = usuario_empleado.email or ''
+                nombre_empleado = usuario_empleado.nombre_completo or ''
+                if usuario_empleado.numero_whatsapp:
+                    codigo_tel = _pais_email.get('codigo_telefonico', '')
+                    whatsapp_empleado = (
+                        f"{codigo_tel}{usuario_empleado.numero_whatsapp}"
+                    )
+            except Empleado.DoesNotExist:
+                User = get_user_model()
+                try:
+                    usuario = User.objects.get(pk=usuario_id)
+                    email_empleado = usuario.email or ''
+                    nombre_empleado = (
+                        usuario.get_full_name() or usuario.username or ''
+                    )
+                except User.DoesNotExist:
+                    pass
+
+        context_email = {
+            'orden': orden,
+            'detalle': detalle,
+            'orden_sicser': orden_sicser,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'email_empleado': email_empleado,
+            'nombre_empleado': nombre_empleado,
+            'whatsapp_empleado': whatsapp_empleado,
+        }
+        html_content = render_to_string(
+            'servicio_tecnico/emails/formato_garantia_cliente.html',
+            context_email,
+        )
 
         st_from = (config('SERVICIO_TECNICO_FROM_EMAIL', default='') or '').strip()
         if st_from:
@@ -5191,11 +5313,46 @@ def enviar_formato_garantia_email_task(
 
         email_msg = EmailMessage(
             subject=asunto,
-            body=cuerpo,
+            body=html_content,
             from_email=from_email,
             to=destinatarios,
         )
         email_msg.content_subtype = 'html'
+
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header(
+                        'Content-Disposition', 'inline', filename='logo_sic.png',
+                    )
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning('[FORMATO_GARANTIA] Error al adjuntar logo: %s', e)
+
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header(
+                            'Content-Disposition',
+                            'inline',
+                            filename=f'{cid_name}.png',
+                        )
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning('[FORMATO_GARANTIA] Error al adjuntar iconos: %s', e)
 
         with formato.pdf.open('rb') as fh:
             pdf_bytes = fh.read()
@@ -5207,13 +5364,6 @@ def enviar_formato_garantia_email_task(
         )
         email_msg.attach(pdf_mime)
         email_msg.send()
-
-        usuario_empleado = None
-        if usuario_id:
-            try:
-                usuario_empleado = Empleado.objects.get(user_id=usuario_id)
-            except Empleado.DoesNotExist:
-                usuario_empleado = None
 
         destinarios_txt = ', '.join(destinatarios)
         HistorialOrden.objects.create(

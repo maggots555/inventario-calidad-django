@@ -502,3 +502,118 @@ class FormatoGarantiaEliminarEvidenciaTest(TestCase):
         )
         self.assertEqual(resp.status_code, 404)
         self.assertTrue(ImagenOrden.objects.filter(pk=img.pk).exists())
+
+
+class FormatoGarantiaEmailTaskTest(TestCase):
+    """
+    La task Celery envía HTML profesional (template) conservando el asunto.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Mockeamos EmailMessage.send para no mandar correos reales en CI.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Email Garantía',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='email_garantia',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Técnico Email Garantía',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='email.garantia@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='999888777',
+            folio_sicser='FOLIO-GAR-01',
+            sicser_origen='garantia',
+            sicser_id_externo='999888777',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude 7430',
+            numero_serie='GARSTAG01',
+            email_cliente='cliente.gar@test.local',
+            nombre_cliente='Cliente Garantía',
+            falla_principal='Teclado',
+            gama='media',
+        )
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_task_asunto_y_cuerpo_profesional(self):
+        from unittest.mock import patch
+
+        from servicio_tecnico.models import HistorialOrden
+        from servicio_tecnico.tasks import enviar_formato_garantia_email_task
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.pdf.save(
+            'FormatoGarantia_test.pdf',
+            ContentFile(b'%PDF-1.4 fake-garantia-pdf'),
+            save=True,
+        )
+        formato.emails_envio = ['cliente.gar@test.local']
+        formato.email_envio = 'cliente.gar@test.local'
+        formato.save(update_fields=['emails_envio', 'email_envio'])
+
+        capturados = []
+
+        def _fake_send(self_msg):
+            capturados.append(self_msg)
+            return 1
+
+        with patch(
+            'django.core.mail.EmailMessage.send',
+            new=_fake_send,
+        ):
+            resultado = enviar_formato_garantia_email_task.run(
+                formato_id=formato.pk,
+                usuario_id=self.user.pk,
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        msg = capturados[0]
+        # Asunto: prioridad orden_cliente (DPS) sobre folio_sicser.
+        self.assertEqual(
+            msg.subject,
+            'Formato de Servicio Garantía Dell — 999888777',
+        )
+        body = msg.body
+        self.assertIn('FORMATO DE SERVICIO GARANTÍA DELL', body)
+        self.assertIn('equipment-info', body)
+        self.assertIn('cid:logo_sic', body)
+        self.assertIn('999888777', body)
+        self.assertIn('GARSTAG01', body)
+        self.assertNotIn('Estimado(a) cliente', body)
+        self.assertTrue(
+            HistorialOrden.objects.filter(
+                orden=self.orden,
+                tipo_evento='email',
+            ).exists()
+        )

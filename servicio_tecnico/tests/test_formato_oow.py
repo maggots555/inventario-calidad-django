@@ -447,3 +447,119 @@ class FormatoOowVistaTest(TestCase):
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )
+
+
+class FormatoOowEmailTaskTest(TestCase):
+    """
+    La task Celery envía HTML profesional (template) conservando el asunto.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Mockeamos EmailMessage.send para no mandar correos reales en CI.
+    Creamos un PDF mínimo en el FileField (no hace falta regenerar ReportLab).
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Email OOW',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='email_oow',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Técnico Email OOW',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='email.oow@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-EMAIL01',
+            folio_sicser='OOW-EMAIL01',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 5520',
+            numero_serie='EMAILSTAG01',
+            email_cliente='cliente.email@test.local',
+            nombre_cliente='Cliente Email',
+            falla_principal='Pantalla',
+            gama='media',
+        )
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_task_asunto_y_cuerpo_profesional(self):
+        from unittest.mock import patch
+
+        from servicio_tecnico.models import HistorialOrden
+        from servicio_tecnico.tasks import enviar_formato_oow_email_task
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        # PDF mínimo: basta con bytes para adjuntar; no validamos el contenido PDF.
+        formato.pdf.save(
+            'FormatoOOW_test.pdf',
+            ContentFile(b'%PDF-1.4 fake-oow-pdf'),
+            save=True,
+        )
+        formato.emails_envio = ['cliente.email@test.local']
+        formato.email_envio = 'cliente.email@test.local'
+        formato.save(update_fields=['emails_envio', 'email_envio'])
+
+        capturados = []
+
+        def _fake_send(self_msg):
+            capturados.append(self_msg)
+            return 1
+
+        with patch(
+            'django.core.mail.EmailMessage.send',
+            new=_fake_send,
+        ):
+            # .run() ejecuta el cuerpo de la task sin broker Celery.
+            resultado = enviar_formato_oow_email_task.run(
+                formato_id=formato.pk,
+                usuario_id=self.user.pk,
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        msg = capturados[0]
+        self.assertEqual(
+            msg.subject,
+            'Formato de Servicio OOW — OOW-EMAIL01',
+        )
+        body = msg.body
+        # Template profesional (no el HTML mínimo antiguo).
+        self.assertIn('FORMATO DE SERVICIO FUERA DE GARANTÍA', body)
+        self.assertIn('equipment-info', body)
+        self.assertIn('cid:logo_sic', body)
+        self.assertIn('OOW-EMAIL01', body)
+        self.assertIn('EMAILSTAG01', body)
+        self.assertNotIn('Estimado(a) cliente', body)
+        self.assertTrue(
+            HistorialOrden.objects.filter(
+                orden=self.orden,
+                tipo_evento='email',
+            ).exists()
+        )
