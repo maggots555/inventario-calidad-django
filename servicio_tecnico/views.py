@@ -111,6 +111,7 @@ from .views_envios_cliente import (  # noqa: F401
     enviar_imagenes_cliente,
     enviar_imagenes_egreso_cliente,
     enviar_rewind_egreso_cliente,
+    notificar_equipo_disponible,
     obtener_destinatarios_egreso,
     preview_pdf_diagnostico,
 )
@@ -803,6 +804,16 @@ def detalle_orden(request, orden_id):
                         # Guardar cambios si hubo actualización de estado
                         if cambio_realizado:
                             orden.save()
+
+                        # Aviso a recepción: fotos de egreso (anti-dup con finalizado).
+                        # EXPLICACIÓN: Si el save() anterior ya pasó a finalizado, el
+                        # signal pudo haber avisado; el flag evita el duplicado.
+                        # Si la orden YA estaba finalizada, solo este disparo avisa.
+                        if tipo_imagen == 'egreso':
+                            from servicio_tecnico.services.notificaciones_recepcion import (
+                                notificar_recepcion_equipo_listo,
+                            )
+                            notificar_recepcion_equipo_listo(orden, motivo='egreso')
                         
                         # Construir mensaje de respuesta
                         mensaje = f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'
@@ -1647,6 +1658,16 @@ def detalle_orden(request, orden_id):
         tipo_evento='email',
         comentario__icontains='video rewind'
     ).exists()
+
+    # Botón "Notificar equipo disponible": solo en Finalizado / Listo para Entrega
+    equipo_disponible_ya_notificado = (
+        orden.fecha_notificacion_equipo_disponible is not None
+    )
+    email_cliente_valido_notificar = bool(
+        orden.detalle_equipo
+        and orden.detalle_equipo.email_cliente
+        and orden.detalle_equipo.email_cliente != 'cliente@ejemplo.com'
+    )
     
     # ========================================================================
     # DATOS DE COTIZACIÓN (Si existe)
@@ -1826,6 +1847,8 @@ def detalle_orden(request, orden_id):
         'tiene_4_tipos_fotos': tiene_4_tipos_fotos,
         'tiene_3_tipos_fotos': tiene_3_tipos_fotos,
         'rewind_ya_enviado': rewind_ya_enviado,
+        'equipo_disponible_ya_notificado': equipo_disponible_ya_notificado,
+        'email_cliente_valido_notificar': email_cliente_valido_notificar,
 
         # Videos
         'videos_por_tipo': videos_por_tipo,

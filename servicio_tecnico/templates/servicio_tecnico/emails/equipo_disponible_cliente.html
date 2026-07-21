@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipo listo para recolección — {{ folio }}</title>
+<style>
+  body { margin:0; padding:0; background:#f0f4f8; font-family:'Segoe UI',Arial,sans-serif; color:#333; }
+  .wrapper { max-width:640px; margin:20px auto; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.08); }
+  .header {
+    background: linear-gradient(180deg, #ffffff 0%, #e8f4fd 50%, #90caf9 100%);
+    padding: 28px 32px 22px;
+    text-align: center;
+    border-bottom: 3px solid #1565c0;
+  }
+  .header img.logo { max-width:160px; height:auto; margin-bottom:12px; }
+  .header h1 { margin:0; font-size:1.35rem; color:#051d63; font-weight:800; }
+  .header p { margin:8px 0 0; color:#1565c0; font-size:0.95rem; }
+  .content { padding: 28px 32px; }
+  .content p { font-size:0.95rem; line-height:1.65; margin:0 0 14px; color:#374151; }
+  .equipo-box {
+    margin: 0 0 20px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border-left: 5px solid #1565c0;
+    padding: 14px 18px;
+  }
+  .equipo-box .label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:#1565c0; font-weight:700; }
+  .equipo-box .nombre { font-size:1.05rem; font-weight:700; color:#1e293b; margin:4px 0 8px; }
+  .folio-badge {
+    display:inline-block; background:#e3f2fd; color:#1565c0;
+    border-radius:16px; padding:3px 12px; font-size:0.8rem; font-weight:600;
+  }
+  .sucursal-box {
+    margin: 18px 0;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .sucursal-box h3 { margin:0 0 8px; font-size:0.95rem; color:#1e40af; }
+  .sucursal-box p { margin:0 0 6px; font-size:0.88rem; color:#1e3a8a; }
+  .nota-importante {
+    margin: 20px 0;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    color: #9a3412;
+    line-height: 1.55;
+  }
+  .nota-importante strong { display:block; margin-bottom:6px; color:#c2410c; }
+  .horario { margin: 16px 0; font-size:0.92rem; color:#374151; }
+  .footer {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    padding: 22px 28px;
+    text-align: center;
+  }
+  .redes { margin-bottom: 10px; }
+  .redes a { display:inline-block; margin:0 6px; }
+  .redes img { width:24px; height:24px; opacity:0.85; }
+  .footer p { color:#94a3b8; font-size:0.75rem; margin:0; line-height:1.5; }
+  @media (max-width:600px) {
+    .content, .header { padding-left:16px; padding-right:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <img src="cid:logo_sic" alt="SIC" class="logo">
+    <h1>Equipo listo para recolección</h1>
+    <p>SIC México — Centro de servicio</p>
+  </div>
+
+  <div class="content">
+    <p>Buen día estimado <strong>{{ nombre_cliente }}</strong>:</p>
+
+    <p>
+      Me dirijo de SIC MÉXICO; nos es grato informarle que su equipo de cómputo
+      se encuentra listo para que pase a recolectar al centro de servicio donde
+      fue ingresado. Es necesario presentar la hoja (formato de servicio) que le
+      fue entregada al momento de ingresar el equipo así como una identificación oficial.
+    </p>
+
+    <div class="equipo-box">
+      <div class="label">Equipo / Folio</div>
+      <p class="nombre">
+        {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
+      </p>
+      <span class="folio-badge">Folio: {{ folio }}</span>
+      {% if service_tag %}
+      <p style="margin:8px 0 0;font-size:0.85rem;color:#64748b;">Service Tag: {{ service_tag }}</p>
+      {% endif %}
+    </div>
+
+    <p>
+      En caso de que sea alguna otra persona quien vaya a recoger el equipo
+      necesitamos de igual manera el Formato de Servicio, identificación oficial
+      de la persona que recogerá y copia de la identificación oficial de la
+      persona que lo ingresó o del titular del servicio.
+      <strong>(COPIAS DE AMBAS CREDENCIALES POR LOS 2 LADOS).</strong>
+    </p>
+
+    <div class="horario">
+      <strong>Le recuerdo los horarios de atención:</strong><br>
+      {{ horario_atencion }}
+    </div>
+
+    <div class="sucursal-box">
+      <h3>Sucursal de recolección</h3>
+      <p><strong>{{ sucursal_nombre }}</strong></p>
+      {% if sucursal_direccion %}<p>{{ sucursal_direccion }}</p>{% endif %}
+      {% if sucursal_ciudad_estado %}<p>{{ sucursal_ciudad_estado }}</p>{% endif %}
+      {% if sucursal_telefono %}<p>Tel: {{ sucursal_telefono }}</p>{% endif %}
+      {% if sucursal_horario_extra %}
+      <p><em>Horario de la sucursal:</em> {{ sucursal_horario_extra }}</p>
+      {% endif %}
+    </div>
+
+    <div class="nota-importante">
+      <strong>NOTA IMPORTANTE</strong>
+      ES SUMAMENTE IMPORTANTE LO RETIREN A LA BREVEDAD YA QUE SE GENERA CARGO
+      DE ALMACENAJE O DESTRUCCIÓN DEL EQUIPO (CLÁUSULA 6 DEL FORMATO QUE FIRMA
+      AL INGRESO DEL EQUIPO).
+    </div>
+
+    <p>
+      Agradecemos su preferencia y nos ponemos a sus órdenes para esta y futuras
+      ocasiones, saludos cordiales.
+    </p>
+  </div>
+
+  <div class="footer">
+    <div class="redes">
+      <a href="https://sicfix.mx"><img src="cid:icon_link" alt="Web"></a>
+      <a href="https://instagram.com/sic.com.mx"><img src="cid:icon_instagram" alt="Instagram"></a>
+      <a href="https://facebook.com/sic.com.mx"><img src="cid:icon_facebook" alt="Facebook"></a>
+      <a href="https://wa.me/523318189988"><img src="cid:icon_whatsapp" alt="WhatsApp"></a>
+    </div>
+    <p>
+      SIC México — Servicio Técnico<br>
+      Este correo se generó automáticamente desde SIGMA.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

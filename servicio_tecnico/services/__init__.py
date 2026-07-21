@@ -13,6 +13,7 @@ from .notificaciones_piezas import (
     enviar_notificacion_pieza_recibida,
     _enviar_notificacion_pieza_recibida,
 )
+from .notificaciones_recepcion import notificar_recepcion_equipo_listo
 from .ventas_mostrador_analytics import (
     determinar_categoria_venta,
     obtener_top_productos_vendidos,
@@ -24,6 +25,7 @@ __all__ = [
     'comprimir_y_guardar_video',
     'enviar_notificacion_pieza_recibida',
     '_enviar_notificacion_pieza_recibida',
+    'notificar_recepcion_equipo_listo',
     'determinar_categoria_venta',
     'obtener_top_productos_vendidos',
 ]

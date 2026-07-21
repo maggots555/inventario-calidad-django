@@ -1914,6 +1914,229 @@ def enviar_imagenes_egreso_cliente_task(
 
 
 # ============================================================================
+# TAREA: CORREO "EQUIPO DISPONIBLE PARA RECOLECCIÓN"
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='servicio_tecnico.enviar_notificacion_equipo_disponible',
+)
+def enviar_notificacion_equipo_disponible_task(
+    self, orden_id, empleado_id=None, usuario_id=None, db_alias='default'
+):
+    """
+    Envía al cliente el correo de que el equipo está listo para recolectar.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Recepción pulsa "Notificar equipo disponible" en detalle_orden.
+    La vista valida (estado finalizado, email válido, no duplicado) y encola
+    esta tarea. Aquí se arma el HTML, se manda por SMTP y se escribe historial.
+
+    Args:
+        orden_id: PK de OrdenServicio
+        empleado_id: PK del Empleado que disparó el envío (para historial)
+        usuario_id: PK del User (campanita éxito/error)
+        db_alias: tenant Celery multi-país
+    """
+    import re
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from email.mime.image import MIMEImage
+
+    from .models import HistorialOrden, OrdenServicio
+    from inventario.models import Empleado
+
+    logger.info('[EQUIPO-DISPONIBLE] Iniciando tarea orden_id=%s', orden_id)
+
+    try:
+        try:
+            orden = OrdenServicio.objects.select_related(
+                'detalle_equipo',
+                'sucursal',
+            ).get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            return {'success': False, 'mensaje': f'Orden {orden_id} no encontrada.'}
+
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return {'success': False, 'mensaje': 'Email de cliente inválido.'}
+
+        sucursal = orden.sucursal
+        folio = (
+            detalle.orden_cliente
+            if detalle and detalle.orden_cliente
+            else orden.numero_orden_interno
+        )
+        nombre_cliente = (detalle.nombre_cliente or 'cliente').strip() or 'cliente'
+        service_tag = (detalle.numero_serie or '').strip()
+
+        # Horario: preferir el de la sucursal; si está vacío, el texto estándar.
+        horario_default = 'Lunes a Viernes de 09:00 a 17:30 hrs horario corrido.'
+        horario_sucursal = (sucursal.horario_atencion or '').strip() if sucursal else ''
+        horario_atencion = horario_sucursal or horario_default
+
+        partes_ciudad = []
+        if sucursal:
+            if sucursal.ciudad:
+                partes_ciudad.append(sucursal.ciudad)
+            if sucursal.estado_provincia:
+                partes_ciudad.append(sucursal.estado_provincia)
+
+        context_email = {
+            'nombre_cliente': nombre_cliente,
+            'folio': folio,
+            'service_tag': service_tag,
+            'tipo_equipo': detalle.tipo_equipo or '',
+            'marca_equipo': detalle.marca or '',
+            'modelo_equipo': detalle.modelo or '',
+            'horario_atencion': horario_atencion,
+            'sucursal_nombre': sucursal.nombre if sucursal else 'Centro de servicio',
+            'sucursal_direccion': (sucursal.direccion or '').strip() if sucursal else '',
+            'sucursal_ciudad_estado': ', '.join(partes_ciudad),
+            'sucursal_telefono': (sucursal.telefono or '').strip() if sucursal else '',
+            'sucursal_horario_extra': '',
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/equipo_disponible_cliente.html',
+            context_email,
+        )
+
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f'SIC México — Servicio Técnico <{email_solo}>'
+        asunto = f'Equipo listo para recolección — {folio}'
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+        )
+        email_msg.content_subtype = 'html'
+
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header(
+                        'Content-Disposition', 'inline', filename='logo_sic.png'
+                    )
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning('[EQUIPO-DISPONIBLE] Logo CID: %s', e)
+
+        iconos_sociales = {
+            'icon_link': 'images/utilitys/link.png',
+            'icon_instagram': 'images/utilitys/instagram.png',
+            'icon_facebook': 'images/utilitys/facebook.png',
+            'icon_whatsapp': 'images/utilitys/whatsapp.png',
+        }
+        for cid_name, icon_static_path in iconos_sociales.items():
+            icon_path = finders.find(icon_static_path)
+            if not icon_path:
+                continue
+            try:
+                with open(icon_path, 'rb') as f:
+                    icon_mime = MIMEImage(f.read(), _subtype='png')
+                    icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                    icon_mime.add_header(
+                        'Content-Disposition', 'inline', filename=f'{cid_name}.png'
+                    )
+                    email_msg.attach(icon_mime)
+            except Exception as e:
+                logger.warning('[EQUIPO-DISPONIBLE] Icono %s: %s', cid_name, e)
+
+        email_msg.send(fail_silently=False)
+
+        empleado = None
+        if empleado_id:
+            try:
+                empleado = Empleado.objects.get(pk=empleado_id)
+            except Empleado.DoesNotExist:
+                empleado = None
+
+        # La vista ya marcó fecha_notificacion_equipo_disponible (candado).
+        # Aquí solo registramos el historial tras el envío exitoso.
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f'Correo de equipo disponible para recolección enviado a {email_cliente}'
+            ),
+            usuario=empleado,
+            es_sistema=False,
+        )
+
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_exito(
+                titulo='Equipo disponible notificado',
+                mensaje=f'Orden {folio} — Correo enviado a {email_cliente}.',
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+
+        return {
+            'success': True,
+            'orden': orden.numero_orden_interno,
+            'destinatario': email_cliente,
+        }
+
+    except Exception as exc:
+        logger.error(
+            '[EQUIPO-DISPONIBLE] Error orden %s: %s\n%s',
+            orden_id,
+            exc,
+            traceback.format_exc(),
+        )
+        # Liberar candado optimista de la vista si el SMTP falló.
+        try:
+            OrdenServicio.objects.filter(pk=orden_id).update(
+                fecha_notificacion_equipo_disponible=None,
+                usuario_notificacion_equipo_disponible=None,
+            )
+        except Exception:
+            pass
+
+        try:
+            _usuario_err = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo='Error al notificar equipo disponible',
+                mensaje=f'Orden {orden_id} — {str(exc)[:200]}',
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ============================================================================
 # TAREA: enviar_feedback_satisfaccion_task
 # Envía correo al cliente con link de encuesta de satisfacción después de
 # que su equipo fue entregado y la cotización fue aceptada.

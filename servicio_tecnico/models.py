@@ -101,6 +101,38 @@ class OrdenServicio(models.Model):
         blank=True,
         help_text="Fecha en que se entregó al cliente"
     )
+
+    # ------------------------------------------------------------------
+    # AVISO A RECEPCIÓN + CORREO "EQUIPO DISPONIBLE PARA RECOLECCIÓN"
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Cuando el equipo queda listo (egreso / finalizado), avisamos al
+    # responsable de seguimiento (campanita + push). El flag evita avisar
+    # dos veces si ambos disparadores ocurren. El correo al cliente es
+    # manual: recepción pulsa "Notificar equipo disponible".
+    # ------------------------------------------------------------------
+    aviso_recepcion_listo_enviado = models.BooleanField(
+        default=False,
+        help_text=(
+            "¿Ya se avisó a recepción (campanita/push) de que el equipo "
+            "está listo para notificar recolección al cliente?"
+        ),
+    )
+    fecha_notificacion_equipo_disponible = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Fecha en que se envió al cliente el correo de "
+            "'equipo disponible para recolección'"
+        ),
+    )
+    usuario_notificacion_equipo_disponible = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ordenes_notificacion_equipo_disponible',
+        help_text="Empleado que envió el correo de equipo disponible al cliente",
+    )
     
     # UBICACIÓN Y RESPONSABLES
     sucursal = models.ForeignKey(

@@ -156,6 +156,11 @@ urlpatterns = [
          views.enviar_imagenes_egreso_cliente,
          name='enviar_imagenes_egreso_cliente'),
 
+    # Notificar al cliente que el equipo está disponible para recolección
+    path('orden/<int:orden_id>/notificar-equipo-disponible/',
+         views.notificar_equipo_disponible,
+         name='notificar_equipo_disponible'),
+
     # Enviar video rewind de egreso al cliente (chain Celery: generar video → enviar correo)
     path('orden/<int:orden_id>/enviar-rewind-egreso/',
          views.enviar_rewind_egreso_cliente,

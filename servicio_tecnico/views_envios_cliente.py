@@ -964,3 +964,106 @@ def preview_pdf_diagnostico(request, orden_id):
         return HttpResponse(f'Error: {str(e)}', status=500)
 
 
+# ============================================================================
+# NOTIFICAR EQUIPO DISPONIBLE PARA RECOLECCIÓN
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(['POST'])
+def notificar_equipo_disponible(request, orden_id):
+    """
+    Encola el correo al cliente: equipo listo para recolectar.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Solo disponible cuando la orden está en estado 'finalizado'.
+    Marca la fecha de forma atómica para evitar doble clic, dispara Celery
+    y responde JSON inmediato. Si el correo falla, la task limpia la fecha.
+
+    Args:
+        request: HttpRequest POST
+        orden_id: PK de la orden
+
+    Returns:
+        JsonResponse con success / error
+    """
+    from django.utils import timezone
+    from config.paises_config import get_pais_actual
+    from .tasks import enviar_notificacion_equipo_disponible_task
+
+    orden = get_object_or_404(
+        OrdenServicio.objects.select_related('detalle_equipo'),
+        pk=orden_id,
+    )
+
+    # 1) Solo en Finalizado / Listo para Entrega
+    if orden.estado != 'finalizado':
+        return JsonResponse({
+            'success': False,
+            'error': (
+                '❌ El botón solo está disponible cuando la orden está en '
+                'estado "Finalizado / Listo para Entrega".'
+            ),
+        }, status=400)
+
+    detalle = orden.detalle_equipo
+    email_cliente = detalle.email_cliente if detalle else None
+    if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+        return JsonResponse({
+            'success': False,
+            'error': (
+                '❌ El email del cliente no está configurado o es el valor '
+                'por defecto. Actualízalo antes de notificar.'
+            ),
+        }, status=400)
+
+    # Empleado que dispara (historial + FK de la orden)
+    empleado = getattr(request.user, 'empleado', None)
+    empleado_id = empleado.pk if empleado else None
+
+    # 2) Candado atómico: solo el primer clic gana
+    ahora = timezone.now()
+    filas = OrdenServicio.objects.filter(
+        pk=orden.pk,
+        estado='finalizado',
+        fecha_notificacion_equipo_disponible__isnull=True,
+    ).update(
+        fecha_notificacion_equipo_disponible=ahora,
+        usuario_notificacion_equipo_disponible_id=empleado_id,
+    )
+    if filas == 0:
+        return JsonResponse({
+            'success': False,
+            'error': '❌ Esta orden ya fue notificada al cliente como equipo disponible.',
+            'ya_notificado': True,
+        }, status=400)
+
+    try:
+        async_result = enviar_notificacion_equipo_disponible_task.delay(
+            orden_id=orden.pk,
+            empleado_id=empleado_id,
+            usuario_id=request.user.pk,
+            db_alias=get_pais_actual()['db_alias'],
+        )
+    except Exception as e:
+        # Si no se pudo encolar, liberar el candado
+        OrdenServicio.objects.filter(pk=orden.pk).update(
+            fecha_notificacion_equipo_disponible=None,
+            usuario_notificacion_equipo_disponible=None,
+        )
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ No se pudo encolar el correo: {e}',
+        }, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'message': (
+            f'✅ Correo de equipo disponible encolado para {email_cliente}. '
+            'Se enviará en segundo plano.'
+        ),
+        'task_id': async_result.id,
+        'email': email_cliente,
+        'fecha_notificacion': ahora.isoformat(),
+    })
+

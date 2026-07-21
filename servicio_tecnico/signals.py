@@ -617,6 +617,37 @@ def notificar_dispatchers_finalizacion(sender, instance: OrdenServicio, created:
 
 
 @receiver(post_save, sender=OrdenServicio)
+def notificar_recepcion_al_finalizar(sender, instance: OrdenServicio, created: bool, **kwargs):
+    """
+    Avisa a recepción cuando la orden pasa a 'finalizado'.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Disparador B del plan "equipo disponible": cambio a Finalizado / Listo
+    para Entrega. Si el aviso ya se mandó al subir fotos de egreso, el helper
+    omite (flag aviso_recepcion_listo_enviado). Aplica a garantía y OOW.
+    """
+    if created:
+        return
+
+    estado_anterior = getattr(instance, '_estado_anterior', None)
+
+    if instance.estado == 'finalizado' and estado_anterior != 'finalizado':
+        from servicio_tecnico.services.notificaciones_recepcion import (
+            notificar_recepcion_equipo_listo,
+        )
+
+        try:
+            notificar_recepcion_equipo_listo(instance, motivo='finalizado')
+        except Exception as exc:
+            logger_push.warning(
+                '[AVISO-RECEPCION] Signal finalizado falló orden %s: %s',
+                instance.pk,
+                exc,
+            )
+
+
+@receiver(post_save, sender=OrdenServicio)
 def encolar_recordatorios_imagen_al_finalizar(sender, instance: OrdenServicio, created: bool, **kwargs):
     """
     Al pasar a 'finalizado', encola recordatorios inmediatos de imágenes faltantes.

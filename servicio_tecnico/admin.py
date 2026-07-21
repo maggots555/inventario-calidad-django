@@ -246,6 +246,18 @@ class OrdenServicioAdmin(admin.ModelAdmin):
                 'fecha_entrega',
             )
         }),
+        ('Equipo disponible / Recepción', {
+            'fields': (
+                'aviso_recepcion_listo_enviado',
+                'fecha_notificacion_equipo_disponible',
+                'usuario_notificacion_equipo_disponible',
+            ),
+            'classes': ('collapse',),
+            'description': (
+                'Aviso interno a recepción al quedar listo el equipo, y '
+                'registro del correo al cliente "Notificar equipo disponible".'
+            ),
+        }),
         ('Reingreso y ScoreCard', {
             'fields': (
                 'es_reingreso',

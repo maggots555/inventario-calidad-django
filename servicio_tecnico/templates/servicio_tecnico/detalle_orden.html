@@ -2380,6 +2380,42 @@
                                  </div>
                              </div>
 
+                             {# Botón: notificar al cliente que el equipo está listo para recolectar #}
+                             {% if orden.estado == 'finalizado' %}
+                             <div class="row mb-3" id="notificar-equipo-disponible">
+                                 <div class="col-12">
+                                     <button type="button"
+                                             class="btn w-100 {% if equipo_disponible_ya_notificado %}btn-outline-success{% else %}btn-success{% endif %}"
+                                             id="btnNotificarEquipoDisponible"
+                                             data-url="{% url 'servicio_tecnico:notificar_equipo_disponible' orden.id %}"
+                                             data-email="{{ orden.detalle_equipo.email_cliente|default:'' }}"
+                                             data-folio="{{ orden.detalle_equipo.orden_cliente|default:orden.numero_orden_interno }}"
+                                             {% if equipo_disponible_ya_notificado or not email_cliente_valido_notificar %}disabled{% endif %}
+                                             title="{% if equipo_disponible_ya_notificado %}Ya se notificó al cliente{% elif not email_cliente_valido_notificar %}Configura el email del cliente{% else %}Enviar correo: equipo listo para recolección{% endif %}">
+                                         {% if equipo_disponible_ya_notificado %}
+                                             <i class="bi bi-check-circle-fill me-1"></i> Equipo notificado
+                                         {% else %}
+                                             <i class="bi bi-bell-fill me-1"></i> Notificar equipo disponible
+                                         {% endif %}
+                                     </button>
+                                     {% if not email_cliente_valido_notificar and not equipo_disponible_ya_notificado %}
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-info-circle"></i> Actualiza el email del cliente para habilitar el aviso
+                                     </small>
+                                     {% elif equipo_disponible_ya_notificado and orden.fecha_notificacion_equipo_disponible %}
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-clock-history"></i>
+                                         Notificado el {{ orden.fecha_notificacion_equipo_disponible|date:"d/m/Y H:i" }}
+                                     </small>
+                                     {% else %}
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-info-circle"></i> Envía al cliente el aviso de que puede recolectar el equipo
+                                     </small>
+                                     {% endif %}
+                                 </div>
+                             </div>
+                             {% endif %}
+
                              <!-- Botón para enviar video rewind al cliente (4 tipos diagnóstico ó 3 tipos venta mostrador) -->
                              {% if tiene_4_tipos_fotos or tiene_3_tipos_fotos %}
                              <div class="row mb-3">
@@ -6184,6 +6220,7 @@
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
 <!-- v6.1: Mejoras en UX del selector de imágenes -->
 <script src="{% static 'js/upload_imagenes_dual.js' %}"></script>
+<script src="{% static 'js/notificar_equipo_disponible.js' %}"></script>
 
 <!-- Subida y eliminación de videos de evidencia -->
 <script src="{% static 'js/upload_video.js' %}"></script>

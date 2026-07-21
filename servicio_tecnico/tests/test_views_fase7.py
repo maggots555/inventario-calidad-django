@@ -66,6 +66,10 @@ class CompatibilidadRhitsoEnviosReexportsTest(SimpleTestCase):
                 views_envios_cliente.enviar_diagnostico_cliente,
             ),
             ('preview_pdf_diagnostico', views_envios_cliente.preview_pdf_diagnostico),
+            (
+                'notificar_equipo_disponible',
+                views_envios_cliente.notificar_equipo_disponible,
+            ),
         ]
         for attr, expected in pares:
             with self.subTest(attr=attr):
@@ -183,6 +187,11 @@ class CompatibilidadRhitsoEnviosReexportsTest(SimpleTestCase):
                 'servicio_tecnico:preview_pdf_diagnostico',
                 {'orden_id': 1},
                 views_envios_cliente.preview_pdf_diagnostico,
+            ),
+            (
+                'servicio_tecnico:notificar_equipo_disponible',
+                {'orden_id': 1},
+                views_envios_cliente.notificar_equipo_disponible,
             ),
         ]
         for name, kwargs, expected in casos:
