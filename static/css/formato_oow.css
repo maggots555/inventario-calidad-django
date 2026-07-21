@@ -10,12 +10,145 @@
 
 .formato-oow-titulo {
   color: var(--text-primary, #1e293b);
+  text-wrap: balance;
+}
+
+/* Badge diferenciador OOW vs Garantía Dell (solo acento, no todo el theme) */
+.formato-oow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.25rem;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  background: #003366;
+  color: #fff;
+}
+
+.formato-oow-page--garantia .formato-oow-badge {
+  background: #007db8;
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .formato-oow-badge {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .formato-oow-page--garantia .formato-oow-badge {
+  background: #0e7490;
+  color: #ecfeff;
+}
+
+/* Chips de navegación / progreso del wizard */
+.formato-oow-nav-progreso {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  background: var(--body-bg, #fff);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .formato-oow-nav-progreso {
+  background: var(--body-bg, #0f172a);
+}
+
+.formato-oow-nav-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 40px;
+  padding: 0.35rem 0.7rem;
+  border-radius: 2rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #1e293b);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  scroll-margin-top: 4.5rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.formato-oow-nav-chip:hover,
+.formato-oow-nav-chip:focus-visible {
+  border-color: #003366;
+  color: #003366;
+  outline: 2px solid rgba(0, 51, 102, 0.35);
+  outline-offset: 1px;
+}
+
+.formato-oow-page--garantia .formato-oow-nav-chip:hover,
+.formato-oow-page--garantia .formato-oow-nav-chip:focus-visible {
+  border-color: #007db8;
+  color: #007db8;
+  outline-color: rgba(0, 125, 184, 0.4);
+}
+
+.formato-oow-nav-chip[aria-current="true"] {
+  background: #003366;
+  border-color: #003366;
+  color: #fff;
+}
+
+.formato-oow-page--garantia .formato-oow-nav-chip[aria-current="true"] {
+  background: #007db8;
+  border-color: #007db8;
+}
+
+.formato-oow-nav-chip.is-pendiente {
+  border-style: dashed;
+  border-color: #f59e0b;
+}
+
+.formato-oow-nav-chip.is-listo {
+  border-color: #16a34a;
+}
+
+[data-bs-theme="dark"] .formato-oow-nav-chip {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .formato-oow-nav-chip[aria-current="true"] {
+  background: #334155;
+  border-color: #64748b;
+  color: #f8fafc;
+}
+
+.formato-oow-nav-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  opacity: 0.85;
 }
 
 .formato-oow-card {
   background-color: var(--card-bg, #fff);
   border: 1px solid var(--border-color, #dee2e6);
   border-radius: 0.5rem;
+  scroll-margin-top: 5.5rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Resalte temporal cuando falla validación al finalizar */
+.formato-oow-card.is-error-focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.25);
+}
+
+[data-bs-theme="dark"] .formato-oow-card.is-error-focus {
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.3);
 }
 
 .formato-oow-section-header {
@@ -25,7 +158,12 @@
   padding: 0.65rem 1rem;
 }
 
-[data-bs-theme="dark"] .formato-oow-section-header {
+.formato-oow-page--garantia .formato-oow-section-header {
+  background-color: #007db8;
+}
+
+[data-bs-theme="dark"] .formato-oow-section-header,
+[data-bs-theme="dark"] .formato-oow-page--garantia .formato-oow-section-header {
   background-color: #1e293b;
   color: #e2e8f0;
   border-bottom: 1px solid var(--border-color, #334155);
@@ -160,17 +298,18 @@
 
 .formato-oow-evidencia-eliminar {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 0;
+  right: 0;
   z-index: 2;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
+  /* PWA: hit area ≥44×44; el círculo visual queda centrado */
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: none;
-  border-radius: 50%;
-  background: rgba(185, 28, 28, 0.92);
+  border-radius: 0 0 0 0.5rem;
+  background: transparent;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -178,23 +317,39 @@
   font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
-.formato-oow-evidencia-eliminar:hover,
-.formato-oow-evidencia-eliminar:focus-visible {
+.formato-oow-evidencia-eliminar::before {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(185, 28, 28, 0.92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  z-index: -1;
+}
+
+.formato-oow-evidencia-eliminar:hover::before,
+.formato-oow-evidencia-eliminar:focus-visible::before {
   background: #991b1b;
+}
+
+.formato-oow-evidencia-eliminar:focus-visible {
   outline: 2px solid #fecaca;
   outline-offset: 1px;
 }
 
-[data-bs-theme="dark"] .formato-oow-evidencia-eliminar {
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar::before {
   background: rgba(248, 113, 113, 0.95);
+}
+
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar {
   color: #0f172a;
 }
 
-[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:hover,
-[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:focus-visible {
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:hover::before,
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:focus-visible::before {
   background: #f87171;
 }
 
@@ -242,6 +397,8 @@
   background: var(--body-bg, #fff);
   border-top: 1px solid var(--border-color, #e2e8f0);
   z-index: 10;
+  /* Notch / home indicator en iPad y móviles */
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 [data-bs-theme="dark"] .formato-oow-actions {
@@ -251,6 +408,54 @@
 .formato-oow-actions .btn {
   min-height: 48px;
   min-width: 160px;
+}
+
+/* Checklist compacto de requisitos antes de Finalizar */
+.formato-oow-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.formato-oow-check-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  color: var(--text-muted, #64748b);
+  background: var(--card-bg, #f8fafc);
+}
+
+.formato-oow-check-item.is-listo {
+  border-color: #16a34a;
+  color: #15803d;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.formato-oow-check-item.is-pendiente {
+  border-color: #f59e0b;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+[data-bs-theme="dark"] .formato-oow-check-item {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .formato-oow-check-item.is-listo {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+}
+
+[data-bs-theme="dark"] .formato-oow-check-item.is-pendiente {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
 }
 
 .formato-oow-status-box {
@@ -295,6 +500,27 @@
   text-align: center;
   color: #f8fafc;
   padding: 1.5rem;
+}
+
+.formato-oow-overlay-spinner {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Modales: evitar scroll encadenado al fondo (tablet) */
+.formato-oow-aviso-modal {
+  overscroll-behavior: contain;
+}
+
+.modal-dialog-scrollable .modal-body.formato-oow-aviso-modal {
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .formato-oow-card,
+  .formato-oow-nav-chip {
+    transition: none;
+  }
 }
 
 /* Lista de hasta 3 correos para compartir el PDF */

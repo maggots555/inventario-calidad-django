@@ -368,6 +368,11 @@ urlpatterns = [
     path('orden/<int:orden_id>/formato-oow/subir-evidencia/',
          views.formato_oow_subir_evidencia,
          name='formato_oow_subir_evidencia'),
+    path(
+        'orden/<int:orden_id>/formato-oow/evidencia/<int:imagen_id>/eliminar/',
+        views.formato_oow_eliminar_evidencia,
+        name='formato_oow_eliminar_evidencia',
+    ),
 
     # Formato Digital Garantía Dell (wizard iPad + PDF plantilla Dell)
     path('orden/<int:orden_id>/formato-garantia/',

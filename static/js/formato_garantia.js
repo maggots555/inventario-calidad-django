@@ -510,7 +510,7 @@
         }
     }
     function inicializarFormatoGarantia() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
         const app = byId('formatoGarantiaApp');
         if (!app) {
             return;
@@ -532,6 +532,23 @@
                 formatoInicial = {};
             }
         }
+        /**
+         * Resalta una sección y hace scroll (tablet: el operador ve qué falta).
+         */
+        const enfocarSeccion = (seccionId) => {
+            document.querySelectorAll('.formato-oow-card.is-error-focus').forEach((el) => {
+                el.classList.remove('is-error-focus');
+            });
+            const seccion = byId(seccionId);
+            if (!seccion) {
+                return;
+            }
+            seccion.classList.add('is-error-focus');
+            seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window.setTimeout(() => {
+                seccion.classList.remove('is-error-focus');
+            }, 3500);
+        };
         /**
          * Lee los correos escritos en los inputs dinámicos (máx. 3).
          */
@@ -653,6 +670,36 @@
         padFirmaCli.ctx.strokeStyle = '#111827';
         padFirmaCli.ctx.lineWidth = 2.2;
         /**
+         * Actualiza checklist sticky (firma / condiciones / privacidad).
+         *
+         * EXPLICACIÓN PARA PRINCIPIANTES:
+         * Antes de Finalizar, la barra inferior muestra en verde lo listo
+         * y en ámbar lo pendiente, para no perderse en el scroll largo.
+         */
+        const actualizarChecklistRequeridos = () => {
+            const tieneFirma = padFirmaCli.tieneTrazos || Boolean(formatoInicial.firma_cliente_url);
+            const items = [
+                { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
+                { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
+                { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
+            ];
+            items.forEach((item) => {
+                const el = byId(item.id);
+                if (!el) {
+                    return;
+                }
+                el.classList.toggle('is-listo', item.listo);
+                el.classList.toggle('is-pendiente', !item.listo);
+                if (item.chipId) {
+                    const chip = byId(item.chipId);
+                    if (chip) {
+                        chip.classList.toggle('is-listo', item.listo);
+                        chip.classList.toggle('is-pendiente', !item.listo);
+                    }
+                }
+            });
+        };
+        /**
          * Actualiza la miniatura de firma (igual que las previews de daños).
          */
         const actualizarPreviewFirma = (src) => {
@@ -688,6 +735,7 @@
                 padFirmaCli.ctx.lineWidth = 2.2;
                 padFirmaCli.tieneTrazos = true;
                 actualizarPreviewFirma(url);
+                actualizarChecklistRequeridos();
             };
             img.src = url;
         };
@@ -811,6 +859,7 @@
         canvasFirmaCli.addEventListener('pointerup', () => {
             if (padFirmaCli.tieneTrazos) {
                 actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
+                actualizarChecklistRequeridos();
             }
         });
         (_f = byId('btnLimpiarFirmaCli')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
@@ -820,13 +869,22 @@
             actualizarPreviewFirma('');
             // Si borra, ya no cuenta la firma previa del servidor hasta que vuelva a firmar
             formatoInicial.firma_cliente_url = undefined;
+            actualizarChecklistRequeridos();
         });
-        (_g = byId('btnAceptarAvisoModal')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
+        (_g = byId('aceptaCondiciones')) === null || _g === void 0 ? void 0 : _g.addEventListener('change', () => {
+            actualizarChecklistRequeridos();
+        });
+        (_h = byId('btnAceptarAvisoModal')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
             const cb = byId('aceptaPrivacidad');
             if (cb) {
                 cb.checked = true;
             }
+            actualizarChecklistRequeridos();
         });
+        (_j = byId('aceptaPrivacidad')) === null || _j === void 0 ? void 0 : _j.addEventListener('change', () => {
+            actualizarChecklistRequeridos();
+        });
+        actualizarChecklistRequeridos();
         const construirPayload = (incluirFlagsFinal) => {
             const radio = document.querySelector('input[name="comoEnteraste"]:checked');
             const payload = {
@@ -867,12 +925,24 @@
             if (actions) {
                 actions.hidden = true;
             }
-            if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
-                setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Validamos en orden: si falta algo, scroll a esa sección y no generamos PDF.
+            if (!checked('aceptaCondiciones')) {
+                setStatus('Debes aceptar las condiciones de entrega del equipo.', true, false);
+                enfocarSeccion('seccion-firma');
+                actualizarChecklistRequeridos();
+                return;
+            }
+            if (!checked('aceptaPrivacidad')) {
+                setStatus('Debes aceptar el aviso de privacidad.', true, false);
+                enfocarSeccion('seccion-envio');
+                actualizarChecklistRequeridos();
                 return;
             }
             if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
                 setStatus('La firma del cliente es obligatoria.', true, false);
+                enfocarSeccion('seccion-firma');
+                actualizarChecklistRequeridos();
                 return;
             }
             setBotonesOcupados(true);
@@ -933,7 +1003,7 @@
             }
             return data;
         };
-        (_h = byId('btnGuardarBorrador')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', async () => {
+        (_k = byId('btnGuardarBorrador')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', async () => {
             const actions = byId('formatoGarantiaStatusActions');
             if (actions) {
                 actions.hidden = true;
@@ -960,14 +1030,14 @@
                 setBotonesOcupados(false);
             }
         });
-        (_j = byId('btnFinalizar')) === null || _j === void 0 ? void 0 : _j.addEventListener('click', () => {
+        (_l = byId('btnFinalizar')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', () => {
             void ejecutarGeneracionPdf({
                 soloRegenerar: false,
                 mensajeExito: '¡Listo! Formato finalizado y PDF generado. Si no se abrió solo, usa el botón de abajo.',
             });
         });
         // Botón solo visible cuando el formato ya está finalizado
-        (_k = byId('btnRegenerarPdf')) === null || _k === void 0 ? void 0 : _k.addEventListener('click', () => {
+        (_m = byId('btnRegenerarPdf')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', () => {
             void ejecutarGeneracionPdf({
                 soloRegenerar: true,
                 mensajeExito: 'PDF regenerado (sin reenviar correo). Si no se abrió solo, usa el botón de abajo.',
@@ -977,7 +1047,7 @@
          * Reenvía el PDF actual por correo (no regenera el documento).
          * Usa los emails del formulario (hasta 3).
          */
-        (_l = byId('btnReenviarEmail')) === null || _l === void 0 ? void 0 : _l.addEventListener('click', async () => {
+        (_o = byId('btnReenviarEmail')) === null || _o === void 0 ? void 0 : _o.addEventListener('click', async () => {
             const emails = leerEmailsEnvio();
             if (emails.length === 0) {
                 setStatus('Captura al menos un correo en “Email(s) para recibir el formato”.', true, false);
@@ -1096,7 +1166,7 @@
             }
         };
         // Delegación: un solo listener para botones ya existentes y los nuevos al subir
-        (_m = byId('listaEvidencias')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', (ev) => {
+        (_p = byId('listaEvidencias')) === null || _p === void 0 ? void 0 : _p.addEventListener('click', (ev) => {
             const target = ev.target;
             const btn = target === null || target === void 0 ? void 0 : target.closest('.formato-oow-evidencia-eliminar');
             if (!btn) {
@@ -1152,7 +1222,7 @@
         };
         // EXPLICACIÓN PARA PRINCIPIANTES:
         // En Garantía Dell NO pedimos INE; solo resultado de PC Audit.
-        (_o = byId('fotoEscaneo')) === null || _o === void 0 ? void 0 : _o.addEventListener('change', (ev) => {
+        (_q = byId('fotoEscaneo')) === null || _q === void 0 ? void 0 : _q.addEventListener('change', (ev) => {
             const t = ev.target;
             void subirEvidencia(t, 'escaneo_garantia');
         });

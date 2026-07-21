@@ -55,6 +55,10 @@ class FormatoOowReexportsTest(SimpleTestCase):
             st_views.abrir_formato_oow_desde_sicser,
             views_formato_oow.abrir_formato_oow_desde_sicser,
         )
+        self.assertIs(
+            st_views.formato_oow_eliminar_evidencia,
+            views_formato_oow.formato_oow_eliminar_evidencia,
+        )
 
         match = resolve(reverse('servicio_tecnico:formato_oow_wizard', args=[1]))
         self.assertIs(match.func, views_formato_oow.formato_oow_wizard)
@@ -66,6 +70,17 @@ class FormatoOowReexportsTest(SimpleTestCase):
 
         match_abrir = resolve(reverse('servicio_tecnico:abrir_formato_oow_desde_sicser'))
         self.assertIs(match_abrir.func, views_formato_oow.abrir_formato_oow_desde_sicser)
+
+        match_elim = resolve(
+            reverse(
+                'servicio_tecnico:formato_oow_eliminar_evidencia',
+                args=[1, 2],
+            )
+        )
+        self.assertIs(
+            match_elim.func,
+            views_formato_oow.formato_oow_eliminar_evidencia,
+        )
 
 
 class FormatoOowServiceTest(TestCase):
@@ -563,3 +578,183 @@ class FormatoOowEmailTaskTest(TestCase):
                 tipo_evento='email',
             ).exists()
         )
+
+
+class FormatoOowEliminarEvidenciaTest(TestCase):
+    """
+    POST eliminar solo borra identificacion_oow / escaneo_oow de esa orden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Paridad con Formato Garantía: el técnico puede corregir una foto mal tomada
+    desde el wizard sin ir a la galería general.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Elim Evidencia OOW',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='elim_oow_evid',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Elim Evidencia OOW',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='elim.oow@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        ct = ContentType.objects.get_for_model(OrdenServicio)
+        for codename in ('view_ordenservicio', 'change_ordenservicio'):
+            perm = Permission.objects.get(content_type=ct, codename=codename)
+            self.user.user_permissions.add(perm)
+
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='111222333',
+            sicser_origen='oow',
+            sicser_id_externo='111222333',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude',
+            numero_serie='SNELOW1',
+            email_cliente='c@oow.com',
+            falla_principal='Falla',
+            gama='media',
+        )
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_eliminar_escaneo_oow(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from servicio_tecnico.models import ImagenOrden
+
+        img = ImagenOrden(
+            orden=self.orden,
+            tipo='escaneo_oow',
+            descripcion='PC Audit OOW test',
+            subido_por=self.empleado,
+        )
+        img.imagen.save('escaneo_oow_test.png', ContentFile(_png_bytes()), save=True)
+
+        url = reverse(
+            'servicio_tecnico:formato_oow_eliminar_evidencia',
+            args=[self.orden.pk, img.pk],
+        )
+        request = self.factory.post(url)
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        resp = views_formato_oow.formato_oow_eliminar_evidencia(
+            request, orden_id=self.orden.pk, imagen_id=img.pk,
+        )
+        self.assertEqual(resp.status_code, 200)
+        import json
+        data = json.loads(resp.content.decode('utf-8'))
+        self.assertTrue(data.get('success'))
+        self.assertFalse(ImagenOrden.objects.filter(pk=img.pk).exists())
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_eliminar_identificacion_oow(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from servicio_tecnico.models import ImagenOrden
+
+        img = ImagenOrden(
+            orden=self.orden,
+            tipo='identificacion_oow',
+            descripcion='INE test',
+            subido_por=self.empleado,
+        )
+        img.imagen.save('ident_oow_test.png', ContentFile(_png_bytes()), save=True)
+
+        request = self.factory.post(
+            reverse(
+                'servicio_tecnico:formato_oow_eliminar_evidencia',
+                args=[self.orden.pk, img.pk],
+            )
+        )
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        resp = views_formato_oow.formato_oow_eliminar_evidencia(
+            request, orden_id=self.orden.pk, imagen_id=img.pk,
+        )
+        self.assertEqual(resp.status_code, 200)
+        import json
+        data = json.loads(resp.content.decode('utf-8'))
+        self.assertTrue(data.get('success'))
+        self.assertFalse(ImagenOrden.objects.filter(pk=img.pk).exists())
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_no_elimina_otro_tipo(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from servicio_tecnico.models import ImagenOrden
+
+        img = ImagenOrden(
+            orden=self.orden,
+            tipo='ingreso',
+            descripcion='No debe borrarse',
+            subido_por=self.empleado,
+        )
+        img.imagen.save('ingreso_oow_test.png', ContentFile(_png_bytes()), save=True)
+
+        request = self.factory.post(
+            reverse(
+                'servicio_tecnico:formato_oow_eliminar_evidencia',
+                args=[self.orden.pk, img.pk],
+            )
+        )
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        resp = views_formato_oow.formato_oow_eliminar_evidencia(
+            request, orden_id=self.orden.pk, imagen_id=img.pk,
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(ImagenOrden.objects.filter(pk=img.pk).exists())

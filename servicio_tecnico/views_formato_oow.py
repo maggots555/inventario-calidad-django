@@ -470,3 +470,87 @@ def formato_oow_subir_evidencia(request, orden_id: int):
             'descripcion': imagen.descripcion,
         },
     })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
+@require_http_methods(['POST'])
+def formato_oow_eliminar_evidencia(request, orden_id: int, imagen_id: int):
+    """
+    Elimina una foto de identificación o escaneo del Formato OOW.
+
+    Objetivo de negocio:
+        Si el técnico se equivoca al subir INE o PC Audit, puede borrarlo
+        desde la miniatura del wizard (paridad con Formato Garantía).
+
+    Args:
+        request: HttpRequest POST (AJAX)
+        orden_id: PK de OrdenServicio
+        imagen_id: PK de ImagenOrden
+
+    Efectos secundarios:
+        Borra archivos en disco/storage y el registro ImagenOrden.
+        Solo permite tipos ``identificacion_oow`` / ``escaneo_oow`` de esa orden.
+    """
+    from pathlib import Path
+
+    from .models import HistorialOrden
+    from .services.formato_oow import _empleado_desde_usuario
+
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    empleado = _empleado_desde_usuario(request.user)
+    if not empleado:
+        return _json_error('Tu usuario no tiene perfil de empleado', status=403)
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Filtramos por orden + tipos OOW para que nadie borre fotos de otra orden
+    # ni evidencias que no sean del formato digital OOW.
+    tipos_oow = ('identificacion_oow', 'escaneo_oow')
+    imagen = ImagenOrden.objects.filter(
+        pk=imagen_id,
+        orden=orden,
+        tipo__in=tipos_oow,
+    ).first()
+    if not imagen:
+        return _json_error('Evidencia no encontrada o no es del formato OOW', status=404)
+
+    descripcion = imagen.descripcion or imagen.nombre_archivo or f'#{imagen.pk}'
+    tipo_label = (
+        'Identificación OOW' if imagen.tipo == 'identificacion_oow' else 'Escaneo OOW'
+    )
+
+    for campo in ('imagen', 'imagen_original'):
+        archivo = getattr(imagen, campo, None)
+        if not archivo:
+            continue
+        try:
+            ruta = Path(archivo.path)
+            if ruta.is_file():
+                ruta.unlink()
+        except Exception as exc:
+            logger.warning(
+                '[FORMATO_OOW] No se pudo borrar archivo %s de imagen %s: %s',
+                campo, imagen_id, exc,
+            )
+
+    imagen.delete()
+
+    try:
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='imagen',
+            comentario=(
+                f'{tipo_label} eliminado: {descripcion} '
+                f'(por {empleado.nombre_completo})'
+            ),
+            usuario=empleado,
+            es_sistema=False,
+        )
+    except Exception as exc:
+        logger.warning('[FORMATO_OOW] Historial al eliminar evidencia: %s', exc)
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': 'Foto eliminada',
+        'imagen_id': imagen_id,
+    })

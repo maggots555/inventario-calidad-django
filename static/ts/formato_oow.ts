@@ -637,6 +637,8 @@ function inicializarFormatoOow(): void {
   const urlReenviar = app.dataset.urlReenviar || '';
   const urlPdf = app.dataset.urlPdf || '';
   const urlEvidencia = app.dataset.urlEvidencia || '';
+  // Plantilla con 999999999: se sustituye por el id real al eliminar
+  const urlEliminarEvidenciaTpl = app.dataset.urlEliminarEvidencia || '';
 
   const dataEl = document.getElementById('formato-oow-data');
   let formatoInicial: {
@@ -652,6 +654,24 @@ function inicializarFormatoOow(): void {
       formatoInicial = {};
     }
   }
+
+  /**
+   * Resalta una sección y hace scroll (tablet: el operador ve qué falta).
+   */
+  const enfocarSeccion = (seccionId: string): void => {
+    document.querySelectorAll('.formato-oow-card.is-error-focus').forEach((el) => {
+      el.classList.remove('is-error-focus');
+    });
+    const seccion = byId(seccionId);
+    if (!seccion) {
+      return;
+    }
+    seccion.classList.add('is-error-focus');
+    seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      seccion.classList.remove('is-error-focus');
+    }, 3500);
+  };
 
   /**
    * Lee los correos escritos en los inputs dinámicos (máx. 3).
@@ -787,6 +807,37 @@ function inicializarFormatoOow(): void {
   padFirmaCli.ctx.lineWidth = 2.2;
 
   /**
+   * Actualiza checklist sticky (firma / condiciones / privacidad).
+   *
+   * EXPLICACIÓN PARA PRINCIPIANTES:
+   * Antes de Finalizar, la barra inferior muestra en verde lo listo
+   * y en ámbar lo pendiente, para no perderse en el scroll largo.
+   */
+  const actualizarChecklistRequeridos = (): void => {
+    const tieneFirma = padFirmaCli.tieneTrazos || Boolean(formatoInicial.firma_cliente_url);
+    const items: Array<{ id: string; listo: boolean; chipId?: string }> = [
+      { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
+      { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
+      { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
+    ];
+    items.forEach((item) => {
+      const el = byId(item.id);
+      if (!el) {
+        return;
+      }
+      el.classList.toggle('is-listo', item.listo);
+      el.classList.toggle('is-pendiente', !item.listo);
+      if (item.chipId) {
+        const chip = byId(item.chipId);
+        if (chip) {
+          chip.classList.toggle('is-listo', item.listo);
+          chip.classList.toggle('is-pendiente', !item.listo);
+        }
+      }
+    });
+  };
+
+  /**
    * Actualiza la miniatura de firma (igual que las previews de daños).
    */
   const actualizarPreviewFirma = (src: string): void => {
@@ -826,6 +877,7 @@ function inicializarFormatoOow(): void {
       padFirmaCli.ctx.lineWidth = 2.2;
       padFirmaCli.tieneTrazos = true;
       actualizarPreviewFirma(url);
+      actualizarChecklistRequeridos();
     };
     img.src = url;
   };
@@ -966,6 +1018,7 @@ function inicializarFormatoOow(): void {
   canvasFirmaCli.addEventListener('pointerup', () => {
     if (padFirmaCli.tieneTrazos) {
       actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
+      actualizarChecklistRequeridos();
     }
   });
 
@@ -976,6 +1029,11 @@ function inicializarFormatoOow(): void {
     actualizarPreviewFirma('');
     // Si borra, ya no cuenta la firma previa del servidor hasta que vuelva a firmar
     formatoInicial.firma_cliente_url = undefined;
+    actualizarChecklistRequeridos();
+  });
+
+  byId('aceptaCondiciones')?.addEventListener('change', () => {
+    actualizarChecklistRequeridos();
   });
 
   byId('btnAceptarAvisoModal')?.addEventListener('click', () => {
@@ -983,7 +1041,15 @@ function inicializarFormatoOow(): void {
     if (cb) {
       cb.checked = true;
     }
+    actualizarChecklistRequeridos();
   });
+
+  byId('aceptaPrivacidad')?.addEventListener('change', () => {
+    actualizarChecklistRequeridos();
+  });
+
+  // Estado inicial del checklist (p. ej. borrador ya firmado)
+  actualizarChecklistRequeridos();
 
   const construirPayload = (incluirFlagsFinal: boolean): FormatoOowPayload => {
     const radio = document.querySelector('input[name="comoEnteraste"]:checked') as HTMLInputElement | null;
@@ -1025,12 +1091,24 @@ function inicializarFormatoOow(): void {
     if (actions) {
       actions.hidden = true;
     }
-    if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
-      setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Validamos en orden: si falta algo, scroll a esa sección y no generamos PDF.
+    if (!checked('aceptaCondiciones')) {
+      setStatus('Debes aceptar las condiciones de entrega del equipo.', true, false);
+      enfocarSeccion('seccion-firma');
+      actualizarChecklistRequeridos();
+      return;
+    }
+    if (!checked('aceptaPrivacidad')) {
+      setStatus('Debes aceptar el aviso de privacidad.', true, false);
+      enfocarSeccion('seccion-envio');
+      actualizarChecklistRequeridos();
       return;
     }
     if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
       setStatus('La firma del cliente es obligatoria.', true, false);
+      enfocarSeccion('seccion-firma');
+      actualizarChecklistRequeridos();
       return;
     }
 
@@ -1207,7 +1285,7 @@ function inicializarFormatoOow(): void {
     const fd = new FormData();
     fd.append('tipo', tipo);
     fd.append('imagen', file);
-      fd.append('descripcion', tipo === 'escaneo_oow' ? 'Escaneo OOW' : 'Identificación oficial OOW');
+    fd.append('descripcion', tipo === 'escaneo_oow' ? 'Escaneo OOW' : 'Identificación oficial OOW');
     setStatus('Subiendo foto…', false, true);
     try {
       const resp = await fetch(urlEvidencia, {
@@ -1219,9 +1297,9 @@ function inicializarFormatoOow(): void {
       const data = (await resp.json()) as {
         success?: boolean;
         error?: string;
-        imagen?: { url: string; tipo: string };
+        imagen?: { id: number; url: string; tipo: string };
       };
-      if (!resp.ok || !data.success || !data.imagen) {
+      if (!resp.ok || !data.success || !data.imagen || !data.imagen.url) {
         throw new Error(data.error || 'No se pudo subir la imagen');
       }
       const lista = byId('listaEvidencias');
@@ -1229,14 +1307,16 @@ function inicializarFormatoOow(): void {
       if (vacias) {
         vacias.remove();
       }
-      if (lista) {
-        const a = document.createElement('a');
-        a.href = data.imagen.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.className = 'formato-oow-thumb';
-        a.innerHTML = `<img src="${data.imagen.url}" alt="${tipo}"><span>${tipo}</span>`;
-        lista.prepend(a);
+      if (lista && data.imagen.id) {
+        const etiqueta = tipo === 'escaneo_oow'
+          ? 'Resultado de escaneo — OOW'
+          : 'Identificación oficial — OOW';
+        const item = crearItemEvidencia({
+          id: data.imagen.id,
+          url: data.imagen.url,
+          etiqueta,
+        });
+        lista.prepend(item);
       }
       setStatus('Foto guardada.', false, false);
       input.value = '';
@@ -1244,6 +1324,117 @@ function inicializarFormatoOow(): void {
       setStatus(err instanceof Error ? err.message : 'Error al subir foto', true, false);
     }
   };
+
+  /**
+   * Crea la miniatura de una evidencia con botón eliminar.
+   *
+   * EXPLICACIÓN PARA PRINCIPIANTES:
+   * Al subir o al cargar la página, cada foto lleva un botón rojo (X).
+   * Al hacer clic pedimos confirmación y llamamos al endpoint de borrado.
+   */
+  const crearItemEvidencia = (opts: {
+    id: number;
+    url: string;
+    etiqueta: string;
+  }): HTMLDivElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'formato-oow-evidencia-item';
+    wrap.dataset.imagenId = String(opts.id);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'formato-oow-evidencia-eliminar';
+    btn.title = 'Eliminar esta foto';
+    btn.setAttribute('aria-label', 'Eliminar foto de evidencia');
+    btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+
+    const enlace = document.createElement('a');
+    enlace.href = opts.url;
+    enlace.target = '_blank';
+    enlace.rel = 'noopener';
+    enlace.className = 'formato-oow-thumb';
+    enlace.innerHTML = `<img src="${opts.url}" alt="${opts.etiqueta}" width="120" height="80"><span>${opts.etiqueta}</span>`;
+
+    wrap.appendChild(btn);
+    wrap.appendChild(enlace);
+    return wrap;
+  };
+
+  const urlParaEliminarEvidencia = (imagenId: number): string => {
+    if (!urlEliminarEvidenciaTpl) {
+      return '';
+    }
+    return urlEliminarEvidenciaTpl.replace('999999999', String(imagenId));
+  };
+
+  const mostrarListaVaciaSiHaceFalta = (): void => {
+    const lista = byId('listaEvidencias');
+    if (!lista) {
+      return;
+    }
+    if (lista.querySelectorAll('.formato-oow-evidencia-item').length > 0) {
+      return;
+    }
+    if (byId('evidenciasVacias')) {
+      return;
+    }
+    const p = document.createElement('p');
+    p.className = 'text-muted small mb-0';
+    p.id = 'evidenciasVacias';
+    p.textContent = 'Sin evidencias aún. Toma la foto arriba.';
+    lista.appendChild(p);
+  };
+
+  const eliminarEvidencia = async (item: HTMLElement): Promise<void> => {
+    const rawId = item.dataset.imagenId || '';
+    const imagenId = Number.parseInt(rawId, 10);
+    if (!Number.isFinite(imagenId) || imagenId <= 0) {
+      setStatus('No se pudo identificar la foto a eliminar.', true, false);
+      return;
+    }
+    const url = urlParaEliminarEvidencia(imagenId);
+    if (!url) {
+      setStatus('URL de eliminación no configurada.', true, false);
+      return;
+    }
+    // Confirmación para evitar borrados accidentales en iPad
+    if (!window.confirm('¿Eliminar esta foto? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setStatus('Eliminando foto…', false, true);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': leerCookieCsrf() },
+        credentials: 'same-origin',
+      });
+      const data = (await resp.json()) as { success?: boolean; error?: string; mensaje?: string };
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'No se pudo eliminar la foto');
+      }
+      item.remove();
+      mostrarListaVaciaSiHaceFalta();
+      setStatus(data.mensaje || 'Foto eliminada.', false, false);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Error al eliminar foto', true, false);
+    }
+  };
+
+  // Delegación: un solo listener para botones ya existentes y los nuevos al subir
+  byId('listaEvidencias')?.addEventListener('click', (ev: Event) => {
+    const target = ev.target as HTMLElement | null;
+    const btn = target?.closest('.formato-oow-evidencia-eliminar') as HTMLElement | null;
+    if (!btn) {
+      return;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    const item = btn.closest('.formato-oow-evidencia-item') as HTMLElement | null;
+    if (item) {
+      void eliminarEvidencia(item);
+    }
+  });
 
   byId('fotoIdentificacion')?.addEventListener('change', (ev: Event) => {
     const t = ev.target as HTMLInputElement;

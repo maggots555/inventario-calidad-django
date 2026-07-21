@@ -8,6 +8,12 @@
 {% endblock %}
 
 {% block content %}
+<!--
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Wizard de recepción OOW (fuera de garantía) para tablet/iPad.
+  Las secciones tienen id para anclar los chips de progreso;
+  la barra sticky muestra checklist de requisitos (firma, condiciones, privacidad).
+-->
 <div class="container-fluid formato-oow-page py-3"
      id="formatoOowApp"
      data-url-guardar="{{ url_guardar }}"
@@ -16,13 +22,16 @@
      data-url-pdf="{{ url_pdf }}"
      data-url-detalle="{{ url_detalle }}"
      data-url-evidencia="{% url 'servicio_tecnico:formato_oow_subir_evidencia' orden.pk %}"
+     data-url-eliminar-evidencia="{% url 'servicio_tecnico:formato_oow_eliminar_evidencia' orden.pk 999999999 %}"
      data-aviso-version="{{ aviso_privacidad_version }}"
      data-estado="{{ formato.estado }}">
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
             <h1 class="formato-oow-titulo h3 mb-1">
-                <i class="bi bi-file-earmark-pdf"></i> Formato Digital OOW
+                <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                Formato Digital OOW
+                <span class="formato-oow-badge">OOW</span>
             </h1>
             <p class="text-muted mb-0">
                 {{ orden.numero_orden_interno }}
@@ -36,15 +45,21 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ url_detalle }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Volver a la orden
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a la orden
             </a>
-            {% if formato.estado == 'finalizado' and formato.pdf %}
-            <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-primary" target="_blank" rel="noopener">
-                <i class="bi bi-eye"></i> Ver PDF
-            </a>
-            {% endif %}
         </div>
     </div>
+
+    {# Chips ancla: saltar rápido a cada bloque del wizard #}
+    <nav class="formato-oow-nav-progreso" aria-label="Progreso del formato OOW">
+        <a class="formato-oow-nav-chip" href="#seccion-datos"><span class="formato-oow-nav-num">1</span> Datos</a>
+        <a class="formato-oow-nav-chip" href="#seccion-accesorios"><span class="formato-oow-nav-num">2</span> Accesorios</a>
+        <a class="formato-oow-nav-chip" href="#seccion-danos"><span class="formato-oow-nav-num">3</span> Daños</a>
+        <a class="formato-oow-nav-chip" href="#seccion-observaciones"><span class="formato-oow-nav-num">4</span> Observaciones</a>
+        <a class="formato-oow-nav-chip" href="#seccion-firma" id="chipFirma" data-req="firma"><span class="formato-oow-nav-num">5</span> Firma</a>
+        <a class="formato-oow-nav-chip" href="#seccion-fotos"><span class="formato-oow-nav-num">6</span> Fotos</a>
+        <a class="formato-oow-nav-chip" href="#seccion-envio" id="chipEnvio" data-req="envio"><span class="formato-oow-nav-num">7</span> Envío</a>
+    </nav>
 
     {% if formato.estado == 'finalizado' %}
     <div class="alert alert-info" role="status">
@@ -53,13 +68,14 @@
         <ul class="mb-0 mt-2">
             <li><strong>Regenerar PDF</strong> — actualiza el documento (no envía correo).</li>
             <li><strong>Reenviar por correo</strong> — manda el PDF actual a los emails capturados.</li>
+            <li><strong>Ver PDF actual</strong> — abre el documento desde la barra inferior.</li>
         </ul>
     </div>
     {% endif %}
 
     {# --- Resumen datos orden (solo lectura) --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Datos de la orden</div>
+    <section class="card formato-oow-card mb-3" id="seccion-datos">
+        <div class="card-header formato-oow-section-header">1 · Datos de la orden</div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
@@ -86,8 +102,8 @@
     </section>
 
     {# --- Accesorios --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Accesorios entregados</div>
+    <section class="card formato-oow-card mb-3" id="seccion-accesorios">
+        <div class="card-header formato-oow-section-header">2 · Accesorios entregados</div>
         <div class="card-body">
             <div class="row g-2 formato-oow-checks">
                 <div class="col-6 col-md-4 col-lg-2">
@@ -143,8 +159,8 @@
     </section>
 
     {# --- Daños estéticos --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Define los daños estéticos</div>
+    <section class="card formato-oow-card mb-3" id="seccion-danos">
+        <div class="card-header formato-oow-section-header">3 · Define los daños estéticos</div>
         <div class="card-body">
             <div class="row g-3 align-items-end mb-3">
                 <div class="col-md-4">
@@ -192,10 +208,10 @@
             </div>
             <div class="d-flex flex-wrap gap-2 mt-2">
                 <button type="button" class="btn btn-primary" id="btnGuardarVista">
-                    <i class="bi bi-check2"></i> Guardar vista
+                    <i class="bi bi-check2" aria-hidden="true"></i> Guardar vista
                 </button>
                 <button type="button" class="btn btn-outline-danger" id="btnLimpiarVista">
-                    <i class="bi bi-eraser"></i> Limpiar trazos
+                    <i class="bi bi-eraser" aria-hidden="true"></i> Limpiar trazos
                 </button>
             </div>
 
@@ -206,8 +222,8 @@
     </section>
 
     {# --- Observaciones --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Observaciones técnicas</div>
+    <section class="card formato-oow-card mb-3" id="seccion-observaciones">
+        <div class="card-header formato-oow-section-header">4 · Observaciones técnicas</div>
         <div class="card-body">
             <label class="form-label" for="observacionesTecnicas">Detalle (rayones, manchas, golpes, etc.)</label>
             <textarea class="form-control" id="observacionesTecnicas" rows="4">{{ formato.observaciones_tecnicas }}</textarea>
@@ -215,12 +231,13 @@
     </section>
 
     {# --- Firma del cliente --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Firma del cliente</div>
+    <section class="card formato-oow-card mb-3" id="seccion-firma">
+        <div class="card-header formato-oow-section-header">5 · Firma del cliente</div>
         <div class="card-body">
             <p class="form-label mb-1">Firma cliente <span class="text-danger">*</span></p>
             <div class="formato-oow-firma-wrap">
-                <canvas id="canvasFirmaCliente" width="640" height="200"></canvas>
+                <canvas id="canvasFirmaCliente" width="640" height="200"
+                        aria-label="Lienzo para la firma del cliente"></canvas>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
                 <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarFirmaCli">
@@ -238,14 +255,14 @@
             </div>
             <label class="formato-oow-check mt-3">
                 <input type="checkbox" id="aceptaCondiciones" {% if formato.acepta_condiciones %}checked{% endif %}>
-                <span>ACEPTO LAS CONDICIONES EN LAS QUE ENTREGO EL EQUIPO AL CENTRO DE SERVICIO</span>
+                <span>Acepto las condiciones en las que entrego el equipo al centro de servicio <span class="text-danger">*</span></span>
             </label>
         </div>
     </section>
 
     {# --- Fotos --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Fotos de identificación y escaneo</div>
+    <section class="card formato-oow-card mb-3" id="seccion-fotos">
+        <div class="card-header formato-oow-section-header">6 · Fotos de identificación y escaneo</div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
@@ -277,31 +294,40 @@
             </div>
             <div class="formato-oow-evidencias mt-3 d-flex flex-wrap gap-2" id="listaEvidencias">
                 {% for img in evidencias %}
-                <a href="{{ img.imagen.url }}" target="_blank" rel="noopener" class="formato-oow-thumb">
-                    <img src="{{ img.imagen.url }}" alt="{{ img.get_tipo_display }}">
-                    <span>{{ img.get_tipo_display }}</span>
-                </a>
+                <div class="formato-oow-evidencia-item" data-imagen-id="{{ img.pk }}">
+                    <button type="button"
+                            class="formato-oow-evidencia-eliminar"
+                            title="Eliminar esta foto"
+                            aria-label="Eliminar foto de evidencia">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                    <a href="{{ img.imagen.url }}" target="_blank" rel="noopener" class="formato-oow-thumb">
+                        <img src="{{ img.imagen.url }}" alt="{{ img.get_tipo_display }}" width="120" height="80" loading="lazy">
+                        <span>{{ img.get_tipo_display }}</span>
+                    </a>
+                </div>
                 {% empty %}
-                <p class="text-muted small mb-0" id="evidenciasVacias">Sin evidencias aún.</p>
+                <p class="text-muted small mb-0" id="evidenciasVacias">Sin evidencias aún. Toma la foto arriba.</p>
                 {% endfor %}
             </div>
         </div>
     </section>
 
     {# --- Privacidad + email + cómo te enteraste --- #}
-    <section class="card formato-oow-card mb-3">
-        <div class="card-header formato-oow-section-header">Aviso de privacidad y envío</div>
+    <section class="card formato-oow-card mb-3" id="seccion-envio">
+        <div class="card-header formato-oow-section-header">7 · Aviso de privacidad y envío</div>
         <div class="card-body">
             <button type="button" class="btn btn-outline-primary mb-2" data-bs-toggle="modal"
                     data-bs-target="#modalAvisoPrivacidad">
-                <i class="bi bi-shield-lock"></i> Leer aviso de privacidad
+                <i class="bi bi-shield-lock" aria-hidden="true"></i> Leer aviso de privacidad
             </button>
+            <p class="form-text small mt-0 mb-1">Vista previa truncada; abre el modal para leer el texto completo.</p>
             <div class="formato-oow-aviso-preview mb-3" tabindex="0">
                 {{ aviso_privacidad_texto|truncatechars:400 }}
             </div>
             <label class="formato-oow-check mb-3">
                 <input type="checkbox" id="aceptaPrivacidad" {% if formato.acepta_privacidad %}checked{% endif %}>
-                <span>He leído y acepto el Aviso de Privacidad de SIC (versión {{ aviso_privacidad_version }})</span>
+                <span>He leído y acepto el Aviso de Privacidad de SIC (versión {{ aviso_privacidad_version }}) <span class="text-danger">*</span></span>
             </label>
 
             <div class="row g-3">
@@ -312,7 +338,7 @@
                         {# Rellenado por JS; el primero usa el valor guardado #}
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="btnAgregarEmail">
-                        <i class="bi bi-plus-lg"></i> Agregar otro correo
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i> Agregar otro correo
                     </button>
                 </div>
                 <div class="col-md-6">
@@ -338,26 +364,32 @@
     </section>
 
     <div class="formato-oow-actions sticky-bottom py-3">
+        {# Checklist de requisitos visibles en tablet antes de Finalizar #}
+        <div class="formato-oow-checklist" id="formatoOowChecklist" aria-live="polite">
+            <span class="formato-oow-check-item" id="checkItemFirma" data-req="firma">Firma</span>
+            <span class="formato-oow-check-item" id="checkItemCondiciones" data-req="condiciones">Condiciones</span>
+            <span class="formato-oow-check-item" id="checkItemPrivacidad" data-req="privacidad">Privacidad</span>
+        </div>
         <div class="d-flex flex-wrap gap-2 justify-content-center">
             <button type="button" class="btn btn-outline-primary btn-lg" id="btnGuardarBorrador">
-                <i class="bi bi-save"></i>
+                <i class="bi bi-save" aria-hidden="true"></i>
                 {% if formato.estado == 'finalizado' %}Guardar cambios{% else %}Guardar borrador{% endif %}
             </button>
             {% if formato.estado == 'finalizado' %}
             <button type="button" class="btn btn-warning btn-lg" id="btnRegenerarPdf"
                     title="Guarda los cambios y vuelve a generar el PDF. No envía correo.">
-                <i class="bi bi-arrow-repeat"></i> Regenerar PDF
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Regenerar PDF
             </button>
             <button type="button" class="btn btn-success btn-lg" id="btnReenviarEmail"
                     title="Envía el PDF actual a los correos capturados (hasta 3). No regenera el PDF.">
-                <i class="bi bi-envelope"></i> Reenviar por correo
+                <i class="bi bi-envelope" aria-hidden="true"></i> Reenviar por correo
             </button>
             <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-success btn-lg" target="_blank" rel="noopener">
-                <i class="bi bi-file-earmark-pdf"></i> Ver PDF actual
+                <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Ver PDF actual
             </a>
             {% else %}
             <button type="button" class="btn btn-primary btn-lg" id="btnFinalizar">
-                <i class="bi bi-check2-circle"></i> Guardar y Finalizar
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> Guardar y Finalizar
             </button>
             {% endif %}
         </div>
@@ -371,7 +403,7 @@
             <div class="mt-2" id="formatoOowStatusActions" hidden>
                 <a href="{{ url_pdf }}?inline=1" class="btn btn-success btn-sm" id="btnVerPdfGenerado"
                    target="_blank" rel="noopener">
-                    <i class="bi bi-file-earmark-pdf"></i> Ver / descargar PDF
+                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Ver / descargar PDF
                 </a>
             </div>
         </div>
@@ -381,7 +413,7 @@
 {# Overlay a pantalla completa mientras se genera el PDF (útil en iPad) #}
 <div class="formato-oow-overlay" id="formatoOowOverlay" hidden aria-hidden="true">
     <div class="formato-oow-overlay-card">
-        <div class="spinner-border text-light mb-3" role="status" style="width: 3rem; height: 3rem;">
+        <div class="spinner-border text-light mb-3 formato-oow-overlay-spinner" role="status">
             <span class="visually-hidden">Generando…</span>
         </div>
         <p class="mb-1 fw-semibold" id="formatoOowOverlayTitulo">Generando PDF…</p>

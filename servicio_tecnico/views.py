@@ -151,6 +151,7 @@ from .views_ordenes import (  # noqa: F401
 from .views_sicser import consultar_sicser, importar_orden_sicser  # noqa: F401
 from .views_formato_oow import (  # noqa: F401
     abrir_formato_oow_desde_sicser,
+    formato_oow_eliminar_evidencia,
     formato_oow_finalizar,
     formato_oow_guardar,
     formato_oow_pdf,

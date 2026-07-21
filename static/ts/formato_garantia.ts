@@ -667,6 +667,24 @@ function inicializarFormatoGarantia(): void {
   }
 
   /**
+   * Resalta una sección y hace scroll (tablet: el operador ve qué falta).
+   */
+  const enfocarSeccion = (seccionId: string): void => {
+    document.querySelectorAll('.formato-oow-card.is-error-focus').forEach((el) => {
+      el.classList.remove('is-error-focus');
+    });
+    const seccion = byId(seccionId);
+    if (!seccion) {
+      return;
+    }
+    seccion.classList.add('is-error-focus');
+    seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      seccion.classList.remove('is-error-focus');
+    }, 3500);
+  };
+
+  /**
    * Lee los correos escritos en los inputs dinámicos (máx. 3).
    */
   const leerEmailsEnvio = (): string[] => {
@@ -800,6 +818,37 @@ function inicializarFormatoGarantia(): void {
   padFirmaCli.ctx.lineWidth = 2.2;
 
   /**
+   * Actualiza checklist sticky (firma / condiciones / privacidad).
+   *
+   * EXPLICACIÓN PARA PRINCIPIANTES:
+   * Antes de Finalizar, la barra inferior muestra en verde lo listo
+   * y en ámbar lo pendiente, para no perderse en el scroll largo.
+   */
+  const actualizarChecklistRequeridos = (): void => {
+    const tieneFirma = padFirmaCli.tieneTrazos || Boolean(formatoInicial.firma_cliente_url);
+    const items: Array<{ id: string; listo: boolean; chipId?: string }> = [
+      { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
+      { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
+      { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
+    ];
+    items.forEach((item) => {
+      const el = byId(item.id);
+      if (!el) {
+        return;
+      }
+      el.classList.toggle('is-listo', item.listo);
+      el.classList.toggle('is-pendiente', !item.listo);
+      if (item.chipId) {
+        const chip = byId(item.chipId);
+        if (chip) {
+          chip.classList.toggle('is-listo', item.listo);
+          chip.classList.toggle('is-pendiente', !item.listo);
+        }
+      }
+    });
+  };
+
+  /**
    * Actualiza la miniatura de firma (igual que las previews de daños).
    */
   const actualizarPreviewFirma = (src: string): void => {
@@ -839,6 +888,7 @@ function inicializarFormatoGarantia(): void {
       padFirmaCli.ctx.lineWidth = 2.2;
       padFirmaCli.tieneTrazos = true;
       actualizarPreviewFirma(url);
+      actualizarChecklistRequeridos();
     };
     img.src = url;
   };
@@ -979,6 +1029,7 @@ function inicializarFormatoGarantia(): void {
   canvasFirmaCli.addEventListener('pointerup', () => {
     if (padFirmaCli.tieneTrazos) {
       actualizarPreviewFirma(canvasFirmaCli.toDataURL('image/png'));
+      actualizarChecklistRequeridos();
     }
   });
 
@@ -989,6 +1040,11 @@ function inicializarFormatoGarantia(): void {
     actualizarPreviewFirma('');
     // Si borra, ya no cuenta la firma previa del servidor hasta que vuelva a firmar
     formatoInicial.firma_cliente_url = undefined;
+    actualizarChecklistRequeridos();
+  });
+
+  byId('aceptaCondiciones')?.addEventListener('change', () => {
+    actualizarChecklistRequeridos();
   });
 
   byId('btnAceptarAvisoModal')?.addEventListener('click', () => {
@@ -996,7 +1052,14 @@ function inicializarFormatoGarantia(): void {
     if (cb) {
       cb.checked = true;
     }
+    actualizarChecklistRequeridos();
   });
+
+  byId('aceptaPrivacidad')?.addEventListener('change', () => {
+    actualizarChecklistRequeridos();
+  });
+
+  actualizarChecklistRequeridos();
 
   const construirPayload = (incluirFlagsFinal: boolean): FormatoGarantiaPayload => {
     const radio = document.querySelector('input[name="comoEnteraste"]:checked') as HTMLInputElement | null;
@@ -1042,12 +1105,24 @@ function inicializarFormatoGarantia(): void {
     if (actions) {
       actions.hidden = true;
     }
-    if (!checked('aceptaCondiciones') || !checked('aceptaPrivacidad')) {
-      setStatus('Debes aceptar condiciones y aviso de privacidad.', true, false);
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Validamos en orden: si falta algo, scroll a esa sección y no generamos PDF.
+    if (!checked('aceptaCondiciones')) {
+      setStatus('Debes aceptar las condiciones de entrega del equipo.', true, false);
+      enfocarSeccion('seccion-firma');
+      actualizarChecklistRequeridos();
+      return;
+    }
+    if (!checked('aceptaPrivacidad')) {
+      setStatus('Debes aceptar el aviso de privacidad.', true, false);
+      enfocarSeccion('seccion-envio');
+      actualizarChecklistRequeridos();
       return;
     }
     if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
       setStatus('La firma del cliente es obligatoria.', true, false);
+      enfocarSeccion('seccion-firma');
+      actualizarChecklistRequeridos();
       return;
     }
 
