@@ -13,6 +13,7 @@ Campos principales:
 - titulo   : Texto corto que describe la notificación (ej: "Correo RHITSO enviado")
 - mensaje  : Texto largo con detalles (ej: "Orden ST-001, enviado a 3 destinatarios")
 - tipo     : Categoría visual (exito=verde, error=rojo, warning=amarillo, info=azul)
+- categoria: Agrupación para pestañas de la campanita (general, equipo_disponible, …)
 - leida    : Si el usuario ya la vio (True) o no (False)
 - usuario  : Quién debe ver esta notificación (el que disparó la tarea)
 - task_id  : ID de la tarea Celery (para rastreo técnico)
@@ -52,6 +53,19 @@ class Notificacion(models.Model):
         default='info',
         verbose_name="Tipo",
         help_text="Determina el icono y color de la notificación"
+    )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # "tipo" es solo visual (verde/rojo). "categoria" agrupa notificaciones
+    # en pestañas de la campanita (ej. Equipo disponible vs el resto).
+    categoria = models.CharField(
+        max_length=40,
+        default='general',
+        db_index=True,
+        verbose_name="Categoría",
+        help_text=(
+            "Agrupación para pestañas de la campanita "
+            "(ej. general, equipo_disponible)"
+        ),
     )
     leida = models.BooleanField(
         default=False,

@@ -123,6 +123,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
                 usuario=usuario,
                 url=url_orden,
                 app_origen='servicio_tecnico',
+                categoria='equipo_disponible',
             )
         except Exception as exc:
             logger.warning(

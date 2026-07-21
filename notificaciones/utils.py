@@ -36,7 +36,8 @@ logger = logging.getLogger('notificaciones')
 
 
 def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
-                       task_id=None, app_origen=None, url=None):
+                       task_id=None, app_origen=None, url=None,
+                       categoria='general'):
     """
     Función base para crear una notificación en la base de datos.
 
@@ -52,6 +53,7 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
         task_id (str, optional): ID de la tarea Celery.
         app_origen (str, optional): App que originó la notificación.
         url (str, optional): URL a la que navega el usuario al pulsar la notif.
+        categoria (str): Pestaña de la campanita (default 'general').
 
     Returns:
         list[Notificacion]: Lista de notificaciones creadas (usuario + superusers).
@@ -62,6 +64,7 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
     from .models import Notificacion
 
     notificaciones_creadas = []
+    categoria_limpia = (categoria or 'general').strip() or 'general'
 
     # ── 1. Crear notificación para el usuario que disparó la tarea ──
     if usuario:
@@ -73,6 +76,7 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
             task_id=task_id,
             app_origen=app_origen,
             url=url,
+            categoria=categoria_limpia,
         )
         notificaciones_creadas.append(notif)
         # Invalidar cache para que el próximo polling muestre la nueva notificación
@@ -95,6 +99,7 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
             task_id=task_id,
             app_origen=app_origen,
             url=url,
+            categoria=categoria_limpia,
         )
         notificaciones_creadas.append(notif_su)
         # Invalidar cache de cada superusuario

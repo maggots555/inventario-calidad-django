@@ -505,6 +505,26 @@
                                     </button>
                                 </div>
                             </div>
+                            {# Pestañas: Todas | Equipo disponible (filtro por categoria) #}
+                            <div class="notif-tabs" role="tablist" aria-label="Filtrar notificaciones">
+                                <button type="button"
+                                        class="notif-tab active"
+                                        id="notif-tab-todas"
+                                        data-tab="todas"
+                                        role="tab"
+                                        aria-selected="true">
+                                    Todas
+                                </button>
+                                <button type="button"
+                                        class="notif-tab"
+                                        id="notif-tab-equipo"
+                                        data-tab="equipo_disponible"
+                                        role="tab"
+                                        aria-selected="false">
+                                    Equipo disponible
+                                    <span id="notif-tab-equipo-count" class="notif-tab-count d-none">0</span>
+                                </button>
+                            </div>
                             <ul id="notif-lista" class="notif-lista">
                                 <li class="notif-vacia">
                                     <i class="bi bi-bell-slash text-muted"></i>

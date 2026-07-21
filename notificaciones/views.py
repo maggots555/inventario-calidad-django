@@ -111,14 +111,15 @@ def obtener_notificaciones(request):
             'no_leidas': no_leidas,
             'notificaciones': [
                 {
-                    'id':     n.id,
-                    'titulo': n.titulo,
-                    'mensaje': n.mensaje,
-                    'tipo':   n.tipo,
-                    'leida':  n.leida,
-                    'fecha':  n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-                    'app':    n.app_origen or '',
-                    'url':    n.url or '',
+                    'id':         n.id,
+                    'titulo':     n.titulo,
+                    'mensaje':    n.mensaje,
+                    'tipo':       n.tipo,
+                    'categoria':  n.categoria or 'general',
+                    'leida':      n.leida,
+                    'fecha':      n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                    'app':        n.app_origen or '',
+                    'url':        n.url or '',
                 }
                 for n in notificaciones
             ]

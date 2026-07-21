@@ -11,7 +11,8 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.core import mail
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import resolve, reverse
 
 from inventario.models import Empleado, Sucursal
@@ -22,6 +23,7 @@ from servicio_tecnico.models import DetalleEquipo, HistorialOrden, OrdenServicio
 from servicio_tecnico.services.notificaciones_recepcion import (
     notificar_recepcion_equipo_listo,
 )
+from servicio_tecnico.tasks import enviar_notificacion_equipo_disponible_task
 
 
 User = get_user_model()
@@ -364,3 +366,91 @@ class NotificarEquipoDisponibleVistaTest(TestCase):
         import json
         data = json.loads(r2.content.decode())
         self.assertTrue(data.get('ya_notificado'))
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    JEFE_CALIDAD_EMAIL='jefe1@test.local',
+    JEFE_CALIDAD_2_EMAIL='jefe2@test.local',
+)
+class EquipoDisponibleEmailCcTest(TestCase):
+    """
+    Verifica que el correo de equipo disponible lleve CC correcto.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Usamos EMAIL_BACKEND=locmem: Django guarda el correo en mail.outbox
+    en memoria (no sale a Internet). Así comprobamos To y CC sin SMTP.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal CC Test',
+            ciudad='CDMX',
+            direccion='Calle CC 1',
+            horario_atencion='Lun-Vie 9-17',
+        )
+        self.user = User.objects.create_user(
+            username='envio_cc',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Quien Envia CC',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='quien.envia@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+            rol='recepcionista',
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='finalizado',
+            tecnico_asignado_actual=self.empleado,
+            responsable_seguimiento=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-CC-01',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude',
+            numero_serie='STCC01',
+            email_cliente='cliente.cc@test.local',
+            nombre_cliente='Cliente CC',
+            falla_principal='Falla',
+            gama='media',
+        )
+
+    def test_correo_incluye_cc_remitente_y_jefes(self):
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertEqual(len(mail.outbox), 1)
+
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['cliente.cc@test.local'])
+        # Orden fijado: quien envió → jefe 1 → jefe 2
+        self.assertEqual(
+            mensaje.cc,
+            [
+                'quien.envia@test.local',
+                'jefe1@test.local',
+                'jefe2@test.local',
+            ],
+        )
+
+        historial = HistorialOrden.objects.filter(
+            orden=self.orden,
+            tipo_evento='email',
+            comentario__icontains='equipo disponible',
+        ).first()
+        self.assertIsNotNone(historial)
+        self.assertIn('quien.envia@test.local', historial.comentario)
+        self.assertIn('jefe1@test.local', historial.comentario)
+        self.assertIn('jefe2@test.local', historial.comentario)

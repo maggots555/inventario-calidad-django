@@ -35,11 +35,16 @@
  * tu editor (VS Code) te sugiere las propiedades disponibles
  * y te avisa si intentas usar una que no existe.
  */
+/** Pestaña activa en el filtro de la campanita. */
+type NotifTabActiva = 'todas' | 'equipo_disponible';
+
 interface NotificacionItem {
     id: number;
     titulo: string;
     mensaje: string;
     tipo: 'exito' | 'error' | 'warning' | 'info';
+    /** Agrupación para pestañas (general, equipo_disponible, …) */
+    categoria: string;
     leida: boolean;
     fecha: string;
     app: string;
@@ -110,6 +115,9 @@ class PanelNotificaciones {
     private readonly lista: HTMLElement | null;
     private readonly btnTodas: HTMLElement | null;
     private readonly btnLimpiar: HTMLElement | null;
+    private readonly tabTodas: HTMLElement | null;
+    private readonly tabEquipo: HTMLElement | null;
+    private readonly tabEquipoCount: HTMLElement | null;
     private intervalo: number | null = null;
 
     // ── Polling adaptativo ──
@@ -124,6 +132,11 @@ class PanelNotificaciones {
     private pollingsSinCambio: number = 0;
     private ultimoNoLeidas: number = -1;
 
+    /** Copia completa de la última respuesta (filtro de pestañas en cliente). */
+    private notificacionesCache: NotificacionItem[] = [];
+    /** Pestaña activa: 'todas' muestra todo; 'equipo_disponible' solo esa categoría. */
+    private tabActiva: NotifTabActiva = 'todas';
+
     /**
      * Constructor: se ejecuta automáticamente al hacer `new PanelNotificaciones()`.
      *
@@ -135,6 +148,9 @@ class PanelNotificaciones {
         this.lista      = document.getElementById('notif-lista');
         this.btnTodas   = document.getElementById('notif-marcar-todas');
         this.btnLimpiar = document.getElementById('notif-limpiar-todas');
+        this.tabTodas = document.getElementById('notif-tab-todas');
+        this.tabEquipo = document.getElementById('notif-tab-equipo');
+        this.tabEquipoCount = document.getElementById('notif-tab-equipo-count');
 
         // Solo iniciar si los elementos existen en el HTML
         // (no existen si el usuario no está logueado)
@@ -220,6 +236,94 @@ class PanelNotificaciones {
                 this.marcarTodasLeidas();
             });
         }
+
+        // Pestañas de filtro (Todas / Equipo disponible)
+        this.registrarClicksTabs();
+    }
+
+    /**
+     * Registra clics en las pestañas de filtro de la campanita.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * No volvemos a pedir datos al servidor: filtramos la lista que ya
+     * tenemos en memoria (notificacionesCache).
+     */
+    private registrarClicksTabs(): void {
+        const tabs: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
+            { el: this.tabTodas, tab: 'todas' },
+            { el: this.tabEquipo, tab: 'equipo_disponible' },
+        ];
+
+        for (const { el, tab } of tabs) {
+            if (!el) {
+                continue;
+            }
+            el.addEventListener('click', (e: Event) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.cambiarTab(tab);
+            });
+        }
+    }
+
+    /**
+     * Cambia la pestaña activa y vuelve a dibujar la lista filtrada.
+     */
+    private cambiarTab(tab: NotifTabActiva): void {
+        this.tabActiva = tab;
+        this.actualizarEstadoVisualTabs();
+        this.renderListaFiltrada();
+    }
+
+    /**
+     * Marca visualmente qué pestaña está activa (clase + aria-selected).
+     */
+    private actualizarEstadoVisualTabs(): void {
+        const pares: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
+            { el: this.tabTodas, tab: 'todas' },
+            { el: this.tabEquipo, tab: 'equipo_disponible' },
+        ];
+        for (const { el, tab } of pares) {
+            if (!el) {
+                continue;
+            }
+            const activa = tab === this.tabActiva;
+            el.classList.toggle('active', activa);
+            el.setAttribute('aria-selected', activa ? 'true' : 'false');
+        }
+    }
+
+    /**
+     * Actualiza el contador del tab "Equipo disponible" (no leídas de esa categoría).
+     */
+    private actualizarContadorTabEquipo(): void {
+        if (!this.tabEquipoCount) {
+            return;
+        }
+        const noLeidasEquipo = this.notificacionesCache.filter(
+            (n) =>
+                (n.categoria || 'general') === 'equipo_disponible' && !n.leida
+        ).length;
+
+        if (noLeidasEquipo > 0) {
+            this.tabEquipoCount.textContent = String(noLeidasEquipo);
+            this.tabEquipoCount.classList.remove('d-none');
+        } else {
+            this.tabEquipoCount.classList.add('d-none');
+        }
+    }
+
+    /**
+     * Aplica el filtro de la pestaña activa y dibuja la lista.
+     */
+    private renderListaFiltrada(): void {
+        const filtradas =
+            this.tabActiva === 'todas'
+                ? this.notificacionesCache
+                : this.notificacionesCache.filter(
+                      (n) => (n.categoria || 'general') === this.tabActiva
+                  );
+        this.renderLista(filtradas);
     }
 
     // ── Gestión del intervalo de polling ──
@@ -315,8 +419,14 @@ class PanelNotificaciones {
             }
 
             this.ultimoNoLeidas = data.no_leidas;
+            // Normalizar categoria por si el backend aún no la envía (cache viejo).
+            this.notificacionesCache = data.notificaciones.map((n) => ({
+                ...n,
+                categoria: n.categoria || 'general',
+            }));
             this.renderBadge(data.no_leidas);
-            this.renderLista(data.notificaciones);
+            this.actualizarContadorTabEquipo();
+            this.renderListaFiltrada();
 
         } catch (error: unknown) {
             // Silencioso: errores de red son esperados (usuario sin conexión, etc.)
@@ -360,10 +470,14 @@ class PanelNotificaciones {
         if (!this.lista) return;
 
         if (notificaciones.length === 0) {
+            const mensajeVacio =
+                this.tabActiva === 'equipo_disponible'
+                    ? 'Sin avisos de equipo disponible'
+                    : 'Sin notificaciones recientes';
             this.lista.innerHTML = `
                 <li class="notif-vacia">
                     <i class="bi bi-bell-slash text-muted"></i>
-                    <span>Sin notificaciones recientes</span>
+                    <span>${mensajeVacio}</span>
                 </li>`;
             return;
         }
@@ -427,6 +541,13 @@ class PanelNotificaciones {
             // Actualiza badge a 0 inmediatamente (sin esperar al próximo polling)
             this.renderBadge(0);
 
+            // Sincronizar cache local (contadores de pestaña + re-render)
+            this.notificacionesCache = this.notificacionesCache.map((n) => ({
+                ...n,
+                leida: true,
+            }));
+            this.actualizarContadorTabEquipo();
+
             // Marca visualmente todas como leídas
             if (this.lista) {
                 const nuevas: NodeListOf<Element> = this.lista.querySelectorAll('.notif-nueva');
@@ -466,19 +587,20 @@ class PanelNotificaciones {
 
             if (!response.ok) return;
 
+            this.notificacionesCache = this.notificacionesCache.filter(
+                (n) => n.id !== id
+            );
+            this.actualizarContadorTabEquipo();
+
             // Animación de salida: el item se desliza y desvanece
             if (itemLi) {
                 itemLi.classList.add('notif-removing');
                 // Esperar a que termine la animación CSS (300ms) antes de remover
                 setTimeout(() => {
                     itemLi.remove();
-                    // Si ya no quedan items, mostrar estado vacío
+                    // Si ya no quedan items visibles, re-render filtrado (mensaje vacío)
                     if (this.lista && this.lista.querySelectorAll('.notif-item').length === 0) {
-                        this.lista.innerHTML = `
-                            <li class="notif-vacia">
-                                <i class="bi bi-bell-slash text-muted"></i>
-                                <span>Sin notificaciones recientes</span>
-                            </li>`;
+                        this.renderListaFiltrada();
                     }
                 }, 300);
             }
@@ -508,15 +630,11 @@ class PanelNotificaciones {
 
             if (!response.ok) return;
 
-            // Limpiar la UI
+            // Limpiar la UI y el cache local
+            this.notificacionesCache = [];
             this.renderBadge(0);
-            if (this.lista) {
-                this.lista.innerHTML = `
-                    <li class="notif-vacia">
-                        <i class="bi bi-bell-slash text-muted"></i>
-                        <span>Sin notificaciones recientes</span>
-                    </li>`;
-            }
+            this.actualizarContadorTabEquipo();
+            this.renderListaFiltrada();
 
         } catch (error: unknown) {
             void error;

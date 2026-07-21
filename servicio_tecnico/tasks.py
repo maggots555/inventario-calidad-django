@@ -1936,7 +1936,7 @@ def enviar_notificacion_equipo_disponible_task(
 
     Args:
         orden_id: PK de OrdenServicio
-        empleado_id: PK del Empleado que disparó el envío (para historial)
+        empleado_id: PK del Empleado que disparó el envío (historial + CC)
         usuario_id: PK del User (campanita éxito/error)
         db_alias: tenant Celery multi-país
     """
@@ -2013,11 +2013,46 @@ def enviar_notificacion_equipo_disponible_task(
         remitente = f'SIC México — Servicio Técnico <{email_solo}>'
         asunto = f'Equipo listo para recolección — {folio}'
 
+        # ------------------------------------------------------------------
+        # CC: quien envió → JEFE_CALIDAD → JEFE_CALIDAD_2
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El cliente va en "Para" (To). En copia van recepción/quien avisó
+        # y los jefes de calidad configurados en .env (settings).
+        # ------------------------------------------------------------------
+        empleado = None
+        if empleado_id:
+            try:
+                empleado = Empleado.objects.get(pk=empleado_id)
+            except Empleado.DoesNotExist:
+                empleado = None
+
+        cc_list: list[str] = []
+        vistos: set[str] = {email_cliente.lower()}
+
+        def _agregar_cc(correo: str | None) -> None:
+            """Agrega un email a CC si es válido y no está duplicado."""
+            if not correo:
+                return
+            correo_limpio = correo.strip()
+            if '@' not in correo_limpio:
+                return
+            clave = correo_limpio.lower()
+            if clave in vistos:
+                return
+            vistos.add(clave)
+            cc_list.append(correo_limpio)
+
+        if empleado and empleado.email:
+            _agregar_cc(empleado.email)
+        _agregar_cc(getattr(settings, 'JEFE_CALIDAD_EMAIL', None) or None)
+        _agregar_cc(getattr(settings, 'JEFE_CALIDAD_2_EMAIL', None) or None)
+
         email_msg = EmailMessage(
             subject=asunto,
             body=html_content,
             from_email=remitente,
             to=[email_cliente],
+            cc=cc_list,
         )
         email_msg.content_subtype = 'html'
 
@@ -2057,21 +2092,18 @@ def enviar_notificacion_equipo_disponible_task(
 
         email_msg.send(fail_silently=False)
 
-        empleado = None
-        if empleado_id:
-            try:
-                empleado = Empleado.objects.get(pk=empleado_id)
-            except Empleado.DoesNotExist:
-                empleado = None
-
         # La vista ya marcó fecha_notificacion_equipo_disponible (candado).
         # Aquí solo registramos el historial tras el envío exitoso.
+        comentario_historial = (
+            f'Correo de equipo disponible para recolección enviado a {email_cliente}'
+        )
+        if cc_list:
+            comentario_historial += f'\nCC: {", ".join(cc_list)}'
+
         HistorialOrden.objects.create(
             orden=orden,
             tipo_evento='email',
-            comentario=(
-                f'Correo de equipo disponible para recolección enviado a {email_cliente}'
-            ),
+            comentario=comentario_historial,
             usuario=empleado,
             es_sistema=False,
         )
@@ -2090,6 +2122,7 @@ def enviar_notificacion_equipo_disponible_task(
                 usuario=_usuario_notif,
                 task_id=self.request.id,
                 app_origen='servicio_tecnico',
+                categoria='equipo_disponible',
             )
         except Exception:
             pass
@@ -2098,6 +2131,7 @@ def enviar_notificacion_equipo_disponible_task(
             'success': True,
             'orden': orden.numero_orden_interno,
             'destinatario': email_cliente,
+            'cc': cc_list,
         }
 
     except Exception as exc:
@@ -2130,6 +2164,7 @@ def enviar_notificacion_equipo_disponible_task(
                 usuario=_usuario_err,
                 task_id=self.request.id,
                 app_origen='servicio_tecnico',
+                categoria='equipo_disponible',
             )
         except Exception:
             pass

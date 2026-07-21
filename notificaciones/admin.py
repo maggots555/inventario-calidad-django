@@ -16,8 +16,16 @@ from .models import Notificacion, PushSubscription, PushSubscriptionCliente
 
 @admin.register(Notificacion)
 class NotificacionAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'tipo', 'usuario', 'leida', 'app_origen', 'fecha_creacion')
-    list_filter = ('tipo', 'leida', 'app_origen', 'fecha_creacion')
+    list_display = (
+        'titulo',
+        'tipo',
+        'categoria',
+        'usuario',
+        'leida',
+        'app_origen',
+        'fecha_creacion',
+    )
+    list_filter = ('tipo', 'categoria', 'leida', 'app_origen', 'fecha_creacion')
     search_fields = ('titulo', 'mensaje', 'usuario__username')
     ordering = ['-fecha_creacion']
     readonly_fields = ('fecha_creacion', 'task_id')
