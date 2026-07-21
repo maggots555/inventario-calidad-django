@@ -63,6 +63,10 @@ class FormatoGarantiaReexportsTest(SimpleTestCase):
             st_views.abrir_formato_garantia_desde_sicser,
             views_formato_garantia.abrir_formato_garantia_desde_sicser,
         )
+        self.assertIs(
+            st_views.formato_garantia_eliminar_evidencia,
+            views_formato_garantia.formato_garantia_eliminar_evidencia,
+        )
 
         match = resolve(reverse('servicio_tecnico:formato_garantia_wizard', args=[1]))
         self.assertIs(match.func, views_formato_garantia.formato_garantia_wizard)
@@ -73,6 +77,17 @@ class FormatoGarantiaReexportsTest(SimpleTestCase):
         self.assertIs(
             match_abrir.func,
             views_formato_garantia.abrir_formato_garantia_desde_sicser,
+        )
+
+        match_elim = resolve(
+            reverse(
+                'servicio_tecnico:formato_garantia_eliminar_evidencia',
+                args=[1, 2],
+            )
+        )
+        self.assertIs(
+            match_elim.func,
+            views_formato_garantia.formato_garantia_eliminar_evidencia,
         )
 
 
@@ -337,6 +352,141 @@ class FormatoGarantiaWizardViewTest(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Formato Digital Garant', resp.content)
+        # Aviso Dell informativo (sin guardar aceptación): debe verse en el wizard
+        self.assertIn(b'ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTIA', resp.content)
+        self.assertIn(b'modalActividadesDell', resp.content)
+        self.assertIn(b'Servidores y equipos de almacenamiento', resp.content)
         self.assertTrue(
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )
+
+
+class FormatoGarantiaEliminarEvidenciaTest(TestCase):
+    """POST eliminar solo borra escaneo_garantia de esa orden."""
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Elim Evidencia Garantía',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='elim_gar_evid',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Elim Evidencia',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='elim.gar@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        ct = ContentType.objects.get_for_model(OrdenServicio)
+        for codename in ('view_ordenservicio', 'change_ordenservicio'):
+            perm = Permission.objects.get(content_type=ct, codename=codename)
+            self.user.user_permissions.add(perm)
+
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='555666777',
+            sicser_origen='garantia',
+            sicser_id_externo='555666777',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='XPS',
+            numero_serie='SNELIM1',
+            email_cliente='c@d.com',
+            falla_principal='Falla',
+            gama='media',
+        )
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_eliminar_escaneo_garantia(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from servicio_tecnico.models import ImagenOrden
+
+        img = ImagenOrden(
+            orden=self.orden,
+            tipo='escaneo_garantia',
+            descripcion='PC Audit test',
+            subido_por=self.empleado,
+        )
+        img.imagen.save('escaneo_test.png', ContentFile(_png_bytes()), save=True)
+
+        url = reverse(
+            'servicio_tecnico:formato_garantia_eliminar_evidencia',
+            args=[self.orden.pk, img.pk],
+        )
+        request = self.factory.post(url)
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        resp = views_formato_garantia.formato_garantia_eliminar_evidencia(
+            request, orden_id=self.orden.pk, imagen_id=img.pk,
+        )
+        self.assertEqual(resp.status_code, 200)
+        import json
+        data = json.loads(resp.content.decode('utf-8'))
+        self.assertTrue(data.get('success'))
+        self.assertFalse(ImagenOrden.objects.filter(pk=img.pk).exists())
+
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_no_elimina_otro_tipo(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from servicio_tecnico.models import ImagenOrden
+
+        img = ImagenOrden(
+            orden=self.orden,
+            tipo='ingreso',
+            descripcion='No debe borrarse',
+            subido_por=self.empleado,
+        )
+        img.imagen.save('ingreso_test.png', ContentFile(_png_bytes()), save=True)
+
+        request = self.factory.post(
+            reverse(
+                'servicio_tecnico:formato_garantia_eliminar_evidencia',
+                args=[self.orden.pk, img.pk],
+            )
+        )
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.session.save()
+        setattr(request, '_messages', FallbackStorage(request))
+
+        resp = views_formato_garantia.formato_garantia_eliminar_evidencia(
+            request, orden_id=self.orden.pk, imagen_id=img.pk,
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(ImagenOrden.objects.filter(pk=img.pk).exists())

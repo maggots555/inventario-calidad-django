@@ -45,6 +45,7 @@ def formato_garantia_wizard(request, orden_id: int):
     """
     from config.constants import (
         COMO_ENTERASTE_GARANTIA_CHOICES,
+        ACTIVIDADES_NO_INCLUIDAS_GARANTIA_DELL,
         VISTAS_DANO_ESTETICO_AIO,
         VISTAS_DANO_ESTETICO_ESCRITORIO,
         VISTAS_DANO_ESTETICO_LAPTOP,
@@ -91,6 +92,8 @@ def formato_garantia_wizard(request, orden_id: int):
         'orden_json': datos_orden_para_wizard(orden),
         'aviso_privacidad_texto': texto_aviso,
         'aviso_privacidad_version': version_aviso,
+        # Aviso Dell (solo informativo): aparece en el PDF; NO se guarda aceptación en BD.
+        'actividades_no_incluidas': ACTIVIDADES_NO_INCLUIDAS_GARANTIA_DELL,
         'como_enteraste_choices': COMO_ENTERASTE_GARANTIA_CHOICES,
         'vistas_laptop': VISTAS_DANO_ESTETICO_LAPTOP,
         'vistas_escritorio': VISTAS_DANO_ESTETICO_ESCRITORIO,
@@ -460,4 +463,84 @@ def formato_garantia_subir_evidencia(request, orden_id: int):
             'url': imagen.imagen.url if imagen.imagen else '',
             'descripcion': imagen.descripcion,
         },
+    })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
+@require_http_methods(['POST'])
+def formato_garantia_eliminar_evidencia(request, orden_id: int, imagen_id: int):
+    """
+    Elimina una foto de escaneo PC Audit del Formato Garantía.
+
+    Objetivo de negocio:
+        Si el técnico se equivoca al subir el resultado de PC Audit, puede
+        borrarlo desde la miniatura del wizard (sin ir a la galería general).
+
+    Args:
+        request: HttpRequest POST (AJAX)
+        orden_id: PK de OrdenServicio
+        imagen_id: PK de ImagenOrden
+
+    Efectos secundarios:
+        Borra archivos en disco/storage y el registro ImagenOrden.
+        Solo permite tipo ``escaneo_garantia`` de esa orden (seguridad).
+    """
+    from pathlib import Path
+
+    from .models import HistorialOrden
+    from .services.formato_garantia import _empleado_desde_usuario
+
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    empleado = _empleado_desde_usuario(request.user)
+    if not empleado:
+        return _json_error('Tu usuario no tiene perfil de empleado', status=403)
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Filtramos por orden + tipo para que nadie borre fotos de otra orden
+    # ni evidencias que no sean del formato Garantía.
+    imagen = ImagenOrden.objects.filter(
+        pk=imagen_id,
+        orden=orden,
+        tipo='escaneo_garantia',
+    ).first()
+    if not imagen:
+        return _json_error('Evidencia no encontrada o no es de escaneo Garantía', status=404)
+
+    descripcion = imagen.descripcion or imagen.nombre_archivo or f'#{imagen.pk}'
+
+    for campo in ('imagen', 'imagen_original'):
+        archivo = getattr(imagen, campo, None)
+        if not archivo:
+            continue
+        try:
+            ruta = Path(archivo.path)
+            if ruta.is_file():
+                ruta.unlink()
+        except Exception as exc:
+            logger.warning(
+                '[FORMATO_GARANTIA] No se pudo borrar archivo %s de imagen %s: %s',
+                campo, imagen_id, exc,
+            )
+
+    imagen.delete()
+
+    try:
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='imagen',
+            comentario=(
+                f'Escaneo PC Audit (Formato Garantía) eliminado: {descripcion} '
+                f'(por {empleado.nombre_completo})'
+            ),
+            usuario=empleado,
+            es_sistema=False,
+        )
+    except Exception as exc:
+        logger.warning('[FORMATO_GARANTIA] Historial al eliminar evidencia: %s', exc)
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': 'Foto eliminada',
+        'imagen_id': imagen_id,
     })

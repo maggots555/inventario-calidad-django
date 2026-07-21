@@ -498,7 +498,7 @@
         }
     }
     function inicializarFormatoGarantia() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
         const app = byId('formatoGarantiaApp');
         if (!app) {
             return;
@@ -508,6 +508,8 @@
         const urlReenviar = app.dataset.urlReenviar || '';
         const urlPdf = app.dataset.urlPdf || '';
         const urlEvidencia = app.dataset.urlEvidencia || '';
+        // Plantilla con 999999999: se sustituye por el id real al eliminar
+        const urlEliminarEvidenciaTpl = app.dataset.urlEliminarEvidencia || '';
         const dataEl = document.getElementById('formato-garantia-data');
         let formatoInicial = {};
         if (dataEl && dataEl.textContent) {
@@ -996,6 +998,105 @@
                 setBotonesOcupados(false);
             }
         });
+        /**
+         * Crea la miniatura de una evidencia con botón eliminar.
+         *
+         * EXPLICACIÓN PARA PRINCIPIANTES:
+         * Al subir o al cargar la página, cada foto lleva un botón rojo (X).
+         * Al hacer clic pedimos confirmación y llamamos al endpoint de borrado.
+         */
+        const crearItemEvidencia = (opts) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'formato-oow-evidencia-item';
+            wrap.dataset.imagenId = String(opts.id);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'formato-oow-evidencia-eliminar';
+            btn.title = 'Eliminar esta foto';
+            btn.setAttribute('aria-label', 'Eliminar foto de escaneo');
+            btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+            const enlace = document.createElement('a');
+            enlace.href = opts.url;
+            enlace.target = '_blank';
+            enlace.rel = 'noopener';
+            enlace.className = 'formato-oow-thumb';
+            enlace.innerHTML = `<img src="${opts.url}" alt="${opts.etiqueta}"><span>${opts.etiqueta}</span>`;
+            wrap.appendChild(btn);
+            wrap.appendChild(enlace);
+            return wrap;
+        };
+        const urlParaEliminarEvidencia = (imagenId) => {
+            if (!urlEliminarEvidenciaTpl) {
+                return '';
+            }
+            return urlEliminarEvidenciaTpl.replace('999999999', String(imagenId));
+        };
+        const mostrarListaVaciaSiHaceFalta = () => {
+            const lista = byId('listaEvidencias');
+            if (!lista) {
+                return;
+            }
+            if (lista.querySelectorAll('.formato-oow-evidencia-item').length > 0) {
+                return;
+            }
+            if (byId('evidenciasVacias')) {
+                return;
+            }
+            const p = document.createElement('p');
+            p.className = 'text-muted small mb-0';
+            p.id = 'evidenciasVacias';
+            p.textContent = 'Sin evidencias aún.';
+            lista.appendChild(p);
+        };
+        const eliminarEvidencia = async (item) => {
+            const rawId = item.dataset.imagenId || '';
+            const imagenId = Number.parseInt(rawId, 10);
+            if (!Number.isFinite(imagenId) || imagenId <= 0) {
+                setStatus('No se pudo identificar la foto a eliminar.', true, false);
+                return;
+            }
+            const url = urlParaEliminarEvidencia(imagenId);
+            if (!url) {
+                setStatus('URL de eliminación no configurada.', true, false);
+                return;
+            }
+            // Confirmación para evitar borrados accidentales en iPad
+            if (!window.confirm('¿Eliminar esta foto de escaneo? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            setStatus('Eliminando foto…', false, true);
+            try {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': leerCookieCsrf() },
+                    credentials: 'same-origin',
+                });
+                const data = (await resp.json());
+                if (!resp.ok || !data.success) {
+                    throw new Error(data.error || 'No se pudo eliminar la foto');
+                }
+                item.remove();
+                mostrarListaVaciaSiHaceFalta();
+                setStatus(data.mensaje || 'Foto eliminada.', false, false);
+            }
+            catch (err) {
+                setStatus(err instanceof Error ? err.message : 'Error al eliminar foto', true, false);
+            }
+        };
+        // Delegación: un solo listener para botones ya existentes y los nuevos al subir
+        (_m = byId('listaEvidencias')) === null || _m === void 0 ? void 0 : _m.addEventListener('click', (ev) => {
+            const target = ev.target;
+            const btn = target === null || target === void 0 ? void 0 : target.closest('.formato-oow-evidencia-eliminar');
+            if (!btn) {
+                return;
+            }
+            ev.preventDefault();
+            ev.stopPropagation();
+            const item = btn.closest('.formato-oow-evidencia-item');
+            if (item) {
+                void eliminarEvidencia(item);
+            }
+        });
         const subirEvidencia = async (input, tipo) => {
             const file = input.files && input.files[0];
             if (!file) {
@@ -1014,7 +1115,7 @@
                     body: fd,
                 });
                 const data = (await resp.json());
-                if (!resp.ok || !data.success || !data.imagen) {
+                if (!resp.ok || !data.success || !data.imagen || !data.imagen.url) {
                     throw new Error(data.error || 'No se pudo subir la imagen');
                 }
                 const lista = byId('listaEvidencias');
@@ -1022,14 +1123,13 @@
                 if (vacias) {
                     vacias.remove();
                 }
-                if (lista) {
-                    const a = document.createElement('a');
-                    a.href = data.imagen.url;
-                    a.target = '_blank';
-                    a.rel = 'noopener';
-                    a.className = 'formato-oow-thumb';
-                    a.innerHTML = `<img src="${data.imagen.url}" alt="${tipo}"><span>${tipo}</span>`;
-                    lista.prepend(a);
+                if (lista && data.imagen.id) {
+                    const item = crearItemEvidencia({
+                        id: data.imagen.id,
+                        url: data.imagen.url,
+                        etiqueta: 'Resultado de escaneo — Formato Garantía Dell',
+                    });
+                    lista.prepend(item);
                 }
                 setStatus('Foto guardada.', false, false);
                 input.value = '';
@@ -1040,7 +1140,7 @@
         };
         // EXPLICACIÓN PARA PRINCIPIANTES:
         // En Garantía Dell NO pedimos INE; solo resultado de PC Audit.
-        (_m = byId('fotoEscaneo')) === null || _m === void 0 ? void 0 : _m.addEventListener('change', (ev) => {
+        (_o = byId('fotoEscaneo')) === null || _o === void 0 ? void 0 : _o.addEventListener('change', (ev) => {
             const t = ev.target;
             void subirEvidencia(t, 'escaneo_garantia');
         });

@@ -17,6 +17,7 @@
      data-url-pdf="{{ url_pdf }}"
      data-url-detalle="{{ url_detalle }}"
      data-url-evidencia="{% url 'servicio_tecnico:formato_garantia_subir_evidencia' orden.pk %}"
+     data-url-eliminar-evidencia="{% url 'servicio_tecnico:formato_garantia_eliminar_evidencia' orden.pk 999999999 %}"
      data-aviso-version="{{ aviso_privacidad_version }}"
      data-estado="{{ formato.estado }}">
 
@@ -303,10 +304,19 @@
             </div>
             <div class="formato-oow-evidencias mt-3 d-flex flex-wrap gap-2" id="listaEvidencias">
                 {% for img in evidencias %}
-                <a href="{{ img.imagen.url }}" target="_blank" rel="noopener" class="formato-oow-thumb">
-                    <img src="{{ img.imagen.url }}" alt="{{ img.get_tipo_display }}">
-                    <span>{{ img.get_tipo_display }}</span>
-                </a>
+                {# Contenedor con botón eliminar: si se equivocan al tomar la foto #}
+                <div class="formato-oow-evidencia-item" data-imagen-id="{{ img.pk }}">
+                    <button type="button"
+                            class="formato-oow-evidencia-eliminar"
+                            title="Eliminar esta foto"
+                            aria-label="Eliminar foto de escaneo">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                    <a href="{{ img.imagen.url }}" target="_blank" rel="noopener" class="formato-oow-thumb">
+                        <img src="{{ img.imagen.url }}" alt="{{ img.get_tipo_display }}">
+                        <span>{{ img.get_tipo_display }}</span>
+                    </a>
+                </div>
                 {% empty %}
                 <p class="text-muted small mb-0" id="evidenciasVacias">Sin evidencias aún.</p>
                 {% endfor %}
@@ -314,10 +324,43 @@
         </div>
     </section>
 
-    {# --- Privacidad + email + cómo te enteraste --- #}
+    {# --- Privacidad + exclusiones Dell + email + cómo te enteraste --- #}
     <section class="card formato-oow-card mb-3">
         <div class="card-header formato-oow-section-header">Aviso de privacidad y envío</div>
         <div class="card-body">
+            {# --- Exclusiones Dell (solo lectura; mismo texto del papel / PDF) --- #}
+            <!--
+              EXPLICACIÓN PARA PRINCIPIANTES:
+              Esto es un aviso de la marca Dell (no de SIC). El cliente lo ve
+              aquí y también en la última página del PDF. NO pedimos checkbox
+              ni lo guardamos en la base de datos: no hay que “aceptarlo”
+              aparte; es informativo como en el formato papel.
+            -->
+            <div class="formato-oow-aviso-dell mb-4">
+                <p class="fw-semibold mb-2">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Actividades no incluidas en el servicio de garantía (Dell)
+                </p>
+                <p class="form-text small mt-0 mb-2">
+                    Aviso de la marca. Se imprime en la página final del PDF
+                    («SERVICIO FINAL»). No requiere aceptación adicional.
+                </p>
+                <button type="button" class="btn btn-outline-secondary mb-2"
+                        data-bs-toggle="modal" data-bs-target="#modalActividadesDell">
+                    <i class="bi bi-list-ol"></i> Leer actividades no incluidas
+                </button>
+                <div class="formato-oow-aviso-preview" tabindex="0">
+                    <ol class="mb-0 ps-3 small">
+                        {% for actividad in actividades_no_incluidas|slice:":3" %}
+                        <li>{{ actividad|truncatechars:120 }}</li>
+                        {% endfor %}
+                    </ol>
+                    <p class="small text-muted mb-0 mt-1">… y {{ actividades_no_incluidas|length|add:"-3" }} más (ver lista completa).</p>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
             <button type="button" class="btn btn-outline-primary mb-2" data-bs-toggle="modal"
                     data-bs-target="#modalAvisoPrivacidad">
                 <i class="bi bi-shield-lock"></i> Leer aviso de privacidad
@@ -429,6 +472,34 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
                         id="btnAceptarAvisoModal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal informativo Dell: exclusiones de garantía (sin checkbox / sin guardar) #}
+<div class="modal fade" id="modalActividadesDell" tabindex="-1"
+     aria-labelledby="modalActividadesDellLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="modalActividadesDellLabel">
+                    ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTIA
+                </h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body formato-oow-aviso-modal">
+                <p class="small text-muted">
+                    Texto oficial de la marca Dell. También se incluye en la última página del PDF.
+                </p>
+                <ol class="formato-oow-aviso-dell-lista">
+                    {% for actividad in actividades_no_incluidas %}
+                    <li class="mb-2">{{ actividad }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>

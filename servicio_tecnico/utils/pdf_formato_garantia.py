@@ -938,37 +938,19 @@ class PDFFormatoServicioGarantia:
             elementos.append(KeepTogether([tarjeta, Spacer(1, 5 * mm)]))
         return elementos
 
-    def _nombre_tecnico(self) -> str:
-        """Nombre del técnico asignado a la orden (o vacío si no hay)."""
-        tecnico = getattr(self.orden, 'tecnico_asignado_actual', None)
-        if tecnico and getattr(tecnico, 'nombre_completo', None):
-            return tecnico.nombre_completo
-        return ''
-
     def _tipo_dispositivo_checks(self) -> str:
         """
-        Casillas NOTEBOOK / TABLET / PC / AIO según DetalleEquipo.tipo_equipo.
+        Casillas NOTEBOOK / TABLET / PC / AIO vacías (se marcan a mano en papel).
 
         Returns:
-            str: HTML con la casilla correcta marcada.
+            str: HTML con las cuatro casillas sin marcar.
         """
-        tipo = (getattr(self.detalle, 'tipo_equipo', '') or '').strip().lower()
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # En SIGMA usamos Laptop/PC/AIO; en el papel Dell dice NOTEBOOK/TABLET/PC/AIO.
-        mapa = {
-            'laptop': 'NOTEBOOK',
-            'notebook': 'NOTEBOOK',
-            'tablet': 'TABLET',
-            'pc': 'PC',
-            'escritorio': 'PC',
-            'aio': 'AIO',
-        }
-        activo = mapa.get(tipo, '')
+        # Antes marcábamos según tipo_equipo de SIGMA ([X] NOTEBOOK, etc.).
+        # En el papel Dell el auditor lo llena a mano, así que dejamos todo vacío.
         partes = []
         for etiqueta in ('NOTEBOOK', 'TABLET', 'PC', 'AIO'):
-            # ASCII [X]/[ ] — Helvetica no soporta bien los glifos Unicode de casilla
-            marca = '[X]' if etiqueta == activo else '[ ]'
-            partes.append(f'{marca} {etiqueta}')
+            partes.append(f'[&#160;] {etiqueta}')
         return ' &nbsp;&nbsp; '.join(partes)
 
     def _generar_qr_whatsapp(self, lado_mm: float = 22) -> Optional[RLImage]:
@@ -1044,10 +1026,10 @@ class PDFFormatoServicioGarantia:
         ))
         elementos.append(Spacer(1, 1.2 * mm))
 
-        tecnico = self._nombre_tecnico()
-        linea_tec = (
-            f'<b>Técnico que repara:</b> {self._esc(tecnico) or "__________________________"}'
-        )
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # En el papel Dell estos campos se llenan a mano al entregar el equipo.
+        # No auto-rellenamos con el técnico de SIGMA.
+        linea_tec = '<b>Técnico que repara:</b> __________________________'
         linea_entrega = (
             '<b>Persona que entrega el equipo:</b> __________________________'
         )
@@ -1112,17 +1094,50 @@ class PDFFormatoServicioGarantia:
         elementos.append(Spacer(1, 2.5 * mm))
 
         # --- Firma ENTERADO Y ACEPTADO + QR ---
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Aquí reutilizamos la misma firma digital capturada en el wizard
+        # (firma_cliente). En el papel se firma a mano; en SIGMA ya la tenemos.
         qr_img = self._generar_qr_whatsapp(20)
-        firma_bloque = Table(
-            [
-                [Paragraph('NOMBRE Y FIRMA DEL CLIENTE', self._estilos['FirmaLabel'])],
-                [Paragraph('_____________________________________', self._estilos['FirmaLabel'])],
-                [Paragraph('<b>ENTERADO Y ACEPTADO</b>', self._estilos['FirmaLabel'])],
-            ],
-            colWidths=[90 * mm],
+        firma_img = None
+        if self.formato.firma_cliente:
+            try:
+                firma_img = RLImage(
+                    self.formato.firma_cliente.path,
+                    width=48 * mm,
+                    height=16 * mm,
+                    kind='proportional',
+                )
+            except Exception:
+                firma_img = None
+
+        nombre_cli = (
+            getattr(self.detalle, 'nombre_cliente', None)
+            or getattr(self.detalle, 'contacto_cliente', None)
+            or ''
         )
+        nombre_cli = (nombre_cli or '').strip()
+
+        filas_firma: List[List] = [
+            [Paragraph('NOMBRE Y FIRMA DEL CLIENTE', self._estilos['FirmaLabel'])],
+        ]
+        if firma_img is not None:
+            filas_firma.append([firma_img])
+        else:
+            filas_firma.append([
+                Paragraph('_____________________________________', self._estilos['FirmaLabel']),
+            ])
+        if nombre_cli:
+            filas_firma.append([
+                Paragraph(self._esc(nombre_cli), self._estilos['FirmaLabel']),
+            ])
+        filas_firma.append([
+            Paragraph('<b>ENTERADO Y ACEPTADO</b>', self._estilos['FirmaLabel']),
+        ])
+
+        firma_bloque = Table(filas_firma, colWidths=[90 * mm])
         firma_bloque.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 1),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
@@ -1170,7 +1185,7 @@ class PDFFormatoServicioGarantia:
                     self._estilos['ServicioFinalCampo'],
                 ),
                 Paragraph(
-                    f'<b>Técnico a cargo:</b> {self._esc(tecnico) or "_____________________________"}',
+                    '<b>Técnico a cargo:</b> _____________________________',
                     self._estilos['ServicioFinalCampo'],
                 ),
             ]],

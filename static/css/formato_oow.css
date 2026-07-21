@@ -148,6 +148,56 @@
   text-align: center;
 }
 
+/* Miniatura de evidencia con botón eliminar (Formato Garantía / OOW) */
+.formato-oow-evidencia-item {
+  position: relative;
+  width: 120px;
+}
+
+.formato-oow-evidencia-item .formato-oow-thumb {
+  width: 100%;
+}
+
+.formato-oow-evidencia-eliminar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(185, 28, 28, 0.92);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.formato-oow-evidencia-eliminar:hover,
+.formato-oow-evidencia-eliminar:focus-visible {
+  background: #991b1b;
+  outline: 2px solid #fecaca;
+  outline-offset: 1px;
+}
+
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar {
+  background: rgba(248, 113, 113, 0.95);
+  color: #0f172a;
+}
+
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:hover,
+[data-bs-theme="dark"] .formato-oow-evidencia-eliminar:focus-visible {
+  background: #f87171;
+}
+
 .formato-oow-aviso-preview {
   max-height: 6rem;
   overflow: auto;
@@ -162,6 +212,22 @@
 [data-bs-theme="dark"] .formato-oow-aviso-preview {
   background: #0f172a;
   color: #cbd5e1;
+}
+
+/* Bloque informativo Dell (exclusiones) dentro del wizard Garantía */
+.formato-oow-aviso-dell .formato-oow-aviso-preview {
+  max-height: 7.5rem;
+}
+
+.formato-oow-aviso-dell-lista {
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-primary, #1e293b);
+}
+
+[data-bs-theme="dark"] .formato-oow-aviso-dell-lista {
+  color: #e2e8f0;
 }
 
 .formato-oow-aviso-texto {

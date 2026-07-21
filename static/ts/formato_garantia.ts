@@ -635,6 +635,8 @@ function inicializarFormatoGarantia(): void {
   const urlReenviar = app.dataset.urlReenviar || '';
   const urlPdf = app.dataset.urlPdf || '';
   const urlEvidencia = app.dataset.urlEvidencia || '';
+  // Plantilla con 999999999: se sustituye por el id real al eliminar
+  const urlEliminarEvidenciaTpl = app.dataset.urlEliminarEvidencia || '';
 
   const dataEl = document.getElementById('formato-garantia-data');
   let formatoInicial: {
@@ -1201,6 +1203,117 @@ function inicializarFormatoGarantia(): void {
     }
   });
 
+  /**
+   * Crea la miniatura de una evidencia con botón eliminar.
+   *
+   * EXPLICACIÓN PARA PRINCIPIANTES:
+   * Al subir o al cargar la página, cada foto lleva un botón rojo (X).
+   * Al hacer clic pedimos confirmación y llamamos al endpoint de borrado.
+   */
+  const crearItemEvidencia = (opts: {
+    id: number;
+    url: string;
+    etiqueta: string;
+  }): HTMLDivElement => {
+    const wrap = document.createElement('div');
+    wrap.className = 'formato-oow-evidencia-item';
+    wrap.dataset.imagenId = String(opts.id);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'formato-oow-evidencia-eliminar';
+    btn.title = 'Eliminar esta foto';
+    btn.setAttribute('aria-label', 'Eliminar foto de escaneo');
+    btn.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+
+    const enlace = document.createElement('a');
+    enlace.href = opts.url;
+    enlace.target = '_blank';
+    enlace.rel = 'noopener';
+    enlace.className = 'formato-oow-thumb';
+    enlace.innerHTML = `<img src="${opts.url}" alt="${opts.etiqueta}"><span>${opts.etiqueta}</span>`;
+
+    wrap.appendChild(btn);
+    wrap.appendChild(enlace);
+    return wrap;
+  };
+
+  const urlParaEliminarEvidencia = (imagenId: number): string => {
+    if (!urlEliminarEvidenciaTpl) {
+      return '';
+    }
+    return urlEliminarEvidenciaTpl.replace('999999999', String(imagenId));
+  };
+
+  const mostrarListaVaciaSiHaceFalta = (): void => {
+    const lista = byId('listaEvidencias');
+    if (!lista) {
+      return;
+    }
+    if (lista.querySelectorAll('.formato-oow-evidencia-item').length > 0) {
+      return;
+    }
+    if (byId('evidenciasVacias')) {
+      return;
+    }
+    const p = document.createElement('p');
+    p.className = 'text-muted small mb-0';
+    p.id = 'evidenciasVacias';
+    p.textContent = 'Sin evidencias aún.';
+    lista.appendChild(p);
+  };
+
+  const eliminarEvidencia = async (item: HTMLElement): Promise<void> => {
+    const rawId = item.dataset.imagenId || '';
+    const imagenId = Number.parseInt(rawId, 10);
+    if (!Number.isFinite(imagenId) || imagenId <= 0) {
+      setStatus('No se pudo identificar la foto a eliminar.', true, false);
+      return;
+    }
+    const url = urlParaEliminarEvidencia(imagenId);
+    if (!url) {
+      setStatus('URL de eliminación no configurada.', true, false);
+      return;
+    }
+    // Confirmación para evitar borrados accidentales en iPad
+    if (!window.confirm('¿Eliminar esta foto de escaneo? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    setStatus('Eliminando foto…', false, true);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': leerCookieCsrf() },
+        credentials: 'same-origin',
+      });
+      const data = (await resp.json()) as { success?: boolean; error?: string; mensaje?: string };
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'No se pudo eliminar la foto');
+      }
+      item.remove();
+      mostrarListaVaciaSiHaceFalta();
+      setStatus(data.mensaje || 'Foto eliminada.', false, false);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Error al eliminar foto', true, false);
+    }
+  };
+
+  // Delegación: un solo listener para botones ya existentes y los nuevos al subir
+  byId('listaEvidencias')?.addEventListener('click', (ev: Event) => {
+    const target = ev.target as HTMLElement | null;
+    const btn = target?.closest('.formato-oow-evidencia-eliminar') as HTMLElement | null;
+    if (!btn) {
+      return;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    const item = btn.closest('.formato-oow-evidencia-item') as HTMLElement | null;
+    if (item) {
+      void eliminarEvidencia(item);
+    }
+  });
+
   const subirEvidencia = async (input: HTMLInputElement, tipo: string): Promise<void> => {
     const file = input.files && input.files[0];
     if (!file) {
@@ -1209,7 +1322,7 @@ function inicializarFormatoGarantia(): void {
     const fd = new FormData();
     fd.append('tipo', tipo);
     fd.append('imagen', file);
-      fd.append('descripcion', 'Escaneo PC Audit Garantía');
+    fd.append('descripcion', 'Escaneo PC Audit Garantía');
     setStatus('Subiendo foto…', false, true);
     try {
       const resp = await fetch(urlEvidencia, {
@@ -1221,9 +1334,9 @@ function inicializarFormatoGarantia(): void {
       const data = (await resp.json()) as {
         success?: boolean;
         error?: string;
-        imagen?: { url: string; tipo: string };
+        imagen?: { id: number; url: string; tipo: string };
       };
-      if (!resp.ok || !data.success || !data.imagen) {
+      if (!resp.ok || !data.success || !data.imagen || !data.imagen.url) {
         throw new Error(data.error || 'No se pudo subir la imagen');
       }
       const lista = byId('listaEvidencias');
@@ -1231,14 +1344,13 @@ function inicializarFormatoGarantia(): void {
       if (vacias) {
         vacias.remove();
       }
-      if (lista) {
-        const a = document.createElement('a');
-        a.href = data.imagen.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.className = 'formato-oow-thumb';
-        a.innerHTML = `<img src="${data.imagen.url}" alt="${tipo}"><span>${tipo}</span>`;
-        lista.prepend(a);
+      if (lista && data.imagen.id) {
+        const item = crearItemEvidencia({
+          id: data.imagen.id,
+          url: data.imagen.url,
+          etiqueta: 'Resultado de escaneo — Formato Garantía Dell',
+        });
+        lista.prepend(item);
       }
       setStatus('Foto guardada.', false, false);
       input.value = '';

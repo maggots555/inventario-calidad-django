@@ -160,6 +160,7 @@ from .views_formato_oow import (  # noqa: F401
 )
 from .views_formato_garantia import (  # noqa: F401
     abrir_formato_garantia_desde_sicser,
+    formato_garantia_eliminar_evidencia,
     formato_garantia_finalizar,
     formato_garantia_guardar,
     formato_garantia_pdf,

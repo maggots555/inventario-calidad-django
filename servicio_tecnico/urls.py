@@ -388,6 +388,11 @@ urlpatterns = [
     path('orden/<int:orden_id>/formato-garantia/subir-evidencia/',
          views.formato_garantia_subir_evidencia,
          name='formato_garantia_subir_evidencia'),
+    path(
+        'orden/<int:orden_id>/formato-garantia/evidencia/<int:imagen_id>/eliminar/',
+        views.formato_garantia_eliminar_evidencia,
+        name='formato_garantia_eliminar_evidencia',
+    ),
 
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
