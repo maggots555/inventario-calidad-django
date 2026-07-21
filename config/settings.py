@@ -874,21 +874,23 @@ OLLAMA_MODELS: list[str] = (
 #   NUNCA la expongas en código o commits.
 #
 # GEMINI_MODEL:
-#   Modelo predeterminado. Recomendados:
-#     gemini-2.0-flash      → rápido, bajo costo, excelente para corrección de texto
-#     gemini-1.5-pro        → mayor calidad, más lento
-#     gemini-1.5-flash      → balance velocidad/calidad
+#   Modelo predeterminado. Recomendados (GA jul 2026):
+#     gemini-3.6-flash       → workhorse: multimodal, calidad, menos tokens de salida
+#     gemini-3.5-flash-lite  → más rápido/barato 3.5; alto throughput
+#     gemini-2.5-flash       → reserva estable 2.5 si el free tier 3.x se satura
+#     gemini-2.5-flash-lite  → último recurso ligero
 #
 # GEMINI_TIMEOUT:
 #   Segundos antes de abortar la llamada. 60s es suficiente para la API de Google.
 
 GEMINI_ENABLED = config('GEMINI_ENABLED', default=False, cast=bool)
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
-GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.0-flash')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-3.6-flash')
 GEMINI_TIMEOUT = config('GEMINI_TIMEOUT', default=60, cast=int)
 
 # GEMINI_MODELS: lista de modelos Gemini disponibles para el selector.
-# Formato: nombres separados por coma. Ejemplo: gemini-2.0-flash,gemini-1.5-pro
+# Formato: nombres separados por coma.
+# Ejemplo: gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite
 # Si no se define, se usa GEMINI_MODEL como única opción.
 _gemini_models_raw = config('GEMINI_MODELS', default='')
 GEMINI_MODELS: list[str] = (
@@ -905,7 +907,7 @@ GEMINI_MODELS: list[str] = (
 # Los prefijos visuales ("[Gemini] ", "[Ollama] ") se remueven antes de llamar a la API.
 #
 # Ejemplo de lista resultante:
-#   ["[Ollama] gemma4:e2b", "[Gemini] gemini-2.0-flash", "[Gemini] gemini-1.5-pro"]
+#   ["[Ollama] gemma4:e2b", "[Gemini] gemini-3.6-flash", "[Gemini] gemini-3.5-flash-lite"]
 
 _ai_models: list[str] = []
 
@@ -937,7 +939,7 @@ AI_ENABLED: bool = bool(_ai_models)
 #                          conversaciones cortas. No consume tokens de la API
 #                          de Gemini (corre en Ollama local).
 #
-#   Para usar Gemini en el chat: CHAT_SEGUIMIENTO_MODEL=gemini-2.0-flash
+#   Para usar Gemini en el chat: CHAT_SEGUIMIENTO_MODEL=gemini-3.5-flash-lite
 #   Para usar un modelo Ollama diferente: CHAT_SEGUIMIENTO_MODEL=llama3.2:3b
 #
 # NOTA: Si no se configura, se usa 'gemma4:e2b' por defecto (vía Ollama).

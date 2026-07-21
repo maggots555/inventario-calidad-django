@@ -1901,7 +1901,7 @@ def detalle_orden(request, orden_id):
         # AI_ENABLED es True si al menos un proveedor está habilitado en .env.
         'ollama_enabled': getattr(settings, 'AI_ENABLED', False),
         # Lista unificada de modelos de todos los proveedores habilitados.
-        # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-2.0-flash"
+        # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-3.6-flash"
         'ollama_models': getattr(settings, 'AI_MODELS', []),
     }
     

@@ -739,7 +739,7 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
 
     Args:
         mensajes: Lista de mensajes con roles system/user/assistant
-        modelo: Nombre del modelo Gemini (ej: gemini-2.0-flash)
+        modelo: Nombre del modelo Gemini (ej: gemini-3.5-flash-lite)
         timeout: Timeout en segundos
         api_key: API Key de Google AI Studio
 
@@ -748,6 +748,8 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
     """
     import ssl
     from django.conf import settings
+    # Reutilizamos el helper dual 2.5 vs 3.6/3.5-lite (temperature deprecada en API nueva)
+    from servicio_tecnico.gemini_client import construir_generation_config
 
     max_tokens = getattr(settings, 'CHAT_SEGUIMIENTO_MAX_TOKENS', 1200)
 
@@ -769,15 +771,17 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
     if not historial_gemini:
         return {'success': False, 'error': 'No hay mensajes para procesar.'}
 
-    # Construir payload de Gemini
+    # Construir payload de Gemini (chat = throughput → thinking minimal / budget 0)
     payload: dict = {
         "contents": historial_gemini,
-        "generationConfig": {
-            "temperature": 0.6,
-            "topP": 0.9,
-            "maxOutputTokens": max_tokens,
-            "thinkingConfig": {"thinkingBudget": 0},
-        },
+        "generationConfig": construir_generation_config(
+            modelo,
+            max_output_tokens=max_tokens,
+            temperature=0.6,
+            top_p=0.9,
+            thinking_budget=0,
+            thinking_level='minimal',
+        ),
     }
 
     # El system prompt va como systemInstruction (campo separado en Gemini)
@@ -959,7 +963,7 @@ def mejorar_diagnostico_dispatch(
     y delega la llamada al cliente correcto (Gemini o Ollama).
 
     Regla de detección:
-        - Si el modelo empieza con "gemini" (ej: gemini-2.0-flash) → API de Google Gemini
+        - Si el modelo empieza con "gemini" (ej: gemini-3.6-flash) → API de Google Gemini
         - Cualquier otro nombre → Ollama (local o remoto via Tailscale)
 
     Esto permite al frontend enviar cualquier modelo del selector unificado
@@ -1359,7 +1363,7 @@ def analizar_sentimiento_dispatch(
     según el prefijo del modelo recibido del frontend.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    El frontend envía el modelo con un prefijo visual como "[Gemini] gemini-2.0-flash"
+    El frontend envía el modelo con un prefijo visual como "[Gemini] gemini-3.6-flash"
     o "[Ollama] gemma4:e4b". Esta función quita el prefijo, detecta el proveedor
     y delega al cliente correcto. Es el mismo patrón que mejorar_diagnostico_dispatch().
 
@@ -1369,7 +1373,7 @@ def analizar_sentimiento_dispatch(
 
     Args:
         encuestas:       Lista de dicts de encuestas (mismo formato que analizar_sentimiento_encuestas)
-        modelo_override: Modelo con prefijo visual, ej: "[Gemini] gemini-2.0-flash"
+        modelo_override: Modelo con prefijo visual, ej: "[Gemini] gemini-3.6-flash"
                          Si está vacío usa el modelo Ollama por defecto.
 
     Returns:
@@ -1423,7 +1427,7 @@ def analizar_sentimiento_dispatch(
 #
 # MODELOS COMPATIBLES:
 #   Ollama: gemma4:e4b, gemma4:e2b (ambos soportan visión de forma nativa)
-#   Gemini: gemini-2.0-flash, gemini-2.5-flash-lite (soporte de visión completo)
+#   Gemini: gemini-3.6-flash, gemini-3.5-flash-lite, gemini-2.5-flash-lite (visión)
 #
 # LÍMITE DE IMÁGENES:
 #   Configurable via OLLAMA_MAX_IMAGENES_IA (default: 8).
@@ -2811,7 +2815,7 @@ def generar_cita_nihilismo_dispatch() -> dict:
 
     if not gemini_models_configurados:
         # Si no hay modelos configurados, usar el modelo por defecto
-        default_model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        default_model = getattr(settings, 'GEMINI_MODEL', 'gemini-3.6-flash')
         gemini_models_configurados = [default_model]
 
     logger.info(

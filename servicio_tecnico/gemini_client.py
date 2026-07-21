@@ -40,6 +40,89 @@ logger = logging.getLogger(__name__)
 # URL base de la API REST de Gemini (v1beta — soporta todos los modelos actuales)
 GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
+# Default canónico si settings no define GEMINI_MODEL (alineado con .env.example jul 2026)
+GEMINI_MODEL_DEFAULT = 'gemini-3.6-flash'
+
+
+def usa_api_gemini_sin_sampling(modelo: str) -> bool:
+    """
+    Indica si el modelo usa la API Gemini “nueva” (jul 2026 en adelante).
+
+    Objetivo de negocio:
+        A partir de gemini-3.6-flash y gemini-3.5-flash-lite, Google deprecó
+        temperature / top_p / top_k (se ignoran hoy; en el futuro pueden dar HTTP 400)
+        y pide thinking_level en lugar de thinkingBudget.
+
+    Args:
+        modelo: Nombre del modelo (con o sin prefijo visual "[Gemini] ").
+
+    Returns:
+        True si debemos armar generationConfig sin sampling params y con thinkingLevel.
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES: limpiamos el prefijo de la UI y comparamos
+    # por prefijo de ID, no por igualdad exacta (así cubrimos variantes -preview).
+    nombre = modelo.strip()
+    if nombre.lower().startswith('[gemini] '):
+        nombre = nombre[len('[Gemini] '):]
+    nombre = nombre.lower().strip()
+
+    if nombre.startswith('gemini-3.6'):
+        return True
+    # 3.5 Flash-Lite GA (y previews del mismo ID) — no confundir con gemini-3.5-flash
+    if '3.5-flash-lite' in nombre:
+        return True
+    return False
+
+
+def construir_generation_config(
+    modelo: str,
+    *,
+    max_output_tokens: int,
+    temperature: float = 0.3,
+    top_p: float | None = 0.9,
+    thinking_budget: int = 0,
+    thinking_level: str = 'minimal',
+    response_mime_type: str | None = None,
+) -> dict:
+    """
+    Arma generationConfig compatible con Gemini 2.5 y con 3.6 / 3.5 Flash-Lite.
+
+    Args:
+        modelo: ID del modelo Gemini (decide qué campos enviar).
+        max_output_tokens: Tope de tokens de salida (siempre se envía).
+        temperature: Solo para modelos 2.5 y anteriores (deprecado en 3.6+).
+        top_p: Solo para modelos 2.5 y anteriores; None = no incluir topP.
+        thinking_budget: Solo 2.5: 0 = sin thinking, -1 = dinámico.
+        thinking_level: Solo API nueva: 'minimal' | 'medium' | 'high'.
+        response_mime_type: Opcional, ej. 'application/json' (sentimiento).
+
+    Returns:
+        dict listo para meter en payload['generationConfig'].
+
+    Efectos secundarios:
+        Ninguno (pura construcción de dict; no llama a la red).
+    """
+    config: dict = {
+        'maxOutputTokens': max_output_tokens,
+    }
+
+    if response_mime_type:
+        config['responseMimeType'] = response_mime_type
+
+    # ── Rama API nueva (3.6 Flash / 3.5 Flash-Lite): sin temperature/topP ──
+    # EXPLICACIÓN PARA PRINCIPIANTES: Google pidió quitar sampling params y usar
+    # thinkingLevel (string). Si mandamos temperature, hoy se ignora; mañana puede fallar.
+    if usa_api_gemini_sin_sampling(modelo):
+        config['thinkingConfig'] = {'thinkingLevel': thinking_level}
+        return config
+
+    # ── Rama clásica (2.5-flash, 2.0-flash, etc.): temperature + thinkingBudget ──
+    config['temperature'] = temperature
+    if top_p is not None:
+        config['topP'] = top_p
+    config['thinkingConfig'] = {'thinkingBudget': thinking_budget}
+    return config
+
 
 def mejorar_diagnostico(
     diagnostico_sic: str,
@@ -97,7 +180,7 @@ def mejorar_diagnostico(
     model = (
         modelo_override.strip()
         if modelo_override.strip()
-        else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        else getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
     )
 
     # Si el modelo viene con prefijo "[Gemini] ", lo removemos para la API
@@ -123,7 +206,7 @@ def mejorar_diagnostico(
 
     # ── Payload para la API de Gemini ──
     # Estructura: contents[].parts[].text
-    # Temperatura baja (0.3) = respuestas conservadoras y predecibles (igual que Ollama)
+    # thinking_level minimal / budget 0: corrección de texto no necesita razonamiento profundo.
     payload = {
         "contents": [
             {
@@ -132,22 +215,14 @@ def mejorar_diagnostico(
                 ]
             }
         ],
-        "generationConfig": {
-            "temperature": 0.3,
-            "topP": 0.9,
-            # maxOutputTokens: 8192 es más que suficiente para cualquier diagnóstico técnico.
-            # (gemini-2.5-flash soporta hasta 65536 tokens de salida)
-            # Un diagnóstico detallado en español raramente supera 500 tokens.
-            "maxOutputTokens": 8192,
-            # thinkingConfig: desactiva el razonamiento interno (thinking budget = 0).
-            # Para corrección de texto no se necesita razonamiento profundo.
-            # Sin esto, gemini-2.5-flash consume ~1000 tokens internos antes de responder,
-            # dejando muy poco espacio para la respuesta real con límites bajos.
-            # En modelos 2.0 y anteriores este campo se ignora silenciosamente.
-            "thinkingConfig": {
-                "thinkingBudget": 0
-            }
-        }
+        "generationConfig": construir_generation_config(
+            model,
+            max_output_tokens=8192,
+            temperature=0.3,
+            top_p=0.9,
+            thinking_budget=0,
+            thinking_level='minimal',
+        ),
     }
 
     data = json.dumps(payload).encode('utf-8')
@@ -362,7 +437,7 @@ def mejorar_diagnostico(
 
 def analizar_sentimiento_encuestas(
     encuestas: list[dict],
-    modelo: str = 'gemini-2.0-flash',
+    modelo: str = GEMINI_MODEL_DEFAULT,
 ) -> dict:
     """
     Analiza el sentimiento general del conjunto de encuestas de satisfacción
@@ -376,7 +451,7 @@ def analizar_sentimiento_encuestas(
         encuestas: Lista de dicts con claves:
                    calificacion_general, calificacion_atencion,
                    calificacion_tiempo, nps, recomienda, comentario
-        modelo:    Nombre del modelo Gemini (default: gemini-2.0-flash)
+        modelo:    Nombre del modelo Gemini (default: gemini-3.6-flash)
 
     Returns:
         dict con las claves:
@@ -433,7 +508,7 @@ def analizar_sentimiento_encuestas(
 
     # ── Payload Gemini generateContent ──────────────────────────────────────
     # systemInstruction + contents (rol user) + responseMimeType=application/json
-    # para forzar salida JSON nativa (soportado en gemini-1.5+ y gemini-2.x)
+    # thinking_level minimal: clasificación de sentimiento es throughput, no razonamiento profundo.
     payload = {
         'systemInstruction': {
             'parts': [{'text': _PROMPT_SENTIMIENTO_SISTEMA}],
@@ -444,13 +519,15 @@ def analizar_sentimiento_encuestas(
                 'parts': [{'text': prompt_usuario}],
             }
         ],
-        'generationConfig': {
-            'temperature': 0.2,
-            'topP': 0.9,
-            'maxOutputTokens': 1024,
-            'responseMimeType': 'application/json',
-            'thinkingConfig': {'thinkingBudget': 0},  # Sin cadena de pensamiento
-        },
+        'generationConfig': construir_generation_config(
+            modelo,
+            max_output_tokens=1024,
+            temperature=0.2,
+            top_p=0.9,
+            thinking_budget=0,
+            thinking_level='minimal',
+            response_mime_type='application/json',
+        ),
     }
 
     url = f'{GEMINI_API_BASE}/{modelo}:generateContent?key={api_key}'
@@ -650,7 +727,7 @@ def analizar_imagenes_ingreso_gemini(
         logger.error("[InspeccionIA][Gemini] GEMINI_API_KEY no está configurada.")
         return {'success': False, 'error': 'GEMINI_API_KEY no configurada.', 'error_type': 'config_error'}
 
-    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
     # Para visión usamos el mismo timeout que Ollama vision: más generoso
     # porque el payload de imágenes es más grande y la red puede ser el cuello.
     timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
@@ -688,19 +765,15 @@ def analizar_imagenes_ingreso_gemini(
                 "parts": parts,
             }
         ],
-        "generationConfig": {
-            # Temperatura muy baja = descripciones objetivas (igual que Ollama)
-            "temperature": 0.15,
-            "topP": 0.9,
-            "maxOutputTokens": max_output_tokens,
-            # thinkingBudget=-1: permite al modelo decidir cuánto razonamiento
-            # interno necesita (modo dinámico). Para inspección visual esto es
-            # ideal — el modelo puede tomarse más tiempo examinando cada zona
-            # antes de comprometerse con una descripción. Sin thinking, tiende a
-            # generar descripciones superficiales o asumir detalles no visibles.
-            # (En modelos 2.0 y anteriores este campo se ignora silenciosamente)
-            "thinkingConfig": {"thinkingBudget": -1},
-        },
+        # medium / budget -1: inspección visual se beneficia de más razonamiento multimodal.
+        "generationConfig": construir_generation_config(
+            model,
+            max_output_tokens=max_output_tokens,
+            temperature=0.15,
+            top_p=0.9,
+            thinking_budget=-1,
+            thinking_level='medium',
+        ),
     }
 
     url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
@@ -839,7 +912,7 @@ def analizar_imagenes_ingreso_gemini(
 # igual que las imágenes. Se envía en base64 con el MIME type correspondiente.
 # Soporta: audio/wav, audio/webm, audio/mp3, audio/ogg, audio/aac, audio/flac.
 #
-# Modelos compatibles: gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-pro.
+# Modelos compatibles: gemini-3.6-flash, gemini-3.5-flash-lite, gemini-2.5-flash.
 # El modelo recibe el audio y el prompt juntos en el mismo "turn".
 # ============================================================================
 
@@ -892,7 +965,7 @@ def transcribir_audio_gemini(
 
     # Usar el modelo recibido como parámetro, o el predeterminado del settings
     if not model:
-        model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        model = getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
     # Si viene con prefijo "[Gemini] ", lo removemos
     if model.startswith('[Gemini] '):
         model = model[len('[Gemini] '):]
@@ -924,13 +997,14 @@ def transcribir_audio_gemini(
                 ]
             }
         ],
-        "generationConfig": {
-            "temperature": 0.0,       # Sin aleatoriedad — transcripción literal
-            "maxOutputTokens": 2048,  # Suficiente para varios minutos de audio
-            "thinkingConfig": {
-                "thinkingBudget": 0   # Sin razonamiento interno para transcripción
-            },
-        },
+        "generationConfig": construir_generation_config(
+            model,
+            max_output_tokens=2048,
+            temperature=0.0,
+            top_p=None,
+            thinking_budget=0,
+            thinking_level='minimal',
+        ),
     }
 
     url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
@@ -1068,7 +1142,7 @@ def transcribir_audio_gemini_con_fallback(
 
     # Garantizar que siempre haya al menos el modelo predeterminado
     if not modelos:
-        modelos = [getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')]
+        modelos = [getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)]
 
     ultimo_error = 'No hay modelos Gemini configurados en GEMINI_MODELS.'
     intentos = 0
@@ -1158,7 +1232,7 @@ def analizar_video_evidencia_gemini(
         logger.error("[VideoIA][Gemini] GEMINI_API_KEY no está configurada.")
         return {'success': False, 'error': 'GEMINI_API_KEY no configurada.', 'error_type': 'config_error'}
 
-    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
     timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
     max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
 
@@ -1205,12 +1279,14 @@ def analizar_video_evidencia_gemini(
                 "parts": parts,
             }
         ],
-        "generationConfig": {
-            "temperature": 0.2,
-            "topP": 0.9,
-            "maxOutputTokens": 2048,
-            "thinkingConfig": {"thinkingBudget": -1},
-        },
+        "generationConfig": construir_generation_config(
+            model,
+            max_output_tokens=2048,
+            temperature=0.2,
+            top_p=0.9,
+            thinking_budget=-1,
+            thinking_level='medium',
+        ),
     }
 
     url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
@@ -1335,8 +1411,8 @@ def analizar_video_evidencia_gemini(
 # Esta función es llamada por el dispatcher en ollama_client.py como parte de
 # la cascada de fallback: Gemini → Ollama → lista predefinida.
 #
-# A diferencia de las funciones de diagnóstico (temperature 0.3), aquí usamos
-# temperature 0.9 para obtener citas creativas y variadas cada día.
+# A diferencia de las funciones de diagnóstico (temperature 0.3 en modelos 2.5),
+# aquí pedimos temperature 0.9 en la rama clásica; en 3.6+ se usa thinking_level=minimal.
 # ============================================================================
 
 # Prompt fijo para la generación de citas — se reutiliza en Ollama para consistencia.
@@ -1398,7 +1474,7 @@ def generar_cita_nihilismo_gemini(
     model = (
         modelo_override.strip()
         if modelo_override.strip()
-        else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        else getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
     )
 
     # Limpiar prefijo visual si viene del selector (aunque el dispatcher ya lo limpia)
@@ -1408,9 +1484,8 @@ def generar_cita_nihilismo_gemini(
     timeout = min(getattr(settings, 'GEMINI_TIMEOUT', 60), 15)
 
     # ── Construir el payload ──
-    # Temperature alta (0.9) = citas creativas y variadas cada día.
-    # maxOutputTokens bajo (150) = suficiente para 1-3 oraciones breves.
-    # thinkingBudget: 0 = sin razonamiento interno, respuesta directa.
+    # Cita creativa: en 2.5 usamos temperature alta; en 3.6+ Google ignora temperature
+    # y controlamos el esfuerzo con thinking_level=minimal (respuesta corta y directa).
     payload = {
         "contents": [
             {
@@ -1419,13 +1494,14 @@ def generar_cita_nihilismo_gemini(
                 ]
             }
         ],
-        "generationConfig": {
-            "temperature": 0.9,
-            "maxOutputTokens": 150,
-            "thinkingConfig": {
-                "thinkingBudget": 0
-            }
-        }
+        "generationConfig": construir_generation_config(
+            model,
+            max_output_tokens=150,
+            temperature=0.9,
+            top_p=None,
+            thinking_budget=0,
+            thinking_level='minimal',
+        ),
     }
 
     data = json.dumps(payload).encode('utf-8')
