@@ -14,6 +14,7 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from .decorators import permission_required_with_message
@@ -218,15 +219,19 @@ def importar_orden_sicser(request):
     sucursal_id = int(sucursal_id_raw) if sucursal_id_raw.isdigit() else None
     codigo_pais = get_pais_actual().get('codigo', 'MX')
 
-    redirect_url = 'servicio_tecnico:consultar_sicser'
-    query_parts = [f'tab={tab}']
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # redirect() con un nombre de vista llama a reverse(). Si concatenamos
+    # '?tab=garantia' al nombre ('servicio_tecnico:consultar_sicser?tab=...'),
+    # Django busca una vista con ese nombre completo y lanza NoReverseMatch (500).
+    # Lo correcto: reverse() primero → URL real → luego añadir el query string.
+    # (Mismo patrón que views_formato_garantia / views_formato_oow.)
+    redirect_listado = reverse('servicio_tecnico:consultar_sicser') + f'?tab={tab}'
     if texto_busqueda:
-        query_parts.append(f'q={quote(texto_busqueda)}')
-    redirect_suffix = '?' + '&'.join(query_parts)
+        redirect_listado += f'&q={quote(texto_busqueda)}'
 
     if tipo not in ('oow', 'garantia') or not id_externo:
         messages.error(request, 'Datos de importación SICSER incompletos o inválidos.')
-        return redirect(redirect_url + redirect_suffix)
+        return redirect(redirect_listado)
 
     try:
         if tipo == 'oow':
@@ -256,5 +261,7 @@ def importar_orden_sicser(request):
         return redirect('servicio_tecnico:detalle_orden', orden_id=resultado.orden.pk)
 
     except (SicserImportError, SicserAPIError, ValueError) as exc:
+        # Error de negocio esperado (duplicado, sin ST, API caída, etc.):
+        # mensaje al usuario y vuelta al listado SICSER, sin 500.
         messages.error(request, f'No se pudo importar desde SICSER: {exc}')
-        return redirect(redirect_url + redirect_suffix)
+        return redirect(redirect_listado)

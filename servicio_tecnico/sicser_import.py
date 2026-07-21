@@ -442,9 +442,20 @@ def importar_orden_oow_desde_sicser(
         )
 
     orden_cliente = registro.preview_orden_sigma
-    if DetalleEquipo.objects.filter(orden_cliente__iexact=orden_cliente).exists():
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # orden_cliente debe ser único en SIGMA. Si ya hay una fila con el mismo
+    # número, no creamos otra: avisamos con el folio interno para que el
+    # usuario abra la orden existente en lugar de reintentar a ciegas.
+    conflicto = (
+        DetalleEquipo.objects
+        .filter(orden_cliente__iexact=orden_cliente)
+        .select_related('orden')
+        .first()
+    )
+    if conflicto:
         raise SicserImportError(
-            f'Ya existe una orden con número de cliente "{orden_cliente}" en SIGMA.'
+            f'Ya existe una orden con número de cliente "{orden_cliente}" en SIGMA '
+            f'({conflicto.orden.numero_orden_interno}). Abra esa orden o use otro DPS.'
         )
 
     if not registro.service_tag:
@@ -538,9 +549,19 @@ def importar_orden_garantia_desde_sicser(
         )
 
     orden_cliente = id_externo
-    if DetalleEquipo.objects.filter(orden_cliente__iexact=orden_cliente).exists():
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # En garantías Dell el número de cliente SIGMA es el DPS. Si ya existe,
+    # no duplicamos: el mensaje incluye el folio interno para localizarla.
+    conflicto = (
+        DetalleEquipo.objects
+        .filter(orden_cliente__iexact=orden_cliente)
+        .select_related('orden')
+        .first()
+    )
+    if conflicto:
         raise SicserImportError(
-            f'Ya existe una orden con número de cliente "{orden_cliente}" en SIGMA.'
+            f'Ya existe una orden con número de cliente "{orden_cliente}" en SIGMA '
+            f'({conflicto.orden.numero_orden_interno}). Abra esa orden o use otro DPS.'
         )
 
     if not registro.service_tag:
