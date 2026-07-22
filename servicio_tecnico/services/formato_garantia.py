@@ -4,8 +4,8 @@ Servicio de negocio para el Formato Digital de Garantía Dell.
 EXPLICACIÓN PARA PRINCIPIANTES:
 ------------------------------------------------
 Espejo del servicio OOW, pero con accesorios Dell, número de cargador
-y candidatura por sicser_origen='garantia'. Las vistas HTTP solo llaman
-aquí; la lógica de negocio vive en este módulo.
+y candidatura: marca Dell + dentro de garantía (import SICSER o diagnóstico).
+Las vistas HTTP solo llaman aquí; la lógica de negocio vive en este módulo.
 """
 
 from __future__ import annotations
@@ -138,7 +138,10 @@ def orden_es_candidata_formato_garantia(orden: OrdenServicio) -> bool:
     Indica si la orden puede abrir el Formato Digital Garantía Dell.
 
     Regla de negocio:
-        - Órdenes importadas desde SICSER con sicser_origen='garantia'
+        - Solo marca Dell (comparación sin mayúsculas/minúsculas)
+        - No aplica a venta mostrador ni a fuera de garantía (OOW)
+        - Import SICSER con sicser_origen='garantia', o
+        - Diagnóstico dentro de garantía (es_fuera_garantia=False)
 
     Args:
         orden: OrdenServicio a evaluar
@@ -146,11 +149,28 @@ def orden_es_candidata_formato_garantia(orden: OrdenServicio) -> bool:
     Returns:
         bool: True si el botón/wizard aplica
     """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Este formato es exclusivo de Dell en garantía. Venta mostrador y
+    # órdenes OOW/FL usan otros flujos (VM o Formato OOW).
+    if orden.tipo_servicio == 'venta_mostrador':
+        return False
+
     try:
         detalle = orden.detalle_equipo
     except Exception:
         return False
-    return (detalle.sicser_origen or '').lower() == 'garantia'
+
+    marca = (detalle.marca or '').strip().upper()
+    if marca != 'DELL':
+        return False
+
+    if getattr(orden, 'es_fuera_garantia', False):
+        return False
+
+    origen = (detalle.sicser_origen or '').lower()
+    if origen == 'garantia':
+        return True
+    return orden.tipo_servicio == 'diagnostico'
 
 
 def obtener_o_crear_borrador(

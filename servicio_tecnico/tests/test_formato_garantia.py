@@ -158,6 +158,93 @@ class FormatoGarantiaServiceTest(TestCase):
         self.assertTrue(orden_es_candidata_formato_garantia(self.orden))
         self.assertFalse(orden_es_candidata_formato_oow(self.orden))
 
+    def test_candidata_diagnostico_dell_dentro_garantia(self):
+        """
+        Diagnóstico Dell dentro de garantía (sin SICSER) → sí.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            es_fuera_garantia=False,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='CLI-DELL-001',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude 5420',
+            numero_serie='TESTDELL01',
+            gama='media',
+        )
+        orden.refresh_from_db()
+        self.assertFalse(orden.es_fuera_garantia)
+        self.assertTrue(orden_es_candidata_formato_garantia(orden))
+
+    def test_no_candidata_otra_marca(self):
+        """Diagnóstico HP dentro de garantía → no (solo Dell)."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            es_fuera_garantia=False,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='CLI-HP-001',
+            tipo_equipo='Laptop',
+            marca='HP',
+            modelo='EliteBook',
+            numero_serie='TESTHP0001',
+            gama='media',
+        )
+        self.assertFalse(orden_es_candidata_formato_garantia(orden))
+
+    def test_no_candidata_dell_fuera_garantia(self):
+        """Dell fuera de garantía → Formato OOW, no Garantía."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='OOW-77777',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude 3520',
+            numero_serie='TESTOOW01',
+            gama='media',
+        )
+        orden.refresh_from_db()
+        self.assertTrue(orden.es_fuera_garantia)
+        self.assertFalse(orden_es_candidata_formato_garantia(orden))
+        self.assertTrue(orden_es_candidata_formato_oow(orden))
+
+    def test_no_candidata_venta_mostrador_dell(self):
+        """Venta mostrador Dell nunca debe ver Formato Garantía."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='venta_mostrador',
+            estado='espera',
+            es_fuera_garantia=False,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='VM-DELL-01',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Inspiron',
+            numero_serie='TESTVMD01',
+            gama='media',
+            sicser_origen='garantia',
+        )
+        self.assertFalse(orden_es_candidata_formato_garantia(orden))
+
     def test_extraer_falla_completa(self):
         """Import guarda el texto completo de instrucciones_dell."""
         texto = (
