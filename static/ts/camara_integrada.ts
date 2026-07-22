@@ -111,16 +111,9 @@ class CamaraIntegrada {
     // Si el navegador no lo soporta, caemos al toBlob() de siempre.
     //
     // Además medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5 s,
-    // bajamos calidad JPEG (0.95 → 0.75) sin tocar los píxeles (preview FHD / foto 2K).
+    // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución Full HD.
     private dispositivoLento: boolean = false;   // true cuando se detecta hardware lento
     private primeraCaptura: boolean = true;      // false tras la primera medición
-
-    // ── Resolución dual (v9.1) ───────────────────────────────────────────────
-    // Preview fluido en Full HD; al disparar se intenta subir a 2K solo un instante.
-    private static readonly RES_PREVIEW_W = 1920;
-    private static readonly RES_PREVIEW_H = 1080;
-    private static readonly RES_CAPTURA_W = 2560;
-    private static readonly RES_CAPTURA_H = 1440;
 
     // ── Web Worker JPEG (v9.0) ───────────────────────────────────────────────
     // jpegWorker: hilo aparte que comprime; null si no hay soporte o tras cerrar.
@@ -850,20 +843,24 @@ class CamaraIntegrada {
     }
     
     /**
-     * Construye las constraints para getUserMedia (apertura del stream).
+     * Construye las constraints para getUserMedia según el dispositivo seleccionado.
      *
-     * EXPLICACIÓN PARA PRINCIPIANTES (resolución dual v9.1):
-     * - Preview / stream normal: Full HD (1920×1080) → fluido al mover el teléfono.
-     * - Al capturar: intentamos subir un momento a 2K (2560×1440) con applyConstraints
-     *   y luego volvemos a Full HD (ver subirResolucionParaCaptura).
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Pedimos Full HD (1920×1080) como ideal. Antes pedíamos ~4K (4096×2160) y las
+     * fotos salían nítidas, pero el preview en vivo se sentía con lag en celulares
+     * de gama media: el stream del <video> usa esa misma resolución todo el tiempo.
      *
-     * Así no pagamos el costo de 2K en cada frame del preview, solo en la foto.
-     * Si el celular no puede subir a 2K, la foto queda en Full HD (sin error).
+     * Full HD es un buen balance para documentación técnica (rayones, etiquetas)
+     * y mantiene el preview fluido. No usamos "min" estricto: si el hardware no
+     * llega a 1080p, el navegador entrega lo máximo que pueda sin fallar.
+     *
+     * En dispositivos lentos solo bajamos la calidad JPEG (0.95 → 0.75), no los
+     * píxeles del stream (ver capturarFoto / modo optimizado).
      */
     private construirConstraintsCamara(): MediaTrackConstraints {
         const constraints: MediaTrackConstraints = {
-            width:  { ideal: CamaraIntegrada.RES_PREVIEW_W },
-            height: { ideal: CamaraIntegrada.RES_PREVIEW_H }
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 }
         };
         
         // Si hay un dispositivo específico seleccionado, usarlo
@@ -875,122 +872,6 @@ class CamaraIntegrada {
         }
         
         return constraints;
-    }
-
-    /**
-     * Obtiene el track de video activo del stream (o null).
-     */
-    private obtenerVideoTrack(): MediaStreamTrack | null {
-        if (!this.mediaStream) {
-            return null;
-        }
-        const tracks = this.mediaStream.getVideoTracks();
-        return tracks.length > 0 ? tracks[0] : null;
-    }
-
-    /**
-     * Ancho efectivo actual del stream (settings del track o del elemento video).
-     */
-    private obtenerAnchoStreamActual(track: MediaStreamTrack): number {
-        const settings = track.getSettings();
-        if (typeof settings.width === 'number' && settings.width > 0) {
-            return settings.width;
-        }
-        return this.videoElement?.videoWidth ?? 0;
-    }
-
-    /**
-     * Espera a que el stream se acerque a la resolución pedida (o timeout).
-     * Algunos Android tardan unos cientos de ms en renegociar el modo del sensor.
-     */
-    private async esperarEstabilizacionResolucion(
-        anchoAntes: number,
-        anchoIdeal: number,
-        timeoutMs: number
-    ): Promise<void> {
-        const track = this.obtenerVideoTrack();
-        if (!track) {
-            return;
-        }
-
-        const umbralMejora = Math.min(anchoIdeal * 0.85, anchoAntes + 200);
-        const inicio = Date.now();
-
-        while (Date.now() - inicio < timeoutMs) {
-            const ancho = this.obtenerAnchoStreamActual(track);
-            // Listo si mejoró respecto al preview o ya estamos cerca del ideal
-            if (ancho >= umbralMejora || ancho >= anchoIdeal * 0.9) {
-                return;
-            }
-            await new Promise<void>((resolve) => setTimeout(resolve, 50));
-        }
-    }
-
-    /**
-     * Sube la resolución del stream a 2K solo para capturar el frame.
-     *
-     * @returns true si applyConstraints se aplicó (hay que restaurar preview después)
-     */
-    private async subirResolucionParaCaptura(): Promise<boolean> {
-        const track = this.obtenerVideoTrack();
-        if (!track || !this.videoElement) {
-            return false;
-        }
-
-        const anchoAntes = this.obtenerAnchoStreamActual(track);
-
-        // Ya estamos cerca de 2K: no hace falta boost
-        if (anchoAntes >= CamaraIntegrada.RES_CAPTURA_W * 0.9) {
-            console.log(`📐 Stream ya en alta resolución (${anchoAntes}px) — sin boost`);
-            return false;
-        }
-
-        try {
-            console.log(
-                `📐 Boost captura: preview ~${anchoAntes}px → ideal ` +
-                `${CamaraIntegrada.RES_CAPTURA_W}×${CamaraIntegrada.RES_CAPTURA_H}`
-            );
-            await track.applyConstraints({
-                width:  { ideal: CamaraIntegrada.RES_CAPTURA_W },
-                height: { ideal: CamaraIntegrada.RES_CAPTURA_H }
-            });
-            await this.esperarEstabilizacionResolucion(
-                anchoAntes,
-                CamaraIntegrada.RES_CAPTURA_W,
-                900
-            );
-
-            const anchoDespues = this.obtenerAnchoStreamActual(track);
-            console.log(`📐 Boost resultado: ${anchoAntes}px → ${anchoDespues}px`);
-            // Aunque no llegue a 2K exacto, si pedimos restore igual (dejamos preview FHD)
-            return true;
-        } catch (err) {
-            console.warn('⚠️ No se pudo subir a 2K — capturando a resolución de preview:', err);
-            return false;
-        }
-    }
-
-    /**
-     * Vuelve el stream a Full HD para que el preview siga fluido.
-     */
-    private async restaurarResolucionPreview(): Promise<void> {
-        const track = this.obtenerVideoTrack();
-        if (!track) {
-            return;
-        }
-
-        try {
-            await track.applyConstraints({
-                width:  { ideal: CamaraIntegrada.RES_PREVIEW_W },
-                height: { ideal: CamaraIntegrada.RES_PREVIEW_H }
-            });
-            console.log(
-                `📐 Preview restaurado a Full HD ` +
-                `(${CamaraIntegrada.RES_PREVIEW_W}×${CamaraIntegrada.RES_PREVIEW_H})`
-            );
-        } catch (err) {
-            console.warn('⚠️ No se pudo restaurar preview Full HD:', err);
-        }
     }
     
     /**
@@ -1657,7 +1538,7 @@ class CamaraIntegrada {
             this.dispositivoLento = true;
             console.warn(
                 `⚡ Dispositivo lento detectado: encode JPEG tardó ${tiempoBlobMs}ms. ` +
-                `Activando modo optimizado (calidad JPEG 0.75; preview FHD / foto hasta 2K).`
+                `Activando modo optimizado (calidad JPEG 0.75, resolución Full HD sin cambios).`
             );
             this.mostrarToastModoOptimizado(tiempoBlobMs);
         } else if (!this.dispositivoLento) {
@@ -1689,8 +1570,9 @@ class CamaraIntegrada {
     
     /**
      * Captura una foto del stream de video.
-     * v9.0: JPEG en Worker (si hay soporte); obturador se libera pronto.
-     * v9.1: preview Full HD; boost temporal a 2K solo al disparar.
+     * v9.0: el frame se copia al canvas en el hilo principal; el JPEG pesado
+     * se comprime en un Worker (si hay soporte). El obturador se libera pronto
+     * para no trabar la UI mientras comprime.
      */
     private async capturarFoto(): Promise<void> {
         // CRÍTICO: Prevenir capturas dobles/múltiples del frame (no del encode)
@@ -1710,7 +1592,7 @@ class CamaraIntegrada {
             return;
         }
         
-        // Marcar como capturando (solo mientras copiamos el frame + boost)
+        // Marcar como capturando (solo mientras copiamos el frame)
         this.estáCapturando = true;
         
         if (this.btnCapturar) {
@@ -1731,13 +1613,9 @@ class CamaraIntegrada {
         let calidadJpeg = this.dispositivoLento ? 0.75 : 0.95;
         let canvasClon: HTMLCanvasElement | null = null;
         let bitmapCaptura: ImageBitmap | null = null;
-        let hizoBoostCaptura = false;
 
         try {
             console.log('📸 Capturando foto...');
-
-            // v9.1: subir a 2K solo un instante; el preview normal sigue en Full HD
-            hizoBoostCaptura = await this.subirResolucionParaCaptura();
             
             orientacion = this.obtenerOrientacionFinal();
             console.log(`📐 Orientación detectada: ${orientacion}°`);
@@ -1804,15 +1682,6 @@ class CamaraIntegrada {
             }
             return;
         } finally {
-            // Volver a Full HD ANTES de liberar el obturador (preview fluido otra vez)
-            if (hizoBoostCaptura) {
-                try {
-                    await this.restaurarResolucionPreview();
-                } catch {
-                    // Ya se loguea dentro de restaurarResolucionPreview
-                }
-            }
-
             // Liberar obturador pronto (~200 ms). El JPEG puede seguir comprimiendo.
             setTimeout(() => {
                 this.estáCapturando = false;
@@ -2317,8 +2186,8 @@ class CamaraIntegrada {
                     </p>
                     <p class="mb-0 small text-muted">
                         <i class="bi bi-check-circle text-success"></i>
-                        Compresión ajustada automáticamente. El preview sigue en Full HD
-                        y la foto intenta 2K al disparar — aptas para documentar detalles.
+                        Compresión ajustada automáticamente. La resolución Full HD se mantiene —
+                        las fotos siguen siendo aptas para documentar detalles finos.
                     </p>
                 </div>
             </div>
