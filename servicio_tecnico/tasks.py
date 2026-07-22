@@ -2018,11 +2018,15 @@ def enviar_notificacion_equipo_disponible_task(
         asunto = f'Equipo listo para recolección — {folio}'
 
         # ------------------------------------------------------------------
-        # CC: quien envió → JEFE_CALIDAD → JEFE_CALIDAD_2
+        # CC: quien envió → recepcionistas de la sucursal → JEFE_CALIDAD → JEFE_2
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # El cliente va en "Para" (To). En copia van recepción/quien avisó
-        # y los jefes de calidad configurados en .env (settings).
+        # El cliente va en "Para" (To). En copia van quien avisó, todos los
+        # recepcionistas activos de la misma sucursal de la orden (para que
+        # el mostrador sepa que ya se avisó al cliente) y los jefes de
+        # calidad configurados en .env (settings).
         # ------------------------------------------------------------------
+        from django.db.models import Q
+
         empleado = None
         if empleado_id:
             try:
@@ -2048,6 +2052,20 @@ def enviar_notificacion_equipo_disponible_task(
 
         if empleado and empleado.email:
             _agregar_cc(empleado.email)
+
+        # Recepcionistas de la misma sucursal (activos + email válido).
+        # Sin user o con user activo: así no perdemos a quien solo recibe correo.
+        if orden.sucursal_id:
+            recepcionistas_sucursal = Empleado.objects.filter(
+                rol='recepcionista',
+                sucursal_id=orden.sucursal_id,
+                activo=True,
+            ).filter(
+                Q(user__isnull=True) | Q(user__is_active=True)
+            )
+            for recepcionista in recepcionistas_sucursal:
+                _agregar_cc(recepcionista.email)
+
         _agregar_cc(getattr(settings, 'JEFE_CALIDAD_EMAIL', None) or None)
         _agregar_cc(getattr(settings, 'JEFE_CALIDAD_2_EMAIL', None) or None)
 

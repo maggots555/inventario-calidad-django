@@ -6,7 +6,8 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 1) Helper anti-dup: egreso vs cambio a finalizado (viceversa).
 2) Vista POST: solo en estado finalizado; segundo clic = ya notificado.
 3) URL / reexport de humo.
-4) Correo al cliente: CC (quien envió + jefes) y nota de almacenaje solo en OOW.
+4) Correo al cliente: CC (quien envió + recepcionistas sucursal + jefes)
+   y nota de almacenaje solo en OOW.
 """
 
 from unittest.mock import MagicMock, patch
@@ -381,6 +382,7 @@ class EquipoDisponibleEmailCcTest(TestCase):
     EXPLICACIÓN PARA PRINCIPIANTES:
     Usamos EMAIL_BACKEND=locmem: Django guarda el correo en mail.outbox
     en memoria (no sale a Internet). Así comprobamos To y CC sin SMTP.
+    Orden del CC: quien envió → recepcionistas de la sucursal → jefes .env.
     """
 
     databases = {'default', 'mexico'}
@@ -436,7 +438,8 @@ class EquipoDisponibleEmailCcTest(TestCase):
 
         mensaje = mail.outbox[0]
         self.assertEqual(mensaje.to, ['cliente.cc@test.local'])
-        # Orden fijado: quien envió → jefe 1 → jefe 2
+        # Orden: quien envió → (otros recepcionistas de sucursal) → jefe 1 → jefe 2
+        # Aquí quien envía es el único recepcionista; no se duplica.
         self.assertEqual(
             mensaje.cc,
             [
@@ -455,6 +458,112 @@ class EquipoDisponibleEmailCcTest(TestCase):
         self.assertIn('quien.envia@test.local', historial.comentario)
         self.assertIn('jefe1@test.local', historial.comentario)
         self.assertIn('jefe2@test.local', historial.comentario)
+
+    def test_cc_incluye_recepcionistas_misma_sucursal(self):
+        """
+        Feliz: otros recepcionistas activos de la misma sucursal entran en CC.
+        """
+        user_r2 = User.objects.create_user(username='recep2_cc', password='x')
+        Empleado.objects.create(
+            nombre_completo='Recepcionista Dos',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep2@test.local',
+            sucursal=self.sucursal,
+            user=user_r2,
+            rol='recepcionista',
+            activo=True,
+        )
+        # Sin user de sistema, pero con email válido → también en CC.
+        Empleado.objects.create(
+            nombre_completo='Recepcionista Sin User',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep.sin.user@test.local',
+            sucursal=self.sucursal,
+            rol='recepcionista',
+            activo=True,
+        )
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        cc = mail.outbox[0].cc
+
+        self.assertEqual(cc[0], 'quien.envia@test.local')
+        self.assertIn('recep2@test.local', cc)
+        self.assertIn('recep.sin.user@test.local', cc)
+        self.assertEqual(cc[-2:], ['jefe1@test.local', 'jefe2@test.local'])
+
+    def test_cc_omite_recepcionista_otra_sucursal(self):
+        """Borde: recepcionista de otra sucursal NO entra en CC."""
+        otra = Sucursal.objects.create(
+            nombre='Otra Sucursal CC',
+            ciudad='GDL',
+            direccion='Calle Otra 1',
+        )
+        user_otra = User.objects.create_user(username='recep_otra', password='x')
+        Empleado.objects.create(
+            nombre_completo='Recepcionista Otra',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep.otra@test.local',
+            sucursal=otra,
+            user=user_otra,
+            rol='recepcionista',
+            activo=True,
+        )
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertNotIn('recep.otra@test.local', mail.outbox[0].cc)
+
+    def test_cc_omite_recepcionista_inactivo_o_sin_email(self):
+        """Borde: inactivo o sin email no entran en CC."""
+        user_inact = User.objects.create_user(username='recep_inact', password='x')
+        Empleado.objects.create(
+            nombre_completo='Recepcionista Inactivo',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep.inactivo@test.local',
+            sucursal=self.sucursal,
+            user=user_inact,
+            rol='recepcionista',
+            activo=False,
+        )
+        Empleado.objects.create(
+            nombre_completo='Recepcionista Sin Email',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='',
+            sucursal=self.sucursal,
+            rol='recepcionista',
+            activo=True,
+        )
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        cc = mail.outbox[0].cc
+        self.assertNotIn('recep.inactivo@test.local', cc)
+        self.assertEqual(
+            cc,
+            [
+                'quien.envia@test.local',
+                'jefe1@test.local',
+                'jefe2@test.local',
+            ],
+        )
 
 
 @override_settings(
