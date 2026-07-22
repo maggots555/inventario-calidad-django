@@ -190,9 +190,10 @@
                             <span class="text-muted">{{ orden.fecha|truncatechars:19 }}</span>
                         </div>
                     </div>
-                    <footer class="sicser-item-card__acciones sicser-acciones">
+                    <!-- EXPLICACIÓN: div (no footer) evita heredar el fondo oscuro del pie del sitio -->
+                    <div class="sicser-item-card__acciones sicser-acciones" role="group" aria-label="Acciones de la orden">
                         {% include 'servicio_tecnico/partials/sicser_acciones_oow.html' %}
-                    </footer>
+                    </div>
                 </article>
                 {% endwith %}
                 {% endfor %}
@@ -327,9 +328,9 @@
                             <span class="text-muted">{{ orden.fecha_recepcion|truncatechars:19 }}</span>
                         </div>
                     </div>
-                    <footer class="sicser-item-card__acciones sicser-acciones">
+                    <div class="sicser-item-card__acciones sicser-acciones" role="group" aria-label="Acciones de la garantía">
                         {% include 'servicio_tecnico/partials/sicser_acciones_garantia.html' %}
-                    </footer>
+                    </div>
                 </article>
                 {% endwith %}
                 {% endfor %}
@@ -473,9 +474,9 @@
                             <span class="text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</span>
                         </div>
                     </div>
-                    <footer class="sicser-item-card__acciones sicser-acciones">
+                    <div class="sicser-item-card__acciones sicser-acciones" role="group" aria-label="Acciones de la orden importada">
                         {% include 'servicio_tecnico/partials/sicser_acciones_importadas.html' %}
-                    </footer>
+                    </div>
                 </article>
                 {% endfor %}
             </div>

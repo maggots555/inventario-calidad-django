@@ -184,22 +184,84 @@
     grid-column: 1 / -1;
 }
 
+/*
+ * Barra de acciones de la tarjeta.
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes usábamos <footer> y heredaba el fondo oscuro del pie del sitio
+ * (regla global `footer { background: ... }` en base.css). Ahora es un
+ * div con fondo claro coherente con la tarjeta.
+ */
 .sicser-item-card__acciones {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    padding-top: 0.35rem;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: stretch;
+    gap: 0.5rem;
+    margin: 0.35rem -1rem -0.85rem; /* se extiende al borde inferior de la card */
+    padding: 0.65rem 0.75rem;
     border-top: 1px solid var(--border-color, #e2e8f0);
-    margin-top: 0.15rem;
+    background-color: var(--gray-100, #f3f4f6);
+    border-radius: 0 0 0.45rem 0.45rem;
+    /* Anula cualquier herencia residual de estilos de footer */
+    color: inherit;
+    overflow: visible;
+    position: relative;
 }
 
+.sicser-item-card__acciones::before {
+    display: none; /* evita la franja azul de footer::before si algo la hereda */
+}
+
+.sicser-item-card__acciones .btn,
 .sicser-item-card__acciones .btn-sm {
+    flex: 1 1 0;
     min-height: 44px;
     min-width: 44px;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.45rem;
+    font-size: 1rem;
+    box-shadow: none;
+    padding: 0.4rem 0.5rem;
+}
+
+/* Botón outline (externo SICSER): misma “peso” visual que los sólidos */
+.sicser-item-card__acciones .btn-outline-secondary {
+    background-color: var(--white, #ffffff);
+    border-color: var(--border-color, #d1d5db);
+    color: var(--gray-700, #374151);
+}
+
+.sicser-item-card__acciones .btn-outline-secondary:hover,
+.sicser-item-card__acciones .btn-outline-secondary:focus-visible {
+    background-color: var(--gray-50, #f9fafb);
+    border-color: var(--gray-400, #9ca3af);
+    color: var(--gray-900, #111827);
+}
+
+.sicser-item-card__acciones .btn-success {
+    background-color: #16a34a;
+    border-color: #16a34a;
+}
+
+.sicser-item-card__acciones .btn-primary {
+    background-color: var(--primary-color, #3498db);
+    border-color: var(--primary-color, #3498db);
 }
 
 .sicser-item-card__acciones form.d-inline {
-    display: inline-flex !important;
+    /* El form ocupa el mismo espacio que un botón hermano */
+    display: flex !important;
+    flex: 1 1 0;
+    margin: 0;
+    min-width: 0;
+}
+
+.sicser-item-card__acciones form.d-inline .btn {
+    width: 100%;
+    flex: 1;
 }
 
 /* ============================================================
@@ -313,7 +375,34 @@
 }
 
 [data-bs-theme="dark"] .sicser-item-card__acciones {
+    background-color: #0f172a;
     border-top-color: var(--border-color, #334155);
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .sicser-item-card__acciones .btn-outline-secondary {
+    background-color: #1e293b;
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .sicser-item-card__acciones .btn-outline-secondary:hover,
+[data-bs-theme="dark"] .sicser-item-card__acciones .btn-outline-secondary:focus-visible {
+    background-color: #334155;
+    border-color: #64748b;
+    color: #f8fafc;
+}
+
+[data-bs-theme="dark"] .sicser-item-card__acciones .btn-success {
+    background-color: #22c55e;
+    border-color: #22c55e;
+    color: #0f172a;
+}
+
+[data-bs-theme="dark"] .sicser-item-card__acciones .btn-primary {
+    background-color: #60a5fa;
+    border-color: #60a5fa;
+    color: #0f172a;
 }
 
 [data-bs-theme="dark"] .sicser-item-card__label {
