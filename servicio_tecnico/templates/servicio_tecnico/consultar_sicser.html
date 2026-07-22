@@ -8,46 +8,55 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4 consultar-sicser-page">
+<!--
+  Vista Consultar SICSER - layout dual:
+  - pantallas menores a xl (movil/tablet/iPad): tarjetas sin scroll horizontal
+  - pantallas xl o mayores (escritorio): tabla compacta con thead sticky
+-->
+<div class="container-fluid mt-3 mt-md-4 px-2 px-sm-3 consultar-sicser-page">
 
-    <div class="row mb-3 align-items-center">
-        <div class="col-lg-8">
-            <h2 class="sicser-titulo mb-1">
-                <i class="bi bi-cloud-download"></i>
+    <!-- Cabecera -->
+    <div class="row mb-3 align-items-center g-2">
+        <div class="col-12 col-lg-8">
+            <h1 class="sicser-titulo mb-1">
+                <i class="bi bi-cloud-download" aria-hidden="true"></i>
                 Consultar SICSER
-            </h2>
-            <p class="text-muted mb-0 small">
+            </h1>
+            <p class="text-muted mb-0 small sicser-subtitulo">
                 Listado en tiempo real desde SICSER &mdash; País: <strong>{{ pais_nombre }}</strong> ({{ codigo_pais }}).
                 {% if puede_importar %}
                 Puede <strong>importar</strong> registros como órdenes nuevas en SIGMA.
                 {% endif %}
             </p>
         </div>
-        <div class="col-lg-4 d-flex justify-content-lg-end mt-2 mt-lg-0">
-            <a href="{% url 'servicio_tecnico:inicio' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left"></i> Volver a Servicio Técnico
+        <div class="col-12 col-lg-4 d-flex justify-content-lg-end">
+            <a href="{% url 'servicio_tecnico:inicio' %}"
+               class="btn btn-outline-secondary btn-sm sicser-btn-touch w-100 w-lg-auto">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a Servicio Técnico
             </a>
         </div>
     </div>
 
-    <div class="card shadow-sm mb-3">
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-3 sicser-filtros-card">
         <div class="card-body py-3">
             <form method="get" class="row g-3 align-items-end">
                 <input type="hidden" name="tab" value="{{ tab_activa }}">
-                <div class="col-md-6 col-lg-5">
+                <div class="col-12 col-md-6 col-xl-5">
                     <label for="q" class="form-label fw-semibold small mb-1">
-                        <i class="bi bi-search"></i> Buscar
+                        <i class="bi bi-search" aria-hidden="true"></i> Buscar
                     </label>
-                    <input type="text" class="form-control" id="q" name="q"
+                    <input type="text" class="form-control sicser-btn-touch" id="q" name="q"
                            value="{{ texto_busqueda }}"
-                           placeholder="Folio, service tag, cliente, DPS...">
+                           placeholder="Folio, service tag, cliente, DPS..."
+                           autocomplete="off">
                 </div>
                 {% if puede_importar and sucursales and tab_activa != 'importadas' %}
-                <div class="col-md-4 col-lg-3">
+                <div class="col-12 col-md-6 col-xl-3">
                     <label for="sicser-sucursal-import" class="form-label fw-semibold small mb-1">
-                        <i class="bi bi-building"></i> Sucursal al importar
+                        <i class="bi bi-building" aria-hidden="true"></i> Sucursal al importar
                     </label>
-                    <select id="sicser-sucursal-import" class="form-select">
+                    <select id="sicser-sucursal-import" class="form-select sicser-btn-touch">
                         <option value="">Automática (por CIS)</option>
                         {% for sucursal in sucursales %}
                         <option value="{{ sucursal.pk }}">{{ sucursal.nombre }}</option>
@@ -55,156 +64,192 @@
                     </select>
                 </div>
                 {% endif %}
-                <div class="col-md-2 col-lg-2 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-grow-1">
-                        <i class="bi bi-funnel"></i> Filtrar
+                <div class="col-12 col-md-6 col-xl-2 d-flex gap-2 sicser-filtro-acciones">
+                    <button type="submit" class="btn btn-primary flex-grow-1 sicser-btn-touch">
+                        <i class="bi bi-funnel" aria-hidden="true"></i> Filtrar
                     </button>
                     <a href="?tab={{ tab_activa }}&refrescar=1{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}"
-                       class="btn btn-outline-primary" title="Actualizar desde SICSER">
-                        <i class="bi bi-arrow-clockwise"></i>
+                       class="btn btn-outline-primary sicser-btn-touch"
+                       title="Actualizar desde SICSER"
+                       aria-label="Actualizar desde SICSER">
+                        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
                     </a>
                 </div>
             </form>
             {% if refresco_forzado %}
             <p class="small text-success mb-0 mt-2">
-                <i class="bi bi-check-circle"></i> Datos actualizados directamente desde SICSER.
+                <i class="bi bi-check-circle" aria-hidden="true"></i> Datos actualizados directamente desde SICSER.
             </p>
             {% endif %}
         </div>
     </div>
 
-    <ul class="nav nav-tabs sicser-tabs mb-3">
-        <li class="nav-item">
-            <a class="nav-link {% if tab_activa == 'oow' %}active{% endif %}"
-               href="?tab=oow{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
-                <i class="bi bi-tools"></i> Órdenes OOW
-                {% if api_oow_ok and nuevas_oow > 0 %}
-                <span class="badge sicser-badge-nuevas">{{ nuevas_oow }} nuevas</span>
-                {% elif not api_oow_ok %}
-                <span class="badge sicser-badge-error" title="{{ error_oow }}">—</span>
-                {% endif %}
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if tab_activa == 'garantia' %}active{% endif %}"
-               href="?tab=garantia{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
-                <i class="bi bi-shield-check"></i> Garantías Dell
-                {% if api_garantia_ok and nuevas_garantia > 0 %}
-                <span class="badge sicser-badge-nuevas">{{ nuevas_garantia }} nuevas</span>
-                {% elif not api_garantia_ok %}
-                <span class="badge sicser-badge-error" title="{{ error_garantia }}">—</span>
-                {% endif %}
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if tab_activa == 'importadas' %}active{% endif %}"
-               href="?tab=importadas{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
-                <i class="bi bi-check2-square"></i> Importadas
-                <span class="badge sicser-badge-importadas">{{ total_importadas }}</span>
-            </a>
-        </li>
-    </ul>
+    <!-- Pestañas (scroll horizontal en móvil) -->
+    <div class="sicser-tabs-wrap mb-3" role="navigation" aria-label="Pestañas SICSER">
+        <ul class="nav nav-tabs sicser-tabs flex-nowrap">
+            <li class="nav-item">
+                <a class="nav-link {% if tab_activa == 'oow' %}active{% endif %}"
+                   href="?tab=oow{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
+                    <i class="bi bi-tools" aria-hidden="true"></i>
+                    <span class="sicser-tab-label">Órdenes OOW</span>
+                    {% if api_oow_ok and nuevas_oow > 0 %}
+                    <span class="badge sicser-badge-nuevas">
+                        <span class="d-none d-sm-inline">{{ nuevas_oow }} nuevas</span>
+                        <span class="d-sm-none">{{ nuevas_oow }}</span>
+                    </span>
+                    {% elif not api_oow_ok %}
+                    <span class="badge sicser-badge-error" title="{{ error_oow }}">—</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if tab_activa == 'garantia' %}active{% endif %}"
+                   href="?tab=garantia{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
+                    <i class="bi bi-shield-check" aria-hidden="true"></i>
+                    <span class="sicser-tab-label">Garantías Dell</span>
+                    {% if api_garantia_ok and nuevas_garantia > 0 %}
+                    <span class="badge sicser-badge-nuevas">
+                        <span class="d-none d-sm-inline">{{ nuevas_garantia }} nuevas</span>
+                        <span class="d-sm-none">{{ nuevas_garantia }}</span>
+                    </span>
+                    {% elif not api_garantia_ok %}
+                    <span class="badge sicser-badge-error" title="{{ error_garantia }}">—</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if tab_activa == 'importadas' %}active{% endif %}"
+                   href="?tab=importadas{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
+                    <i class="bi bi-check2-square" aria-hidden="true"></i>
+                    <span class="sicser-tab-label">Importadas</span>
+                    <span class="badge sicser-badge-importadas">{{ total_importadas }}</span>
+                </a>
+            </li>
+        </ul>
+    </div>
 
+    <!-- ========== Pestaña OOW ========== -->
     {% if tab_activa == 'oow' %}
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="bi bi-list-ul"></i> Órdenes fuera de garantía (OOW)</span>
+            <span><i class="bi bi-list-ul" aria-hidden="true"></i> Órdenes fuera de garantía (OOW)</span>
             <span class="badge bg-primary">{{ total_oow_mostrado }} mostradas · {{ nuevas_oow }} nuevas</span>
         </div>
         <div class="card-body p-0">
             {% if error_oow %}
             <div class="alert alert-danger m-3 mb-0">{{ error_oow }}</div>
             {% elif filas_oow %}
-            <div class="table-responsive">
-                <table class="table table-hover table-sm sicser-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>Folio SICSER</th>
-                            <th>En SIGMA</th>
-                            <th>Service Tag</th>
-                            <th>Cliente</th>
-                            <th>Marca</th>
-                            <th>CIS</th>
-                            <th>Fecha</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for fila in filas_oow %}
-                        {% with orden=fila.registro sigma=fila.sigma %}
-                        <tr>
-                            <td><code class="sicser-folio">{{ orden.folio }}</code></td>
-                            <td>
-                                {% if sigma %}
-                                <span class="badge bg-success">Importada</span>
-                                <span class="small d-block text-muted">{{ sigma.orden_cliente }}</span>
-                                {% else %}
-                                <span class="badge bg-warning text-dark">{{ orden.preview_orden_sigma }}</span>
-                                <span class="small text-muted d-block">Pendiente</span>
-                                {% endif %}
-                            </td>
-                            <td><strong>{{ orden.service_tag }}</strong></td>
-                            <td>{{ orden.nombre_cliente|truncatechars:35 }}</td>
-                            <td>{{ orden.marca }}</td>
-                            <td>
-                                {% if orden.cis_etiqueta %}
-                                <span class="badge bg-light text-dark border">{{ orden.cis_etiqueta }}</span>
-                                {% else %}—{% endif %}
-                            </td>
-                            <td class="small text-muted">{{ orden.fecha|truncatechars:19 }}</td>
-                            <td class="text-center sicser-acciones">
-                                {% if sigma %}
-                                <a href="{% url 'servicio_tecnico:detalle_orden' sigma.orden_id %}"
-                                   class="btn btn-sm btn-primary"
-                                   title="Ver orden en SIGMA">
-                                    <i class="bi bi-eye"></i>
-                                    <span class="d-none d-lg-inline">Ver orden</span>
-                                </a>
-                                <a href="{% url 'servicio_tecnico:formato_oow_wizard' sigma.orden_id %}"
-                                   class="btn btn-sm btn-success"
-                                   title="Formato Digital OOW (SIGMA)">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif puede_importar %}
-                                <form method="post" action="{% url 'servicio_tecnico:abrir_formato_oow_desde_sicser' %}"
-                                      class="d-inline sicser-import-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="id_externo" value="{{ orden.id_orden }}">
-                                    <input type="hidden" name="q" value="{{ texto_busqueda }}">
-                                    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
-                                    <button type="submit" class="btn btn-sm btn-success"
-                                            title="Importar (si falta) y abrir Formato OOW en SIGMA">
-                                        <i class="bi bi-file-earmark-pdf"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                                <a href="{{ orden.url_formato_digital }}"
-                                   class="btn btn-sm btn-outline-secondary"
-                                   target="_blank" rel="noopener noreferrer"
-                                   title="Abrir formato en SICSER (externo)">
-                                    <i class="bi bi-box-arrow-up-right"></i>
-                                </a>
-                                {% if puede_importar and not sigma %}
-                                <form method="post" action="{% url 'servicio_tecnico:importar_orden_sicser' %}"
-                                      class="d-inline sicser-import-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="tipo" value="oow">
-                                    <input type="hidden" name="id_externo" value="{{ orden.id_orden }}">
-                                    <input type="hidden" name="tab" value="oow">
-                                    <input type="hidden" name="q" value="{{ texto_busqueda }}">
-                                    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
-                                    <button type="submit" class="btn btn-sm btn-primary" title="Importar a SIGMA">
-                                        <i class="bi bi-download"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endwith %}
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+            <!-- Tarjetas (menor a xl) -->
+            <div class="sicser-cards d-xl-none p-2 p-sm-3">
+                {% for fila in filas_oow %}
+                {% with orden=fila.registro sigma=fila.sigma %}
+                <article class="sicser-item-card {% if sigma %}sicser-item-card--importada{% else %}sicser-item-card--pendiente{% endif %}">
+                    <header class="sicser-item-card__header">
+                        <code class="sicser-folio">{{ orden.folio }}</code>
+                        {% if sigma %}
+                        <span class="badge bg-success">Importada</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Pendiente</span>
+                        {% endif %}
+                    </header>
+                    <div class="sicser-item-card__st">
+                        <span class="sicser-item-card__label">Service Tag</span>
+                        <strong>{{ orden.service_tag }}</strong>
+                    </div>
+                    <div class="sicser-item-card__meta">
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Cliente</span>
+                            <span>{{ orden.nombre_cliente|truncatechars:40|default:"—" }}</span>
+                        </div>
+                        {% if sigma %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Orden SIGMA</span>
+                            <span>{{ sigma.orden_cliente }}</span>
+                        </div>
+                        {% else %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Preview</span>
+                            <span class="badge bg-warning text-dark">{{ orden.preview_orden_sigma }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Marca</span>
+                            <span>{{ orden.marca|default:"—" }}</span>
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">CIS</span>
+                            {% if orden.cis_etiqueta %}
+                            <span class="badge bg-light text-dark border">{{ orden.cis_etiqueta }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                        <div class="sicser-meta-item sicser-meta-item--full">
+                            <span class="sicser-item-card__label">Fecha</span>
+                            <span class="text-muted">{{ orden.fecha|truncatechars:19 }}</span>
+                        </div>
+                    </div>
+                    <footer class="sicser-item-card__acciones sicser-acciones">
+                        {% include 'servicio_tecnico/partials/sicser_acciones_oow.html' %}
+                    </footer>
+                </article>
+                {% endwith %}
+                {% endfor %}
             </div>
+
+            <!-- Tabla (xl o mayor) -->
+            <div class="sicser-table-wrap d-none d-xl-block">
+                <div class="table-responsive sicser-table-scroll">
+                    <table class="table table-hover table-sm sicser-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="sicser-col-sticky">Folio SICSER</th>
+                                <th>En SIGMA</th>
+                                <th>Service Tag</th>
+                                <th>Cliente</th>
+                                <th class="d-none d-xxl-table-cell">Marca</th>
+                                <th>CIS</th>
+                                <th class="d-none d-xxl-table-cell">Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in filas_oow %}
+                            {% with orden=fila.registro sigma=fila.sigma %}
+                            <tr>
+                                <td class="sicser-col-sticky">
+                                    <code class="sicser-folio">{{ orden.folio }}</code>
+                                </td>
+                                <td>
+                                    {% if sigma %}
+                                    <span class="badge bg-success">Importada</span>
+                                    <span class="small d-block text-muted">{{ sigma.orden_cliente }}</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">{{ orden.preview_orden_sigma }}</span>
+                                    <span class="small text-muted d-block">Pendiente</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ orden.service_tag }}</strong></td>
+                                <td>{{ orden.nombre_cliente|truncatechars:35 }}</td>
+                                <td class="d-none d-xxl-table-cell">{{ orden.marca }}</td>
+                                <td>
+                                    {% if orden.cis_etiqueta %}
+                                    <span class="badge bg-light text-dark border">{{ orden.cis_etiqueta }}</span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td class="small text-muted d-none d-xxl-table-cell">{{ orden.fecha|truncatechars:19 }}</td>
+                                <td class="text-center sicser-acciones">
+                                    {% include 'servicio_tecnico/partials/sicser_acciones_oow.html' %}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {% else %}
             <div class="text-center text-muted py-5">No hay órdenes OOW para mostrar.</div>
             {% endif %}
@@ -212,123 +257,153 @@
     </div>
     {% endif %}
 
+    <!-- ========== Pestaña Garantía ========== -->
     {% if tab_activa == 'garantia' %}
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="bi bi-shield-check"></i> Garantías Dell</span>
+            <span><i class="bi bi-shield-check" aria-hidden="true"></i> Garantías Dell</span>
             <span class="badge bg-success">{{ total_garantia_mostrado }} mostradas · {{ nuevas_garantia }} nuevas</span>
         </div>
         <div class="card-body p-0">
             {% if error_garantia %}
             <div class="alert alert-danger m-3 mb-0">{{ error_garantia }}</div>
             {% elif filas_garantia %}
-            <div class="table-responsive">
-                <table class="table table-hover table-sm sicser-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>DPS</th>
-                            <th>En SIGMA</th>
-                            <th>Service Tag</th>
-                            <th>Contacto</th>
-                            <th>Modelo</th>
-                            <th>Ciudad</th>
-                            <th>CIS (estimado)</th>
-                            <th>Grupo</th>
-                            <th>Fecha</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for fila in filas_garantia %}
-                        {% with orden=fila.registro sigma=fila.sigma %}
-                        <tr>
-                            <td><code>{{ orden.numero_dps }}</code></td>
-                            <td>
-                                {% if sigma %}
-                                <span class="badge bg-success">Importada</span>
-                                <span class="small d-block text-muted">{{ sigma.numero_orden_interno }}</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Pendiente</span>
-                                {% endif %}
-                            </td>
-                            <td><strong>{{ orden.service_tag }}</strong></td>
-                            <td>{{ orden.contacto|truncatechars:30 }}</td>
-                            <td>{{ orden.especificaciones }}</td>
-                            <td>
-                                {% if orden.ciudad %}
-                                <span>{{ orden.ciudad|truncatechars:22 }}</span>
-                                {% if orden.estado %}
-                                <span class="small d-block text-muted">{{ orden.estado|truncatechars:20 }}</span>
-                                {% endif %}
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if orden.cis_etiqueta %}
-                                <span class="badge bg-light text-dark border"
-                                      title="Inferido desde ciudad/estado (la API de garantías no envía CIS)">
-                                    {{ orden.cis_etiqueta }}
-                                </span>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="badge bg-secondary">{{ orden.nombre_grupo }}</span></td>
-                            <td class="small text-muted">{{ orden.fecha_recepcion|truncatechars:19 }}</td>
-                            <td class="text-center sicser-acciones">
-                                {% if sigma %}
-                                <a href="{% url 'servicio_tecnico:detalle_orden' sigma.orden_id %}"
-                                   class="btn btn-sm btn-primary"
-                                   title="Ver orden en SIGMA">
-                                    <i class="bi bi-eye"></i>
-                                    <span class="d-none d-lg-inline">Ver orden</span>
-                                </a>
-                                <a href="{% url 'servicio_tecnico:formato_garantia_wizard' sigma.orden_id %}"
-                                   class="btn btn-sm btn-success"
-                                   title="Formato Digital Garantía Dell (SIGMA)">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif puede_importar %}
-                                <form method="post" action="{% url 'servicio_tecnico:abrir_formato_garantia_desde_sicser' %}"
-                                      class="d-inline sicser-import-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="id_externo" value="{{ orden.numero_dps }}">
-                                    <input type="hidden" name="q" value="{{ texto_busqueda }}">
-                                    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
-                                    <button type="submit" class="btn btn-sm btn-success"
-                                            title="Importar (si falta) y abrir Formato Garantía en SIGMA">
-                                        <i class="bi bi-file-earmark-pdf"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                                <a href="{{ orden.url_formato_digital }}"
-                                   class="btn btn-sm btn-outline-secondary"
-                                   target="_blank" rel="noopener noreferrer"
-                                   title="Abrir formato en SICSER (externo)">
-                                    <i class="bi bi-box-arrow-up-right"></i>
-                                </a>
-                                {% if puede_importar and not sigma %}
-                                <form method="post" action="{% url 'servicio_tecnico:importar_orden_sicser' %}"
-                                      class="d-inline sicser-import-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="tipo" value="garantia">
-                                    <input type="hidden" name="id_externo" value="{{ orden.numero_dps }}">
-                                    <input type="hidden" name="tab" value="garantia">
-                                    <input type="hidden" name="q" value="{{ texto_busqueda }}">
-                                    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
-                                    <button type="submit" class="btn btn-sm btn-primary" title="Importar a SIGMA">
-                                        <i class="bi bi-download"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endwith %}
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+            <!-- Tarjetas (menor a xl) -->
+            <div class="sicser-cards d-xl-none p-2 p-sm-3">
+                {% for fila in filas_garantia %}
+                {% with orden=fila.registro sigma=fila.sigma %}
+                <article class="sicser-item-card {% if sigma %}sicser-item-card--importada{% else %}sicser-item-card--pendiente{% endif %}">
+                    <header class="sicser-item-card__header">
+                        <code class="sicser-folio">{{ orden.numero_dps }}</code>
+                        {% if sigma %}
+                        <span class="badge bg-success">Importada</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Pendiente</span>
+                        {% endif %}
+                    </header>
+                    <div class="sicser-item-card__st">
+                        <span class="sicser-item-card__label">Service Tag</span>
+                        <strong>{{ orden.service_tag }}</strong>
+                    </div>
+                    <div class="sicser-item-card__meta">
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Contacto</span>
+                            <span>{{ orden.contacto|truncatechars:35|default:"—" }}</span>
+                        </div>
+                        {% if sigma %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Orden SIGMA</span>
+                            <span>{{ sigma.numero_orden_interno }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Modelo</span>
+                            <span>{{ orden.especificaciones|truncatechars:40|default:"—" }}</span>
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Ciudad</span>
+                            {% if orden.ciudad %}
+                            <span>{{ orden.ciudad|truncatechars:22 }}{% if orden.estado %}, {{ orden.estado|truncatechars:15 }}{% endif %}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">CIS (est.)</span>
+                            {% if orden.cis_etiqueta %}
+                            <span class="badge bg-light text-dark border"
+                                  title="Inferido desde ciudad/estado">{{ orden.cis_etiqueta }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Grupo</span>
+                            <span class="badge bg-secondary">{{ orden.nombre_grupo }}</span>
+                        </div>
+                        <div class="sicser-meta-item sicser-meta-item--full">
+                            <span class="sicser-item-card__label">Fecha</span>
+                            <span class="text-muted">{{ orden.fecha_recepcion|truncatechars:19 }}</span>
+                        </div>
+                    </div>
+                    <footer class="sicser-item-card__acciones sicser-acciones">
+                        {% include 'servicio_tecnico/partials/sicser_acciones_garantia.html' %}
+                    </footer>
+                </article>
+                {% endwith %}
+                {% endfor %}
             </div>
+
+            <!-- Tabla (xl o mayor) -->
+            <div class="sicser-table-wrap d-none d-xl-block">
+                <div class="table-responsive sicser-table-scroll">
+                    <table class="table table-hover table-sm sicser-table mb-0">
+                        <thead>
+                            <tr>
+                                <th class="sicser-col-sticky">DPS</th>
+                                <th>En SIGMA</th>
+                                <th>Service Tag</th>
+                                <th>Contacto</th>
+                                <th class="d-none d-xxl-table-cell">Modelo</th>
+                                <th class="d-none d-xxl-table-cell">Ciudad</th>
+                                <th>CIS (est.)</th>
+                                <th class="d-none d-xxl-table-cell">Grupo</th>
+                                <th class="d-none d-xxl-table-cell">Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in filas_garantia %}
+                            {% with orden=fila.registro sigma=fila.sigma %}
+                            <tr>
+                                <td class="sicser-col-sticky"><code class="sicser-folio">{{ orden.numero_dps }}</code></td>
+                                <td>
+                                    {% if sigma %}
+                                    <span class="badge bg-success">Importada</span>
+                                    <span class="small d-block text-muted">{{ sigma.numero_orden_interno }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Pendiente</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ orden.service_tag }}</strong></td>
+                                <td>{{ orden.contacto|truncatechars:30 }}</td>
+                                <td class="d-none d-xxl-table-cell">{{ orden.especificaciones }}</td>
+                                <td class="d-none d-xxl-table-cell">
+                                    {% if orden.ciudad %}
+                                    <span>{{ orden.ciudad|truncatechars:22 }}</span>
+                                    {% if orden.estado %}
+                                    <span class="small d-block text-muted">{{ orden.estado|truncatechars:20 }}</span>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if orden.cis_etiqueta %}
+                                    <span class="badge bg-light text-dark border"
+                                          title="Inferido desde ciudad/estado (la API de garantías no envía CIS)">
+                                        {{ orden.cis_etiqueta }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-xxl-table-cell">
+                                    <span class="badge bg-secondary">{{ orden.nombre_grupo }}</span>
+                                </td>
+                                <td class="small text-muted d-none d-xxl-table-cell">{{ orden.fecha_recepcion|truncatechars:19 }}</td>
+                                <td class="text-center sicser-acciones">
+                                    {% include 'servicio_tecnico/partials/sicser_acciones_garantia.html' %}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {% else %}
             <div class="text-center text-muted py-5">No hay garantías para mostrar.</div>
             {% endif %}
@@ -336,108 +411,146 @@
     </div>
     {% endif %}
 
+    <!-- ========== Pestaña Importadas ========== -->
     {% if tab_activa == 'importadas' %}
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="bi bi-check2-square"></i> Órdenes ya importadas a SIGMA</span>
+            <span><i class="bi bi-check2-square" aria-hidden="true"></i> Órdenes ya importadas a SIGMA</span>
             <span class="badge bg-secondary">{{ filas_importadas|length }} mostradas · {{ total_importadas }} en total</span>
         </div>
         <div class="card-body p-0">
             {% if filas_importadas %}
-            <div class="table-responsive">
-                <table class="table table-hover table-sm sicser-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>Origen</th>
-                            <th>Folio / DPS</th>
-                            <th>Orden SIGMA</th>
-                            <th>Service Tag</th>
-                            <th>Cliente</th>
-                            <th>Ciudad</th>
-                            <th>CIS</th>
-                            <th>Fecha ingreso</th>
-                            <th class="text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for fila in filas_importadas %}
-                        <tr>
-                            <td>
-                                {% if fila.origen == 'oow' %}
-                                <span class="badge bg-warning text-dark">{{ fila.origen_etiqueta }}</span>
-                                {% else %}
-                                <span class="badge bg-info text-dark">{{ fila.origen_etiqueta }}</span>
-                                {% endif %}
-                            </td>
-                            <td><code class="sicser-folio">{{ fila.folio_sicser }}</code></td>
-                            <td>
-                                <strong>{{ fila.orden_cliente }}</strong>
-                                <span class="small d-block text-muted">{{ fila.numero_orden_interno }}</span>
-                            </td>
-                            <td><strong>{{ fila.service_tag }}</strong></td>
-                            <td>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</td>
-                            <td>
-                                {% if fila.ciudad %}
-                                <span>{{ fila.ciudad|truncatechars:22 }}</span>
-                                {% if fila.estado %}
-                                <span class="small d-block text-muted">{{ fila.estado|truncatechars:20 }}</span>
-                                {% endif %}
-                                {% elif fila.sucursal %}
-                                <span class="small text-muted" title="Sucursal asignada en SIGMA">{{ fila.sucursal }}</span>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if fila.cis_etiqueta %}
-                                <span class="badge bg-light text-dark border">{{ fila.cis_etiqueta }}</span>
-                                {% elif fila.sucursal %}
-                                <span class="small text-muted">{{ fila.sucursal }}</span>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="small text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</td>
-                            <td class="text-center sicser-acciones">
-                                <a href="{% url 'servicio_tecnico:detalle_orden' fila.orden_id %}"
-                                   class="btn btn-sm btn-primary"
-                                   title="Ver orden en SIGMA"
-                                   aria-label="Ver orden en SIGMA">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                {% if fila.origen == 'oow' %}
-                                <a href="{% url 'servicio_tecnico:formato_oow_wizard' fila.orden_id %}"
-                                   class="btn btn-sm btn-success"
-                                   title="Formato Digital OOW (SIGMA)"
-                                   aria-label="Formato Digital OOW">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif fila.origen == 'garantia' %}
-                                <a href="{% url 'servicio_tecnico:formato_garantia_wizard' fila.orden_id %}"
-                                   class="btn btn-sm btn-success"
-                                   title="Formato Digital Garantía Dell (SIGMA)"
-                                   aria-label="Formato Digital Garantía Dell">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% endif %}
-                                {% if fila.url_formato_digital %}
-                                <a href="{{ fila.url_formato_digital }}"
-                                   class="btn btn-sm btn-outline-secondary"
-                                   target="_blank" rel="noopener noreferrer"
-                                   title="Abrir formato en SICSER (externo)"
-                                   aria-label="Formato digital SICSER externo">
-                                    <i class="bi bi-box-arrow-up-right"></i>
-                                </a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+            <!-- Tarjetas (menor a xl) -->
+            <div class="sicser-cards d-xl-none p-2 p-sm-3">
+                {% for fila in filas_importadas %}
+                <article class="sicser-item-card sicser-item-card--importada">
+                    <header class="sicser-item-card__header">
+                        <code class="sicser-folio">{{ fila.folio_sicser }}</code>
+                        {% if fila.origen == 'oow' %}
+                        <span class="badge bg-warning text-dark">{{ fila.origen_etiqueta }}</span>
+                        {% else %}
+                        <span class="badge bg-info text-dark">{{ fila.origen_etiqueta }}</span>
+                        {% endif %}
+                    </header>
+                    <div class="sicser-item-card__st">
+                        <span class="sicser-item-card__label">Service Tag</span>
+                        <strong>{{ fila.service_tag }}</strong>
+                    </div>
+                    <div class="sicser-item-card__meta">
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Orden SIGMA</span>
+                            <span><strong>{{ fila.orden_cliente }}</strong>
+                                <span class="small text-muted d-block">{{ fila.numero_orden_interno }}</span>
+                            </span>
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Cliente</span>
+                            <span>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</span>
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Ciudad</span>
+                            {% if fila.ciudad %}
+                            <span>{{ fila.ciudad|truncatechars:22 }}{% if fila.estado %}, {{ fila.estado|truncatechars:15 }}{% endif %}</span>
+                            {% elif fila.sucursal %}
+                            <span class="small text-muted" title="Sucursal asignada en SIGMA">{{ fila.sucursal }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">CIS</span>
+                            {% if fila.cis_etiqueta %}
+                            <span class="badge bg-light text-dark border">{{ fila.cis_etiqueta }}</span>
+                            {% elif fila.sucursal %}
+                            <span class="small text-muted">{{ fila.sucursal }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                        <div class="sicser-meta-item sicser-meta-item--full">
+                            <span class="sicser-item-card__label">Fecha ingreso</span>
+                            <span class="text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</span>
+                        </div>
+                    </div>
+                    <footer class="sicser-item-card__acciones sicser-acciones">
+                        {% include 'servicio_tecnico/partials/sicser_acciones_importadas.html' %}
+                    </footer>
+                </article>
+                {% endfor %}
             </div>
+
+            <!-- Tabla (xl o mayor) -->
+            <div class="sicser-table-wrap d-none d-xl-block">
+                <div class="table-responsive sicser-table-scroll">
+                    <table class="table table-hover table-sm sicser-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Origen</th>
+                                <th class="sicser-col-sticky">Folio / DPS</th>
+                                <th>Orden SIGMA</th>
+                                <th>Service Tag</th>
+                                <th>Cliente</th>
+                                <th class="d-none d-xxl-table-cell">Ciudad</th>
+                                <th>CIS</th>
+                                <th class="d-none d-xxl-table-cell">Fecha ingreso</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in filas_importadas %}
+                            <tr>
+                                <td>
+                                    {% if fila.origen == 'oow' %}
+                                    <span class="badge bg-warning text-dark">{{ fila.origen_etiqueta }}</span>
+                                    {% else %}
+                                    <span class="badge bg-info text-dark">{{ fila.origen_etiqueta }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="sicser-col-sticky">
+                                    <code class="sicser-folio">{{ fila.folio_sicser }}</code>
+                                </td>
+                                <td>
+                                    <strong>{{ fila.orden_cliente }}</strong>
+                                    <span class="small d-block text-muted">{{ fila.numero_orden_interno }}</span>
+                                </td>
+                                <td><strong>{{ fila.service_tag }}</strong></td>
+                                <td>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</td>
+                                <td class="d-none d-xxl-table-cell">
+                                    {% if fila.ciudad %}
+                                    <span>{{ fila.ciudad|truncatechars:22 }}</span>
+                                    {% if fila.estado %}
+                                    <span class="small d-block text-muted">{{ fila.estado|truncatechars:20 }}</span>
+                                    {% endif %}
+                                    {% elif fila.sucursal %}
+                                    <span class="small text-muted" title="Sucursal asignada en SIGMA">{{ fila.sucursal }}</span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if fila.cis_etiqueta %}
+                                    <span class="badge bg-light text-dark border">{{ fila.cis_etiqueta }}</span>
+                                    {% elif fila.sucursal %}
+                                    <span class="small text-muted">{{ fila.sucursal }}</span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small text-muted d-none d-xxl-table-cell">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                                <td class="text-center sicser-acciones">
+                                    {% include 'servicio_tecnico/partials/sicser_acciones_importadas.html' %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {% else %}
             <div class="text-center text-muted py-5">
-                <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                <i class="bi bi-inbox display-4 d-block mb-2" aria-hidden="true"></i>
                 {% if texto_busqueda %}
                 No hay importadas que coincidan con «{{ texto_busqueda }}».
                 {% else %}
@@ -449,8 +562,8 @@
     </div>
     {% endif %}
 
-    <p class="small text-muted mt-3 mb-0">
-        <i class="bi bi-info-circle"></i>
+    <p class="small text-muted mt-3 mb-0 sicser-ayuda">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
         Los badges <strong>nuevas</strong> son registros en SICSER aún no importados.
         La pestaña <strong>Importadas</strong> muestra el histórico en SIGMA aunque ya no aparezcan en SICSER.
         En garantías, el <strong>CIS</strong> se estima por ciudad/estado (la API no lo envía).

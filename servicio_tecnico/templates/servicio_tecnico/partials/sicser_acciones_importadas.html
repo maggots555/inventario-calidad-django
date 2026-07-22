@@ -1,0 +1,34 @@
+<!--
+  Acciones de una fila Importadas (tabla o tarjeta).
+  Contexto esperado: fila (dict con orden_id, origen, url_formato_digital, ...)
+-->
+<a href="{% url 'servicio_tecnico:detalle_orden' fila.orden_id %}"
+   class="btn btn-sm btn-primary"
+   title="Ver orden en SIGMA"
+   aria-label="Ver orden en SIGMA">
+    <i class="bi bi-eye" aria-hidden="true"></i>
+</a>
+{% if fila.origen == 'oow' %}
+<a href="{% url 'servicio_tecnico:formato_oow_wizard' fila.orden_id %}"
+   class="btn btn-sm btn-success"
+   title="Formato Digital OOW (SIGMA)"
+   aria-label="Formato Digital OOW">
+    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+</a>
+{% elif fila.origen == 'garantia' %}
+<a href="{% url 'servicio_tecnico:formato_garantia_wizard' fila.orden_id %}"
+   class="btn btn-sm btn-success"
+   title="Formato Digital Garantía Dell (SIGMA)"
+   aria-label="Formato Digital Garantía Dell">
+    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+</a>
+{% endif %}
+{% if fila.url_formato_digital %}
+<a href="{{ fila.url_formato_digital }}"
+   class="btn btn-sm btn-outline-secondary"
+   target="_blank" rel="noopener noreferrer"
+   title="Abrir formato en SICSER (externo)"
+   aria-label="Formato digital SICSER externo">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+</a>
+{% endif %}

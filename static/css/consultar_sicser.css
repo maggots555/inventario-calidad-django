@@ -1,5 +1,6 @@
 /* ============================================================
    CONSULTAR SICSER — Estilos base (modo claro)
+   Layout dual: tarjetas < xl · tabla ≥ xl
    ============================================================ */
 
 .consultar-sicser-page {
@@ -7,14 +8,65 @@
 }
 
 .sicser-titulo {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
     font-weight: 600;
     color: var(--gray-900);
+    line-height: 1.3;
+}
+
+@media (min-width: 768px) {
+    .sicser-titulo {
+        font-size: 1.5rem;
+    }
+}
+
+.sicser-subtitulo {
+    line-height: 1.45;
+}
+
+/* Targets táctiles mínimos (PWA / móvil) */
+.sicser-btn-touch {
+    min-height: 44px;
+}
+
+.sicser-filtro-acciones .btn {
+    min-height: 44px;
+}
+
+@media (min-width: 992px) {
+    .consultar-sicser-page .w-lg-auto {
+        width: auto !important;
+    }
+}
+
+/* ============================================================
+   PESTAÑAS — scroll horizontal en móvil / tablet
+   ============================================================ */
+
+.sicser-tabs-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+    /* Evita que el borde inferior de las tabs se corte al scrollear */
+    margin-bottom: 0;
+}
+
+.sicser-tabs {
+    border-bottom: 1px solid var(--border-color, #dee2e6);
+    min-width: max-content;
 }
 
 .sicser-tabs .nav-link {
     color: var(--gray-700);
     font-weight: 500;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.65rem 0.9rem;
 }
 
 .sicser-tabs .nav-link.active {
@@ -27,7 +79,7 @@
     font-size: 0.7rem;
     font-weight: 600;
     vertical-align: middle;
-    margin-left: 0.25rem;
+    margin-left: 0.15rem;
 }
 
 .sicser-badge-nuevas {
@@ -51,18 +103,150 @@
     color: var(--gray-800);
 }
 
+/* ============================================================
+   TARJETAS — móvil / tablet / iPad (< xl)
+   ============================================================ */
+
+.sicser-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+/* En tablet landscape: 2 columnas para aprovechar espacio */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+    .sicser-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+.sicser-item-card {
+    background-color: var(--gray-50, #f8fafc);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-left: 4px solid var(--primary-color, #1f6391);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.sicser-item-card:hover {
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.sicser-item-card--importada {
+    border-left-color: var(--success-color, #22c55e);
+}
+
+.sicser-item-card--pendiente {
+    border-left-color: var(--warning-color, #f59e0b);
+}
+
+.sicser-item-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.sicser-item-card__label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-500, #6b7280);
+    margin-bottom: 0.1rem;
+}
+
+.sicser-item-card__st {
+    font-size: 1.05rem;
+    line-height: 1.3;
+}
+
+.sicser-item-card__st strong {
+    color: var(--gray-900);
+    word-break: break-word;
+}
+
+.sicser-item-card__meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.sicser-meta-item--full {
+    grid-column: 1 / -1;
+}
+
+.sicser-item-card__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+    margin-top: 0.15rem;
+}
+
+.sicser-item-card__acciones .btn-sm {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.sicser-item-card__acciones form.d-inline {
+    display: inline-flex !important;
+}
+
+/* ============================================================
+   TABLA — escritorio (≥ xl)
+   ============================================================ */
+
+.sicser-table-scroll {
+    max-height: 70vh;
+    overflow: auto;
+}
+
 .sicser-table thead th {
     background-color: var(--gray-100);
     color: var(--gray-800);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     white-space: nowrap;
+    padding: 0.55rem 0.65rem;
+    /* Cabecera fija al hacer scroll vertical dentro del contenedor */
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: 0 1px 0 var(--border-color, #e2e8f0);
 }
 
 .sicser-table tbody td {
     vertical-align: middle;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.65rem;
+}
+
+/* Primera columna (Folio/DPS) fija al scroll horizontal residual */
+.sicser-col-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--white, #ffffff);
+}
+
+.sicser-table thead th.sicser-col-sticky {
+    z-index: 3;
+    background-color: var(--gray-100);
+}
+
+.sicser-table tbody tr:hover .sicser-col-sticky {
+    background-color: var(--gray-50, #f8fafc);
 }
 
 .sicser-folio {
@@ -83,17 +267,21 @@
     min-width: 36px;
 }
 
-@media (max-width: 575.98px) {
-    .sicser-acciones .btn-sm {
-        min-height: 44px;
-        min-width: 44px;
-    }
+.sicser-acciones .btn:focus-visible {
+    outline: 2px solid var(--primary-color, #1f6391);
+    outline-offset: 2px;
 }
 
 @media (max-width: 575.98px) {
+    .sicser-acciones .btn-sm,
     .sicser-table .btn-sm {
         min-height: 44px;
         min-width: 44px;
+    }
+
+    .sicser-ayuda {
+        font-size: 0.75rem;
+        padding-inline: 0.25rem;
     }
 }
 
@@ -105,20 +293,58 @@
     color: var(--text-primary);
 }
 
+[data-bs-theme="dark"] .sicser-item-card__st strong {
+    color: var(--text-primary);
+}
+
 [data-bs-theme="dark"] .sicser-card-header {
     background-color: #1e293b;
     color: var(--text-primary);
     border-color: var(--border-color);
 }
 
+[data-bs-theme="dark"] .sicser-item-card {
+    background-color: #1e293b;
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .sicser-item-card:hover {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] .sicser-item-card__acciones {
+    border-top-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .sicser-item-card__label {
+    color: var(--text-secondary, #94a3b8);
+}
+
 [data-bs-theme="dark"] .sicser-table thead th {
     background-color: #0f172a;
     color: var(--text-secondary);
+    box-shadow: 0 1px 0 var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .sicser-col-sticky {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .sicser-table thead th.sicser-col-sticky {
+    background-color: #0f172a;
+}
+
+[data-bs-theme="dark"] .sicser-table tbody tr:hover .sicser-col-sticky {
+    background-color: #334155;
 }
 
 [data-bs-theme="dark"] .sicser-folio {
     color: var(--text-primary);
     background-color: #334155;
+}
+
+[data-bs-theme="dark"] .sicser-tabs {
+    border-bottom-color: var(--border-color, #334155);
 }
 
 [data-bs-theme="dark"] .sicser-tabs .nav-link {
@@ -148,4 +374,8 @@
     background-color: #334155 !important;
     color: var(--text-primary) !important;
     border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .sicser-acciones .btn:focus-visible {
+    outline-color: #60a5fa;
 }

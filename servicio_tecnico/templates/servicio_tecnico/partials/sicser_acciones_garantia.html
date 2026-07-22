@@ -1,0 +1,55 @@
+<!--
+  Acciones de una fila Garantía Dell (tabla o tarjeta).
+  Contexto esperado: orden, sigma, puede_importar, texto_busqueda
+-->
+{% if sigma %}
+<a href="{% url 'servicio_tecnico:detalle_orden' sigma.orden_id %}"
+   class="btn btn-sm btn-primary"
+   title="Ver orden en SIGMA"
+   aria-label="Ver orden en SIGMA">
+    <i class="bi bi-eye" aria-hidden="true"></i>
+    <span class="d-none d-xxl-inline">Ver orden</span>
+</a>
+<a href="{% url 'servicio_tecnico:formato_garantia_wizard' sigma.orden_id %}"
+   class="btn btn-sm btn-success"
+   title="Formato Digital Garantía Dell (SIGMA)"
+   aria-label="Formato Digital Garantía Dell">
+    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+</a>
+{% elif puede_importar %}
+<form method="post" action="{% url 'servicio_tecnico:abrir_formato_garantia_desde_sicser' %}"
+      class="d-inline sicser-import-form">
+    {% csrf_token %}
+    <input type="hidden" name="id_externo" value="{{ orden.numero_dps }}">
+    <input type="hidden" name="q" value="{{ texto_busqueda }}">
+    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
+    <button type="submit" class="btn btn-sm btn-success"
+            title="Importar (si falta) y abrir Formato Garantía en SIGMA"
+            aria-label="Importar y abrir Formato Garantía">
+        <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+    </button>
+</form>
+{% endif %}
+<a href="{{ orden.url_formato_digital }}"
+   class="btn btn-sm btn-outline-secondary"
+   target="_blank" rel="noopener noreferrer"
+   title="Abrir formato en SICSER (externo)"
+   aria-label="Abrir formato en SICSER externo">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+</a>
+{% if puede_importar and not sigma %}
+<form method="post" action="{% url 'servicio_tecnico:importar_orden_sicser' %}"
+      class="d-inline sicser-import-form">
+    {% csrf_token %}
+    <input type="hidden" name="tipo" value="garantia">
+    <input type="hidden" name="id_externo" value="{{ orden.numero_dps }}">
+    <input type="hidden" name="tab" value="garantia">
+    <input type="hidden" name="q" value="{{ texto_busqueda }}">
+    <input type="hidden" name="sucursal_id" value="" class="js-sicser-sucursal">
+    <button type="submit" class="btn btn-sm btn-primary"
+            title="Importar a SIGMA"
+            aria-label="Importar a SIGMA">
+        <i class="bi bi-download" aria-hidden="true"></i>
+    </button>
+</form>
+{% endif %}
