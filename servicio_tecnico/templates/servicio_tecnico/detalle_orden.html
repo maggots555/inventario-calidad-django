@@ -4184,12 +4184,26 @@
                                                for="diag_emp_{{ empleado.id }}"
                                                id="label_emp_{{ empleado.id }}">
                                             <div class="d-flex align-items-center">
+                                                {# EXPLICACIÓN PARA PRINCIPIANTES:
+                                                   Misma lógica de preselección que el modal de imágenes:
+                                                   - Tú: siempre marcado y bloqueado
+                                                   - CALIDAD: siempre marcado
+                                                   - FRONTDESK de la misma sucursal: marcado
+                                                   - CARRY IN: solo si la orden es MIS (Mail-In Service) #}
                                                 <input class="form-check-input me-3 flex-shrink-0 checkbox-cc-empleado" 
                                                        type="checkbox" name="copia_empleados" 
                                                        value="{{ empleado.email }}" 
                                                        data-empleado-id="{{ empleado.id }}"
                                                        id="diag_emp_{{ empleado.id }}"
-                                                       {% if empleado.id == request.user.empleado.id %}checked disabled{% endif %}>
+                                                       {% if empleado.id == request.user.empleado.id %}
+                                                           checked disabled
+                                                       {% elif empleado.area == 'CALIDAD' %}
+                                                           checked
+                                                       {% elif empleado.area == 'FRONTDESK' and empleado.sucursal == orden.sucursal %}
+                                                           checked
+                                                       {% elif empleado.area == 'CARRY IN' and orden.detalle_equipo.es_mis %}
+                                                           checked
+                                                       {% endif %}>
                                                 
                                                 {# Input oculto para que el valor se envíe aunque esté disabled #}
                                                 {% if empleado.id == request.user.empleado.id %}
@@ -4730,11 +4744,19 @@
                                                     value="{{ empleado.email }}"
                                                     data-empleado-id="{{ empleado.id }}"
                                                     id="emp_img_{{ empleado.id }}"
+                                                    {# EXPLICACIÓN PARA PRINCIPIANTES:
+                                                       Preselección de CC al enviar imágenes:
+                                                       - Tú: siempre marcado y bloqueado
+                                                       - CALIDAD: siempre marcado
+                                                       - FRONTDESK misma sucursal: marcado
+                                                       - CARRY IN: solo si es_mis (Mail-In Service) #}
                                                     {% if empleado.id == request.user.empleado.id %}
                                                         checked disabled
                                                     {% elif empleado.area == 'CALIDAD' %}
                                                         checked
                                                     {% elif empleado.area == 'FRONTDESK' and empleado.sucursal == orden.sucursal %}
+                                                        checked
+                                                    {% elif empleado.area == 'CARRY IN' and orden.detalle_equipo.es_mis %}
                                                         checked
                                                     {% endif %}>
 
@@ -5211,11 +5233,16 @@
                                                        value="{{ empleado.email }}"
                                                        data-empleado-id="{{ empleado.id }}"
                                                        id="ev_emp_{{ empleado.id }}"
+                                                       {# EXPLICACIÓN PARA PRINCIPIANTES:
+                                                          Misma preselección CC que imágenes/diagnóstico;
+                                                          CARRY IN se marca solo si la orden es MIS. #}
                                                        {% if empleado.id == request.user.empleado.id %}
                                                            checked disabled
                                                        {% elif empleado.area == 'CALIDAD' %}
                                                            checked
                                                        {% elif empleado.area == 'FRONTDESK' and empleado.sucursal == orden.sucursal %}
+                                                           checked
+                                                       {% elif empleado.area == 'CARRY IN' and orden.detalle_equipo.es_mis %}
                                                            checked
                                                        {% endif %}>
                                                 {% if empleado.id == request.user.empleado.id %}
