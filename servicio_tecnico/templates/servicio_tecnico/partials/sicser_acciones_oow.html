@@ -1,6 +1,7 @@
 <!--
   Acciones de una fila OOW (tabla o tarjeta).
   Contexto esperado: orden, sigma, puede_importar, texto_busqueda
+  Solo acciones internas SIGMA: ver / formato / importar (sin enlace externo SICSER).
 -->
 {% if sigma %}
 <a href="{% url 'servicio_tecnico:detalle_orden' sigma.orden_id %}"
@@ -17,6 +18,7 @@
     <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
 </a>
 {% elif puede_importar %}
+<!-- Importar + abrir formato automático en SIGMA -->
 <form method="post" action="{% url 'servicio_tecnico:abrir_formato_oow_desde_sicser' %}"
       class="d-inline sicser-import-form">
     {% csrf_token %}
@@ -29,15 +31,7 @@
         <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
     </button>
 </form>
-{% endif %}
-<a href="{{ orden.url_formato_digital }}"
-   class="btn btn-sm btn-outline-secondary"
-   target="_blank" rel="noopener noreferrer"
-   title="Abrir formato en SICSER (externo)"
-   aria-label="Abrir formato en SICSER externo">
-    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
-</a>
-{% if puede_importar and not sigma %}
+<!-- Solo importar a SIGMA (sin abrir formato) -->
 <form method="post" action="{% url 'servicio_tecnico:importar_orden_sicser' %}"
       class="d-inline sicser-import-form">
     {% csrf_token %}
