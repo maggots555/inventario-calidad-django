@@ -319,8 +319,9 @@ def gestion_rhitso(request, orden_id):
     }
     
     # E) PREVISUALIZACIÓN DEL CORREO
-    # EXPLICACIÓN: Generamos el asunto y cuerpo del correo que se enviará
-    asunto_correo = f"ENVIO DE EQUIPO RHITSO: {orden_cliente} - {datos_correo['modelo']}"
+    # EXPLICACIÓN: El asunto por defecto es el mismo que usa la task al enviar
+    # (editable en el modal). Formato: emoji + orden del cliente (OOW/FL…).
+    asunto_correo = f'🔧ENVIO DE EQUIPO RHITSO - {orden_cliente}'
     
     cuerpo_correo = f"""Buen día Team Rhitso:
 
@@ -952,25 +953,22 @@ def agregar_comentario_rhitso(request, orden_id):
 @require_http_methods(["POST"])
 def enviar_correo_rhitso(request, orden_id):
     """
-    Vista para enviar correo electrónico a RHITSO con información del equipo.
+    Vista para encolar el correo RHITSO (PDF + imágenes) vía Celery.
 
-    REFACTORIZADO CON CELERY:
-    Esta vista ahora solo hace la validación rápida (< 1 segundo) y delega
-    el trabajo pesado (PDF, imágenes, email.send) a una tarea Celery en
-    segundo plano. El usuario recibe respuesta inmediata sin esperar.
-
-    Flujo:
-        1. Validar que la orden existe y es candidato RHITSO
-        2. Validar que hay al menos un destinatario
-        3. Disparar tarea Celery con .delay() → retorna un ID de tarea
-        4. Responder al usuario inmediatamente con "Enviando en segundo plano..."
+    Objetivo de negocio:
+        Validar destinatarios y asunto del modal, y disparar el envío en
+        segundo plano sin hacer esperar al usuario.
 
     Args:
-        request: HttpRequest object con datos POST del formulario
-        orden_id: ID de la orden de servicio
+        request: HttpRequest POST con destinatarios_principales, copia_empleados
+                 y asunto_correo (editable en el modal).
+        orden_id: ID de la OrdenServicio candidata RHITSO.
 
     Returns:
-        JsonResponse inmediato — el correo se procesa en background
+        JsonResponse inmediato con task_id; el Worker procesa el correo.
+
+    Efectos secundarios:
+        Encola enviar_correo_rhitso_task con db_alias del país actual.
     """
     from .tasks import enviar_correo_rhitso_task
 
@@ -999,6 +997,20 @@ def enviar_correo_rhitso(request, orden_id):
             }, status=400)
 
         # =======================================================================
+        # PASO 2.5: ASUNTO DEL CORREO (editable en el modal)
+        # =======================================================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El modal manda "asunto_correo". Si el usuario lo borra o llega vacío,
+        # reconstruimos el default histórico: 🔧ENVIO DE EQUIPO RHITSO - {orden_cliente}.
+        asunto_correo = request.POST.get('asunto_correo', '').strip()
+        if not asunto_correo:
+            detalle = getattr(orden, 'detalle_equipo', None)
+            orden_para_asunto = orden.numero_orden_interno
+            if detalle and detalle.orden_cliente:
+                orden_para_asunto = detalle.orden_cliente
+            asunto_correo = f'🔧ENVIO DE EQUIPO RHITSO - {orden_para_asunto}'
+
+        # =======================================================================
         # PASO 3: DISPARAR TAREA CELERY EN SEGUNDO PLANO
         # =======================================================================
         # EXPLICACIÓN: .delay() es la forma de enviar una tarea a Celery.
@@ -1013,6 +1025,7 @@ def enviar_correo_rhitso(request, orden_id):
             orden_id=orden_id,
             destinatarios_principales=destinatarios_principales,
             copia_empleados=copia_empleados,
+            asunto_correo=asunto_correo,
             usuario_id=usuario_id,
             db_alias=get_pais_actual()['db_alias'],
         )

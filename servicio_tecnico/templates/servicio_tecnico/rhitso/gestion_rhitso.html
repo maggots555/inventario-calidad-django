@@ -1392,10 +1392,23 @@
                                     </div>
                                     {% endif %}
                                     <div class="col-12 mt-2">
-                                        <small class="text-muted d-block mb-1"><strong>Asunto:</strong></small>
-                                        <div class="p-2 bg-white border rounded">
-                                            <strong class="text-dark">{{ previsualizacion_correo.asunto }}</strong>
-                                        </div>
+                                        {# EXPLICACIÓN: Asunto editable; FormData lo manda como asunto_correo #}
+                                        <label class="text-muted d-block mb-1" for="asuntoCorreoRhitso">
+                                            <strong>Asunto:</strong>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm"
+                                            id="asuntoCorreoRhitso"
+                                            name="asunto_correo"
+                                            value="{{ previsualizacion_correo.asunto }}"
+                                            maxlength="250"
+                                            required
+                                            autocomplete="off"
+                                        >
+                                        <small class="text-muted">
+                                            Puedes editarlo si necesitas un asunto personalizado.
+                                        </small>
                                     </div>
                                     <div class="col-12">
                                         <small class="text-muted d-block mb-1"><strong>Archivos adjuntos:</strong></small>

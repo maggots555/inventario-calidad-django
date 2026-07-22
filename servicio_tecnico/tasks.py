@@ -37,7 +37,15 @@ logger = logging.getLogger('servicio_tecnico')
     default_retry_delay=60,   # Reintentar tras 60 segundos si falla
     name='servicio_tecnico.enviar_correo_rhitso'
 )
-def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_empleados, usuario_id=None, db_alias='default'):
+def enviar_correo_rhitso_task(
+    self,
+    orden_id,
+    destinatarios_principales,
+    copia_empleados,
+    usuario_id=None,
+    db_alias='default',
+    asunto_correo='',
+):
     """
     Tarea Celery: genera el PDF, comprime imágenes y envía el correo RHITSO.
 
@@ -52,11 +60,17 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
         destinatarios_principales: Lista de emails principales  ej: ['a@lab.com', 'b@lab.com']
         copia_empleados         : Lista de emails en copia       ej: ['jefe@empresa.com']
         usuario_id              : ID del usuario que disparó la acción (para el historial)
+        db_alias                : Alias de BD del país (multi-tenant Celery)
+        asunto_correo           : Asunto editable del modal. Si llega vacío, se usa
+                                  el default: 🔧ENVIO DE EQUIPO RHITSO - {orden_cliente}
 
     NOTA IMPORTANTE: Los parámetros deben ser tipos simples (int, str, list, dict).
     NUNCA pasar objetos de Django (como una instancia de OrdenServicio) directamente,
     porque Celery los serializa a JSON y los objetos no son serializables.
     En su lugar, pasas el ID y dentro de la tarea lo buscas en la BD.
+
+    Efectos secundarios:
+        Genera PDF temporal, comprime imágenes, envía EmailMessage y limpia temporales.
     """
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string
@@ -166,11 +180,16 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
         # ===================================================================
         # PASO 5: CREAR Y ENVIAR EL CORREO
         # ===================================================================
+        # EXPLICACIÓN: Prioridad al asunto del modal; si viene vacío (llamadas
+        # antiguas / sin campo), usamos el formato histórico con emoji.
         orden_para_asunto = orden.numero_orden_interno
         if orden.detalle_equipo and orden.detalle_equipo.orden_cliente:
             orden_para_asunto = orden.detalle_equipo.orden_cliente
 
-        asunto = f'🔧ENVIO DE EQUIPO RHITSO - {orden_para_asunto}'
+        if asunto_correo and str(asunto_correo).strip():
+            asunto = str(asunto_correo).strip()
+        else:
+            asunto = f'🔧ENVIO DE EQUIPO RHITSO - {orden_para_asunto}'
 
         from_email_base = settings.DEFAULT_FROM_EMAIL
         if '<' in from_email_base and '>' in from_email_base:
