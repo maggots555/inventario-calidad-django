@@ -351,8 +351,9 @@
 }
 
 .lo-carga-star-badge {
-    font-size: 0.6rem;
-    padding: 0.25rem 0.4rem;
+    font-size: 0.45rem;
+    padding: 0.1rem 0.22rem;
+    line-height: 1;
 }
 
 .lo-carga-nombre-wrap {
@@ -368,7 +369,10 @@
 }
 
 .lo-carga-badge-siguiente {
-    font-size: 0.65rem;
+    font-size: 0.5rem;
+    padding: 0.12rem 0.28rem;
+    line-height: 1.2;
+    font-weight: 600;
 }
 
 .lo-carga-num {
@@ -576,13 +580,15 @@
     }
 
     .lo-carga-badge-siguiente {
-        font-size: 0.55rem;
-        padding: 0.12rem 0.3rem;
+        font-size: 0.45rem;
+        padding: 0.08rem 0.22rem;
+        line-height: 1.15;
     }
 
     .lo-carga-star-badge {
-        font-size: 0.5rem;
-        padding: 0.1rem 0.25rem;
+        font-size: 0.4rem;
+        padding: 0.08rem 0.18rem;
+        line-height: 1;
     }
 
     .lo-carga-num {
