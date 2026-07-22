@@ -37,6 +37,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 # Pillow - Librería para manipular imágenes (convertir PNG a JPG, etc.)
 from PIL import Image as PILImage
@@ -640,65 +641,146 @@ class PDFGeneratorRhitso:
         
         return y_fila - 5
     
+    @staticmethod
+    def _partir_texto_en_lineas(
+        texto: str,
+        ancho_maximo: float,
+        fuente: str = 'Helvetica',
+        tamano: float = 9,
+    ) -> List[str]:
+        """
+        Parte un texto largo en varias líneas según el ancho disponible del PDF.
+
+        Objetivo de negocio:
+            En el formato RHITSO, el "MOTIVO" puede ser un párrafo largo.
+            Antes de dibujar la caja, necesitamos saber cuántas líneas ocupará
+            para que el rectángulo crezca y no se solape con ACCESORIOS.
+
+        Args:
+            texto: Párrafo a envolver (palabras separadas por espacios).
+            ancho_maximo: Ancho máximo en puntos (pt) que puede ocupar cada línea.
+            fuente: Nombre de fuente ReportLab (ej. 'Helvetica').
+            tamano: Tamaño de fuente en puntos.
+
+        Returns:
+            Lista de líneas ya cortadas para dibujar con beginText/textLine.
+
+        Efectos secundarios:
+            Ninguno (función pura: no toca BD ni el canvas).
+        """
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # ReportLab no "ajusta" el texto solo: medimos cada palabra con stringWidth
+        # (como medir con una regla) y, si ya no cabe, empezamos una línea nueva.
+        palabras = (texto or '').split()
+        if not palabras:
+            return ['']
+
+        lineas: List[str] = []
+        linea_actual = ''
+
+        # Paso a paso: probar si la siguiente palabra cabe en la línea actual.
+        for palabra in palabras:
+            linea_prueba = f'{linea_actual}{palabra} '
+            # stringWidth no necesita canvas: sirve también en tests unitarios.
+            if stringWidth(linea_prueba, fuente, tamano) <= ancho_maximo:
+                linea_actual = linea_prueba
+            else:
+                # La palabra ya no cabe: guardamos la línea llena y arrancamos otra.
+                if linea_actual.strip():
+                    lineas.append(linea_actual.strip())
+                linea_actual = f'{palabra} '
+
+        if linea_actual.strip():
+            lineas.append(linea_actual.strip())
+
+        return lineas
+
+    @staticmethod
+    def _calcular_alto_contenido_motivo(
+        num_lineas: int,
+        alto_minimo: float = 70,
+        alto_linea: float = 12,
+        padding: float = 20,
+    ) -> float:
+        """
+        Calcula la altura (en puntos) de la caja de MOTIVO según cuántas líneas hay.
+
+        Objetivo de negocio:
+            Evitar el desborde: la caja debe ser al menos 70 pt (diseño original)
+            y crecer si el diagnóstico RHITSO es más largo.
+
+        Args:
+            num_lineas: Cantidad de líneas ya envueltas por ancho.
+            alto_minimo: Altura mínima histórica del bloque (70 pt).
+            alto_linea: Espacio vertical por línea (fuente 9 + interlineado).
+            padding: Márgenes interno superior + inferior del texto.
+
+        Returns:
+            Altura en puntos para el rectángulo de contenido.
+
+        Efectos secundarios:
+            Ninguno.
+        """
+        # Si por algún motivo no hay líneas, igual reservamos el mínimo visual.
+        lineas_seguras = max(1, int(num_lineas))
+        return max(alto_minimo, padding + (lineas_seguras * alto_linea))
+
     def _dibujar_motivo(self, c: canvas.Canvas, y_inicial: float) -> float:
         """
-        Dibuja la sección de motivo del envío.
-        
+        Dibuja la sección de motivo del envío (descripcion_rhitso).
+
+        Objetivo de negocio:
+            Mostrar el diagnóstico/motivo completo dentro de su caja, sin tapar
+            la sección ACCESORIOS ENVIADOS que va debajo.
+
+        Args:
+            c: Canvas de ReportLab donde se dibuja la página.
+            y_inicial: Coordenada Y (desde abajo) donde empieza esta sección.
+
         Returns:
-            Nueva posición Y después de la sección
+            Nueva posición Y debajo del bloque MOTIVO (altura ya dinámica).
+
+        Efectos secundarios:
+            Dibuja header + rectángulo + texto en el canvas del PDF.
         """
         alto_header = 25
-        alto_minimo_contenido = 70
         x_inicio = self.MARGEN_IZQUIERDO
         ancho_total = self.ANCHO_UTIL
-        
-        # Header
+
+        # Header gris con título centrado
         y_header = y_inicial - alto_header
         c.setFillColor(self.COLOR_GRIS_HEADER)
         c.rect(x_inicio, y_header, ancho_total, alto_header, fill=1, stroke=1)
         c.setFillColor(self.COLOR_NEGRO)
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont('Helvetica-Bold', 10)
         c.drawCentredString(
             x_inicio + ancho_total / 2,
             y_header + alto_header / 2 - 4,
-            "MOTIVO"
+            'MOTIVO',
         )
-        
-        # Contenido
+
         motivo_texto = self.orden.descripcion_rhitso or 'No especificado'
-        
-        # Dibujar rectángulo del contenido
-        y_contenido = y_header - alto_minimo_contenido
-        c.rect(x_inicio, y_contenido, ancho_total, alto_minimo_contenido, fill=0, stroke=1)
-        
-        # Dibujar texto del motivo (con margen interno)
-        c.setFont("Helvetica", 9)
         margen_texto = 10
         ancho_texto = ancho_total - (2 * margen_texto)
-        
-        # Crear objeto de texto para texto multilínea
+
+        # 1) Primero partimos el texto: así sabemos cuánto debe medir la caja.
+        lineas = self._partir_texto_en_lineas(motivo_texto, ancho_texto, 'Helvetica', 9)
+        # 2) Altura dinámica (mínimo 70 pt; crece si hay muchas líneas).
+        alto_contenido = self._calcular_alto_contenido_motivo(len(lineas))
+
+        # 3) Rectángulo del contenido con la altura YA calculada.
+        y_contenido = y_header - alto_contenido
+        c.rect(x_inicio, y_contenido, ancho_total, alto_contenido, fill=0, stroke=1)
+
+        # 4) Dibujar cada línea dentro de la caja (de arriba hacia abajo).
+        c.setFont('Helvetica', 9)
         texto_obj = c.beginText(x_inicio + margen_texto, y_header - 15)
-        texto_obj.setFont("Helvetica", 9)
-        
-        # Dividir texto en líneas que quepan en el ancho disponible
-        palabras = motivo_texto.split()
-        linea_actual = ""
-        
-        for palabra in palabras:
-            linea_prueba = linea_actual + palabra + " "
-            ancho_linea = c.stringWidth(linea_prueba, "Helvetica", 9)
-            
-            if ancho_linea <= ancho_texto:
-                linea_actual = linea_prueba
-            else:
-                texto_obj.textLine(linea_actual.strip())
-                linea_actual = palabra + " "
-        
-        if linea_actual:
-            texto_obj.textLine(linea_actual.strip())
-        
+        texto_obj.setFont('Helvetica', 9)
+        for linea in lineas:
+            texto_obj.textLine(linea)
         c.drawText(texto_obj)
-        
+
+        # Devolvemos la Y real: ACCESORIOS empieza debajo de esta caja agrandada.
         return y_contenido - 5
     
     def _dibujar_accesorios(self, c: canvas.Canvas, y_inicial: float) -> float:
