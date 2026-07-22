@@ -8,8 +8,9 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc && tsc --project tsconfig.sw.json",
+    "build": "tsc && tsc --project tsconfig.sw.json && tsc --project tsconfig.jpeg_worker.json",
     "build:sw": "tsc --project tsconfig.sw.json",
+    "build:jpeg-worker": "tsc --project tsconfig.jpeg_worker.json",
     "watch": "tsc --watch"
   },
   "repository": {

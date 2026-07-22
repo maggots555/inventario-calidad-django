@@ -1,0 +1,20 @@
+{
+  // Configuración TypeScript EXCLUSIVA para el Web Worker de JPEG.
+  // NO mezclar con tsconfig.json principal: este script corre en un Worker,
+  // sin window/document; tipamos con lib WebWorker (OffscreenCanvas, etc.).
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": ["ES2019", "WebWorker"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "outDir": "static/js",
+    "rootDir": "static/ts",
+    "sourceMap": true
+  },
+  "include": [
+    "static/ts/jpeg_encode_worker.ts"
+  ]
+}

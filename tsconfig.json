@@ -17,5 +17,9 @@
   "include": [
     "static/ts/**/*.ts",
     "static/ts/**/*.d.ts"
+  ],
+  /* Workers tienen tsconfig propio (WebWorker); no compilarlos con lib DOM */
+  "exclude": [
+    "static/ts/jpeg_encode_worker.ts"
   ]
 }

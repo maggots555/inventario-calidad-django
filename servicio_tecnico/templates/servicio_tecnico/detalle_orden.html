@@ -5623,7 +5623,8 @@
 <!-- ============================================================ -->
 <!-- MODAL: VISOR DE CÁMARA INTEGRADO -->
 <!-- ============================================================ -->
-<div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static">
+{# data-worker-url: URL del Web Worker JPEG (compresión en segundo plano). #}
+<div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static" data-worker-url="{% static 'js/jpeg_encode_worker.js' %}">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
             <div class="modal-header modal-header-camera text-white">
@@ -5692,7 +5693,8 @@
                         <i class="bi bi-circle"></i>
                     </button>
                     
-                    <button type="button" class="btn btn-lg btn-success" data-bs-dismiss="modal" id="btnFinalizarCaptura" title="Finalizar captura">
+                    {# Sin data-bs-dismiss: finalizarCaptura espera encodes pendientes y luego cierra. #}
+                    <button type="button" class="btn btn-lg btn-success" id="btnFinalizarCaptura" title="Finalizar captura">
                         <i class="bi bi-check-lg"></i>
                     </button>
                 </div>

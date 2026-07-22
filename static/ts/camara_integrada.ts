@@ -28,6 +28,31 @@ interface DispositivoCamara {
     facingMode?: 'user' | 'environment';
 }
 
+/**
+ * Mensajes del Web Worker de JPEG (jpeg_encode_worker.ts).
+ * EXPLICACIÓN: el Worker y esta clase no pueden compartir imports (Worker clásico),
+ * así que tipamos el contrato aquí de forma duplicada a propósito.
+ */
+interface JpegEncodeRequestMsg {
+    id: number;
+    bitmap: ImageBitmap;
+    quality: number;
+}
+
+interface JpegEncodeResponseOkMsg {
+    id: number;
+    ok: true;
+    blob: Blob;
+}
+
+interface JpegEncodeResponseErrorMsg {
+    id: number;
+    ok: false;
+    error: string;
+}
+
+type JpegEncodeResponseMsg = JpegEncodeResponseOkMsg | JpegEncodeResponseErrorMsg;
+
 class CamaraIntegrada {
     // Elementos del DOM
     private modal: HTMLElement | null;
@@ -77,25 +102,37 @@ class CamaraIntegrada {
     // Flag para prevenir capturas simultáneas (BUG FIX)
     private estáCapturando: boolean = false;
 
-    // ── SISTEMA ADAPTATIVO DE CALIDAD (v8.1) ────────────────────────────────
+    // ── SISTEMA ADAPTATIVO DE CALIDAD (v8.1) + WORKER JPEG (v9.0) ────────────
     // EXPLICACIÓN PARA PRINCIPIANTES:
-    // canvas.toBlob() comprime la imagen en el hilo principal de JavaScript.
-    // En dispositivos de gama alta (Snapdragon 8xx) esto tarda < 1 segundo.
-    // En gama media (Samsung Galaxy A, Snapdragon 7xx/6xx) puede tardar 10-20s
-    // porque el compresor JPEG trabaja solo con CPU, sin aceleración de GPU.
+    // Comprimir a JPEG es lo más pesado. Antes ocurría en el hilo principal
+    // con canvas.toBlob() y congelaba botones/preview en celulares lentos.
     //
-    // Solución: medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5
-    // segundos, activamos "modo optimizado" que reduce la calidad JPEG (0.95 → 0.75)
-    // manteniendo la resolución 4K intacta. El usuario lo nota en un toast.
+    // Ahora preferimos un Web Worker + OffscreenCanvas (segundo plano).
+    // Si el navegador no lo soporta, caemos al toBlob() de siempre.
     //
-    // Ventaja frente a reducir resolución: con 4K a calidad 0.75, al hacer zoom en
-    // detalles finos (texto en una placa, rayones, piezas) hay el mismo número de
-    // píxeles que en un gama alta. Solo hay más artefactos en fondos lisos.
-    //
-    // En gama alta: la primera captura es rápida → sin cambios, calidad máxima.
-    // En gama baja: la primera captura detecta el problema y se auto-corrige.
+    // Además medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5 s,
+    // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución 4K.
     private dispositivoLento: boolean = false;   // true cuando se detecta hardware lento
     private primeraCaptura: boolean = true;      // false tras la primera medición
+
+    // ── Web Worker JPEG (v9.0) ───────────────────────────────────────────────
+    // jpegWorker: hilo aparte que comprime; null si no hay soporte o tras cerrar.
+    // encodePendientes: Promises de encodes en curso (Finalizar espera a todas).
+    // aceptaResultadosEncode: false al descartar/cerrar → ignora Blobs tardíos.
+    // colaEncodeWorker: encadena encodes en serie dentro del mismo Worker.
+    private jpegWorker: Worker | null = null;
+    private soportaEncodeWorker: boolean = false;
+    private siguienteEncodeId: number = 1;
+    private encodePendientes: Map<number, Promise<void>> = new Map();
+    private aceptaResultadosEncode: boolean = true;
+    private colaEncodeWorker: Promise<void> = Promise.resolve();
+    private workerMessageHandler: ((event: MessageEvent<JpegEncodeResponseMsg>) => void) | null = null;
+    private workerErrorHandler: ((event: ErrorEvent) => void) | null = null;
+    /** Resolvers pendientes esperando la respuesta del Worker por id */
+    private encodeResolvers: Map<
+        number,
+        { resolve: (blob: Blob) => void; reject: (err: Error) => void }
+    > = new Map();
     
     // OPTIMIZACIÓN v6.0: Control de event listeners para prevenir memory leaks
     private abortController: AbortController | null = null;
@@ -221,6 +258,7 @@ class CamaraIntegrada {
      */
     private onModalAbierto(): void {
         this.modalAbierto = true;
+        this.aceptaResultadosEncode = true;
         this.agregarProteccionBotonAtras();
         this.iniciarMonitoreoOrientacion(); // v7.0: async, se ejecuta en paralelo (sin await)
 
@@ -230,6 +268,7 @@ class CamaraIntegrada {
         // sin que hayamos llegado a medir, se pueda medir correctamente.
         this.primeraCaptura = true;
         this.bloquearScrollBody();          // FIX iOS: Prevenir bounce scroll
+        this.asegurarJpegWorker();          // v9.0: lazy-init Worker JPEG (o fallback)
         this.abrirCamara();
     }
     
@@ -241,6 +280,9 @@ class CamaraIntegrada {
      */
     private onModalCerrado(): void {
         this.modalAbierto = false;
+        // v9.0: al cerrar (X / atrás / dismiss) descartamos encodes en curso
+        this.aceptaResultadosEncode = false;
+        this.terminarJpegWorker();
         this.removerProteccionBotonAtras();
         this.detenerMonitoreoOrientacion();
         this.restaurarScrollBody();         // FIX iOS: Restaurar scroll normal
@@ -1287,14 +1329,249 @@ class CamaraIntegrada {
         // Reiniciar cámara con nueva orientación
         await this.abrirCamara();
     }
+
+    // =========================================================================
+    // Web Worker JPEG (v9.0) — compresión en segundo plano
+    // =========================================================================
+
+    /**
+     * Inicializa el Worker de JPEG si el navegador lo soporta.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Leemos la URL desde data-worker-url del modal (Django {% static %}).
+     * Si falta OffscreenCanvas, Worker o la URL, usamos toBlob en el hilo principal.
+     */
+    private asegurarJpegWorker(): void {
+        if (this.jpegWorker) {
+            return;
+        }
+
+        const workerUrl = this.modal?.dataset.workerUrl?.trim() ?? '';
+        const puedeWorker =
+            typeof Worker !== 'undefined' &&
+            typeof OffscreenCanvas !== 'undefined' &&
+            typeof createImageBitmap === 'function' &&
+            workerUrl.length > 0;
+
+        if (!puedeWorker) {
+            this.soportaEncodeWorker = false;
+            console.warn('⚠️ Encode JPEG en Worker no disponible — usando toBlob (hilo principal)');
+            return;
+        }
+
+        try {
+            this.jpegWorker = new Worker(workerUrl);
+            this.soportaEncodeWorker = true;
+
+            this.workerMessageHandler = (event: MessageEvent<JpegEncodeResponseMsg>) => {
+                this.onJpegWorkerMessage(event.data);
+            };
+            this.workerErrorHandler = (event: ErrorEvent) => {
+                console.error('❌ Error en jpeg_encode_worker:', event.message);
+                // Rechazar todas las peticiones abiertas y desactivar Worker
+                this.encodeResolvers.forEach(({ reject }) => {
+                    reject(new Error(event.message || 'Error en Worker JPEG'));
+                });
+                this.encodeResolvers.clear();
+                this.soportaEncodeWorker = false;
+                this.terminarJpegWorker();
+            };
+
+            this.jpegWorker.addEventListener('message', this.workerMessageHandler);
+            this.jpegWorker.addEventListener('error', this.workerErrorHandler);
+            console.log('✅ Worker JPEG listo:', workerUrl);
+        } catch (err) {
+            console.warn('⚠️ No se pudo crear Worker JPEG — fallback toBlob:', err);
+            this.soportaEncodeWorker = false;
+            this.jpegWorker = null;
+        }
+    }
+
+    /**
+     * Resuelve o rechaza la Promise asociada a un id de encode.
+     */
+    private onJpegWorkerMessage(data: JpegEncodeResponseMsg): void {
+        const pendiente = this.encodeResolvers.get(data.id);
+        if (!pendiente) {
+            return;
+        }
+        this.encodeResolvers.delete(data.id);
+
+        if (data.ok) {
+            pendiente.resolve(data.blob);
+        } else {
+            pendiente.reject(new Error(data.error || 'Error desconocido en Worker JPEG'));
+        }
+    }
+
+    /**
+     * Termina el Worker y limpia resolvers/cola (al cerrar el modal).
+     * Los Blobs a medias NO se envían al upload gracias a aceptaResultadosEncode=false.
+     */
+    private terminarJpegWorker(): void {
+        this.encodeResolvers.forEach(({ reject }) => {
+            reject(new Error('Worker JPEG terminado (modal cerrado)'));
+        });
+        this.encodeResolvers.clear();
+        this.encodePendientes.clear();
+        this.colaEncodeWorker = Promise.resolve();
+
+        if (this.jpegWorker) {
+            if (this.workerMessageHandler) {
+                this.jpegWorker.removeEventListener('message', this.workerMessageHandler);
+            }
+            if (this.workerErrorHandler) {
+                this.jpegWorker.removeEventListener('error', this.workerErrorHandler);
+            }
+            this.jpegWorker.terminate();
+            this.jpegWorker = null;
+            console.log('🛑 Worker JPEG terminado');
+        }
+
+        this.workerMessageHandler = null;
+        this.workerErrorHandler = null;
+    }
+
+    /**
+     * Comprime el canvas a JPEG: Worker si hay soporte, si no toBlob.
+     *
+     * @param canvas Canvas con el frame ya rotado (solo para fallback toBlob)
+     * @param bitmap Instantánea del frame (obligatoria para Worker; se transfiere)
+     * @param quality Calidad JPEG 0–1
+     * @returns Blob JPEG
+     */
+    private async comprimirCanvasAJpeg(
+        canvas: HTMLCanvasElement,
+        bitmap: ImageBitmap | null,
+        quality: number
+    ): Promise<Blob> {
+        if (this.soportaEncodeWorker && this.jpegWorker && bitmap) {
+            try {
+                return await this.comprimirConWorker(bitmap, quality);
+            } catch (err) {
+                console.warn('⚠️ Worker JPEG falló — fallback toBlob:', err);
+                this.soportaEncodeWorker = false;
+                // El bitmap ya pudo haberse transferido; para fallback usamos el canvas
+            }
+        } else if (bitmap) {
+            // Worker no disponible: cerrar bitmap para no filtrar memoria
+            bitmap.close();
+        }
+        return this.comprimirConToBlob(canvas, quality);
+    }
+
+    /**
+     * Envía un ImageBitmap al Worker (cola en serie) y espera el Blob.
+     * El bitmap se transfiere: deja de ser usable en el hilo principal.
+     */
+    private comprimirConWorker(bitmap: ImageBitmap, quality: number): Promise<Blob> {
+        const worker = this.jpegWorker;
+        if (!worker) {
+            bitmap.close();
+            return Promise.reject(new Error('Worker JPEG no inicializado'));
+        }
+
+        // Encadenar en serie: un encode tras otro en el mismo Worker
+        const trabajo = this.colaEncodeWorker.then(() => {
+            const id = this.siguienteEncodeId++;
+
+            const blobPromise = new Promise<Blob>((resolve, reject) => {
+                this.encodeResolvers.set(id, { resolve, reject });
+            });
+
+            try {
+                const mensaje: JpegEncodeRequestMsg = { id, bitmap, quality };
+                // Transferimos el bitmap: el hilo principal ya no lo puede usar
+                worker.postMessage(mensaje, [bitmap]);
+            } catch (err) {
+                this.encodeResolvers.delete(id);
+                try {
+                    bitmap.close();
+                } catch {
+                    // Ya transferido o inválido
+                }
+                throw err;
+            }
+
+            return blobPromise;
+        });
+
+        // Mantener la cola viva aunque un encode falle (para no bloquear los siguientes)
+        this.colaEncodeWorker = trabajo.then(
+            () => undefined,
+            () => undefined
+        );
+
+        return trabajo;
+    }
+
+    /**
+     * Fallback clásico: comprime en el hilo principal (puede congelar la UI).
+     */
+    private comprimirConToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+        return new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((b) => {
+                if (b) {
+                    resolve(b);
+                } else {
+                    reject(new Error('Error al crear blob de la foto'));
+                }
+            }, 'image/jpeg', quality);
+        });
+    }
+
+    /**
+     * Tras la primera encode, decide si activar modo optimizado (calidad 0.75).
+     */
+    private aplicarDeteccionDispositivoLento(tiempoBlobMs: number): void {
+        if (!this.primeraCaptura) {
+            return;
+        }
+        this.primeraCaptura = false;
+        const UMBRAL_LENTO_MS = 2500;
+
+        if (!this.dispositivoLento && tiempoBlobMs > UMBRAL_LENTO_MS) {
+            this.dispositivoLento = true;
+            console.warn(
+                `⚡ Dispositivo lento detectado: encode JPEG tardó ${tiempoBlobMs}ms. ` +
+                `Activando modo optimizado (calidad JPEG 0.75, resolución 4K sin cambios).`
+            );
+            this.mostrarToastModoOptimizado(tiempoBlobMs);
+        } else if (!this.dispositivoLento) {
+            console.log(
+                `✅ Dispositivo rápido: encode JPEG tardó ${tiempoBlobMs}ms — calidad máxima activa.`
+            );
+        }
+    }
+
+    /**
+     * Espera a que terminen todos los encodes pendientes (para Finalizar).
+     */
+    private async esperarEncodesPendientes(): Promise<void> {
+        const pendientes = Array.from(this.encodePendientes.values());
+        if (pendientes.length === 0) {
+            return;
+        }
+        console.log(`⏳ Esperando ${pendientes.length} encode(s) JPEG pendiente(s)...`);
+        // ES2019: sin Promise.allSettled — envolvemos cada una para no fallar el lote
+        await Promise.all(
+            pendientes.map((p) =>
+                p.then(
+                    () => undefined,
+                    () => undefined
+                )
+            )
+        );
+    }
     
     /**
-     * Captura una foto del stream de video
-     * BUG FIX: Ahora es async y previene capturas simultáneas con debouncing de 300ms
-     * NUEVO: Detecta y respeta la orientación del dispositivo (landscape/portrait)
+     * Captura una foto del stream de video.
+     * v9.0: el frame se copia al canvas en el hilo principal; el JPEG pesado
+     * se comprime en un Worker (si hay soporte). El obturador se libera pronto
+     * para no trabar la UI mientras comprime.
      */
     private async capturarFoto(): Promise<void> {
-        // CRÍTICO: Prevenir capturas dobles/múltiples
+        // CRÍTICO: Prevenir capturas dobles/múltiples del frame (no del encode)
         if (this.estáCapturando) {
             console.warn('⚠️ Captura en progreso, ignorando clic...');
             return;
@@ -1311,40 +1588,38 @@ class CamaraIntegrada {
             return;
         }
         
-        // Marcar como capturando
+        // Marcar como capturando (solo mientras copiamos el frame)
         this.estáCapturando = true;
         
-        // OPTIMIZACIÓN v6.0: Feedback visual mejorado durante procesamiento
         if (this.btnCapturar) {
             this.btnCapturar.disabled = true;
             this.btnCapturar.classList.add('capturing', 'processing');
-            // Cambiar icono a loading para mejor UX
             const iconoOriginal = this.btnCapturar.innerHTML;
             this.btnCapturar.innerHTML = '<i class="bi bi-hourglass-split"></i>';
             this.btnCapturar.dataset.iconoOriginal = iconoOriginal;
         }
         
+        // Metadatos para el log (se rellenan en el try)
+        let orientacion = 0;
+        let videoWidth = 0;
+        let videoHeight = 0;
+        let canvasWidth = 0;
+        let canvasHeight = 0;
+        let necesitaRotacion = false;
+        let calidadJpeg = this.dispositivoLento ? 0.75 : 0.95;
+        let canvasClon: HTMLCanvasElement | null = null;
+        let bitmapCaptura: ImageBitmap | null = null;
+
         try {
             console.log('📸 Capturando foto...');
             
-            // NUEVO: Obtener orientación del dispositivo
-            const orientacion = this.obtenerOrientacionFinal();
+            orientacion = this.obtenerOrientacionFinal();
             console.log(`📐 Orientación detectada: ${orientacion}°`);
             
-            // Dimensiones reales del video entregadas por la cámara
-            const videoWidth = this.videoElement.videoWidth;
-            const videoHeight = this.videoElement.videoHeight;
+            videoWidth = this.videoElement.videoWidth;
+            videoHeight = this.videoElement.videoHeight;
             
-            // ── Canvas dinámico ───────────────────────────────────────────────
-            // EXPLICACIÓN PARA PRINCIPIANTES:
-            // Cuando el teléfono está en portrait (0°/180°), la foto final mide
-            // igual que el video (ej. 1080×1920). Cuando está en landscape (90°/270°),
-            // rotamos el frame, así que ancho y alto se intercambian (1920×1080).
-            // En vez de usar un canvas de tamaño fijo (que desperdicia píxeles si la
-            // cámara entrega menos resolución, o recorta si entrega más), calculamos
-            // las dimensiones exactas a partir del video real y solo redimensionamos
-            // el canvas cuando cambian — lo cual ocurre como máximo una vez por sesión.
-            const necesitaRotacion = orientacion === 90 || orientacion === 270;
+            necesitaRotacion = orientacion === 90 || orientacion === 270;
             const targetW = necesitaRotacion ? videoHeight : videoWidth;
             const targetH = necesitaRotacion ? videoWidth  : videoHeight;
             
@@ -1354,129 +1629,125 @@ class CamaraIntegrada {
                 return;
             }
             
-            // Redimensionar solo si cambió (el primer frame siempre cambia;
-            // las fotos siguientes dentro de la misma sesión no — sin reflow)
             if (canvasActual.width !== targetW || canvasActual.height !== targetH) {
                 canvasActual.width  = targetW;
                 canvasActual.height = targetH;
                 console.log(`📐 Canvas redimensionado a ${targetW}×${targetH}`);
             }
             
-            const canvasWidth  = canvasActual.width;
-            const canvasHeight = canvasActual.height;
+            canvasWidth  = canvasActual.width;
+            canvasHeight = canvasActual.height;
             
-            // Obtener contexto del canvas
             const context = canvasActual.getContext('2d');
             if (!context) {
                 console.error('❌ No se pudo obtener contexto del canvas');
                 return;
             }
             
-            // Limpiar canvas (sin re-dimensionar, mucho más rápido)
             context.clearRect(0, 0, canvasWidth, canvasHeight);
-            
-            // NUEVO: Aplicar transformación según orientación
             this.aplicarTransformacionCanvas(context, orientacion, canvasWidth, canvasHeight);
-            
-            // Dibujar frame actual del video en el canvas (ya con rotación aplicada)
             context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
-            
-            // Restaurar transformación del canvas para futuras capturas
             context.setTransform(1, 0, 0, 1, 0, 0);
-            
-            // Convertir canvas a Blob — aquí está el costo de CPU principal.
-            //
-            // SISTEMA ADAPTATIVO DE CALIDAD JPEG (v8.1):
-            //
-            // La resolución siempre es la máxima que entregue el sensor (4K si es posible).
-            // Lo que varía es la calidad del compresor JPEG:
-            //
-            // - Calidad 0.95 (gama alta): ~1-2s en Snapdragon 8xx. Archivos ~6-8 MB.
-            //   Artefactos prácticamente imperceptibles.
-            //
-            // - Calidad 0.75 (gama media/baja): ~1.5-2s en Galaxy A / Snapdragon 7xx.
-            //   Archivos ~1-1.5 MB. Artefactos visibles solo en zonas de color uniforme
-            //   (fondos lisos), no en zonas de detalle donde importa (texto, piezas,
-            //   rayones, componentes). Para documentación técnica es completamente válido.
-            //
-            // VENTAJA frente a reducir resolución:
-            // Un Galaxy A con calidad 0.75 tiene los mismos píxeles 4K disponibles
-            // para hacer zoom que un gama alta. Reducir a 2K quitaría esa información.
-            const calidadJpeg = this.dispositivoLento ? 0.75 : 0.95;
-            const t0Blob = Date.now();
 
-            const blob = await new Promise<Blob>((resolve, reject) => {
-                canvasActual.toBlob((b) => {
-                    if (b) {
-                        resolve(b);
-                    } else {
-                        reject(new Error('Error al crear blob de la foto'));
-                    }
-                }, 'image/jpeg', calidadJpeg);
-            });
+            calidadJpeg = this.dispositivoLento ? 0.75 : 0.95;
 
-            const tiempoBlob = Date.now() - t0Blob;
-
-            // ── Detección de dispositivo lento (solo en la primera captura) ───
-            if (this.primeraCaptura) {
-                this.primeraCaptura = false;
-                const UMBRAL_LENTO_MS = 2500; // Si tarda más de 2.5s → modo optimizado
-
-                if (!this.dispositivoLento && tiempoBlob > UMBRAL_LENTO_MS) {
-                    this.dispositivoLento = true;
-                    console.warn(
-                        `⚡ Dispositivo lento detectado: toBlob() tardó ${tiempoBlob}ms. ` +
-                        `Activando modo optimizado (calidad JPEG 0.75, resolución 4K sin cambios).`
-                    );
-                    // Mostrar aviso al usuario
-                    this.mostrarToastModoOptimizado(tiempoBlob);
-                    // No es necesario reiniciar el stream: la resolución no cambia,
-                    // solo la calidad del compresor JPEG en capturas siguientes.
-                } else if (!this.dispositivoLento) {
-                    console.log(`✅ Dispositivo rápido: toBlob() tardó ${tiempoBlob}ms — calidad máxima activa.`);
-                }
+            // Copia síncrona del frame: la siguiente captura puede reutilizar
+            // #canvasCaptura sin pisar este encode (Worker o toBlob).
+            canvasClon = document.createElement('canvas');
+            canvasClon.width = canvasWidth;
+            canvasClon.height = canvasHeight;
+            const ctxClon = canvasClon.getContext('2d');
+            if (!ctxClon) {
+                console.error('❌ No se pudo clonar el canvas de captura');
+                return;
             }
-            
-            // OPTIMIZACIÓN v6.0: dataURL eliminado (no se usa en el flujo de upload)
-            
-            // Agregar a lista de fotos capturadas
-            this.fotosCapturadas.push({
-                blob: blob,
-                timestamp: Date.now()
-            });
-            
-            // Actualizar contador
-            this.actualizarContador();
-            
-            // Feedback visual
+            ctxClon.drawImage(canvasActual, 0, 0);
+
+            // Instantánea transferible para el Worker (rápido vs JPEG)
+            if (this.soportaEncodeWorker && typeof createImageBitmap === 'function') {
+                bitmapCaptura = await createImageBitmap(canvasClon);
+            }
+
+            // Flash inmediato: el usuario siente que la foto “ya salió”
             this.mostrarFeedbackCaptura();
-            
-            // LOGS DETALLADOS PARA DEBUG
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log(`✅ FOTO CAPTURADA #${this.fotosCapturadas.length}`);
-            console.log(`  📐 Orientación aplicada: ${orientacion}° (${this.obtenerDescripcionOrientacion(orientacion)})`);
-            console.log(`  📏 Video original: ${videoWidth}x${videoHeight}`);
-            console.log(`  📏 Canvas final: ${canvasWidth}x${canvasHeight}`);
-            console.log(`  🔄 Rotación aplicada: ${necesitaRotacion ? 'SÍ' : 'NO'}`);
-            console.log(`  💾 Tamaño blob: ${(blob.size / 1024).toFixed(2)} KB`);
-            console.log(`  ⏱️ Tiempo toBlob(): ${tiempoBlob}ms | Calidad: ${calidadJpeg} | Modo: ${this.dispositivoLento ? 'OPTIMIZADO' : 'MÁXIMA CALIDAD'}`);
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            
         } catch (error) {
-            console.error('❌ Error al capturar foto:', error);
+            console.error('❌ Error al capturar frame:', error);
+            if (bitmapCaptura) {
+                bitmapCaptura.close();
+                bitmapCaptura = null;
+            }
+            return;
         } finally {
-            // DEBOUNCING: Esperar 300ms antes de permitir otra captura
+            // Liberar obturador pronto (~200 ms). El JPEG puede seguir comprimiendo.
             setTimeout(() => {
                 this.estáCapturando = false;
                 if (this.btnCapturar) {
                     this.btnCapturar.disabled = false;
                     this.btnCapturar.classList.remove('capturing', 'processing');
-                    // Restaurar icono original
                     const iconoOriginal = this.btnCapturar.dataset.iconoOriginal || '<i class="bi bi-circle"></i>';
                     this.btnCapturar.innerHTML = iconoOriginal;
                 }
-            }, 300);
+            }, 200);
         }
+
+        if (!canvasClon) {
+            return;
+        }
+
+        // ── Encode en segundo plano (Worker o toBlob sobre el clon) ───────────
+        const pendienteId = Date.now() + Math.floor(Math.random() * 1000);
+        const canvasParaEncode = canvasClon;
+        const bitmapParaEncode = bitmapCaptura;
+        const calidadParaEncode = calidadJpeg;
+
+        const promesaEncode = (async () => {
+            const t0 = Date.now();
+            try {
+                const blob = await this.comprimirCanvasAJpeg(
+                    canvasParaEncode,
+                    bitmapParaEncode,
+                    calidadParaEncode
+                );
+                const tiempoBlob = Date.now() - t0;
+
+                // Si el usuario cerró el modal, descartamos el resultado
+                if (!this.aceptaResultadosEncode) {
+                    console.log(`🗑️ Encode pendiente #${pendienteId} descartado (modal cerrado)`);
+                    return;
+                }
+
+                this.aplicarDeteccionDispositivoLento(tiempoBlob);
+
+                this.fotosCapturadas.push({
+                    blob: blob,
+                    timestamp: Date.now()
+                });
+                this.actualizarContador();
+
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log(`✅ FOTO LISTA #${this.fotosCapturadas.length}`);
+                console.log(`  📐 Orientación: ${orientacion}° (${this.obtenerDescripcionOrientacion(orientacion)})`);
+                console.log(`  📏 Video: ${videoWidth}x${videoHeight} | Canvas: ${canvasWidth}x${canvasHeight}`);
+                console.log(`  🔄 Rotación: ${necesitaRotacion ? 'SÍ' : 'NO'}`);
+                console.log(`  💾 Blob: ${(blob.size / 1024).toFixed(2)} KB`);
+                console.log(
+                    `  ⏱️ Encode: ${tiempoBlob}ms | Calidad: ${calidadParaEncode} | ` +
+                    `Vía: ${this.soportaEncodeWorker ? 'Worker' : 'toBlob'} | ` +
+                    `Modo: ${this.dispositivoLento ? 'OPTIMIZADO' : 'MÁXIMA'}`
+                );
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            } catch (error) {
+                if (!this.aceptaResultadosEncode) {
+                    return;
+                }
+                console.error('❌ Error al comprimir foto:', error);
+            }
+        })();
+
+        this.encodePendientes.set(pendienteId, promesaEncode);
+        void promesaEncode.finally(() => {
+            this.encodePendientes.delete(pendienteId);
+        });
     }
     
     /**
@@ -1816,23 +2087,34 @@ class CamaraIntegrada {
     }
     
     /**
-     * Finaliza la captura y envía fotos al sistema de preview
+     * Finaliza la captura y envía fotos al sistema de preview.
+     * v9.0: espera encodes JPEG pendientes antes de entregar los Blobs.
      */
-    private finalizarCaptura(): void {
-        console.log(`🎬 Finalizando captura. ${this.fotosCapturadas.length} foto(s) capturada(s)`);
-        
-        // Si hay callback configurado, enviar las fotos
-        if (this.onFotosCapturadas && this.fotosCapturadas.length > 0) {
-            const blobs = this.fotosCapturadas.map(f => f.blob);
-            this.onFotosCapturadas(blobs);
+    private async finalizarCaptura(): Promise<void> {
+        console.log(`🎬 Finalizando captura. Pendientes: ${this.encodePendientes.size}`);
+
+        if (this.btnFinalizar) {
+            this.btnFinalizar.disabled = true;
         }
-        
-        // Limpiar fotos capturadas
-        this.fotosCapturadas = [];
-        this.actualizarContador();
-        
-        // Cerrar modal
-        this.cerrarModal();
+
+        try {
+            await this.esperarEncodesPendientes();
+
+            console.log(`🎬 Entregando ${this.fotosCapturadas.length} foto(s) al upload`);
+
+            if (this.onFotosCapturadas && this.fotosCapturadas.length > 0) {
+                const blobs = this.fotosCapturadas.map(f => f.blob);
+                this.onFotosCapturadas(blobs);
+            }
+
+            this.fotosCapturadas = [];
+            this.actualizarContador();
+            this.cerrarModal();
+        } finally {
+            if (this.btnFinalizar) {
+                this.btnFinalizar.disabled = false;
+            }
+        }
     }
     
     /**
@@ -1856,6 +2138,7 @@ class CamaraIntegrada {
         this.detenerStream();
         
         // Limpiar fotos capturadas si el usuario cancela
+        // (encodes en curso ya fueron marcados con aceptaResultadosEncode=false)
         if (this.fotosCapturadas.length > 0) {
             console.log(`🗑️ Descartando ${this.fotosCapturadas.length} foto(s) no confirmada(s)`);
             this.fotosCapturadas = [];
