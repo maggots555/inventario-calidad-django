@@ -1,0 +1,27 @@
+{% comment %}
+  Atributos data-* compartidos por fila de tabla y tarjeta móvil.
+  El TypeScript lista_empleados.ts los lee para pintar el Offcanvas.
+{% endcomment %}
+data-empleado-id="{{ empleado.id }}"
+data-nombre="{{ empleado.nombre_completo }}"
+data-cargo="{{ empleado.cargo }}"
+data-area="{{ empleado.area }}"
+data-rol="{{ empleado.get_rol_display }}"
+data-email="{{ empleado.email|default:'' }}"
+data-sucursal="{% if empleado.sucursal %}{{ empleado.sucursal.nombre }}{% else %}Sin asignar{% endif %}"
+data-jefe="{% if empleado.jefe_directo %}{{ empleado.jefe_directo.nombre_completo }}{% else %}Sin asignar{% endif %}"
+data-activo="{% if empleado.activo %}true{% else %}false{% endif %}"
+data-estado-acceso="{{ empleado.get_estado_acceso_codigo }}"
+data-last-login="{% if empleado.user and empleado.user.last_login %}{{ empleado.user.last_login|date:'d/m/Y H:i' }}{% endif %}"
+data-foto-url="{% if empleado.foto_perfil %}{{ empleado.foto_perfil.url }}{% endif %}"
+data-iniciales="{{ empleado.get_iniciales }}"
+data-tiene-email="{% if empleado.email %}true{% else %}false{% endif %}"
+data-es-admin="{% if es_admin %}true{% else %}false{% endif %}"
+data-url-editar="{% url 'editar_empleado' empleado.id %}"
+data-url-dar-acceso="{% url 'dar_acceso_empleado' empleado.id %}"
+data-url-reenviar="{% url 'reenviar_credenciales' empleado.id %}"
+data-url-resetear="{% url 'resetear_contraseña_empleado' empleado.id %}"
+data-url-revocar="{% url 'revocar_acceso_empleado' empleado.id %}"
+data-url-reactivar="{% url 'reactivar_acceso_empleado' empleado.id %}"
+data-url-desactivar="{% url 'eliminar_empleado' empleado.id %}"
+data-csrf-token="{{ csrf_token }}"

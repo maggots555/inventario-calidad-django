@@ -979,65 +979,95 @@ def generar_qr_producto(request, producto_id):
 @permission_required_with_message('inventario.view_empleado', message='No tienes permisos para ver la lista de empleados.')
 def lista_empleados(request):
     """
-    Lista de empleados con filtros
+    Lista administrativa de empleados con filtros y resumen de acceso.
+
+    Objetivo de negocio:
+        Pantalla RH/TI para ver empleados y gestionar acceso al sistema
+        (dar, reenviar, resetear, revocar). Distinta del Directorio gerencial de ST.
+
+    Argumentos:
+        request: HttpRequest con GET opcionales:
+            - busqueda (str): nombre, cargo o área
+            - area (str): filtro por área
+            - activo (str): 'true' | 'false' | ''
+            - acceso_sistema (str): activo | pendiente | revocado | sin_acceso
+
+    Efectos secundarios:
+        Solo lectura de BD (select_related para evitar N+1). No crea usuarios ni envía emails.
     """
-    empleados = Empleado.objects.all()
-    
-    # Filtros de búsqueda
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # select_related trae en UNA consulta las FKs (user, sucursal, jefe).
+    # Sin eso, cada fila de la tabla haría consultas extra (problema N+1).
+    empleados = Empleado.objects.select_related('user', 'sucursal', 'jefe_directo').all()
+
     busqueda = request.GET.get('busqueda', '')
     area = request.GET.get('area', '')
     activo = request.GET.get('activo', '')
     acceso_sistema = request.GET.get('acceso_sistema', '')
-    
+
     if busqueda:
         empleados = empleados.filter(
             Q(nombre_completo__icontains=busqueda) |
             Q(cargo__icontains=busqueda) |
             Q(area__icontains=busqueda)
         )
-    
+
     if area:
         empleados = empleados.filter(area__icontains=area)
-    
+
     if activo == 'true':
         empleados = empleados.filter(activo=True)
     elif activo == 'false':
         empleados = empleados.filter(activo=False)
-    
-    # Filtro de acceso al sistema
+
+    # Filtro de acceso al sistema (estados mutuamente excluyentes)
     if acceso_sistema == 'activo':
-        # Empleados con usuario activo y contraseña configurada
         empleados = empleados.filter(
-            user__isnull=False, 
+            user__isnull=False,
             user__is_active=True,
             contraseña_configurada=True
         )
     elif acceso_sistema == 'pendiente':
-        # Empleados con usuario activo pero sin configurar contraseña
         empleados = empleados.filter(
             user__isnull=False,
             user__is_active=True,
             contraseña_configurada=False
         )
     elif acceso_sistema == 'revocado':
-        # Empleados con usuario pero desactivado (acceso revocado)
         empleados = empleados.filter(
             user__isnull=False,
             user__is_active=False
         )
     elif acceso_sistema == 'sin_acceso':
-        # Empleados sin usuario de sistema
         empleados = empleados.filter(user__isnull=True)
-    
-    # Ordenar por área y luego por nombre
+
     empleados = empleados.order_by('area', 'nombre_completo')
-    
-    # Obtener áreas únicas para filtro
-    areas_disponibles = Empleado.objects.values_list('area', flat=True).distinct().order_by('area')
-    
-    # Verificar si el usuario tiene permisos de administrador
+
+    # Contadores sobre el resultado ya filtrado (chips del encabezado)
+    contadores = {
+        'total': empleados.count(),
+        'acceso_activo': empleados.filter(
+            user__isnull=False,
+            user__is_active=True,
+            contraseña_configurada=True,
+        ).count(),
+        'pendiente': empleados.filter(
+            user__isnull=False,
+            user__is_active=True,
+            contraseña_configurada=False,
+        ).count(),
+        'revocado': empleados.filter(
+            user__isnull=False,
+            user__is_active=False,
+        ).count(),
+        'sin_acceso': empleados.filter(user__isnull=True).count(),
+    }
+
+    areas_disponibles = (
+        Empleado.objects.values_list('area', flat=True).distinct().order_by('area')
+    )
     es_admin = request.user.is_staff or request.user.is_superuser
-    
+
     context = {
         'empleados': empleados,
         'busqueda': busqueda,
@@ -1045,9 +1075,10 @@ def lista_empleados(request):
         'activo_seleccionado': activo,
         'acceso_seleccionado': acceso_sistema,
         'areas_disponibles': areas_disponibles,
-        'es_admin': es_admin,  # Nuevo: Indica si el usuario puede modificar
+        'es_admin': es_admin,
+        'contadores': contadores,
     }
-    
+
     return render(request, 'inventario/lista_empleados.html', context)
 
 @login_required

@@ -657,12 +657,31 @@ class Empleado(models.Model):
         """
         if not self.user:
             return "Sin acceso"
+        elif not self.user.is_active:
+            return "Acceso revocado"
         elif not self.contraseña_configurada:
             return "Pendiente de activación"
         else:
             return "Acceso activo"
-    
+
     estado_acceso_display.short_description = 'Estado de Acceso'
+
+    def get_estado_acceso_codigo(self):
+        """
+        Código estable del estado de acceso para filtros UI / data-attributes.
+
+        Retorna uno de: 'sin_acceso' | 'revocado' | 'pendiente' | 'activo'
+        """
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El panel lateral y los chips usan estos códigos (no el texto legible)
+        # para decidir qué botones mostrar.
+        if not self.user:
+            return 'sin_acceso'
+        if not self.user.is_active:
+            return 'revocado'
+        if not self.contraseña_configurada:
+            return 'pendiente'
+        return 'activo'
     
     def obtener_estadisticas_ordenes_activas(self):
         """

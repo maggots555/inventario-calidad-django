@@ -1,0 +1,710 @@
+/* =============================================================================
+   LISTA DE EMPLEADOS — administración RH / TI (híbrido + panel lateral)
+   Estética industrial-utilitaria SIGMA. Usa variables de base.css.
+   ============================================================================= */
+
+.lista-empleados-page {
+    --le-surface: var(--card-bg, #ffffff);
+    --le-border: var(--border-color, #e2e8f0);
+    --le-muted: var(--gray-500, #64748b);
+    --le-text: var(--text-primary, #0f172a);
+    --le-accent: var(--primary-color, #1f6391);
+    --le-accent-soft: color-mix(in srgb, var(--le-accent) 12%, transparent);
+    --le-radius: 10px;
+    --le-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    padding-bottom: 2.5rem;
+}
+
+[data-bs-theme="dark"] .lista-empleados-page {
+    --le-surface: var(--card-bg, #1e293b);
+    --le-border: var(--border-color, #334155);
+    --le-muted: #94a3b8;
+    --le-text: var(--text-primary, #e2e8f0);
+    --le-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Encabezado ─────────────────────────────────────────────────────────── */
+
+.le-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.le-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--le-text);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.le-header .le-subtitle {
+    margin: 0;
+    color: var(--le-muted);
+    font-size: 0.9rem;
+}
+
+.le-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.le-badge-readonly {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    background: var(--le-accent-soft);
+    color: var(--le-accent);
+    border: 1px solid color-mix(in srgb, var(--le-accent) 25%, transparent);
+}
+
+/* ── Chips de resumen ───────────────────────────────────────────────────── */
+
+.le-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.le-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid var(--le-border);
+    background: var(--le-surface);
+    color: var(--le-text);
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.le-chip:hover {
+    border-color: var(--le-accent);
+    color: var(--le-text);
+}
+
+.le-chip .le-chip-count {
+    font-variant-numeric: tabular-nums;
+    min-width: 1.25rem;
+    text-align: center;
+}
+
+.le-chip--activo {
+    border-color: color-mix(in srgb, #16a34a 40%, var(--le-border));
+}
+
+.le-chip--pendiente {
+    border-color: color-mix(in srgb, #d97706 40%, var(--le-border));
+}
+
+.le-chip--revocado {
+    border-color: color-mix(in srgb, #dc2626 40%, var(--le-border));
+}
+
+.le-chip--sin_acceso {
+    border-color: color-mix(in srgb, #64748b 40%, var(--le-border));
+}
+
+.le-chip.is-active {
+    background: var(--le-accent-soft);
+    border-color: var(--le-accent);
+    color: var(--le-accent);
+}
+
+/* ── Filtros ────────────────────────────────────────────────────────────── */
+
+.le-filtros {
+    background: var(--le-surface);
+    border: 1px solid var(--le-border);
+    border-radius: var(--le-radius);
+    box-shadow: var(--le-shadow);
+    padding: 1rem 1.15rem;
+    margin-bottom: 1.25rem;
+}
+
+.le-filtros .form-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--le-muted);
+    margin-bottom: 0.3rem;
+}
+
+.le-filtros .form-control,
+.le-filtros .form-select {
+    border-color: var(--le-border);
+    background: var(--body-bg, #f8fafc);
+    color: var(--le-text);
+}
+
+[data-bs-theme="dark"] .le-filtros .form-control,
+[data-bs-theme="dark"] .le-filtros .form-select {
+    background: #0f172a;
+}
+
+.le-filtros-actions {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.le-filtros-actions .btn {
+    flex: 1;
+}
+
+/* ── Contador de resultados ─────────────────────────────────────────────── */
+
+.le-counter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    color: var(--le-muted);
+    font-size: 0.9rem;
+}
+
+.le-counter strong {
+    color: var(--le-text);
+}
+
+/* ── Tabla escritorio ───────────────────────────────────────────────────── */
+
+.le-table-wrap {
+    background: var(--le-surface);
+    border: 1px solid var(--le-border);
+    border-radius: var(--le-radius);
+    box-shadow: var(--le-shadow);
+    overflow: hidden;
+}
+
+.le-table {
+    margin-bottom: 0;
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--le-text);
+}
+
+.le-table thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--le-muted);
+    background: color-mix(in srgb, var(--le-accent) 8%, var(--le-surface));
+    border-bottom: 1px solid var(--le-border);
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+}
+
+.le-table tbody td {
+    vertical-align: middle;
+    padding: 0.85rem 1rem;
+    border-color: var(--le-border);
+}
+
+.le-table tbody tr.empleado-row {
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.le-table tbody tr.empleado-row:hover {
+    background: var(--le-accent-soft);
+}
+
+.le-table tbody tr.empleado-row.is-inactive {
+    opacity: 0.62;
+}
+
+.le-persona {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.le-persona-info {
+    min-width: 0;
+}
+
+.le-persona-nombre {
+    font-weight: 600;
+    color: var(--le-text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.le-persona-meta {
+    font-size: 0.8rem;
+    color: var(--le-muted);
+    margin: 0;
+}
+
+/* Rol en el sistema (tabla y panel) */
+.le-rol {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--le-accent);
+    white-space: nowrap;
+}
+
+.le-panel-rol {
+    margin: 0.35rem 0 0 !important;
+    font-size: 0.8rem !important;
+    font-weight: 600;
+    color: var(--le-accent) !important;
+}
+
+/* ── Avatar ─────────────────────────────────────────────────────────────── */
+
+.le-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--le-accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+    border: 2px solid color-mix(in srgb, var(--le-accent) 30%, transparent);
+}
+
+.le-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.le-avatar--lg {
+    width: 72px;
+    height: 72px;
+    font-size: 1.35rem;
+}
+
+/* ── Chips de estado ────────────────────────────────────────────────────── */
+
+.le-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.le-status--activo {
+    background: color-mix(in srgb, #16a34a 16%, transparent);
+    color: #15803d;
+}
+
+.le-status--pendiente {
+    background: color-mix(in srgb, #d97706 16%, transparent);
+    color: #b45309;
+}
+
+.le-status--revocado {
+    background: color-mix(in srgb, #dc2626 16%, transparent);
+    color: #b91c1c;
+}
+
+.le-status--sin_acceso {
+    background: color-mix(in srgb, #64748b 16%, transparent);
+    color: #475569;
+}
+
+.le-status--inactivo-emp {
+    background: color-mix(in srgb, #64748b 14%, transparent);
+    color: var(--le-muted);
+}
+
+[data-bs-theme="dark"] .le-status--activo {
+    color: #4ade80;
+}
+
+[data-bs-theme="dark"] .le-status--pendiente {
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .le-status--revocado {
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .le-status--sin_acceso,
+[data-bs-theme="dark"] .le-status--inactivo-emp {
+    color: #94a3b8;
+}
+
+/* ── Tarjetas móvil ─────────────────────────────────────────────────────── */
+
+.le-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+@media (min-width: 576px) {
+    .le-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.empleado-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--le-surface);
+    border: 1px solid var(--le-border);
+    border-radius: var(--le-radius);
+    box-shadow: var(--le-shadow);
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    width: 100%;
+    min-height: 44px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.empleado-card:hover,
+.empleado-card:focus-visible {
+    border-color: var(--le-accent);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.empleado-card.is-inactive {
+    opacity: 0.65;
+}
+
+.empleado-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.empleado-card-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.empleado-card-nombre {
+    font-weight: 650;
+    font-size: 0.95rem;
+    margin: 0;
+    color: var(--le-text);
+}
+
+.empleado-card-cargo {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: var(--le-muted);
+}
+
+.empleado-card-rol {
+    margin: 0.35rem 0 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--le-accent);
+}
+
+.empleado-card-rol i {
+    margin-right: 0.2rem;
+}
+
+.empleado-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.empleado-card-area {
+    font-size: 0.75rem;
+    color: var(--le-muted);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+.le-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: var(--le-surface);
+    border: 1px dashed var(--le-border);
+    border-radius: var(--le-radius);
+}
+
+.le-empty i {
+    font-size: 3rem;
+    color: var(--le-muted);
+}
+
+.le-empty h4 {
+    margin-top: 1rem;
+    color: var(--le-text);
+}
+
+.le-empty p {
+    color: var(--le-muted);
+}
+
+/* ── Offcanvas / panel lateral ──────────────────────────────────────────── */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El panel se renderiza FUERA de .lista-empleados-page (Bootstrap lo mueve
+ * al body al abrirse). Por eso NO podemos usar --le-surface (solo existe
+ * dentro de esa clase). Usamos --card-bg del tema SIGMA + color sólido
+ * de respaldo para que no se vea translúcido en PC / dark mode.
+ */
+.le-offcanvas {
+    --bs-offcanvas-width: min(420px, 100vw);
+    --bs-offcanvas-bg: var(--card-bg, #ffffff);
+    --bs-offcanvas-color: var(--text-primary, #0f172a);
+    background-color: var(--card-bg, #ffffff) !important;
+    color: var(--text-primary, #0f172a);
+    border-left: 1px solid var(--border-color, #e2e8f0);
+    opacity: 1;
+}
+
+[data-bs-theme="dark"] .le-offcanvas {
+    --bs-offcanvas-bg: #1e293b;
+    --bs-offcanvas-color: #e2e8f0;
+    background-color: #1e293b !important;
+    color: #e2e8f0;
+    border-left-color: #334155;
+}
+
+.le-offcanvas .offcanvas-header {
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    padding: 1rem 1.25rem;
+    background-color: inherit;
+}
+
+[data-bs-theme="dark"] .le-offcanvas .offcanvas-header {
+    border-bottom-color: #334155;
+}
+
+.le-offcanvas .offcanvas-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: inherit;
+}
+
+.le-offcanvas .offcanvas-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    background-color: inherit;
+}
+
+/* Textos del panel: usar colores del tema, no --le-* (panel fuera del page) */
+.le-offcanvas .le-panel-hero-text h2 {
+    color: var(--text-primary, #0f172a);
+}
+
+.le-offcanvas .le-panel-hero-text p,
+.le-offcanvas .le-panel-section-title,
+.le-offcanvas .le-panel-dl dt {
+    color: var(--gray-500, #64748b);
+}
+
+[data-bs-theme="dark"] .le-offcanvas .le-panel-hero-text h2 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .le-offcanvas .le-panel-hero-text p,
+[data-bs-theme="dark"] .le-offcanvas .le-panel-section-title,
+[data-bs-theme="dark"] .le-offcanvas .le-panel-dl dt {
+    color: #94a3b8;
+}
+
+.le-offcanvas .le-panel-dl dd {
+    color: var(--text-primary, #0f172a);
+}
+
+[data-bs-theme="dark"] .le-offcanvas .le-panel-dl dd {
+    color: #e2e8f0;
+}
+
+.le-offcanvas .le-acceso-box {
+    background: color-mix(in srgb, var(--primary-color, #1f6391) 8%, var(--card-bg, #ffffff));
+    border-color: var(--border-color, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .le-offcanvas .le-acceso-box {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.le-panel-hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: le-panel-in 0.28s ease both;
+}
+
+.le-panel-hero-text h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+    color: var(--le-text);
+}
+
+.le-panel-hero-text p {
+    margin: 0;
+    color: var(--le-muted);
+    font-size: 0.875rem;
+}
+
+@keyframes le-panel-in {
+    from {
+        opacity: 0;
+        transform: translateX(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.le-panel-section {
+    animation: le-panel-in 0.32s ease both;
+    animation-delay: 0.05s;
+}
+
+.le-panel-section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: var(--le-muted);
+    margin-bottom: 0.6rem;
+}
+
+.le-panel-dl {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+}
+
+.le-panel-dl div {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.le-panel-dl dt {
+    color: var(--le-muted);
+    font-weight: 500;
+    margin: 0;
+}
+
+.le-panel-dl dd {
+    margin: 0;
+    color: var(--le-text);
+    word-break: break-word;
+}
+
+.le-acceso-box {
+    border: 1px solid var(--le-border);
+    border-radius: var(--le-radius);
+    padding: 0.9rem 1rem;
+    background: color-mix(in srgb, var(--le-accent) 5%, var(--le-surface));
+}
+
+.le-acceso-box p {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: var(--le-muted);
+    line-height: 1.45;
+}
+
+.le-panel-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+    animation: le-panel-in 0.35s ease both;
+    animation-delay: 0.08s;
+}
+
+.le-panel-actions .btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-weight: 600;
+}
+
+.le-panel-actions .btn-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.le-panel-actions .btn-row .btn {
+    flex: 1;
+}
+
+.le-confirm-box {
+    border: 1px solid color-mix(in srgb, #dc2626 35%, var(--le-border));
+    background: color-mix(in srgb, #dc2626 8%, var(--le-surface));
+    border-radius: var(--le-radius);
+    padding: 0.9rem 1rem;
+}
+
+.le-confirm-box p {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--le-text);
+}
+
+.le-confirm-box .btn-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.le-confirm-box .btn-row .btn {
+    flex: 1;
+    min-height: 44px;
+}
+
+.le-panel-readonly-note {
+    font-size: 0.85rem;
+    color: var(--le-muted);
+    padding: 0.75rem;
+    border-radius: var(--le-radius);
+    background: var(--le-accent-soft);
+    text-align: center;
+}
+
+/* Botón gestionar en tabla */
+.btn-gestionar {
+    min-width: 44px;
+    min-height: 36px;
+}
