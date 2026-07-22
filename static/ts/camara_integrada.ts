@@ -111,7 +111,7 @@ class CamaraIntegrada {
     // Si el navegador no lo soporta, caemos al toBlob() de siempre.
     //
     // Además medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5 s,
-    // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución 4K.
+    // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución Full HD.
     private dispositivoLento: boolean = false;   // true cuando se detecta hardware lento
     private primeraCaptura: boolean = true;      // false tras la primera medición
 
@@ -844,19 +844,23 @@ class CamaraIntegrada {
     
     /**
      * Construye las constraints para getUserMedia según el dispositivo seleccionado.
-     * Se pide la máxima resolución posible: min 1280 garantiza que el navegador
-     * no entregue menos (error explícito), ideal 4096 apunta a cámaras 4K/12MP+.
-     * Si el hardware no llega a 4096, el navegador entrega lo máximo que puede.
      *
-     * NOTA: La resolución siempre se pide al máximo posible. En dispositivos lentos
-     * solo se ajusta la calidad JPEG del compresor (ver capturarFoto), no los píxeles
-     * capturados. Así al hacer zoom en detalles finos (texto, rayones, piezas) se
-     * conserva toda la información del sensor aunque el archivo pese menos.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Pedimos Full HD (1920×1080) como ideal. Antes pedíamos ~4K (4096×2160) y las
+     * fotos salían nítidas, pero el preview en vivo se sentía con lag en celulares
+     * de gama media: el stream del <video> usa esa misma resolución todo el tiempo.
+     *
+     * Full HD es un buen balance para documentación técnica (rayones, etiquetas)
+     * y mantiene el preview fluido. No usamos "min" estricto: si el hardware no
+     * llega a 1080p, el navegador entrega lo máximo que pueda sin fallar.
+     *
+     * En dispositivos lentos solo bajamos la calidad JPEG (0.95 → 0.75), no los
+     * píxeles del stream (ver capturarFoto / modo optimizado).
      */
     private construirConstraintsCamara(): MediaTrackConstraints {
         const constraints: MediaTrackConstraints = {
-            width:  { min: 1280, ideal: 4096 },
-            height: { min: 720,  ideal: 2160 }
+            width:  { ideal: 1920 },
+            height: { ideal: 1080 }
         };
         
         // Si hay un dispositivo específico seleccionado, usarlo
@@ -1534,7 +1538,7 @@ class CamaraIntegrada {
             this.dispositivoLento = true;
             console.warn(
                 `⚡ Dispositivo lento detectado: encode JPEG tardó ${tiempoBlobMs}ms. ` +
-                `Activando modo optimizado (calidad JPEG 0.75, resolución 4K sin cambios).`
+                `Activando modo optimizado (calidad JPEG 0.75, resolución Full HD sin cambios).`
             );
             this.mostrarToastModoOptimizado(tiempoBlobMs);
         } else if (!this.dispositivoLento) {
@@ -2182,8 +2186,8 @@ class CamaraIntegrada {
                     </p>
                     <p class="mb-0 small text-muted">
                         <i class="bi bi-check-circle text-success"></i>
-                        Compresión ajustada automáticamente. La resolución 4K se mantiene — 
-                        las fotos siguen siendo aptas para hacer zoom en detalles finos.
+                        Compresión ajustada automáticamente. La resolución Full HD se mantiene —
+                        las fotos siguen siendo aptas para documentar detalles finos.
                     </p>
                 </div>
             </div>
