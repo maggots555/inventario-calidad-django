@@ -350,10 +350,17 @@
     font-size: 1rem;
 }
 
-.lo-carga-star-badge {
-    font-size: 0.45rem;
-    padding: 0.1rem 0.22rem;
-    line-height: 1;
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * En servicio_tecnico.css existe `.table .badge { font-size: 0.75rem; ... }`
+ * (especificidad 0,2,0). Nuestras clases solas (0,1,0) perdían esa pelea.
+ * Por eso usamos `.lo-carga-offcanvas .table .badge.lo-carga-...` + !important.
+ */
+.lo-carga-offcanvas .table .badge.lo-carga-star-badge,
+.lo-carga-offcanvas .badge.lo-carga-star-badge {
+    font-size: 0.45rem !important;
+    padding: 0.1rem 0.22rem !important;
+    line-height: 1 !important;
 }
 
 .lo-carga-nombre-wrap {
@@ -368,10 +375,11 @@
     white-space: nowrap;
 }
 
-.lo-carga-badge-siguiente {
-    font-size: 0.5rem;
-    padding: 0.12rem 0.28rem;
-    line-height: 1.2;
+.lo-carga-offcanvas .table .badge.lo-carga-badge-siguiente,
+.lo-carga-offcanvas .badge.lo-carga-badge-siguiente {
+    font-size: 0.5rem !important;
+    padding: 0.12rem 0.28rem !important;
+    line-height: 1.2 !important;
     font-weight: 600;
 }
 
@@ -579,16 +587,18 @@
         font-size: 0.75rem;
     }
 
-    .lo-carga-badge-siguiente {
-        font-size: 0.45rem;
-        padding: 0.08rem 0.22rem;
-        line-height: 1.15;
+    .lo-carga-offcanvas .table .badge.lo-carga-badge-siguiente,
+    .lo-carga-offcanvas .badge.lo-carga-badge-siguiente {
+        font-size: 0.45rem !important;
+        padding: 0.08rem 0.22rem !important;
+        line-height: 1.15 !important;
     }
 
-    .lo-carga-star-badge {
-        font-size: 0.4rem;
-        padding: 0.08rem 0.18rem;
-        line-height: 1;
+    .lo-carga-offcanvas .table .badge.lo-carga-star-badge,
+    .lo-carga-offcanvas .badge.lo-carga-star-badge {
+        font-size: 0.4rem !important;
+        padding: 0.08rem 0.18rem !important;
+        line-height: 1 !important;
     }
 
     .lo-carga-num {
