@@ -1988,6 +1988,9 @@ def enviar_notificacion_equipo_disponible_task(
             if sucursal.estado_provincia:
                 partes_ciudad.append(sucursal.estado_provincia)
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # es_fuera_garantia controla si la plantilla muestra la "NOTA IMPORTANTE"
+        # de cargo de almacenaje / destrucción (cláusula 6). Solo aplica a OOW/FL.
         context_email = {
             'nombre_cliente': nombre_cliente,
             'folio': folio,
@@ -2001,6 +2004,7 @@ def enviar_notificacion_equipo_disponible_task(
             'sucursal_ciudad_estado': ', '.join(partes_ciudad),
             'sucursal_telefono': (sucursal.telefono or '').strip() if sucursal else '',
             'sucursal_horario_extra': '',
+            'es_fuera_garantia': bool(orden.es_fuera_garantia),
         }
 
         html_content = render_to_string(

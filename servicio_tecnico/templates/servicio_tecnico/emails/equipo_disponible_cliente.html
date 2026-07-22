@@ -121,12 +121,15 @@
       {% endif %}
     </div>
 
+    {# Solo fuera de garantía (OOW/FL): cláusula 6 de almacenaje / destrucción #}
+    {% if es_fuera_garantia %}
     <div class="nota-importante">
       <strong>NOTA IMPORTANTE</strong>
       ES SUMAMENTE IMPORTANTE LO RETIREN A LA BREVEDAD YA QUE SE GENERA CARGO
       DE ALMACENAJE O DESTRUCCIÓN DEL EQUIPO (CLÁUSULA 6 DEL FORMATO QUE FIRMA
       AL INGRESO DEL EQUIPO).
     </div>
+    {% endif %}
 
     <p>
       Agradecemos su preferencia y nos ponemos a sus órdenes para esta y futuras

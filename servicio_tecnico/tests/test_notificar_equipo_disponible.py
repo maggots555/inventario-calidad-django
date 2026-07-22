@@ -6,6 +6,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 1) Helper anti-dup: egreso vs cambio a finalizado (viceversa).
 2) Vista POST: solo en estado finalizado; segundo clic = ya notificado.
 3) URL / reexport de humo.
+4) Correo al cliente: CC (quien envió + jefes) y nota de almacenaje solo en OOW.
 """
 
 from unittest.mock import MagicMock, patch
@@ -454,3 +455,109 @@ class EquipoDisponibleEmailCcTest(TestCase):
         self.assertIn('quien.envia@test.local', historial.comentario)
         self.assertIn('jefe1@test.local', historial.comentario)
         self.assertIn('jefe2@test.local', historial.comentario)
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+)
+class EquipoDisponibleEmailNotaAlmacenajeTest(TestCase):
+    """
+    La cláusula 6 (almacenaje/destrucción) solo va en correos fuera de garantía.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Folio OOW-/FL- → DetalleEquipo.save() marca es_fuera_garantia=True → nota SÍ.
+    - Folio de garantía (ej. SIC-…) → es_fuera_garantia=False → nota NO.
+    """
+
+    databases = {'default', 'mexico'}
+
+    # Fragmentos que aparecen en una sola línea del HTML (el texto se parte
+    # con saltos de línea en la plantilla, por eso no buscamos la frase completa).
+    FRAGMENTO_NOTA = 'ALMACENAJE O DESTRUCCIÓN'
+    FRAGMENTO_CLAUSULA = 'CLÁUSULA 6'
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Nota Almacenaje',
+            ciudad='GDL',
+            direccion='Calle Nota 1',
+            horario_atencion='Lun-Vie 9-17',
+        )
+        self.user = User.objects.create_user(
+            username='envio_nota',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Quien Envia Nota',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='quien.nota@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+            rol='recepcionista',
+        )
+
+    def _crear_orden_finalizada(self, orden_cliente: str) -> OrdenServicio:
+        """
+        Crea orden + detalle listos para el correo de equipo disponible.
+
+        Args:
+            orden_cliente: Folio del cliente (OOW-/FL- = fuera de garantía).
+
+        Returns:
+            OrdenServicio con es_fuera_garantia ya sincronizado por DetalleEquipo.save().
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='finalizado',
+            tecnico_asignado_actual=self.empleado,
+            responsable_seguimiento=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=orden_cliente,
+            tipo_equipo='Laptop',
+            marca='HP',
+            modelo='EliteBook',
+            numero_serie=f'ST-{orden_cliente}',
+            email_cliente='cliente.nota@test.local',
+            nombre_cliente='Cliente Nota',
+            falla_principal='Falla',
+            gama='media',
+        )
+        orden.refresh_from_db(fields=['es_fuera_garantia'])
+        return orden
+
+    def test_oow_incluye_nota_almacenaje(self):
+        """Fuera de garantía: el HTML del correo debe traer la cláusula 6."""
+        orden = self._crear_orden_finalizada('OOW-NOTA-01')
+        self.assertTrue(orden.es_fuera_garantia)
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.FRAGMENTO_NOTA, mail.outbox[0].body)
+        self.assertIn(self.FRAGMENTO_CLAUSULA, mail.outbox[0].body)
+
+    def test_garantia_omite_nota_almacenaje(self):
+        """Dentro de garantía: el correo NO debe mencionar almacenaje/destrucción."""
+        orden = self._crear_orden_finalizada('SIC-NOTA-99')
+        self.assertFalse(orden.es_fuera_garantia)
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertEqual(len(mail.outbox), 1)
+        cuerpo = mail.outbox[0].body
+        self.assertNotIn(self.FRAGMENTO_NOTA, cuerpo)
+        self.assertNotIn(self.FRAGMENTO_CLAUSULA, cuerpo)
+        # El resto del aviso al cliente sí debe enviarse.
+        self.assertIn('listo para que pase a recolectar', cuerpo)
