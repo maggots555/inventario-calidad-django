@@ -2580,6 +2580,19 @@ thead.sticky-top {
     transform: scale(1.15);
 }
 
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   Los botones de envío al cliente usan w-100 (ancho completo).
+   En teléfono está bien; en desktop se ven demasiado largos.
+   Este contenedor solo en md+ limita el ancho (~448px) y los centra.
+   En móvil la media query no aplica → siguen a todo el ancho. */
+@media (min-width: 768px) {
+    .galeria-acciones-cliente {
+        max-width: 28rem;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
 /* Contenedor de preview de imágenes */
 .preview-container {
     background: #f8f9fa;
