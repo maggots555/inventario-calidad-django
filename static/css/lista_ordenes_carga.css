@@ -454,24 +454,147 @@
 
 /* Hint de scroll horizontal solo dentro del panel (móvil) */
 @media (max-width: 768px) {
-    .lo-carga-offcanvas .sucursal-header h5,
-    .lo-carga-sucursal-titulo {
-        font-size: 1rem;
+    /*
+     * Densidad móvil: la captura en teléfono se veía “grande” (avatares,
+     * paddings de headers DELL/LENOVO/OOW y badges). Aquí reducimos escala
+     * solo dentro del Offcanvas / franja, sin tocar desktop.
+     */
+
+    /* Header del panel */
+    .lo-carga-offcanvas__header {
+        padding: 0.65rem 0.75rem;
+        gap: 0.45rem;
     }
 
-    .lo-carga-area-titulo {
-        font-size: 0.85rem;
+    .lo-carga-offcanvas .offcanvas-title {
+        font-size: 0.9rem;
     }
 
-    .lo-carga-table {
+    .lo-carga-offcanvas__sub {
+        font-size: 0.65rem;
+        line-height: 1.3;
+    }
+
+    .lo-carga-offcanvas .btn-close {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 0.45rem;
+    }
+
+    .lo-carga-filtro .form-select {
+        min-width: 118px;
+        min-height: 34px;
         font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Sucursal (SATÉLITE, etc.) — override del padding de servicio_tecnico.css */
+    .lo-carga-offcanvas .sucursal-header {
+        padding: 0.55rem 0.75rem !important;
+    }
+
+    .lo-carga-offcanvas .sucursal-header h5,
+    .lo-carga-offcanvas .lo-carga-sucursal-titulo {
+        font-size: 0.85rem !important;
+        gap: 0.45rem !important;
+    }
+
+    .lo-carga-sucursal-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .lo-carga-badge-areas {
+        font-size: 0.65rem !important;
+        padding: 0.2rem 0.45rem !important;
+    }
+
+    .lo-carga-sucursal-chevron {
+        font-size: 0.95rem;
+    }
+
+    .lo-carga-sucursal-toggle {
+        min-height: 40px;
+    }
+
+    /* Áreas DELL / LENOVO / OOW */
+    .lo-carga-offcanvas .area-header-dell,
+    .lo-carga-offcanvas .area-header-lenovo,
+    .lo-carga-offcanvas .area-header-oow,
+    .lo-carga-offcanvas .area-header-default {
+        padding: 0.35rem 0.65rem 0.35rem 0.85rem !important;
+    }
+
+    .lo-carga-offcanvas .lo-carga-area-titulo,
+    .lo-carga-offcanvas .area-header-dell h6,
+    .lo-carga-offcanvas .area-header-lenovo h6,
+    .lo-carga-offcanvas .area-header-oow h6,
+    .lo-carga-offcanvas .area-header-default h6 {
+        font-size: 0.72rem !important;
+    }
+
+    .lo-carga-area-titulo .badge {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.35rem;
+    }
+
+    /* Tabla más compacta */
+    .lo-carga-table {
+        font-size: 0.72rem;
+        min-width: 560px;
+    }
+
+    .lo-carga-thead {
+        font-size: 0.65rem;
+    }
+
+    .lo-carga-th-tecnico {
+        min-width: 120px;
+    }
+
+    .lo-carga-th,
+    .lo-carga-th-ultima {
+        min-width: 52px;
+        padding: 0.3rem 0.25rem !important;
+    }
+
+    .lo-carga-table td {
+        padding: 0.35rem 0.3rem !important;
+        vertical-align: middle;
     }
 
     .lo-carga-avatar,
     .lo-carga-avatar--iniciales {
-        width: 38px;
-        height: 38px;
-        font-size: 0.8rem;
+        width: 30px;
+        height: 30px;
+        font-size: 0.65rem;
+        border-width: 1px;
+    }
+
+    .lo-carga-nombre {
+        font-size: 0.75rem;
+    }
+
+    .lo-carga-badge-siguiente {
+        font-size: 0.55rem;
+        padding: 0.12rem 0.3rem;
+    }
+
+    .lo-carga-star-badge {
+        font-size: 0.5rem;
+        padding: 0.1rem 0.25rem;
+    }
+
+    .lo-carga-num {
+        font-size: 0.7rem;
+        font-weight: 600;
+        min-width: 28px;
+        padding: 0.2rem 0.4rem !important;
+    }
+
+    .lo-carga-ultima {
+        font-size: 0.62rem;
+        padding: 0.2rem 0.35rem;
     }
 
     .lo-carga-table-wrap {
@@ -482,10 +605,10 @@
         content: "← Desliza para ver más →";
         display: block;
         text-align: center;
-        padding: 0.5rem;
+        padding: 0.25rem;
         background: var(--gray-50, #f8f9fa);
         color: var(--gray-500, #6c757d);
-        font-size: 0.75rem;
+        font-size: 0.65rem;
         border-top: 1px solid var(--border-color, #dee2e6);
     }
 
@@ -495,12 +618,41 @@
         border-top-color: #334155;
     }
 
+    /* Franja de la página + leyenda del panel */
     .lo-carga-strip {
-        padding: 0.75rem 0.9rem;
+        padding: 0.55rem 0.7rem;
+        gap: 0.55rem;
+    }
+
+    .lo-carga-strip__title strong {
+        font-size: 0.85rem;
+    }
+
+    .lo-carga-strip__hint {
+        font-size: 0.65rem;
+    }
+
+    .lo-carga-chip {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.45rem;
     }
 
     .lo-carga-strip__btn {
         width: 100%;
+        min-height: 40px;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.75rem;
+    }
+
+    .lo-carga-leyenda__toggle {
+        min-height: 40px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .lo-carga-leyenda__body {
+        padding: 0 0.75rem 0.75rem;
+        font-size: 0.7rem;
     }
 }
 
