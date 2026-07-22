@@ -127,7 +127,7 @@ inventario-calidad-django/
 ├── scripts/                # testing/, poblado/, verificacion/
 ├── ml_models/
 ├── manage.py, requirements.txt, package.json
-├── tsconfig.json, tsconfig.sw.json
+├── tsconfig.json, tsconfig.sw.json, tsconfig.jpeg_worker.json
 └── AGENTS.md
 ```
 
@@ -207,6 +207,14 @@ Failover disco primario/alterno (`.env`: `PRIMARY_MEDIA_ROOT`, `ALTERNATE_MEDIA_
 - TS: `upload_video.ts`, `camara_integrada.ts`, `camara_video.ts`, `compartir_video.ts`, `video_resumen.ts`
 - Celery en `servicio_tecnico/tasks.py`: comprimir, resumen, evidencia, rewind egreso
 - Envíos HTTP: `views_envios_cliente.py`
+
+**Fotos (detalle orden) — Web Worker JPEG:**
+- UI: `camara_integrada.ts` + modal `#modalCamaraIntegrada` (`data-worker-url` → `{% static 'js/jpeg_encode_worker.js' %}`)
+- Compresión en segundo plano: `jpeg_encode_worker.ts` (`OffscreenCanvas.convertToBlob`); fallback `canvas.toBlob` si no hay Worker
+- Build: `pnpm run build` incluye `tsc --project tsconfig.jpeg_worker.json` (no editar `static/js/`)
+- Stream ideal **Full HD 1920×1080** (límite práctico gama media; ❌ no subir preview a 2K/4K — causa lag)
+- ❌ No confundir con Service Worker PWA (`service_worker.ts` / `tsconfig.sw.json`) ni Celery Workers
+- Video grabado: `camara_video.ts` (~1280×720 @ 60 fps ideal) — independiente de la cámara de fotos
 
 ### IA en diagnóstico / encuestas / home
 - Voz SIC: `voz_diagnostico.ts` (Web Speech → Whisper → Gemini)
