@@ -127,7 +127,118 @@ class FormatoOowServiceTest(TestCase):
         )
 
     def test_orden_es_candidata_oow(self):
+        """Diagnóstico con folio OOW- sigue siendo candidata."""
         self.assertTrue(orden_es_candidata_formato_oow(self.orden))
+
+    def test_candidata_diagnostico_fuera_garantia(self):
+        """
+        Diagnóstico + es_fuera_garantia=True (sin folio OOW) → sí.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            es_fuera_garantia=True,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='CLI-12345',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 3520',
+            numero_serie='TESTFG001',
+            gama='media',
+        )
+        # Tras save de DetalleEquipo, es_fuera_garantia puede quedar False
+        # si el folio no es OOW-/FL-; forzamos el flag de negocio.
+        orden.es_fuera_garantia = True
+        orden.save(update_fields=['es_fuera_garantia'])
+        self.assertTrue(orden_es_candidata_formato_oow(orden))
+
+    def test_no_candidata_venta_mostrador(self):
+        """Venta mostrador nunca debe ver el Formato OOW."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='venta_mostrador',
+            estado='espera',
+            es_fuera_garantia=True,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='OOW-88888',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 3520',
+            numero_serie='TESTVM001',
+            gama='media',
+            sicser_origen='oow',
+        )
+        self.assertFalse(orden_es_candidata_formato_oow(orden))
+
+    def test_no_candidata_garantia_dell(self):
+        """Importación SICSER de garantía → Formato Garantía, no OOW."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='SRV-12345',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 3520',
+            numero_serie='TESTGAR01',
+            gama='media',
+            sicser_origen='garantia',
+        )
+        self.assertFalse(orden_es_candidata_formato_oow(orden))
+
+    def test_no_candidata_diagnostico_sin_fuera_garantia(self):
+        """
+        Diagnóstico sin fuera de garantía y sin OOW/FL → no.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            es_fuera_garantia=False,
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='CLI-SIN-FG',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 3520',
+            numero_serie='TESTNFG01',
+            gama='media',
+        )
+        orden.refresh_from_db()
+        self.assertFalse(orden.es_fuera_garantia)
+        self.assertFalse(orden_es_candidata_formato_oow(orden))
+
+    def test_candidata_diagnostico_folio_fl(self):
+        """Diagnóstico con folio FL- (histórico) → sí."""
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='FL-12345',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude 3520',
+            numero_serie='TESTFL001',
+            gama='media',
+        )
+        self.assertTrue(orden_es_candidata_formato_oow(orden))
 
     def test_obtener_o_crear_borrador_prefill(self):
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)

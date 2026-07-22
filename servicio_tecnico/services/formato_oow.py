@@ -140,10 +140,10 @@ def orden_es_candidata_formato_oow(orden: OrdenServicio) -> bool:
     Indica si la orden puede abrir el Formato Digital OOW.
 
     Regla de negocio:
-        - NO aplica a órdenes de garantía Dell (tienen su propio formato)
-        - Órdenes de diagnóstico (fuera de garantía) o
-        - Órdenes importadas desde SICSER OOW o
-        - Órdenes cuyo orden_cliente empieza con OOW-
+        - NO aplica a venta mostrador
+        - NO aplica a garantías Dell (tienen su propio formato)
+        - Solo diagnóstico fuera de garantía:
+          es_fuera_garantia, import SICSER OOW, o folio OOW-/FL-
 
     Args:
         orden: OrdenServicio a evaluar
@@ -151,25 +151,33 @@ def orden_es_candidata_formato_oow(orden: OrdenServicio) -> bool:
     Returns:
         bool: True si el botón/wizard aplica
     """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Venta mostrador es servicio directo sin este formato de ingreso OOW.
+    if orden.tipo_servicio == 'venta_mostrador':
+        return False
+
     try:
         detalle = orden.detalle_equipo
     except Exception:
         detalle = None
 
-    # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Las garantías Dell se importan con tipo_servicio='diagnostico', pero
-    # usan el Formato Garantía (no el OOW). Por eso las excluimos aquí.
+    # Las garantías Dell se importan a veces como diagnóstico, pero usan
+    # el Formato Garantía (no el OOW).
     if detalle is not None and (detalle.sicser_origen or '').lower() == 'garantia':
         return False
 
-    if orden.tipo_servicio == 'diagnostico':
-        return True
-    if detalle is None:
+    if orden.tipo_servicio != 'diagnostico':
         return False
-    if detalle.sicser_origen == 'oow':
-        return True
-    orden_cliente = (detalle.orden_cliente or '').strip().upper()
-    return orden_cliente.startswith('OOW-')
+
+    orden_cliente = ''
+    if detalle is not None:
+        orden_cliente = (detalle.orden_cliente or '').strip().upper()
+        if (detalle.sicser_origen or '').lower() == 'oow':
+            return True
+        if orden_cliente.startswith('OOW-') or orden_cliente.startswith('FL-'):
+            return True
+
+    return bool(getattr(orden, 'es_fuera_garantia', False))
 
 
 def obtener_o_crear_borrador(
