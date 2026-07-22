@@ -5,162 +5,56 @@
 {% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<!-- Cargar estilos específicos de servicio técnico -->
+{# CSS de ST; panel de carga solo en activas (mostrar_estadisticas) #}
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+{% if mostrar_estadisticas %}
+<link rel="stylesheet" href="{% static 'css/lista_ordenes_carga.css' %}">
+{% endif %}
 <style>
-    /* Ajustes responsive para botones de acciones en header */
-    .d-flex.gap-2 {
+    /* Ajustes responsive solo para botones del header de la página */
+    .lista-ordenes-bg > .row:first-child .d-flex.gap-2 {
         flex-wrap: wrap;
     }
 
-    /* Ajustes para pantallas pequeñas */
     @media (max-width: 768px) {
-        /* Reducir tamaños de fuente y padding en botones */
-        .d-flex.gap-2 .btn {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn {
             font-size: 0.85rem;
             padding: 0.375rem 0.65rem;
         }
-
-        /* Iconos más pequeños */
-        .d-flex.gap-2 .btn i {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn i {
             font-size: 0.9rem;
         }
     }
 
     @media (max-width: 576px) {
-        /* Título y botones stack verticalmente */
-        .d-flex.justify-content-between.align-items-center {
+        .lista-ordenes-bg > .row:first-child .d-flex.justify-content-between.align-items-center {
             flex-direction: column;
             align-items: flex-start !important;
             gap: 1rem;
         }
-
-        /* Botones ocupan ancho disponible y hacen wrap */
-        .d-flex.gap-2 {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 {
             width: 100%;
             gap: 0.5rem !important;
         }
-
-        .d-flex.gap-2 .btn,
-        .d-flex.gap-2 form {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn,
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 form {
             flex: 1 1 auto;
             min-width: fit-content;
         }
-
-        .d-flex.gap-2 .btn {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn {
             font-size: 0.8rem;
             padding: 0.4rem 0.65rem;
         }
     }
 
     @media (max-width: 380px) {
-        /* Ultra compacto */
-        .d-flex.gap-2 .btn {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn {
             font-size: 0.75rem;
             padding: 0.375rem 0.5rem;
         }
-
-        .d-flex.gap-2 .btn i {
+        .lista-ordenes-bg > .row:first-child .d-flex.gap-2 .btn i {
             font-size: 0.85rem;
         }
-    }
-
-    /* Estilos mejorados para la tabla de estadísticas */
-    .table-hover tbody tr:hover {
-        background-color: rgba(103, 126, 234, 0.05);
-        transition: background-color 0.2s ease;
-    }
-    
-    .area-grupo {
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .area-grupo:last-child {
-        border-bottom: none;
-    }
-    
-    /* Mejoras responsive para móviles */
-    @media (max-width: 768px) {
-        .sucursal-header h5 {
-            font-size: 1rem !important;
-        }
-        
-        .area-header h6 {
-            font-size: 0.85rem !important;
-        }
-        
-        .table {
-            font-size: 0.8rem !important;
-        }
-        
-        .badge {
-            font-size: 0.7rem !important;
-            padding: 0.25rem 0.4rem !important;
-        }
-        
-        .tecnico-avatar-wrapper img,
-        .tecnico-avatar-wrapper div {
-            width: 38px !important;
-            height: 38px !important;
-            font-size: 0.8rem !important;
-        }
-        
-        /* Hacer el scroll horizontal más visible en móvil */
-        .table-responsive {
-            border: 1px solid #dee2e6;
-            border-radius: 0.25rem;
-        }
-        
-        /* Alerta de deslizar en móvil */
-        .table-responsive::after {
-            content: "← Desliza para ver más →";
-            display: block;
-            text-align: center;
-            padding: 0.5rem;
-            background: #f8f9fa;
-            color: #6c757d;
-            font-size: 0.75rem;
-            border-top: 1px solid #dee2e6;
-        }
-    }
-    
-    @media (min-width: 769px) {
-        .table-responsive::after {
-            display: none;
-        }
-    }
-    
-    /* Animación suave para badges */
-    .badge {
-        transition: all 0.2s ease;
-    }
-    
-    .badge:hover {
-        transform: scale(1.05);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* Estilos para las filas de "siguiente en rotación" */
-    .table-success {
-        background-color: rgba(40, 167, 69, 0.08) !important;
-        border-left: 3px solid #28a745;
-    }
-    
-    /* Dark mode: fila next-rotation — verde tenue sobre fondo oscuro.
-       Bootstrap 5 dark usa --bs-table-bg (CSS variable), no background-color,
-       por eso hay que sobreescribir la variable Y el background shorthand. */
-    [data-bs-theme="dark"] .table-success {
-        --bs-table-bg: rgba(34, 197, 94, 0.08) !important;
-        --bs-table-striped-bg: rgba(34, 197, 94, 0.10) !important;
-        --bs-table-hover-bg: rgba(34, 197, 94, 0.12) !important;
-        --bs-table-color: #d1fae5 !important;
-        background-color: rgba(34, 197, 94, 0.08) !important;
-        border-left-color: #22c55e !important;
-    }
-
-    /* Clase auxiliar sin Bootstrap — garantiza el override */
-    [data-bs-theme="dark"] .tecnico-siguiente td {
-        background-color: rgba(34, 197, 94, 0.08) !important;
     }
 </style>
 {% endblock %}
@@ -254,350 +148,15 @@
         </div>
     </div>
 
-    <!-- Cuadro informativo: Estadísticas por técnico (solo en vista activas) -->
+    {# Estadísticas de carga: franja + Offcanvas (solo activas). Reasignaciones siguen abajo. #}
     {% if mostrar_estadisticas %}
-        <!-- Banner informativo simplificado -->
-        <div class="alert alert-info mt-4 mb-3" role="alert">
-            <div class="d-flex align-items-center">
-                <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
-                <div>
-                    <h6 class="alert-heading mb-1">
-                        <i class="bi bi-bar-chart-line"></i> Estadísticas de Carga de Trabajo por Técnico
-                    </h6>
-                    <p class="mb-0">
-                        Vista unificada con toda la información de carga actual agrupada por sucursal. 
-                        Las columnas "Hoy" y "Semana" muestran asignaciones <strong>netas</strong> (entradas - reasignaciones salientes).
-                        {% if busqueda %}
-                            <br><small class="text-muted">(Estadísticas independientes de la búsqueda activa)</small>
-                        {% endif %}
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4 g-4 estadisticas-tecnico-row">
-        
-        <!-- ========================================================================
-             TABLA UNIFICADA DE ESTADÍSTICAS POR TÉCNICO (AGRUPADA POR SUCURSAL)
-             ======================================================================== -->
         {% if tecnicos_por_sucursal %}
-        <div class="col-lg-12">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3 stats-card-header" 
-                     style="border: none; padding: 1rem 1.5rem;">
-                    <div>
-                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
-                            <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Estadísticas Unificadas por Técnico
-                        </h6>
-                        <small class="opacity-75">Vista completa de carga de trabajo agrupada por sucursal</small>
-                    </div>
-                    <div class="d-flex gap-2 align-items-center flex-wrap">
-                        <!-- Filtro temporal -->
-                        <form method="get" id="filtroTemporalForm" class="d-flex gap-2">
-                            {% if busqueda %}
-                                <input type="hidden" name="busqueda" value="{{ busqueda }}">
-                            {% endif %}
-                            <select name="filtro_temporal" class="form-select form-select-sm bg-white" style="min-width: 150px;" onchange="this.form.submit()">
-                                <option value="hoy" {% if filtro_temporal == 'hoy' %}selected{% endif %}>📅 Hoy</option>
-                                <option value="semana" {% if filtro_temporal == 'semana' %}selected{% endif %}>📊 Esta Semana</option>
-                                <option value="historico" {% if filtro_temporal == 'historico' %}selected{% endif %}>📜 Histórico Total</option>
-                            </select>
-                        </form>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <!-- Iterar por cada sucursal -->
-                    {% for sucursal_grupo in tecnicos_por_sucursal %}
-                    <div class="sucursal-grupo">
-                        <!-- Encabezado de sucursal mejorado con SVG personalizado -->
-                        <div class="sucursal-header">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                <h5 class="mb-0 d-flex align-items-center gap-3" style="font-weight: 800; font-size: 1.4rem;">
-                                    <!-- SVG personalizado según sucursal -->
-                                    {% if 'SATELITE' in sucursal_grupo.sucursal_nombre|upper or 'SATÉLITE' in sucursal_grupo.sucursal_nombre|upper %}
-                                        <img src="{% static 'images/utilitys/sucursal_satelite.svg' %}" alt="Satélite" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-                                    {% elif 'MONTERREY' in sucursal_grupo.sucursal_nombre|upper or 'MTY' in sucursal_grupo.sucursal_nombre|upper %}
-                                        <img src="{% static 'images/utilitys/sucursal_monterrey.svg' %}" alt="Monterrey" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-                                    {% elif 'GUADALAJARA' in sucursal_grupo.sucursal_nombre|upper or 'GDL' in sucursal_grupo.sucursal_nombre|upper %}
-                                        <img src="{% static 'images/utilitys/sucursal_guadalajara.svg' %}" alt="Guadalajara" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-                                    {% else %}
-                                        <!-- Icono genérico para otras sucursales -->
-                                        <i class="bi bi-geo-alt-fill" style="font-size: 1.5rem;"></i>
-                                    {% endif %}
-                                    <span style="letter-spacing: 0.5px;">{{ sucursal_grupo.sucursal_nombre|upper }}</span>
-                                </h5>
-                                <span class="badge bg-white text-primary px-3 py-2" style="font-size: 0.85rem; font-weight: 700;">
-                                    <i class="bi bi-people-fill me-1"></i>
-                                    {{ sucursal_grupo.areas|length }} área{{ sucursal_grupo.areas|length|pluralize }}
-                                </span>
-                            </div>
-                        </div>
-                        
-                        <!-- Iterar por cada área dentro de la sucursal -->
-                        {% for area_grupo in sucursal_grupo.areas %}
-                        <div class="area-grupo">
-                            <!-- Sub-encabezado de área con colores corporativos -->
-                            {% if 'DELL' in area_grupo.area_nombre %}
-                                <!-- DELL: Azul corporativo + acento amarillo -->
-                                <div class="area-header area-header-dell">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
-                                        <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
-                                        <span class="badge bg-white text-primary ms-2" style="font-size: 0.75rem; font-weight: 600;">
-                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
-                                        </span>
-                                    </h6>
-                                </div>
-                            {% elif 'LENOVO' in area_grupo.area_nombre %}
-                                <!-- LENOVO: Rojo corporativo -->
-                                <div class="area-header area-header-lenovo">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
-                                        <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
-                                        <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
-                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
-                                        </span>
-                                    </h6>
-                                </div>
-                            {% elif 'OOW' in area_grupo.area_nombre %}
-                                <!-- OOW: Magenta oscuro -->
-                                <div class="area-header area-header-oow">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
-                                        <i class="bi bi-tools me-2"></i>{{ area_grupo.area_nombre }}
-                                        <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
-                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
-                                        </span>
-                                    </h6>
-                                </div>
-                            {% else %}
-                                <!-- Otras áreas: Slate -->
-                                <div class="area-header area-header-default">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
-                                        <i class="bi bi-tag-fill me-2"></i>{{ area_grupo.area_nombre }}
-                                        <span class="badge bg-white text-dark ms-2" style="font-size: 0.75rem; font-weight: 600;">
-                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
-                                        </span>
-                                    </h6>
-                                </div>
-                            {% endif %}
-                            
-                            <!-- Tabla de técnicos de esta área -->
-                            <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                                <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem; min-width: 700px;">
-                                    <thead class="table-light" style="font-size: 0.8rem; position: sticky; top: 0; z-index: 10;">
-                                        <tr>
-                                            <th style="min-width: 160px; width: 25%;">
-                                                <i class="bi bi-person-badge"></i> 
-                                                <span class="d-none d-md-inline">Técnico</span>
-                                            </th>
-                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Órdenes activas totales">
-                                                <i class="bi bi-hourglass-split"></i><br>
-                                                <small class="d-none d-sm-inline">Activas</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Equipos que no encienden (activos)">
-                                                <i class="bi bi-exclamation-triangle"></i><br>
-                                                <small class="d-none d-sm-inline">No Enc.</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 90px; width: 10%;" title="Gama Alta (activos) - Se pagan mejor">
-                                                <i class="bi bi-star-fill text-success"></i><br>
-                                                <small class="d-none d-sm-inline">Gama Alta</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Asignaciones netas de Folios FL- hoy">
-                                                <i class="bi bi-receipt"></i><br>
-                                                <small class="d-none d-sm-inline">FL</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Asignaciones netas de hoy">
-                                                <i class="bi bi-calendar-day"></i><br>
-                                                <small class="d-none d-sm-inline">Hoy</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 90px; width: 12%;" title="Asignaciones netas del período">
-                                                <i class="bi bi-calendar-week"></i><br>
-                                                <small class="d-none d-sm-inline">{% if filtro_temporal == 'hoy' %}N/A{% elif filtro_temporal == 'semana' %}Semana{% else %}Hist.{% endif %}</small>
-                                            </th>
-                                            <th class="text-center" style="min-width: 110px; width: 13%;" title="Tiempo desde última asignación">
-                                                <i class="bi bi-clock-history"></i><br>
-                                                <small class="d-none d-sm-inline">Última</small>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for tecnico in area_grupo.tecnicos %}
-                                    <tr class="{% if tecnico.es_siguiente_rotacion %}table-success tecnico-siguiente{% endif %}">
-                                        <!-- Columna: Técnico -->
-                                        <td>
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="tecnico-avatar-wrapper position-relative">
-                                                    {% if tecnico.foto_url %}
-                                                        <img src="{{ tecnico.foto_url }}" 
-                                                             alt="{{ tecnico.tecnico_nombre }}"
-                                                             class="rounded-circle"
-                                                             style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #e5e7eb;">
-                                                    {% else %}
-                                                        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                                                             style="width: 48px; height: 48px; background-color: #6b7280; font-size: 1rem; border: 2px solid #e5e7eb;">
-                                                            {{ tecnico.iniciales }}
-                                                        </div>
-                                                    {% endif %}
-                                                    
-                                                    <!-- Badge de rotación sugerida -->
-                                                    {% if tecnico.es_siguiente_rotacion %}
-                                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" 
-                                                              style="font-size: 0.6rem; padding: 0.25rem 0.4rem;"
-                                                              title="Siguiente en rotación para {{ tecnico.area }}">
-                                                            ★
-                                                        </span>
-                                                    {% endif %}
-                                                </div>
-                                                <div style="flex: 1; min-width: 0;">
-                                                    <div class="fw-bold" style="font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                                        {{ tecnico.tecnico_nombre }}
-                                                    </div>
-                                                    {% if tecnico.es_siguiente_rotacion %}
-                                                        <small class="badge bg-success mt-1" style="font-size: 0.65rem;">
-                                                            ★ SIGUIENTE
-                                                        </small>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        
-                                        <!-- Columna: Órdenes Activas -->
-                                        <td class="text-center">
-                                            {% if tecnico.ordenes_actuales > 0 %}
-                                                <span class="badge rounded-pill bg-primary px-3 py-2" style="font-size: 0.95rem; font-weight: 600; min-width: 45px;">
-                                                    {{ tecnico.ordenes_actuales }}
-                                                </span>
-                                            {% else %}
-                                                <span class="text-muted" style="font-size: 0.9rem;">-</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: No Enciende -->
-                                        <td class="text-center">
-                                            {% if tecnico.equipos_no_encienden > 0 %}
-                                                <span class="badge rounded-pill bg-danger px-3 py-2" style="font-size: 0.9rem; font-weight: 600; min-width: 40px;">
-                                                    {{ tecnico.equipos_no_encienden }}
-                                                </span>
-                                            {% else %}
-                                                <span class="text-muted" style="font-size: 0.9rem;">-</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: Gama Alta -->
-                                        <td class="text-center">
-                                            {% if tecnico.gama_alta > 0 %}
-                                                <span class="badge rounded-pill bg-success px-3 py-2" style="font-size: 0.9rem; font-weight: 600; min-width: 40px;">{{ tecnico.gama_alta }}</span>
-                                            {% else %}
-                                                <span class="text-muted" style="font-size: 0.85rem;">-</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: Folios FL (netas hoy) -->
-                                        <td class="text-center" title="FL semana/hist: {% if tecnico.folios_fl_semana_netas > 0 %}+{{ tecnico.folios_fl_semana_netas }}{% else %}{{ tecnico.folios_fl_semana_netas }}{% endif %} | FL activas: {{ tecnico.folios_fl }}">
-                                            {% if tecnico.folios_fl_hoy_netas > 0 %}
-                                                <span class="badge rounded-pill bg-success px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                    +{{ tecnico.folios_fl_hoy_netas }}
-                                                </span>
-                                            {% elif tecnico.folios_fl_hoy_netas < 0 %}
-                                                <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                    {{ tecnico.folios_fl_hoy_netas }}
-                                                </span>
-                                            {% else %}
-                                                <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: Asignaciones Hoy (netas) -->
-                                        <td class="text-center">
-                                            {% if tecnico.asignaciones_hoy_netas > 0 %}
-                                                <span class="badge rounded-pill bg-success px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                    +{{ tecnico.asignaciones_hoy_netas }}
-                                                </span>
-                                            {% elif tecnico.asignaciones_hoy_netas < 0 %}
-                                                <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                    {{ tecnico.asignaciones_hoy_netas }}
-                                                </span>
-                                            {% else %}
-                                                <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: Asignaciones Semana/Histórico (netas) -->
-                                        <td class="text-center">
-                                            {% if filtro_temporal != 'hoy' %}
-                                                {% if tecnico.asignaciones_semana_netas > 0 %}
-                                                    <span class="badge rounded-pill bg-primary px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                        +{{ tecnico.asignaciones_semana_netas }}
-                                                    </span>
-                                                {% elif tecnico.asignaciones_semana_netas < 0 %}
-                                                    <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
-                                                        {{ tecnico.asignaciones_semana_netas }}
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="text-muted" style="font-size: 0.75rem;">-</span>
-                                            {% endif %}
-                                        </td>
-                                        
-                                        <!-- Columna: Última Asignación -->
-                                        <td class="text-center">
-                                            <span class="badge rounded-pill bg-light text-dark border" style="font-size: 0.75rem; padding: 0.35rem 0.6rem;">
-                                                <i class="bi bi-clock"></i> {{ tecnico.tiempo_sin_asignar }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        <!-- Fin de iteración de áreas -->
-                    </div>
-                    {% if not forloop.last %}
-                        <hr class="m-0" style="border-color: #334155; border-width: 1px; opacity: 0.6;">
-                    {% endif %}
-                    {% endfor %}
-                    
-                    <!-- Leyenda explicativa -->
-                    <div class="alert alert-light border-top border-0 rounded-0 mb-0 mt-0" role="alert" style="background-color: #f8f9fa; font-size: 0.85rem;">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <strong><i class="bi bi-info-circle text-primary"></i> Columnas de carga:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
-                                    <li><strong>Activas:</strong> Total órdenes asignadas actualmente</li>
-                                    <li><strong>No Enc.:</strong> Equipos "No Enciende" activos</li>
-                                    <li><strong>Gama Alta:</strong> Equipos de gama alta (mejor remunerados)</li>
-                                    <li><strong>Folios FL:</strong> Asignaciones netas de órdenes FL- hoy (entrantes - salientes)</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-4">
-                                <strong><i class="bi bi-calendar-check text-success"></i> Asignaciones netas:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
-                                    <li><strong>Hoy (netas):</strong> Asignaciones recibidas - reasignadas salientes hoy</li>
-                                    <li><strong>Semana/Histórico (netas):</strong> Balance neto del período seleccionado</li>
-                                    <li><em>Valores negativos indican más reasignaciones salientes que entrantes</em></li>
-                                </ul>
-                            </div>
-                            <div class="col-md-4">
-                                <strong><i class="bi bi-star text-warning"></i> Rotación (solo Satélite > OOW):</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
-                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">★ SIGUIENTE</span> Técnico sugerido para próxima asignación</li>
-                                    <li><em>Solo visible en Laboratorio OOW de Satélite</em></li>
-                                    <li><em>Criterio:</em> Menor carga + Más tiempo sin asignar + Menos asignaciones hoy</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            {% include 'servicio_tecnico/partials/carga_tecnicos_panel.html' %}
         {% endif %}
 
-        <!-- ========================================================================
-             HISTORIAL DE REASIGNACIONES DEL DÍA
-             ======================================================================== -->
+        <!-- Historial de reasignaciones del día (sigue colapsable en la página) -->
         {% if reasignaciones_hoy %}
+        <div class="row mt-3 g-4 estadisticas-tecnico-row">
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header d-flex justify-content-between align-items-center clickable-header reasignaciones-card-header" 
@@ -716,9 +275,9 @@
                 </div>
             </div>
         </div>
+        </div>
         {% endif %}
-    </div>
-    {% endif %}  <!-- Fin de mostrar_estadisticas -->
+    {% endif %}  {# Fin de mostrar_estadisticas #}
 
     <!-- Grid de cards -->
     {% if ordenes %}
@@ -1037,6 +596,9 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Búsqueda inteligente con autocompletado + manejo de collapse de reasignaciones -->
+{# Búsqueda siempre; JS del panel de carga solo en activas #}
 <script src="{% static 'js/busqueda_ordenes.js' %}"></script>
+{% if mostrar_estadisticas %}
+<script src="{% static 'js/lista_ordenes_carga.js' %}"></script>
+{% endif %}
 {% endblock %}

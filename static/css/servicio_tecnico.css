@@ -2159,10 +2159,9 @@ form:has(#btnSubirImagenes:disabled) textarea {
     position: relative;
 }
 
-/* Efecto hover en filas de técnicos */
+/* Efecto hover en filas de técnicos (sin cursor pointer: no hay acción de clic) */
 .table-hover tbody tr:hover {
     background-color: rgba(13, 110, 253, 0.05);
-    cursor: pointer;
 }
 
 /* Badges personalizados para estados */

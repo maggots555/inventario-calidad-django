@@ -1,0 +1,394 @@
+{% comment %}
+  Partial: franja compacta + Offcanvas de carga de técnicos.
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Antes esta tabla ocupaba toda la página y empujaba el grid de órdenes.
+  Ahora solo se ve una franja corta; al pulsar el botón se abre un panel
+  lateral (Bootstrap Offcanvas), igual que en lista de empleados.
+  El HTML de las tablas se renderiza en el servidor (no es AJAX).
+  NOTA: No uses comentarios {# #} multilínea — Django no los oculta bien.
+{% endcomment %}
+{% load static %}
+
+<!-- Franja compacta siempre visible -->
+<div class="lo-carga-strip mt-4 mb-3" id="cargaTecnicosStrip" role="region"
+     aria-label="Resumen de carga de técnicos">
+    <div class="lo-carga-strip__main">
+        <div class="lo-carga-strip__title">
+            <i class="bi bi-people-fill" aria-hidden="true"></i>
+            <div>
+                <strong>Carga de técnicos</strong>
+                <small class="lo-carga-strip__hint d-block">
+                    Datos al cargar la página
+                    {% if busqueda %}
+                        · independientes de la búsqueda
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+
+        <div class="lo-carga-strip__meta">
+            <!-- Contadores breves: sucursales + órdenes activas del sistema -->
+            <span class="lo-carga-chip lo-carga-chip--muted">
+                <i class="bi bi-building" aria-hidden="true"></i>
+                {{ tecnicos_por_sucursal|length }} sucursal{{ tecnicos_por_sucursal|length|pluralize:"es" }}
+            </span>
+            {% if total_ordenes_activas is not None %}
+            <span class="lo-carga-chip lo-carga-chip--muted">
+                <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                {{ total_ordenes_activas }} activas
+            </span>
+            {% endif %}
+
+            <!-- Chips de siguiente rotación (si el servidor marcó alguno) -->
+            {% for sucursal_grupo in tecnicos_por_sucursal %}
+                {% for area_grupo in sucursal_grupo.areas %}
+                    {% for tecnico in area_grupo.tecnicos %}
+                        {% if tecnico.es_siguiente_rotacion %}
+                        <span class="lo-carga-chip lo-carga-chip--siguiente"
+                              title="Siguiente en rotación — {{ area_grupo.area_nombre }}">
+                            <i class="bi bi-star-fill" aria-hidden="true"></i>
+                            {{ tecnico.tecnico_nombre }}
+                        </span>
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bootstrap abre el Offcanvas sin JS propio (data-bs-*) -->
+    <button type="button"
+            class="btn btn-primary lo-carga-strip__btn"
+            data-bs-toggle="offcanvas"
+            data-bs-target="#panelCargaTecnicos"
+            aria-controls="panelCargaTecnicos">
+        <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+        Ver carga completa
+    </button>
+</div>
+
+<!-- Panel lateral (Offcanvas) — tablas completas -->
+{% comment %}
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  offcanvas-end = entra desde la derecha.
+  Bootstrap mueve este nodo al body al abrirlo; por eso el CSS usa
+  variables globales del tema (--card-bg) y no variables del wrapper de página.
+{% endcomment %}
+<div class="offcanvas offcanvas-end lo-carga-offcanvas"
+     tabindex="-1"
+     id="panelCargaTecnicos"
+     aria-labelledby="panelCargaTecnicosLabel"
+     data-lo-carga-panel="1">
+    <div class="offcanvas-header lo-carga-offcanvas__header">
+        <div class="lo-carga-offcanvas__header-text">
+            <h5 class="offcanvas-title mb-0" id="panelCargaTecnicosLabel">
+                <i class="bi bi-people-fill me-1" aria-hidden="true"></i>
+                Carga de trabajo por técnico
+            </h5>
+            <small class="lo-carga-offcanvas__sub">
+                Asignaciones netas (entradas − reasignaciones salientes)
+            </small>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Filtro temporal: al cambiar, recarga la página (mismo GET de siempre) -->
+            <form method="get" id="filtroTemporalForm" class="lo-carga-filtro d-flex gap-2"
+                  data-lo-carga-filtro="1">
+                {% if busqueda %}
+                    <input type="hidden" name="busqueda" value="{{ busqueda }}">
+                {% endif %}
+                <label class="visually-hidden" for="filtroTemporalSelect">Periodo</label>
+                <select id="filtroTemporalSelect"
+                        name="filtro_temporal"
+                        class="form-select form-select-sm"
+                        onchange="this.form.submit()">
+                    <option value="hoy" {% if filtro_temporal == 'hoy' %}selected{% endif %}>Hoy</option>
+                    <option value="semana" {% if filtro_temporal == 'semana' %}selected{% endif %}>Esta semana</option>
+                    <option value="historico" {% if filtro_temporal == 'historico' %}selected{% endif %}>Histórico total</option>
+                </select>
+            </form>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+    </div>
+
+    <div class="offcanvas-body lo-carga-offcanvas__body p-0">
+        <div class="lo-carga-panel-in">
+            {% for sucursal_grupo in tecnicos_por_sucursal %}
+            <!-- Cada sucursal: header clicable. Satélite abierto; el resto cerrado. -->
+            <div class="sucursal-grupo">
+                {% with sn=sucursal_grupo.sucursal_nombre|upper %}
+                {% if 'SATELITE' in sn or 'SATÉLITE' in sn %}
+                <div class="sucursal-header lo-carga-sucursal-toggle"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="collapse"
+                     data-bs-target="#collapseSucursal{{ forloop.counter }}"
+                     aria-expanded="true"
+                     aria-controls="collapseSucursal{{ forloop.counter }}">
+                {% else %}
+                <div class="sucursal-header lo-carga-sucursal-toggle collapsed"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="collapse"
+                     data-bs-target="#collapseSucursal{{ forloop.counter }}"
+                     aria-expanded="false"
+                     aria-controls="collapseSucursal{{ forloop.counter }}">
+                {% endif %}
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 w-100">
+                        <h5 class="mb-0 d-flex align-items-center gap-3 lo-carga-sucursal-titulo">
+                            {% if 'SATELITE' in sn or 'SATÉLITE' in sn %}
+                                <img src="{% static 'images/utilitys/sucursal_satelite.svg' %}"
+                                     alt="Satélite" class="lo-carga-sucursal-icon">
+                            {% elif 'MONTERREY' in sn or 'MTY' in sn %}
+                                <img src="{% static 'images/utilitys/sucursal_monterrey.svg' %}"
+                                     alt="Monterrey" class="lo-carga-sucursal-icon">
+                            {% elif 'GUADALAJARA' in sn or 'GDL' in sn %}
+                                <img src="{% static 'images/utilitys/sucursal_guadalajara.svg' %}"
+                                     alt="Guadalajara" class="lo-carga-sucursal-icon">
+                            {% else %}
+                                <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
+                            {% endif %}
+                            <span>{{ sucursal_grupo.sucursal_nombre|upper }}</span>
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-white text-primary px-3 py-2 lo-carga-badge-areas">
+                                <i class="bi bi-people-fill me-1" aria-hidden="true"></i>
+                                {{ sucursal_grupo.areas|length }} área{{ sucursal_grupo.areas|length|pluralize }}
+                            </span>
+                            <i class="bi bi-chevron-down lo-carga-sucursal-chevron" aria-hidden="true"></i>
+                        </div>
+                    </div>
+                </div>
+
+                {% if 'SATELITE' in sn or 'SATÉLITE' in sn %}
+                <div class="collapse show" id="collapseSucursal{{ forloop.counter }}">
+                {% else %}
+                <div class="collapse" id="collapseSucursal{{ forloop.counter }}">
+                {% endif %}
+                {% endwith %}
+
+                {% for area_grupo in sucursal_grupo.areas %}
+                <div class="area-grupo">
+                    {% if 'DELL' in area_grupo.area_nombre %}
+                        <div class="area-header area-header-dell">
+                            <h6 class="mb-0 text-white lo-carga-area-titulo">
+                                <i class="bi bi-laptop me-2" aria-hidden="true"></i>{{ area_grupo.area_nombre }}
+                                <span class="badge bg-white text-primary ms-2">
+                                    {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                </span>
+                            </h6>
+                        </div>
+                    {% elif 'LENOVO' in area_grupo.area_nombre %}
+                        <div class="area-header area-header-lenovo">
+                            <h6 class="mb-0 text-white lo-carga-area-titulo">
+                                <i class="bi bi-laptop me-2" aria-hidden="true"></i>{{ area_grupo.area_nombre }}
+                                <span class="badge bg-white text-danger ms-2">
+                                    {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                </span>
+                            </h6>
+                        </div>
+                    {% elif 'OOW' in area_grupo.area_nombre %}
+                        <div class="area-header area-header-oow">
+                            <h6 class="mb-0 text-white lo-carga-area-titulo">
+                                <i class="bi bi-tools me-2" aria-hidden="true"></i>{{ area_grupo.area_nombre }}
+                                <span class="badge bg-white text-danger ms-2">
+                                    {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                </span>
+                            </h6>
+                        </div>
+                    {% else %}
+                        <div class="area-header area-header-default">
+                            <h6 class="mb-0 text-white lo-carga-area-titulo">
+                                <i class="bi bi-tag-fill me-2" aria-hidden="true"></i>{{ area_grupo.area_nombre }}
+                                <span class="badge bg-white text-dark ms-2">
+                                    {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                </span>
+                            </h6>
+                        </div>
+                    {% endif %}
+
+                    <div class="table-responsive lo-carga-table-wrap">
+                        <table class="table table-hover align-middle mb-0 lo-carga-table">
+                            <thead class="table-light lo-carga-thead">
+                                <tr>
+                                    <th class="lo-carga-th-tecnico">
+                                        <i class="bi bi-person-badge" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline">Técnico</span>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Órdenes activas totales">
+                                        <i class="bi bi-hourglass-split" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">Activas</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Equipos que no encienden (activos)">
+                                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">No Enc.</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Gama Alta (activos)">
+                                        <i class="bi bi-star-fill text-success" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">Gama Alta</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Asignaciones netas de Folios FL- hoy">
+                                        <i class="bi bi-receipt" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">FL</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Asignaciones netas de hoy">
+                                        <i class="bi bi-calendar-day" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">Hoy</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th" title="Asignaciones netas del período">
+                                        <i class="bi bi-calendar-week" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">{% if filtro_temporal == 'hoy' %}N/A{% elif filtro_temporal == 'semana' %}Semana{% else %}Hist.{% endif %}</small>
+                                    </th>
+                                    <th class="text-center lo-carga-th-ultima" title="Tiempo desde última asignación">
+                                        <i class="bi bi-clock-history" aria-hidden="true"></i><br>
+                                        <small class="d-none d-sm-inline">Última</small>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tecnico in area_grupo.tecnicos %}
+                                <tr class="{% if tecnico.es_siguiente_rotacion %}table-success tecnico-siguiente{% endif %}">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="tecnico-avatar-wrapper position-relative">
+                                                {% if tecnico.foto_url %}
+                                                    <img src="{{ tecnico.foto_url }}"
+                                                         alt="{{ tecnico.tecnico_nombre }}"
+                                                         class="rounded-circle lo-carga-avatar">
+                                                {% else %}
+                                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold lo-carga-avatar lo-carga-avatar--iniciales">
+                                                        {{ tecnico.iniciales }}
+                                                    </div>
+                                                {% endif %}
+                                                {% if tecnico.es_siguiente_rotacion %}
+                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success lo-carga-star-badge"
+                                                          title="Siguiente en rotación para {{ tecnico.area }}">★</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="lo-carga-nombre-wrap">
+                                                <div class="fw-bold lo-carga-nombre">
+                                                    {{ tecnico.tecnico_nombre }}
+                                                </div>
+                                                {% if tecnico.es_siguiente_rotacion %}
+                                                    <small class="badge bg-success mt-1 lo-carga-badge-siguiente">★ SIGUIENTE</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if tecnico.ordenes_actuales > 0 %}
+                                            <span class="badge rounded-pill bg-primary px-3 py-2 lo-carga-num">{{ tecnico.ordenes_actuales }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if tecnico.equipos_no_encienden > 0 %}
+                                            <span class="badge rounded-pill bg-danger px-3 py-2 lo-carga-num">{{ tecnico.equipos_no_encienden }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if tecnico.gama_alta > 0 %}
+                                            <span class="badge rounded-pill bg-success px-3 py-2 lo-carga-num">{{ tecnico.gama_alta }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center" title="FL semana/hist: {% if tecnico.folios_fl_semana_netas > 0 %}+{{ tecnico.folios_fl_semana_netas }}{% else %}{{ tecnico.folios_fl_semana_netas }}{% endif %} | FL activas: {{ tecnico.folios_fl }}">
+                                        {% if tecnico.folios_fl_hoy_netas > 0 %}
+                                            <span class="badge rounded-pill bg-success px-2 py-1 lo-carga-num">+{{ tecnico.folios_fl_hoy_netas }}</span>
+                                        {% elif tecnico.folios_fl_hoy_netas < 0 %}
+                                            <span class="badge rounded-pill bg-danger px-2 py-1 lo-carga-num">{{ tecnico.folios_fl_hoy_netas }}</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill bg-light text-dark border px-2 py-1 lo-carga-num">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if tecnico.asignaciones_hoy_netas > 0 %}
+                                            <span class="badge rounded-pill bg-success px-2 py-1 lo-carga-num">+{{ tecnico.asignaciones_hoy_netas }}</span>
+                                        {% elif tecnico.asignaciones_hoy_netas < 0 %}
+                                            <span class="badge rounded-pill bg-danger px-2 py-1 lo-carga-num">{{ tecnico.asignaciones_hoy_netas }}</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill bg-light text-dark border px-2 py-1 lo-carga-num">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if filtro_temporal != 'hoy' %}
+                                            {% if tecnico.asignaciones_semana_netas > 0 %}
+                                                <span class="badge rounded-pill bg-primary px-2 py-1 lo-carga-num">+{{ tecnico.asignaciones_semana_netas }}</span>
+                                            {% elif tecnico.asignaciones_semana_netas < 0 %}
+                                                <span class="badge rounded-pill bg-danger px-2 py-1 lo-carga-num">{{ tecnico.asignaciones_semana_netas }}</span>
+                                            {% else %}
+                                                <span class="badge rounded-pill bg-light text-dark border px-2 py-1 lo-carga-num">0</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill bg-light text-dark border lo-carga-ultima">
+                                            <i class="bi bi-clock" aria-hidden="true"></i> {{ tecnico.tiempo_sin_asignar }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+                </div><!-- /collapse sucursal -->
+            </div>
+            {% if not forloop.last %}
+                <hr class="lo-carga-sucursal-sep m-0">
+            {% endif %}
+            {% endfor %}
+
+            <!-- Leyenda compacta (colapsable) -->
+            <div class="lo-carga-leyenda">
+                <button class="lo-carga-leyenda__toggle"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#loCargaLeyendaCollapse"
+                        aria-expanded="false"
+                        aria-controls="loCargaLeyendaCollapse">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    ¿Qué significan las columnas?
+                    <i class="bi bi-chevron-down lo-carga-leyenda__chevron" aria-hidden="true"></i>
+                </button>
+                <div class="collapse" id="loCargaLeyendaCollapse">
+                    <div class="lo-carga-leyenda__body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-info-circle text-primary" aria-hidden="true"></i> Columnas de carga:</strong>
+                                <ul class="mb-0">
+                                    <li><strong>Activas:</strong> órdenes asignadas ahora</li>
+                                    <li><strong>No Enc.:</strong> equipos "No Enciende"</li>
+                                    <li><strong>Gama Alta:</strong> mejor remunerados</li>
+                                    <li><strong>FL:</strong> folios FL- netos de hoy</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-calendar-check text-success" aria-hidden="true"></i> Asignaciones netas:</strong>
+                                <ul class="mb-0">
+                                    <li><strong>Hoy:</strong> recibidas − reasignadas salientes</li>
+                                    <li><strong>Semana/Hist.:</strong> balance del período</li>
+                                    <li><em>Negativo = más salidas que entradas</em></li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-star text-warning" aria-hidden="true"></i> Rotación (Satélite › OOW):</strong>
+                                <ul class="mb-0">
+                                    <li><span class="badge bg-success">★ SIGUIENTE</span> sugerido para asignar</li>
+                                    <li><em>Criterio:</em> menor carga + más tiempo sin asignar + menos hoy</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
