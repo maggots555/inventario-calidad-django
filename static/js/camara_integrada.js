@@ -31,7 +31,7 @@ class CamaraIntegrada {
         // Si el navegador no lo soporta, caemos al toBlob() de siempre.
         //
         // Además medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5 s,
-        // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución Full HD.
+        // bajamos calidad JPEG (0.95 → 0.75) sin tocar la resolución del stream (2K).
         this.dispositivoLento = false; // true cuando se detecta hardware lento
         this.primeraCaptura = true; // false tras la primera medición
         // ── Web Worker JPEG (v9.0) ───────────────────────────────────────────────
@@ -668,21 +668,20 @@ class CamaraIntegrada {
      * Construye las constraints para getUserMedia según el dispositivo seleccionado.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Pedimos Full HD (1920×1080) como ideal. Antes pedíamos ~4K (4096×2160) y las
-     * fotos salían nítidas, pero el preview en vivo se sentía con lag en celulares
-     * de gama media: el stream del <video> usa esa misma resolución todo el tiempo.
+     * Pedimos 2K / QHD (2560×1440) como ideal: más detalle que Full HD (1920×1080)
+     * y menos pesado que ~4K (4096×2160), que hacía lag el preview en gama media.
      *
-     * Full HD es un buen balance para documentación técnica (rayones, etiquetas)
-     * y mantiene el preview fluido. No usamos "min" estricto: si el hardware no
-     * llega a 1080p, el navegador entrega lo máximo que pueda sin fallar.
+     * El stream del <video> usa esta resolución todo el tiempo (preview + captura).
+     * No usamos "min" estricto: si el hardware no llega a 1440p, el navegador
+     * entrega lo máximo que pueda (a menudo Full HD) sin fallar.
      *
      * En dispositivos lentos solo bajamos la calidad JPEG (0.95 → 0.75), no los
      * píxeles del stream (ver capturarFoto / modo optimizado).
      */
     construirConstraintsCamara() {
         const constraints = {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 2560 },
+            height: { ideal: 1440 }
         };
         // Si hay un dispositivo específico seleccionado, usarlo
         if (this.dispositivoActualId) {
@@ -1272,7 +1271,7 @@ class CamaraIntegrada {
         if (!this.dispositivoLento && tiempoBlobMs > UMBRAL_LENTO_MS) {
             this.dispositivoLento = true;
             console.warn(`⚡ Dispositivo lento detectado: encode JPEG tardó ${tiempoBlobMs}ms. ` +
-                `Activando modo optimizado (calidad JPEG 0.75, resolución Full HD sin cambios).`);
+                `Activando modo optimizado (calidad JPEG 0.75, resolución 2K sin cambios).`);
             this.mostrarToastModoOptimizado(tiempoBlobMs);
         }
         else if (!this.dispositivoLento) {
@@ -1863,7 +1862,7 @@ class CamaraIntegrada {
                     </p>
                     <p class="mb-0 small text-muted">
                         <i class="bi bi-check-circle text-success"></i>
-                        Compresión ajustada automáticamente. La resolución Full HD se mantiene —
+                        Compresión ajustada automáticamente. La resolución 2K se mantiene —
                         las fotos siguen siendo aptas para documentar detalles finos.
                     </p>
                 </div>
