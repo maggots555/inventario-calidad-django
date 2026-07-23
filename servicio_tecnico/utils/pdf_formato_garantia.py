@@ -860,9 +860,10 @@ class PDFFormatoServicioGarantia:
                 )
             except Exception:
                 img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
+            # Solo el nombre de la pieza (Pantalla, Top Cover…). El tipo de
+            # daño (Desgaste, etc.) se ve en el diagrama anotado; no lo
+            # repetimos en el título de la tarjeta.
             titulo = labels.get(vista.clave_vista, vista.clave_vista)
-            if vista.etiqueta_dano:
-                titulo = f'{titulo} — {vista.etiqueta_dano}'
             tarjeta = Table(
                 [
                     [Paragraph(f'<b>{self._esc(titulo)}</b>', self._estilos['CeldaLabel'])],
