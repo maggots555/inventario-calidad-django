@@ -8,7 +8,7 @@
  * Dependencias (CDN en el template, no npm):
  * - QuaggaJS 0.12.x → códigos de barras 1D
  * - jsQR 1.4.x → códigos QR
- * - @zxing/library → Data Matrix (etiquetas de cargador Dell: no son QR)
+ * - zxing-wasm (zxing-cpp WASM) → Data Matrix (etiquetas de cargador Dell: no son QR)
  *
  * Efectos secundarios:
  * - Solicita permiso de cámara (getUserMedia)
@@ -17,7 +17,9 @@
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * El código cuadrado de muchos cargadores Dell NO es un QR (no tiene los 3
- * cuadritos de esquina). Es un Data Matrix. jsQR no lo lee; por eso usamos ZXing.
+ * cuadritos de esquina). Es un Data Matrix. jsQR no lo lee.
+ * @zxing/library (JS) también falla con estos densos; zxing-wasm (C++ en
+ * WebAssembly) sí los lee — lo validamos con una foto real de etiqueta Dell.
  */
 
 /** Opciones al abrir el scanner desde otra pantalla (Garantía, etc.). */
@@ -68,18 +70,30 @@ declare function jsQR(
   options?: { inversionAttempts?: string },
 ): { data: string } | null;
 
-/** Resultado mínimo de ZXing al decodificar un canvas */
-interface ZXingDecodeResult {
-  getText: () => string;
+/** Resultado de lectura de zxing-wasm */
+interface ZXingWasmReadResult {
+  text: string;
+  format: string;
 }
 
-/** API UMD de @zxing/library (global `ZXing`) */
-interface ZXingLibraryApi {
-  DecodeHintType: { POSSIBLE_FORMATS: unknown; TRY_HARDER: unknown };
-  BarcodeFormat: { DATA_MATRIX: unknown; QR_CODE: unknown };
-  BrowserMultiFormatReader: new (hints?: Map<unknown, unknown>) => {
-    decodeFromCanvas: (canvas: HTMLCanvasElement) => ZXingDecodeResult;
-  };
+/**
+ * API IIFE de zxing-wasm (global `ZXingWASM`).
+ * Motor: zxing-cpp compilado a WebAssembly — mucho más preciso en Data Matrix
+ * densos que el puerto JS @zxing/library.
+ */
+interface ZXingWasmApi {
+  readBarcodes: (
+    input: ImageData | Blob | Uint8Array,
+    options?: {
+      tryHarder?: boolean;
+      formats?: string[];
+      maxNumberOfSymbols?: number;
+    },
+  ) => Promise<ZXingWasmReadResult[]>;
+  prepareZXingModule?: (opts: {
+    fireImmediately?: boolean;
+    overrides?: Record<string, unknown>;
+  }) => void | Promise<unknown>;
 }
 
 /** Código leído + etiqueta para el mensaje al usuario */
@@ -88,10 +102,8 @@ interface CodigoLeido {
   tipo: string;
 }
 
-/** Lector ZXing reutilizado (crear uno por frame es caro) */
-let lectorZxingDataMatrix: {
-  decodeFromCanvas: (canvas: HTMLCanvasElement) => ZXingDecodeResult;
-} | null = null;
+/** true cuando el módulo WASM ya se precalentó (evita demora en el 1er frame) */
+let zxingWasmListo = false;
 
 /** Acceso tipado mínimo a Bootstrap Modal (global de CDN, sin redeclarar `bootstrap`). */
 type BootstrapModalApi = {
@@ -361,53 +373,94 @@ function prepararVideoYCanvas(): void {
   sesion.canvasCtx = ctx;
 }
 
-function obtenerZXing(): ZXingLibraryApi | null {
-  const w = window as unknown as { ZXing?: ZXingLibraryApi };
-  return w.ZXing || null;
+function obtenerZXingWasm(): ZXingWasmApi | null {
+  const w = window as unknown as { ZXingWASM?: ZXingWasmApi };
+  return w.ZXingWASM || null;
 }
 
 /**
- * Lector ZXing solo para Data Matrix (cargadores Dell), con TRY_HARDER.
- * Se crea una vez y se reutiliza en cada frame.
+ * Descarga/compila el WASM de zxing-cpp al abrir el modal (antes del 1er frame).
  */
-function obtenerLectorDataMatrix(): {
-  decodeFromCanvas: (canvas: HTMLCanvasElement) => ZXingDecodeResult;
-} | null {
-  if (lectorZxingDataMatrix) {
-    return lectorZxingDataMatrix;
+async function calentarZxingWasm(): Promise<void> {
+  const api = obtenerZXingWasm();
+  if (!api || zxingWasmListo) {
+    return;
   }
-  const zxing = obtenerZXing();
-  if (!zxing) {
-    return null;
+  try {
+    if (typeof api.prepareZXingModule === 'function') {
+      await Promise.resolve(api.prepareZXingModule({ fireImmediately: true }));
+    } else {
+      // Fuerza instancia creando una ImageData mínima
+      const dummy = new ImageData(8, 8);
+      await api.readBarcodes(dummy, { formats: ['DataMatrix'], maxNumberOfSymbols: 1 });
+    }
+    zxingWasmListo = true;
+  } catch (err) {
+    // Aunque falle el calentamiento, readBarcodes puede instanciar después
+    console.warn('Precalentamiento zxing-wasm:', err);
   }
-  const hints = new Map<unknown, unknown>();
-  hints.set(zxing.DecodeHintType.POSSIBLE_FORMATS, [zxing.BarcodeFormat.DATA_MATRIX]);
-  hints.set(zxing.DecodeHintType.TRY_HARDER, true);
-  lectorZxingDataMatrix = new zxing.BrowserMultiFormatReader(hints);
-  return lectorZxingDataMatrix;
 }
 
 function libreriasScannerDisponibles(): boolean {
-  // Quagga + jsQR obligatorios; ZXing recomendado para Data Matrix Dell
   return typeof Quagga !== 'undefined' && typeof jsQR === 'function';
 }
 
 /**
- * Intenta leer Data Matrix desde el canvas ya dibujado (ZXing).
- * Si no hay código, ZXing lanza excepción → devolvemos null (es normal).
+ * Sube contraste en ImageData (copia) para ayudar a Data Matrix con poca luz.
+ * EXPLICACIÓN PARA PRINCIPIANTES: el motor lee mejor blanco/negro “duros”.
  */
-function intentarDataMatrixDesdeCanvas(canvas: HTMLCanvasElement): string | null {
-  const lector = obtenerLectorDataMatrix();
-  if (!lector) {
+function potenciarContrasteImageData(origen: ImageData): ImageData {
+  const copia = new ImageData(
+    new Uint8ClampedArray(origen.data),
+    origen.width,
+    origen.height,
+  );
+  const d = copia.data;
+  // Factor de contraste: >1 = más contraste
+  const factor = 1.45;
+  const intercept = 128 * (1 - factor);
+  for (let i = 0; i < d.length; i += 4) {
+    // Escala de grises primero
+    const gris = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = Math.max(0, Math.min(255, factor * gris + intercept));
+    d[i] = v;
+    d[i + 1] = v;
+    d[i + 2] = v;
+  }
+  return copia;
+}
+
+/**
+ * Lee Data Matrix con zxing-wasm (C++/WASM). Probado con etiqueta real Dell.
+ */
+async function intentarDataMatrixDesdeImageData(
+  imageData: ImageData,
+): Promise<string | null> {
+  const api = obtenerZXingWasm();
+  if (!api) {
     return null;
   }
+
+  const opciones = {
+    tryHarder: true,
+    formats: ['DataMatrix'],
+    maxNumberOfSymbols: 1,
+  };
+
   try {
-    const result = lector.decodeFromCanvas(canvas);
-    const texto = result.getText();
-    return texto && texto.trim() ? texto.trim() : null;
-  } catch {
-    return null;
+    let results = await api.readBarcodes(imageData, opciones);
+    if (results.length && results[0].text) {
+      return results[0].text.trim();
+    }
+    // Segundo intento: contraste alto (etiquetas con reflejo / poca luz)
+    results = await api.readBarcodes(potenciarContrasteImageData(imageData), opciones);
+    if (results.length && results[0].text) {
+      return results[0].text.trim();
+    }
+  } catch (err) {
+    console.warn('zxing-wasm Data Matrix:', err);
   }
+  return null;
 }
 
 /**
@@ -536,17 +589,17 @@ function intentarJsQr(imageData: ImageData, intentarInvertir: boolean): string |
 
 /**
  * Dibuja un recorte centrado ampliado y prueba:
- * 1) Data Matrix (ZXing) — etiquetas de cargador Dell
+ * 1) Data Matrix (zxing-wasm) — etiquetas de cargador Dell
  * 2) QR (jsQR) — códigos QR normales
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * El Data Matrix de Dell es denso y pequeño. Recortamos el centro y lo agrandamos
- * para que cada “puntito” tenga más píxeles; luego ZXing intenta leerlo.
+ * Validamos con una foto real: el motor WASM leyó "CN01C4XJLOC0056A04CSA02".
+ * El puerto JS antiguo (@zxing/library) no lograba decodificar esa misma etiqueta.
  */
-function escanearRecorteCentralAmpliado(
+async function escanearRecorteCentralAmpliado(
   fraccionLado: number,
   intentarInvertir: boolean,
-): CodigoLeido | null {
+): Promise<CodigoLeido | null> {
   const video = sesion.video;
   const canvas = sesion.canvas;
   const ctx = sesion.canvasCtx;
@@ -565,7 +618,7 @@ function escanearRecorteCentralAmpliado(
   const sy = Math.floor((vh - lado) / 2);
   const dest = Math.min(
     MAX_LADO_ANALISIS_PX,
-    Math.max(320, Math.floor(lado * FACTOR_ZOOM_RECORTE)),
+    Math.max(360, Math.floor(lado * FACTOR_ZOOM_RECORTE)),
   );
 
   canvas.width = dest;
@@ -573,13 +626,14 @@ function escanearRecorteCentralAmpliado(
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(video, sx, sy, lado, lado, 0, 0, dest, dest);
 
-  // Prioridad: Data Matrix (cargador Dell) — jsQR nunca lo va a ver
-  const dataMatrix = intentarDataMatrixDesdeCanvas(canvas);
+  const imageData = ctx.getImageData(0, 0, dest, dest);
+
+  // Prioridad: Data Matrix (cargador Dell)
+  const dataMatrix = await intentarDataMatrixDesdeImageData(imageData);
   if (dataMatrix) {
     return { codigo: dataMatrix, tipo: 'Data Matrix' };
   }
 
-  const imageData = ctx.getImageData(0, 0, dest, dest);
   const qr = intentarJsQr(imageData, intentarInvertir);
   if (qr) {
     return { codigo: qr, tipo: 'Código QR' };
@@ -590,7 +644,9 @@ function escanearRecorteCentralAmpliado(
 /**
  * Escaneo de respaldo: frame reducido (QR/Data Matrix ya cercanos).
  */
-function escanearFrameCompleto(intentarInvertir: boolean): CodigoLeido | null {
+async function escanearFrameCompleto(
+  intentarInvertir: boolean,
+): Promise<CodigoLeido | null> {
   const video = sesion.video;
   const canvas = sesion.canvas;
   const ctx = sesion.canvasCtx;
@@ -609,12 +665,13 @@ function escanearFrameCompleto(intentarInvertir: boolean): CodigoLeido | null {
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(video, 0, 0, dw, dh);
 
-  const dataMatrix = intentarDataMatrixDesdeCanvas(canvas);
+  const imageData = ctx.getImageData(0, 0, dw, dh);
+
+  const dataMatrix = await intentarDataMatrixDesdeImageData(imageData);
   if (dataMatrix) {
     return { codigo: dataMatrix, tipo: 'Data Matrix' };
   }
 
-  const imageData = ctx.getImageData(0, 0, dw, dh);
   const qr = intentarJsQr(imageData, intentarInvertir);
   if (qr) {
     return { codigo: qr, tipo: 'Código QR' };
@@ -623,7 +680,7 @@ function escanearFrameCompleto(intentarInvertir: boolean): CodigoLeido | null {
 }
 
 /**
- * Loop de detección: Data Matrix (ZXing) + QR (jsQR), un análisis por tick.
+ * Loop de detección: Data Matrix (WASM) + QR (jsQR), un análisis por tick.
  */
 function iniciarJsQr(): void {
   if (sesion.intervaloQr !== null) {
@@ -632,14 +689,14 @@ function iniciarJsQr(): void {
   sesion.framesSinExito = 0;
   sesion.analizandoFrame = false;
 
-  if (!obtenerLectorDataMatrix()) {
+  if (!obtenerZXingWasm()) {
     console.warn(
-      'ZXing no está cargado: las etiquetas Data Matrix de cargadores Dell no se leerán.',
+      'zxing-wasm no está cargado: las etiquetas Data Matrix de cargadores Dell no se leerán.',
     );
   }
 
   // Recortes más cerrados ayudan a Data Matrix densos y pequeños
-  const fraccionesRecorte = [0.38, 0.50, 0.62];
+  const fraccionesRecorte = [0.35, 0.48, 0.60];
   let indiceTick = 0;
 
   sesion.intervaloQr = window.setInterval(() => {
@@ -654,26 +711,29 @@ function iniciarJsQr(): void {
     }
 
     sesion.analizandoFrame = true;
-    try {
-      const fraccion = fraccionesRecorte[indiceTick % fraccionesRecorte.length];
-      const probarInvertido = indiceTick % 2 === 1;
-      indiceTick += 1;
+    const fraccion = fraccionesRecorte[indiceTick % fraccionesRecorte.length];
+    const probarInvertido = indiceTick % 2 === 1;
+    const tick = indiceTick;
+    indiceTick += 1;
 
-      let leido = escanearRecorteCentralAmpliado(fraccion, probarInvertido);
+    void (async () => {
+      try {
+        let leido = await escanearRecorteCentralAmpliado(fraccion, probarInvertido);
 
-      if (!leido && indiceTick % 4 === 0) {
-        leido = escanearFrameCompleto(false);
+        if (!leido && tick % 4 === 0) {
+          leido = await escanearFrameCompleto(false);
+        }
+
+        if (leido) {
+          procesarCodigoDetectado(leido.codigo, leido.tipo);
+          return;
+        }
+
+        sesion.framesSinExito += 1;
+      } finally {
+        sesion.analizandoFrame = false;
       }
-
-      if (leido) {
-        procesarCodigoDetectado(leido.codigo, leido.tipo);
-        return;
-      }
-
-      sesion.framesSinExito += 1;
-    } finally {
-      sesion.analizandoFrame = false;
-    }
+    })();
   }, INTERVALO_JSQR_MS);
 }
 
@@ -787,11 +847,13 @@ async function iniciarSesionCamara(): Promise<void> {
     return;
   }
 
-  if (!obtenerZXing()) {
+  if (!obtenerZXingWasm()) {
     mostrarEstadoScanner(
       'warning',
-      'ZXing no cargó: se leerán QR/barras, pero no las etiquetas Data Matrix de cargadores Dell. Recarga la página.',
+      'zxing-wasm no cargó: se leerán QR/barras, pero no las etiquetas Data Matrix de cargadores Dell. Recarga la página.',
     );
+  } else {
+    void calentarZxingWasm();
   }
 
   try {
@@ -945,6 +1007,9 @@ function abrirScannerCodigo(opciones: AbrirScannerCodigoOpciones): void {
     status.innerHTML = '';
   }
   ocultarTipsSinDeteccion();
+
+  // Precalentar WASM cuanto antes (mientras abre el modal)
+  void calentarZxingWasm();
 
   // Listeners con once para no acumular al abrir varias veces
   modalEl.addEventListener(

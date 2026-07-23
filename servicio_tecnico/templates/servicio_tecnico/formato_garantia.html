@@ -176,7 +176,7 @@
                     <!--
                       EXPLICACIÓN PARA PRINCIPIANTES:
                       input-group = textbox + botón cámara al lado.
-                      El botón abre scanner_codigo.js (Quagga + jsQR + ZXing Data Matrix)
+                      El botón abre scanner_codigo.js (Quagga + jsQR + zxing-wasm)
                       y llena este campo. Las etiquetas de cargador Dell suelen ser Data Matrix, no QR.
                     -->
                     <label class="form-label" for="numeroCargador">Número del cargador</label>
@@ -547,10 +547,10 @@
 {% endblock %}
 
 {% block extra_js %}
-{# Quagga (barras 1D) + jsQR (QR) + ZXing (Data Matrix de cargadores Dell) #}
+{# Quagga (barras 1D) + jsQR (QR) + zxing-wasm/zxing-cpp (Data Matrix Dell) #}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.2/dist/iife/reader/index.js"></script>
 <script src="{% static 'js/scanner_codigo.js' %}" defer></script>
 <script src="{% static 'js/formato_garantia.js' %}" defer></script>
 {% endblock %}
