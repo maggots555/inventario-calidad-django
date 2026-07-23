@@ -455,6 +455,10 @@ class FormatoGarantiaWizardViewTest(TestCase):
         self.assertIn(b'ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTIA', resp.content)
         self.assertIn(b'modalActividadesDell', resp.content)
         self.assertIn(b'Servidores y equipos de almacenamiento', resp.content)
+        # Scanner QR/barras junto al número de cargador
+        self.assertIn(b'id="numeroCargador"', resp.content)
+        self.assertIn(b'id="btnEscanearCargador"', resp.content)
+        self.assertIn(b'scanner_codigo.js', resp.content)
         self.assertTrue(
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )

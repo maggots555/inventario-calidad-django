@@ -173,10 +173,26 @@
             </div>
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
+                    <!--
+                      EXPLICACIÓN PARA PRINCIPIANTES:
+                      input-group = textbox + botón cámara al lado.
+                      El botón abre scanner_codigo.js (Quagga + jsQR) y llena este campo.
+                    -->
                     <label class="form-label" for="numeroCargador">Número del cargador</label>
-                    <input type="text" class="form-control" id="numeroCargador"
-                           value="{{ formato.numero_cargador }}"
-                           placeholder="No. serie / descripción del cargador…">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="numeroCargador"
+                               value="{{ formato.numero_cargador }}"
+                               placeholder="No. serie / descripción del cargador…"
+                               autocomplete="off">
+                        <button type="button"
+                                class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                id="btnEscanearCargador"
+                                title="Escanear QR o código de barras"
+                                aria-label="Escanear número del cargador con la cámara">
+                            <i class="bi bi-camera" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" for="accOtrosDetalle">Detalle de “Otros”</label>
@@ -530,5 +546,9 @@
 {% endblock %}
 
 {% block extra_js %}
+{# Quagga (barras) + jsQR (QR): mismas CDN que movimiento rápido de inventario #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="{% static 'js/scanner_codigo.js' %}" defer></script>
 <script src="{% static 'js/formato_garantia.js' %}" defer></script>
 {% endblock %}

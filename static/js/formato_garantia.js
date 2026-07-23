@@ -1226,6 +1226,28 @@
             const t = ev.target;
             void subirEvidencia(t, 'escaneo_garantia');
         });
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Botón de cámara junto a "Número del cargador": reutiliza scanner_codigo.ts
+        // (misma idea que inventario). Al detectar, solo llena el textbox — sin AJAX.
+        const btnEscanearCargador = byId('btnEscanearCargador');
+        const inputNumeroCargador = byId('numeroCargador');
+        btnEscanearCargador === null || btnEscanearCargador === void 0 ? void 0 : btnEscanearCargador.addEventListener('click', () => {
+            if (!inputNumeroCargador) {
+                setStatus('No se encontró el campo del número de cargador.', true, false);
+                return;
+            }
+            if (typeof window.abrirScannerCodigo !== 'function') {
+                setStatus('El scanner no está disponible. Recarga la página o escribe el número a mano.', true, false);
+                return;
+            }
+            window.abrirScannerCodigo({
+                targetInput: inputNumeroCargador,
+                tituloModal: 'Escanear número del cargador',
+                onDetect: () => {
+                    setStatus('Número del cargador capturado con el scanner.', false, false);
+                },
+            });
+        });
     }
     document.addEventListener('DOMContentLoaded', () => {
         inicializarFormatoGarantia();
