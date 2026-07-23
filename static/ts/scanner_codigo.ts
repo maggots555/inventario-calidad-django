@@ -43,6 +43,8 @@ interface SesionScannerCodigo {
   canvas: HTMLCanvasElement | null;
   canvasCtx: CanvasRenderingContext2D | null;
   intervaloQr: number | null;
+  /** Evita apilar análisis si el tick anterior aún no terminó (causa de lag) */
+  analizandoFrame: boolean;
   /** Timer de “aún no detecto nada” para dar tips al usuario */
   timeoutSinDetectar: number | null;
   /** Intervalo que refuerza tips si sigue sin detectar */
@@ -98,10 +100,23 @@ const TIPS_ID = 'scannerCodigoTips';
 const SEGUNDOS_ANTES_TIP = 5;
 /** Cada cuántos segundos refrescar tips si sigue fallando */
 const SEGUNDOS_ENTRE_TIPS = 8;
-/** Intervalo del loop jsQR (ms). Un poco más rápido ayuda con QR pequeños. */
-const INTERVALO_JSQR_MS = 70;
-/** Factor de ampliación del recorte central (2 = el QR se ve el doble de grande en píxeles) */
-const FACTOR_ZOOM_RECORTE = 2.2;
+/**
+ * Intervalo del loop jsQR (ms).
+ * EXPLICACIÓN PARA PRINCIPIANTES: si analizamos cada frame a tope, el hilo
+ * principal se satura y el video se ve a tirones. ~150 ms ≈ 6–7 lecturas/s,
+ * suficiente para detectar y deja aire para pintar la cámara fluido.
+ */
+const INTERVALO_JSQR_MS = 150;
+/**
+ * Tope del canvas de análisis (lado en px).
+ * Ampliar de más (p. ej. 1000×1000) hace lento a jsQR; 480 mantiene QR chicos
+ * legibles sin matar el FPS del preview.
+ */
+const MAX_LADO_ANALISIS_PX = 480;
+/** Factor de ampliación del recorte central (antes de aplicar el tope) */
+const FACTOR_ZOOM_RECORTE = 2;
+/** Ancho máx. del escaneo “frame completo” de respaldo */
+const MAX_ANCHO_FRAME_COMPLETO = 640;
 
 const sesion: SesionScannerCodigo = {
   activa: false,
@@ -109,6 +124,7 @@ const sesion: SesionScannerCodigo = {
   canvas: null,
   canvasCtx: null,
   intervaloQr: null,
+  analizandoFrame: false,
   timeoutSinDetectar: null,
   intervaloTips: null,
   framesSinExito: 0,
@@ -352,9 +368,10 @@ async function aplicarMejorasEnfoque(track: MediaStreamTrack): Promise<void> {
     advanced.push({ focusMode: 'single-shot' });
   }
 
-  // Un poco de zoom óptico (si existe) acerca QR pequeños sin perder nitidez
+  // Un poco de zoom óptico (si existe) acerca QR pequeños sin perder nitidez.
+  // Evitamos zoom alto: fuerza reenfoques y se siente “pesado”.
   if (caps.zoom && typeof caps.zoom.max === 'number' && caps.zoom.max > 1) {
-    const zoomIdeal = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 1.5));
+    const zoomIdeal = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 1.25));
     advanced.push({ zoom: zoomIdeal });
   }
 
@@ -371,6 +388,8 @@ async function aplicarMejorasEnfoque(track: MediaStreamTrack): Promise<void> {
 
 /**
  * Inicia QuaggaJS sobre el video ya con stream (códigos de barras).
+ * Configuración “ligera”: Quagga es pesado; si lo ponemos a máxima precisión
+ * el preview de cámara se traba.
  */
 function iniciarQuagga(): void {
   if (!sesion.video || typeof Quagga === 'undefined') {
@@ -384,37 +403,34 @@ function iniciarQuagga(): void {
         type: 'LiveStream',
         target: sesion.video,
         constraints: {
-          // Resolución más alta que 640×480 mejora códigos finos
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
         },
         area: {
           // Solo analiza el centro (coincide con el marco visual)
-          top: '15%',
-          right: '15%',
-          left: '15%',
-          bottom: '15%',
+          top: '18%',
+          right: '18%',
+          left: '18%',
+          bottom: '18%',
         },
       },
       decoder: {
+        // Menos readers = menos CPU; los más usados en series/inventario
         readers: [
           'code_128_reader',
+          'code_39_reader',
           'ean_reader',
           'ean_8_reader',
-          'code_39_reader',
           'upc_reader',
-          'upc_e_reader',
-          'codabar_reader',
-          'i2of5_reader',
         ],
       },
       locator: {
-        // patchSize small + sin halfSample = más precisión (un poco más CPU)
-        patchSize: 'small',
-        halfSample: false,
+        // halfSample true = analiza a la mitad de resolución (mucho más fluido)
+        patchSize: 'medium',
+        halfSample: true,
       },
-      numOfWorkers: 2,
-      frequency: 8,
+      numOfWorkers: 1,
+      frequency: 4,
       debug: false,
     },
     (err: Error | null) => {
@@ -441,11 +457,13 @@ function iniciarQuagga(): void {
 /**
  * Ejecuta jsQR sobre ImageData ya preparado.
  * Devuelve el texto del QR o null.
+ *
+ * @param intentarInvertir - si true, prueba también QR invertidos (cuesta más CPU)
  */
-function intentarJsQr(imageData: ImageData): string | null {
+function intentarJsQr(imageData: ImageData, intentarInvertir: boolean): string | null {
   const qr = jsQR(imageData.data, imageData.width, imageData.height, {
-    // attemptBoth: prueba QR normales e invertidos (fondo oscuro / claro)
-    inversionAttempts: 'attemptBoth',
+    // dontInvert es más barato; attemptBoth solo en ticks alternos
+    inversionAttempts: intentarInvertir ? 'attemptBoth' : 'dontInvert',
   });
   return qr ? qr.data : null;
 }
@@ -459,9 +477,13 @@ function intentarJsQr(imageData: ImageData): string | null {
  * y jsQR los lee mucho mejor — sin cambiar de cámara.
  *
  * @param fraccionLado - fracción del lado menor del video (0.35–0.7)
+ * @param intentarInvertir - modo invertido (más CPU)
  * @returns texto del QR o null
  */
-function escanearRecorteCentralAmpliado(fraccionLado: number): string | null {
+function escanearRecorteCentralAmpliado(
+  fraccionLado: number,
+  intentarInvertir: boolean,
+): string | null {
   const video = sesion.video;
   const canvas = sesion.canvas;
   const ctx = sesion.canvasCtx;
@@ -478,7 +500,11 @@ function escanearRecorteCentralAmpliado(fraccionLado: number): string | null {
   const lado = Math.floor(Math.min(vw, vh) * fraccionLado);
   const sx = Math.floor((vw - lado) / 2);
   const sy = Math.floor((vh - lado) / 2);
-  const dest = Math.floor(lado * FACTOR_ZOOM_RECORTE);
+  // Tope de tamaño: precisión OK + video fluido
+  const dest = Math.min(
+    MAX_LADO_ANALISIS_PX,
+    Math.max(240, Math.floor(lado * FACTOR_ZOOM_RECORTE)),
+  );
 
   canvas.width = dest;
   canvas.height = dest;
@@ -487,13 +513,14 @@ function escanearRecorteCentralAmpliado(fraccionLado: number): string | null {
   ctx.drawImage(video, sx, sy, lado, lado, 0, 0, dest, dest);
 
   const imageData = ctx.getImageData(0, 0, dest, dest);
-  return intentarJsQr(imageData);
+  return intentarJsQr(imageData, intentarInvertir);
 }
 
 /**
- * Escaneo de respaldo: frame completo (QR grandes / ya cercanos).
+ * Escaneo de respaldo: frame reducido (QR grandes / ya cercanos).
+ * Nunca a resolución nativa: eso era una causa fuerte de lag.
  */
-function escanearFrameCompleto(): string | null {
+function escanearFrameCompleto(intentarInvertir: boolean): string | null {
   const video = sesion.video;
   const canvas = sesion.canvas;
   const ctx = sesion.canvasCtx;
@@ -503,9 +530,7 @@ function escanearFrameCompleto(): string | null {
 
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  // Límite de píxeles para no saturar CPU en 4K; 1920 de ancho basta
-  const maxAncho = 1600;
-  const escala = vw > maxAncho ? maxAncho / vw : 1;
+  const escala = vw > MAX_ANCHO_FRAME_COMPLETO ? MAX_ANCHO_FRAME_COMPLETO / vw : 1;
   const dw = Math.floor(vw * escala);
   const dh = Math.floor(vh * escala);
 
@@ -515,46 +540,58 @@ function escanearFrameCompleto(): string | null {
   ctx.drawImage(video, 0, 0, dw, dh);
 
   const imageData = ctx.getImageData(0, 0, dw, dh);
-  return intentarJsQr(imageData);
+  return intentarJsQr(imageData, intentarInvertir);
 }
 
 /**
- * Loop de jsQR: recortes ampliados (QR pequeños) + frame completo.
+ * Loop de jsQR: un solo análisis por tick (no apilar trabajo).
  */
 function iniciarJsQr(): void {
   if (sesion.intervaloQr !== null) {
     window.clearInterval(sesion.intervaloQr);
   }
   sesion.framesSinExito = 0;
+  sesion.analizandoFrame = false;
 
-  // Fracciones del centro: más cerrado = más zoom digital sobre QR chicos
-  const fraccionesRecorte = [0.42, 0.55, 0.68];
-  let indiceFraccion = 0;
+  // Rotamos una fracción por tick (no tres análisis seguidos)
+  const fraccionesRecorte = [0.45, 0.58, 0.70];
+  let indiceTick = 0;
 
   sesion.intervaloQr = window.setInterval(() => {
     if (!sesion.activa || !sesion.video) {
+      return;
+    }
+    // Si el análisis anterior aún corre, saltamos: evita cola de lag
+    if (sesion.analizandoFrame) {
       return;
     }
     if (sesion.video.readyState !== sesion.video.HAVE_ENOUGH_DATA) {
       return;
     }
 
-    // Paso A: recorte central ampliado (prioridad para QR pequeños)
-    const fraccion = fraccionesRecorte[indiceFraccion % fraccionesRecorte.length];
-    indiceFraccion += 1;
-    let codigo = escanearRecorteCentralAmpliado(fraccion);
+    sesion.analizandoFrame = true;
+    try {
+      const fraccion = fraccionesRecorte[indiceTick % fraccionesRecorte.length];
+      const probarInvertido = indiceTick % 2 === 1;
+      indiceTick += 1;
 
-    // Paso B: cada 3 ticks, también prueba el frame completo
-    if (!codigo && indiceFraccion % 3 === 0) {
-      codigo = escanearFrameCompleto();
+      // Prioridad: recorte central (QR pequeños) — un solo intento por tick
+      let codigo = escanearRecorteCentralAmpliado(fraccion, probarInvertido);
+
+      // Cada 4 ticks: frame completo ligero (QR grandes ya cerca)
+      if (!codigo && indiceTick % 4 === 0) {
+        codigo = escanearFrameCompleto(false);
+      }
+
+      if (codigo) {
+        procesarCodigoDetectado(codigo, 'Código QR');
+        return;
+      }
+
+      sesion.framesSinExito += 1;
+    } finally {
+      sesion.analizandoFrame = false;
     }
-
-    if (codigo) {
-      procesarCodigoDetectado(codigo, 'Código QR');
-      return;
-    }
-
-    sesion.framesSinExito += 1;
   }, INTERVALO_JSQR_MS);
 }
 
@@ -633,6 +670,7 @@ function detenerScannerCodigo(): void {
   sesion.canvasCtx = null;
   sesion.videoTrack = null;
   sesion.framesSinExito = 0;
+  sesion.analizandoFrame = false;
 }
 
 /**
@@ -673,13 +711,15 @@ async function iniciarSesionCamara(): Promise<void> {
       throw new Error('No se pudo crear el elemento de video.');
     }
 
-    // Preferimos cámara trasera + resolución alta (mejor detalle en QR chicos)
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // 1280×720 se ve fluido en tablets; 1920×1080 satura CPU al analizar QR.
+    // El “zoom digital” del recorte central compensaba el detalle de Full HD.
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1920, min: 1280 },
-        height: { ideal: 1080, min: 720 },
-        frameRate: { ideal: 30, min: 15 },
+        width: { ideal: 1280, max: 1280 },
+        height: { ideal: 720, max: 720 },
+        frameRate: { ideal: 30, max: 30 },
       },
     });
 
@@ -715,8 +755,13 @@ async function iniciarSesionCamara(): Promise<void> {
     );
     programarFeedbackSinDeteccion();
 
-    iniciarQuagga();
+    // jsQR primero; Quagga un poco después para no pelear el arranque del preview
     iniciarJsQr();
+    window.setTimeout(() => {
+      if (sesion.activa) {
+        iniciarQuagga();
+      }
+    }, 400);
   } catch (error) {
     console.error('Error al iniciar scanner:', error);
     const err = error as DOMException;
@@ -728,7 +773,7 @@ async function iniciarSesionCamara(): Promise<void> {
     } else if (err.name === 'NotFoundError') {
       mostrarEstadoScanner('error', 'No se encontró cámara en este dispositivo.');
     } else if (err.name === 'OverconstrainedError') {
-      // Fallback: constraints muy estrictas (1920) fallaron → pedir sin min
+      // Fallback: constraints estrictas fallaron → pedir sin max
       await iniciarSesionCamaraFallback();
     } else {
       mostrarEstadoScanner(
@@ -740,7 +785,7 @@ async function iniciarSesionCamara(): Promise<void> {
 }
 
 /**
- * Segunda oportunidad si el dispositivo no acepta 1920×1080.
+ * Segunda oportunidad si el dispositivo no acepta 1280×720 exacto.
  */
 async function iniciarSesionCamaraFallback(): Promise<void> {
   try {
@@ -772,8 +817,12 @@ async function iniciarSesionCamaraFallback(): Promise<void> {
       'Scanner activo (resolución estándar) — acerca el código al marco',
     );
     programarFeedbackSinDeteccion();
-    iniciarQuagga();
     iniciarJsQr();
+    window.setTimeout(() => {
+      if (sesion.activa) {
+        iniciarQuagga();
+      }
+    }, 400);
   } catch (error) {
     console.error('Fallback scanner falló:', error);
     mostrarEstadoScanner(

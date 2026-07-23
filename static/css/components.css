@@ -176,6 +176,9 @@
     outline: none;
     margin: 0;
     padding: 0;
+    /* Capa GPU: el preview se pinta más fluido mientras JS analiza en paralelo */
+    transform: translateZ(0);
+    will-change: contents;
 }
 
 .scanner-overlay {
