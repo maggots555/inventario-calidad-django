@@ -24,7 +24,7 @@
 ### 2. 🔧 Servidor Web y Aplicación
 - [x] Nginx configurado en puertos 80 y 443
 - [x] Gunicorn ejecutándose con 5 workers
-- [x] Django 5.2.5 operativo
+- [x] Django 5.2.14 operativo (verificado en prod con `pip show Django`; Python 3.12)
 - [x] PostgreSQL activo y optimizado
 - [x] Archivos estáticos recolectados (70 migraciones aplicadas)
 

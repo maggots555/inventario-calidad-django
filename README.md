@@ -2,7 +2,7 @@
 
 <!-- Badges -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Django-5.2.5-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 5.2.5">
+  <img src="https://img.shields.io/badge/Django-5.2.14-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 5.2.14">
   <img src="https://img.shields.io/badge/Python-3.12.3-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12.3">
   <img src="https://img.shields.io/badge/TypeScript-5.9.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5.9.3">
   <img src="https://img.shields.io/badge/Bootstrap-5.3.2-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white" alt="Bootstrap 5.3.2">
@@ -14,12 +14,12 @@
   <img src="https://img.shields.io/badge/scikit--learn-1.5+-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white" alt="Scikit-learn">
   <img src="https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js">
   <img src="https://img.shields.io/badge/Celery-5.3+-37814A?style=for-the-badge&logo=celery&logoColor=white" alt="Celery">
-  <img src="https://img.shields.io/badge/Redis-5.4+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/django--redis-5.4+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="django-redis">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-5.2-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/SIGMA-v1.0.0-blue?style=for-the-badge" alt="Versión del producto SIGMA v1.0.0">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Modules-6-orange?style=for-the-badge" alt="Modules">
 </p>
@@ -679,7 +679,7 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ## 📋 Características Técnicas
 
-### Backend (Django 5.2.5)
+### Backend (Django 5.2.14)
 
 - **Arquitectura MVC** con separación de responsabilidades
 - **ORM avanzado** con relaciones complejas (OneToOne, ForeignKey, ManyToMany)
@@ -1248,7 +1248,7 @@ inventario-calidad-django/
 
 ### Backend
 
-- **Django 5.2.5** - Framework web Python
+- **Django 5.2.14** - Framework web Python
 - **Python 3.12.3** - Lenguaje de programación
 - **SQLite3** - Base de datos (desarrollo)
 - **PostgreSQL** - Base de datos (producción) con connection pooling

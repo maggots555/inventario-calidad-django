@@ -1,7 +1,7 @@
 # AGENTS.md - Development Guide for AI Coding Agents
 
 > **Project**: Sistema Integrado de Gestión Técnica y Control de Calidad (SIGMA)  
-> **Framework**: Django 5.2.5 | Python 3.12+ | TypeScript 5.9.3  
+> **Framework**: Django 5.2.14 | Python 3.12+ | TypeScript 5.9.3  
 > **Purpose**: Enterprise technical service management with ML analytics  
 > **Deployment**: PWA — instalable en móviles como app nativa
 
@@ -433,6 +433,7 @@ Todas ya llevan `db_alias` en firma; nuevas igual.
 ---
 
 **Last Updated**: Julio 2026  
-**Django Version**: 5.2.5  
-**Python Version**: 3.12+  
+**Django Version**: 5.2.14
+**Python Version**: 3.12+
 **TypeScript Version**: 5.9.3
+**Product Version (SIGMA)**: v1.0.0 (independiente de la versión de Django)

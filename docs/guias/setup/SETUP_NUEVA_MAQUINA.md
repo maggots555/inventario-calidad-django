@@ -3,7 +3,7 @@
 ## 📋 Información del Proyecto
 - **Nombre del proyecto**: Sistema de Gestión de Inventario con Control de Calidad
 - **Repositorio GitHub**: https://github.com/maggots555/inventario-calidad-django
-- **Framework**: Django 5.2.5
+- **Framework**: Django 5.2.14
 - **Base de datos**: SQLite3
 - **Configuración actual**:
   - Usuario Git: Jorge Magos
@@ -49,8 +49,8 @@ pip --version
 
 **Resultado esperado**:
 ```
-Python 3.11.x
-pip 23.x.x
+Python 3.12.x
+pip 24.x.x (o superior)
 ```
 
 ---
@@ -147,7 +147,7 @@ pip install -r requirements.txt
 ```
 
 **¿Qué instala?**
-- Django 5.2.5
+- Django 5.2.14 (y el resto de pins de `requirements.txt`, p. ej. Pillow 12.2.0)
 - Otras dependencias específicas del proyecto
 
 ---

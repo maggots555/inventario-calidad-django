@@ -400,4 +400,4 @@ Si tienes problemas:
 ---
 
 **Fecha de última actualización**: Enero 2026
-**Versión del sistema**: Django 5.2.5 | Python 3.10+
+**Versión del sistema**: Django 5.2.14 | Python 3.12+ | SIGMA v1.0.0

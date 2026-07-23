@@ -130,5 +130,6 @@ Scripts de prueba y testing.
 ---
 
 **Fecha de Última Actualización:** Octubre 2025  
-**Versión del Sistema:** Django 5.2.5  
+**Versión del producto (SIGMA):** v1.0.0  
+**Framework:** Django 5.2.14 | Python 3.12+  
 **Proyecto:** Sistema Integrado de Servicio Técnico y Control de Calidad
