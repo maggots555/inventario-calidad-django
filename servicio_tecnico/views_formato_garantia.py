@@ -336,6 +336,11 @@ def formato_garantia_pdf(request, orden_id: int):
     response['Content-Disposition'] = (
         f'{disposition}; filename="FormatoGarantia_{dps}.pdf"'
     )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Tras “Regenerar PDF” el archivo cambia pero la URL es la misma. Sin estos
+    # headers el navegador puede seguir mostrando el PDF viejo en caché.
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
     return response
 
 

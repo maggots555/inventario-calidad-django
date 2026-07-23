@@ -464,6 +464,45 @@ class FormatoGarantiaWizardViewTest(TestCase):
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )
 
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_pdf_view_headers_anti_cache(self):
+        """
+        Tras regenerar, la URL del PDF es la misma; sin no-store el navegador
+        puede mostrar el PDF viejo (p. ej. número de cargador anterior).
+        """
+        from django.core.files.base import ContentFile
+        from servicio_tecnico.services.formato_garantia import obtener_o_crear_borrador
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.estado = 'finalizado'
+        formato.pdf.save(
+            'garantia_test.pdf',
+            ContentFile(b'%PDF-1.4\n%fake\n'),
+            save=True,
+        )
+
+        request = self.factory.get(
+            reverse('servicio_tecnico:formato_garantia_pdf', args=[self.orden.pk]),
+            {'inline': '1'},
+        )
+        request.user = self.user
+        resp = views_formato_garantia.formato_garantia_pdf(
+            request, orden_id=self.orden.pk,
+        )
+        self.assertEqual(resp.status_code, 200)
+        cache_ctrl = resp.get('Cache-Control', '')
+        self.assertIn('no-store', cache_ctrl)
+        self.assertIn('no-cache', cache_ctrl)
+
 
 class FormatoGarantiaEliminarEvidenciaTest(TestCase):
     """POST eliminar solo borra escaneo_garantia de esa orden."""

@@ -1160,7 +1160,14 @@ function inicializarFormatoGarantia(): void {
       }
 
       const data = await postJson(urlFinalizar, payload);
-      const pdfUrl = String(data.pdf_url || urlPdf) + '?inline=1';
+      // EXPLICACIÓN PARA PRINCIPIANTES:
+      // La URL del PDF es siempre la misma (/.../pdf/). Sin un parámetro que cambie
+      // (v=timestamp), el navegador puede mostrar el PDF ANTERIOR en caché aunque
+      // el servidor ya regeneró el archivo. Por eso “Regenerar” parecía no actualizar
+      // el número del cargador, y “Enviar correo” sí (el adjunto lee el archivo nuevo).
+      const pdfUrlBase = String(data.pdf_url || urlPdf);
+      const pdfUrl =
+        `${pdfUrlBase}?inline=1&v=${Date.now()}`;
 
       setOverlay(false);
       setStatus(opciones.mensajeExito, false, false);
