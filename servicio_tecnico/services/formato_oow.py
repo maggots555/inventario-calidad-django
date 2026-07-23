@@ -517,6 +517,14 @@ def finalizar_formato(
     version, _texto = texto_aviso_privacidad_actual()
     formato.version_aviso_privacidad = version
 
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Fijamos la fecha en memoria ANTES de generar el PDF, para que el
+    # documento imprima la fecha real de finalización (no "hoy" al regenerar).
+    # El save a BD sigue abajo, dentro de transaction.atomic().
+    ahora = timezone.now()
+    if not formato.finalizado_en:
+        formato.finalizado_en = ahora
+
     # Generar PDF (import diferido para evitar ciclos)
     from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
 
@@ -536,7 +544,9 @@ def finalizar_formato(
     with transaction.atomic():
         formato.pdf.save(nombre_archivo, ContentFile(pdf_bytes), save=False)
         formato.estado = 'finalizado'
-        formato.finalizado_en = timezone.now()
+        # Conservamos finalizado_en ya fijado arriba (primera finalización)
+        if not formato.finalizado_en:
+            formato.finalizado_en = ahora
         formato.actualizado_por = empleado
         formato.save()
 

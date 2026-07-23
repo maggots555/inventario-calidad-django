@@ -21,10 +21,10 @@ from __future__ import annotations
 
 import io
 import logging
-from datetime import date
 from typing import Any, Dict, List, Optional
 
 from django.contrib.staticfiles import finders
+from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import letter
@@ -56,8 +56,10 @@ logger = logging.getLogger('servicio_tecnico')
 # Colores corporativos (idénticos a cotización cliente)
 COLOR_NAVY = colors.HexColor('#003366')
 COLOR_NAVY_LIGHT = colors.HexColor('#1d4e8f')
+COLOR_NAVY_SUAVE = colors.HexColor('#E8EEF5')  # Fondo suave columna labels
 COLOR_GRIS_ALT = colors.HexColor('#F2F2F2')
 COLOR_GRIS_BORDE = colors.HexColor('#CCCCCC')
+COLOR_GRIS_TEXTO = colors.HexColor('#888888')  # Accesorio = NO
 COLOR_AMARILLO_BG = colors.HexColor('#FFF2CC')
 COLOR_ROJO_BG = colors.HexColor('#FDECEC')
 COLOR_ROJO_ALERTA = colors.HexColor('#C00000')
@@ -65,6 +67,7 @@ COLOR_BLANCO = colors.white
 COLOR_NEGRO = colors.black
 
 MARGEN = 15 * mm
+MARGEN_INFERIOR = 20 * mm  # Extra espacio para pie de página (folio + nº página)
 
 
 class PDFFormatoServicioOOW:
@@ -99,13 +102,27 @@ class PDFFormatoServicioOOW:
         """
         try:
             buffer = io.BytesIO()
+            # Folio visible en pie y metadatos (SICSER / orden cliente / interno)
+            folio = (
+                self.detalle.folio_sicser
+                or self.detalle.orden_cliente
+                or self.orden.numero_orden_interno
+            )
+            empresa = self.pais_config.get(
+                'empresa_nombre',
+                'SIC Comercialización y Servicios de México SC',
+            )
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=letter,
                 leftMargin=MARGEN,
                 rightMargin=MARGEN,
                 topMargin=MARGEN,
-                bottomMargin=MARGEN,
+                bottomMargin=MARGEN_INFERIOR,
+                title=f'Formato OOW — {folio}',
+                author=empresa,
+                subject='Formato de servicio fuera de garantía',
+                creator='SIGMA',
             )
 
             elementos: List = []
@@ -137,7 +154,14 @@ class PDFFormatoServicioOOW:
             # --- Aviso de privacidad ---
             elementos += self._construir_aviso_privacidad()
 
-            doc.build(elementos)
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # onFirstPage/onLaterPages dibujan el pie en CADA hoja con canvas
+            # (fuera del flujo de párrafos). Así siempre sale folio + nº página.
+            doc.build(
+                elementos,
+                onFirstPage=self._dibujar_pie_pagina,
+                onLaterPages=self._dibujar_pie_pagina,
+            )
             buffer.seek(0)
 
             nombre = f"FormatoOOW_{self.orden.numero_orden_interno}.pdf"
@@ -149,6 +173,39 @@ class PDFFormatoServicioOOW:
         except Exception as exc:
             logger.error('[PDF_FORMATO_OOW] Error: %s', exc, exc_info=True)
             return {'success': False, 'error': str(exc), 'buffer': None}
+
+    def _dibujar_pie_pagina(self, canvas, doc) -> None:
+        """
+        Pie corporativo: folio a la izquierda, «Página N» a la derecha.
+
+        Args:
+            canvas: canvas de ReportLab de la página actual
+            doc: SimpleDocTemplate (para márgenes y número de página)
+
+        Efectos secundarios:
+            Dibuja sobre el canvas de la página (línea + textos del pie).
+        """
+        canvas.saveState()
+        folio = (
+            self.detalle.folio_sicser
+            or self.detalle.orden_cliente
+            or self.orden.numero_orden_interno
+            or ''
+        )
+        y_pie = 10 * mm
+        x_izq = MARGEN
+        x_der = letter[0] - MARGEN
+
+        # Línea sutil arriba del pie
+        canvas.setStrokeColor(COLOR_GRIS_BORDE)
+        canvas.setLineWidth(0.5)
+        canvas.line(x_izq, y_pie + 5 * mm, x_der, y_pie + 5 * mm)
+
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(COLOR_NAVY)
+        canvas.drawString(x_izq, y_pie, f'Formato OOW · {folio}')
+        canvas.drawRightString(x_der, y_pie, f'Página {doc.page}')
+        canvas.restoreState()
 
     # ------------------------------------------------------------------ estilos
 
@@ -165,16 +222,17 @@ class PDFFormatoServicioOOW:
         self._estilos.add(ParagraphStyle(
             'TituloFormato',
             fontName='Helvetica-Bold',
-            fontSize=13,
+            # Un poco más chico: las barras navy se veían muy altas respecto al texto
+            fontSize=10,
             textColor=COLOR_BLANCO,
             alignment=TA_CENTER,
-            leading=16,
+            leading=12,
         ))
         self._estilos.add(ParagraphStyle(
             'CeldaLabel',
             fontName='Helvetica-Bold',
             fontSize=8,
-            textColor=COLOR_NEGRO,
+            textColor=COLOR_NAVY,
             leading=10,
         ))
         self._estilos.add(ParagraphStyle(
@@ -182,6 +240,21 @@ class PDFFormatoServicioOOW:
             fontName='Helvetica',
             fontSize=8,
             textColor=COLOR_NEGRO,
+            leading=10,
+        ))
+        # Accesorios: SI resalta en navy; NO queda gris para escanear más rápido
+        self._estilos.add(ParagraphStyle(
+            'AccesorioSi',
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            textColor=COLOR_NAVY,
+            leading=10,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'AccesorioNo',
+            fontName='Helvetica',
+            fontSize=8,
+            textColor=COLOR_GRIS_TEXTO,
             leading=10,
         ))
         self._estilos.add(ParagraphStyle(
@@ -257,8 +330,9 @@ class PDFFormatoServicioOOW:
             ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            # Padding reducido (antes 6): barras más compactas, sin verse apretadas
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ('LEFTPADDING', (0, 0), (-1, -1), 4),
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         ]))
@@ -278,12 +352,20 @@ class PDFFormatoServicioOOW:
     # ------------------------------------------------------------------ secciones
 
     def _obtener_logo(self) -> Optional[RLImage]:
-        """Carga logo SIC PNG desde static si existe."""
+        """
+        Carga logo SIC PNG desde static si existe.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Si forzamos width y height sin kind='proportional', ReportLab estira
+        la imagen. Con proportional respeta la proporción real del PNG y
+        la altura (15 mm) es solo un tope máximo — igual que en cotizaciones.
+        """
         ruta = finders.find('images/logos/logo_sic.png')
         if not ruta:
             return None
         try:
-            img = RLImage(ruta, width=45 * mm, height=18 * mm)
+            # Un poco menos alto (15 mm) para que no se vea estirado en vertical
+            img = RLImage(ruta, width=45 * mm, height=15 * mm, kind='proportional')
             return img
         except Exception:
             return None
@@ -324,11 +406,13 @@ class PDFFormatoServicioOOW:
 
         EXPLICACIÓN PARA PRINCIPIANTES:
         Barra navy + tabla label|valor a todo el ancho, igual que el resto
-        de secciones de la página 1.
+        de secciones de la página 1. La fecha sale de finalizado_en (fecha
+        real de cierre), no de "hoy", para que regenerar no la cambie.
         """
         elementos = [self._crear_header_seccion('Orden de servicio'), Spacer(1, 2 * mm)]
-        hoy = date.today()
-        fecha_txt = hoy.strftime('%Y-%m-%d')
+        momento = self.formato.finalizado_en or timezone.now()
+        # localtime: muestra la fecha en zona horaria del servidor/Django
+        fecha_txt = timezone.localtime(momento).strftime('%Y-%m-%d')
         folio = (
             self.detalle.folio_sicser
             or self.detalle.orden_cliente
@@ -347,9 +431,29 @@ class PDFFormatoServicioOOW:
             Paragraph(self._esc(valor or '—'), self._estilos['CeldaValor']),
         ]
 
-    def _tabla_pares(self, pares: List[tuple]) -> Table:
-        """Tabla 2 columnas label|valor con filas alternadas."""
-        data = [self._fila_dato(l, v) for l, v in pares]
+    def _tabla_pares(self, pares: List[tuple], valores_flowables: bool = False) -> Table:
+        """
+        Tabla 2 columnas label|valor con jerarquía visual.
+
+        Args:
+            pares: lista de (label, valor). Si valores_flowables=False, valor es str.
+            valores_flowables: si True, el segundo elemento ya es un flowable
+                (p. ej. Paragraph SI/NO estilizado).
+
+        Returns:
+            Table ReportLab lista para insertar en el documento.
+        """
+        if valores_flowables:
+            data = [
+                [
+                    Paragraph(self._esc(label), self._estilos['CeldaLabel']),
+                    valor,
+                ]
+                for label, valor in pares
+            ]
+        else:
+            data = [self._fila_dato(l, v) for l, v in pares]
+
         tabla = Table(data, colWidths=[45 * mm, None])
         estilos = [
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -358,10 +462,13 @@ class PDFFormatoServicioOOW:
             ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            # Columna de labels: fondo navy suave (jerarquía sin cambiar layout)
+            ('BACKGROUND', (0, 0), (0, -1), COLOR_NAVY_SUAVE),
         ]
+        # Filas alternadas solo en la columna de valores
         for i in range(len(data)):
             if i % 2 == 0:
-                estilos.append(('BACKGROUND', (0, i), (-1, i), COLOR_GRIS_ALT))
+                estilos.append(('BACKGROUND', (1, i), (1, i), COLOR_GRIS_ALT))
         tabla.setStyle(TableStyle(estilos))
         return tabla
 
@@ -405,18 +512,25 @@ class PDFFormatoServicioOOW:
         EXPLICACIÓN PARA PRINCIPIANTES:
         ReportLab con fuente Helvetica NO dibuja bien los símbolos ☑ / ☐
         (Unicode). Por eso usamos "SI" / "NO" en texto ASCII, visibles en el PDF.
+        SI va en navy negrita y NO en gris para escanear más rápido en recepción.
         """
         elementos = [self._crear_header_seccion('Accesorios entregados'), Spacer(1, 2 * mm)]
         f = self.formato
+
+        def _celda_si_no(activo: bool) -> Paragraph:
+            if activo:
+                return Paragraph('SI', self._estilos['AccesorioSi'])
+            return Paragraph('NO', self._estilos['AccesorioNo'])
+
         pares = [
-            ('Cargador', 'SI' if f.accesorio_cargador else 'NO'),
-            ('Maletín', 'SI' if f.accesorio_maletin else 'NO'),
-            ('Mouse', 'SI' if f.accesorio_mouse else 'NO'),
-            ('Teclado', 'SI' if f.accesorio_teclado else 'NO'),
-            ('Monitor', 'SI' if f.accesorio_monitor else 'NO'),
-            ('Otros', 'SI' if f.accesorio_otros else 'NO'),
+            ('Cargador', _celda_si_no(f.accesorio_cargador)),
+            ('Maletín', _celda_si_no(f.accesorio_maletin)),
+            ('Mouse', _celda_si_no(f.accesorio_mouse)),
+            ('Teclado', _celda_si_no(f.accesorio_teclado)),
+            ('Monitor', _celda_si_no(f.accesorio_monitor)),
+            ('Otros', _celda_si_no(f.accesorio_otros)),
         ]
-        elementos.append(self._tabla_pares(pares))
+        elementos.append(self._tabla_pares(pares, valores_flowables=True))
         if f.accesorios_otros_detalle:
             elementos.append(Spacer(1, 2 * mm))
             elementos.append(Paragraph(
@@ -543,9 +657,10 @@ class PDFFormatoServicioOOW:
                 img = RLImage(path, width=72 * mm, height=42 * mm, kind='proportional')
             except Exception:
                 img = Paragraph('(imagen no disponible)', self._estilos['CeldaValor'])
+            # Solo el nombre de la pieza (Pantalla, Top Cover…). El tipo de
+            # daño (Desgaste, etc.) se ve en el diagrama anotado; no lo
+            # repetimos en el título de la tarjeta.
             titulo = labels.get(vista.clave_vista, vista.clave_vista)
-            if vista.etiqueta_dano:
-                titulo = f'{titulo} — {vista.etiqueta_dano}'
             # Tarjeta con borde: título + imagen (no se mezcla con la de al lado)
             tarjeta = Table(
                 [
