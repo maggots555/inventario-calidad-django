@@ -160,6 +160,12 @@
     padding: 0;
 }
 
+/* Vista un poco más alta: más área útil al acercar QR pequeños */
+.scanner-container--mejorado {
+    height: min(52vh, 420px);
+    min-height: 320px;
+}
+
 .scanner-video {
     width: 100%;
     height: 100%;
@@ -194,6 +200,14 @@
     position: relative;
     background: transparent;
     animation: scanner-glow 2s infinite ease-in-out;
+}
+
+/* Marco un poco más grande: invita a llenarlo con el código (mejor lectura) */
+.scanner-frame--preciso {
+    width: min(78vw, 300px);
+    height: min(78vw, 300px);
+    max-width: 320px;
+    max-height: 320px;
 }
 
 .scanner-frame::before,

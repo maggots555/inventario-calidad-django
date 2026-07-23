@@ -14,6 +14,12 @@
  * - Inyecta un modal Bootstrap en el DOM si no existe
  * - Al detectar: llena el input, dispara evento `input` y cierra el modal
  *
+ * Mejoras de precisión (QR pequeños):
+ * - Cámara a resolución alta + enfoque continuo si el dispositivo lo permite
+ * - Escaneo del centro del marco ampliado 2× (más píxeles por módulo del QR)
+ * - inversionAttempts attemptBoth (QR claros/oscuros)
+ * - Feedback si pasan varios segundos sin detectar
+ *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Inventario tenía esta lógica duplicada en HTML. Aquí la sacamos a un módulo
  * reutilizable: cualquier página llama `abrirScannerCodigo({ targetInput })`
@@ -37,8 +43,16 @@ interface SesionScannerCodigo {
   canvas: HTMLCanvasElement | null;
   canvasCtx: CanvasRenderingContext2D | null;
   intervaloQr: number | null;
+  /** Timer de “aún no detecto nada” para dar tips al usuario */
+  timeoutSinDetectar: number | null;
+  /** Intervalo que refuerza tips si sigue sin detectar */
+  intervaloTips: number | null;
+  /** Contador de frames analizados sin éxito (para feedback suave) */
+  framesSinExito: number;
+  inicioEscaneoMs: number;
   modalInstancia: BootstrapModalApi | null;
   opciones: AbrirScannerCodigoOpciones | null;
+  videoTrack: MediaStreamTrack | null;
 }
 
 declare const Quagga: {
@@ -78,6 +92,16 @@ function obtenerBootstrapModal(element: Element): BootstrapModalApi {
 const MODAL_ID = 'scannerCodigoUniversalModal';
 const VIDEO_HOST_ID = 'scannerCodigoVideoHost';
 const STATUS_ID = 'scannerCodigoStatus';
+const TIPS_ID = 'scannerCodigoTips';
+
+/** Segundos sin detección antes del primer aviso de ayuda */
+const SEGUNDOS_ANTES_TIP = 5;
+/** Cada cuántos segundos refrescar tips si sigue fallando */
+const SEGUNDOS_ENTRE_TIPS = 8;
+/** Intervalo del loop jsQR (ms). Un poco más rápido ayuda con QR pequeños. */
+const INTERVALO_JSQR_MS = 70;
+/** Factor de ampliación del recorte central (2 = el QR se ve el doble de grande en píxeles) */
+const FACTOR_ZOOM_RECORTE = 2.2;
 
 const sesion: SesionScannerCodigo = {
   activa: false,
@@ -85,8 +109,13 @@ const sesion: SesionScannerCodigo = {
   canvas: null,
   canvasCtx: null,
   intervaloQr: null,
+  timeoutSinDetectar: null,
+  intervaloTips: null,
+  framesSinExito: 0,
+  inicioEscaneoMs: 0,
   modalInstancia: null,
   opciones: null,
+  videoTrack: null,
 };
 
 /**
@@ -120,16 +149,17 @@ function asegurarModalScanner(): HTMLElement {
         </div>
         <div class="modal-body text-center">
           <div id="${STATUS_ID}" class="mb-3"></div>
-          <div class="scanner-container">
+          <div class="scanner-container scanner-container--mejorado">
             <div id="${VIDEO_HOST_ID}"></div>
             <div class="scanner-overlay">
-              <div class="scanner-frame"></div>
+              <div class="scanner-frame scanner-frame--preciso"></div>
             </div>
           </div>
-          <div class="alert alert-info mt-3 mb-0 text-start">
+          <div id="${TIPS_ID}" class="mt-3 text-start" hidden></div>
+          <div class="alert alert-info mt-3 mb-0 text-start small">
             <i class="bi bi-info-circle" aria-hidden="true"></i>
-            Coloca el código dentro del marco. Se detectan QR y códigos de barras
-            (Code 128, EAN, UPC, etc.). Requiere HTTPS o localhost.
+            <strong>Consejo:</strong> acerca el código hasta que llene casi todo el marco
+            (sobre todo si el QR es pequeño). Buena luz y mano firme ayudan.
           </div>
         </div>
         <div class="modal-footer">
@@ -157,6 +187,93 @@ function mostrarEstadoScanner(
     info: 'alert-info',
   };
   host.innerHTML = `<div class="alert ${clases[tipo]} mb-0">${mensaje}</div>`;
+}
+
+/**
+ * Muestra tips cuando el scanner no logra leer el código.
+ * EXPLICACIÓN PARA PRINCIPIANTES: no es un “error fatal”; guía al usuario
+ * a acercar el código, mejorar luz o escribir a mano.
+ */
+function mostrarTipsSinDeteccion(nivel: 'suave' | 'fuerte'): void {
+  const tipsHost = document.getElementById(TIPS_ID);
+  if (!tipsHost) {
+    return;
+  }
+  tipsHost.hidden = false;
+
+  if (nivel === 'suave') {
+    mostrarEstadoScanner(
+      'warning',
+      'Aún no reconozco el código. Acércalo más al marco e inténtalo de nuevo…',
+    );
+    tipsHost.innerHTML = `
+      <div class="alert alert-warning mb-0 text-start">
+        <strong><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+        No se detectó todavía</strong>
+        <ul class="mb-0 mt-2 ps-3">
+          <li>Acerca el QR/código hasta que ocupe casi todo el marco azul.</li>
+          <li>Si el QR es muy pequeño, acércalo más (el zoom digital ayuda).</li>
+          <li>Evita reflejos y sombra; busca luz pareja.</li>
+          <li>Mantén el dispositivo estable 1–2 segundos.</li>
+        </ul>
+      </div>`;
+    return;
+  }
+
+  mostrarEstadoScanner(
+    'warning',
+    'Sigo sin leerlo. Puedes cancelar y escribir el número a mano.',
+  );
+  tipsHost.innerHTML = `
+    <div class="alert alert-warning mb-0 text-start">
+      <strong><i class="bi bi-question-circle" aria-hidden="true"></i>
+      Sigue sin reconocerse</strong>
+      <ul class="mb-0 mt-2 ps-3">
+        <li>Prueba otro ángulo o distancia (un poco más cerca suele bastar).</li>
+        <li>Limpia la lente si está opaca o con huellas.</li>
+        <li>Si el código está dañado o borroso, escríbelo manualmente en el campo.</li>
+        <li>Pulsa <em>Cancelar</em> y usa el teclado — no bloqueamos el guardado.</li>
+      </ul>
+    </div>`;
+}
+
+function ocultarTipsSinDeteccion(): void {
+  const tipsHost = document.getElementById(TIPS_ID);
+  if (tipsHost) {
+    tipsHost.hidden = true;
+    tipsHost.innerHTML = '';
+  }
+}
+
+function limpiarTimersFeedback(): void {
+  if (sesion.timeoutSinDetectar !== null) {
+    window.clearTimeout(sesion.timeoutSinDetectar);
+    sesion.timeoutSinDetectar = null;
+  }
+  if (sesion.intervaloTips !== null) {
+    window.clearInterval(sesion.intervaloTips);
+    sesion.intervaloTips = null;
+  }
+}
+
+/**
+ * Programa avisos si pasan varios segundos sin detectar nada.
+ */
+function programarFeedbackSinDeteccion(): void {
+  limpiarTimersFeedback();
+  sesion.timeoutSinDetectar = window.setTimeout(() => {
+    if (!sesion.activa) {
+      return;
+    }
+    mostrarTipsSinDeteccion('suave');
+    // Segundo nivel de tips si sigue fallando
+    sesion.intervaloTips = window.setInterval(() => {
+      if (!sesion.activa) {
+        return;
+      }
+      mostrarTipsSinDeteccion('fuerte');
+    }, SEGUNDOS_ENTRE_TIPS * 1000);
+  }, SEGUNDOS_ANTES_TIP * 1000);
 }
 
 function reproducirBeepConfirmacion(): void {
@@ -199,7 +316,8 @@ function prepararVideoYCanvas(): void {
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'display:none;position:absolute;top:-9999px;left:-9999px;';
   document.body.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
+  // willReadFrequently: avisa al navegador que leeremos muchos frames (mejor rendimiento)
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   sesion.video = video;
   sesion.canvas = canvas;
@@ -208,6 +326,47 @@ function prepararVideoYCanvas(): void {
 
 function libreriasScannerDisponibles(): boolean {
   return typeof Quagga !== 'undefined' && typeof jsQR === 'function';
+}
+
+/**
+ * Intenta activar enfoque continuo / autoenfoque en la pista de video.
+ * No todos los dispositivos lo soportan; si falla, seguimos igual.
+ */
+async function aplicarMejorasEnfoque(track: MediaStreamTrack): Promise<void> {
+  const caps = track.getCapabilities ? track.getCapabilities() as MediaTrackCapabilities & {
+    focusMode?: string[];
+    zoom?: { min: number; max: number; step?: number };
+  } : null;
+
+  if (!caps) {
+    return;
+  }
+
+  const advanced: Record<string, unknown>[] = [];
+
+  // EXPLICACIÓN PARA PRINCIPIANTES:
+  // focusMode continuous = la cámara reenfoca sola al acercar el código.
+  if (caps.focusMode && caps.focusMode.includes('continuous')) {
+    advanced.push({ focusMode: 'continuous' });
+  } else if (caps.focusMode && caps.focusMode.includes('single-shot')) {
+    advanced.push({ focusMode: 'single-shot' });
+  }
+
+  // Un poco de zoom óptico (si existe) acerca QR pequeños sin perder nitidez
+  if (caps.zoom && typeof caps.zoom.max === 'number' && caps.zoom.max > 1) {
+    const zoomIdeal = Math.min(caps.zoom.max, Math.max(caps.zoom.min || 1, 1.5));
+    advanced.push({ zoom: zoomIdeal });
+  }
+
+  if (advanced.length === 0) {
+    return;
+  }
+
+  try {
+    await track.applyConstraints({ advanced: advanced as MediaTrackConstraintSet[] });
+  } catch (err) {
+    console.warn('No se pudieron aplicar constraints de enfoque/zoom:', err);
+  }
 }
 
 /**
@@ -225,8 +384,16 @@ function iniciarQuagga(): void {
         type: 'LiveStream',
         target: sesion.video,
         constraints: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          // Resolución más alta que 640×480 mejora códigos finos
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        area: {
+          // Solo analiza el centro (coincide con el marco visual)
+          top: '15%',
+          right: '15%',
+          left: '15%',
+          bottom: '15%',
         },
       },
       decoder: {
@@ -242,11 +409,12 @@ function iniciarQuagga(): void {
         ],
       },
       locator: {
-        patchSize: 'medium',
-        halfSample: true,
+        // patchSize small + sin halfSample = más precisión (un poco más CPU)
+        patchSize: 'small',
+        halfSample: false,
       },
       numOfWorkers: 2,
-      frequency: 10,
+      frequency: 8,
       debug: false,
     },
     (err: Error | null) => {
@@ -259,57 +427,135 @@ function iniciarQuagga(): void {
   );
 
   // EXPLICACIÓN PARA PRINCIPIANTES:
-  // Quagga dispara onDetected muchas veces; solo aceptamos confianza > 70
-  // para evitar lecturas falsas de reflejos o códigos a medias.
+  // Quagga dispara onDetected muchas veces; confianza > 55 acepta lecturas
+  // un poco más débiles (códigos pequeños) sin ser demasiado permisivo.
   Quagga.onDetected((result) => {
     const codigo = result.codeResult.code;
     const confianza = result.codeResult.confidence || 0;
-    if (confianza > 70) {
+    if (confianza > 55) {
       procesarCodigoDetectado(codigo, 'Código de barras');
     }
   });
 }
 
 /**
- * Loop de jsQR: cada 100 ms toma un frame del video y busca un QR.
+ * Ejecuta jsQR sobre ImageData ya preparado.
+ * Devuelve el texto del QR o null.
+ */
+function intentarJsQr(imageData: ImageData): string | null {
+  const qr = jsQR(imageData.data, imageData.width, imageData.height, {
+    // attemptBoth: prueba QR normales e invertidos (fondo oscuro / claro)
+    inversionAttempts: 'attemptBoth',
+  });
+  return qr ? qr.data : null;
+}
+
+/**
+ * Dibuja un recorte centrado del video, ampliado (zoom digital), y lo pasa a jsQR.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Un QR pequeño en la foto completa tiene pocos píxeles por “cuadrito”.
+ * Si recortamos el centro y lo agrandamos, esos cuadritos se ven más grandes
+ * y jsQR los lee mucho mejor — sin cambiar de cámara.
+ *
+ * @param fraccionLado - fracción del lado menor del video (0.35–0.7)
+ * @returns texto del QR o null
+ */
+function escanearRecorteCentralAmpliado(fraccionLado: number): string | null {
+  const video = sesion.video;
+  const canvas = sesion.canvas;
+  const ctx = sesion.canvasCtx;
+  if (!video || !canvas || !ctx) {
+    return null;
+  }
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw < 40 || vh < 40) {
+    return null;
+  }
+
+  const lado = Math.floor(Math.min(vw, vh) * fraccionLado);
+  const sx = Math.floor((vw - lado) / 2);
+  const sy = Math.floor((vh - lado) / 2);
+  const dest = Math.floor(lado * FACTOR_ZOOM_RECORTE);
+
+  canvas.width = dest;
+  canvas.height = dest;
+  // imageSmoothingEnabled false = pixels nítidos al ampliar (mejor para QR)
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(video, sx, sy, lado, lado, 0, 0, dest, dest);
+
+  const imageData = ctx.getImageData(0, 0, dest, dest);
+  return intentarJsQr(imageData);
+}
+
+/**
+ * Escaneo de respaldo: frame completo (QR grandes / ya cercanos).
+ */
+function escanearFrameCompleto(): string | null {
+  const video = sesion.video;
+  const canvas = sesion.canvas;
+  const ctx = sesion.canvasCtx;
+  if (!video || !canvas || !ctx) {
+    return null;
+  }
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  // Límite de píxeles para no saturar CPU en 4K; 1920 de ancho basta
+  const maxAncho = 1600;
+  const escala = vw > maxAncho ? maxAncho / vw : 1;
+  const dw = Math.floor(vw * escala);
+  const dh = Math.floor(vh * escala);
+
+  canvas.width = dw;
+  canvas.height = dh;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(video, 0, 0, dw, dh);
+
+  const imageData = ctx.getImageData(0, 0, dw, dh);
+  return intentarJsQr(imageData);
+}
+
+/**
+ * Loop de jsQR: recortes ampliados (QR pequeños) + frame completo.
  */
 function iniciarJsQr(): void {
   if (sesion.intervaloQr !== null) {
     window.clearInterval(sesion.intervaloQr);
   }
+  sesion.framesSinExito = 0;
+
+  // Fracciones del centro: más cerrado = más zoom digital sobre QR chicos
+  const fraccionesRecorte = [0.42, 0.55, 0.68];
+  let indiceFraccion = 0;
+
   sesion.intervaloQr = window.setInterval(() => {
-    if (!sesion.activa || !sesion.video || !sesion.canvas || !sesion.canvasCtx) {
+    if (!sesion.activa || !sesion.video) {
       return;
     }
     if (sesion.video.readyState !== sesion.video.HAVE_ENOUGH_DATA) {
       return;
     }
 
-    // Paso 1: copiar el frame actual al canvas oculto
-    sesion.canvas.width = sesion.video.videoWidth;
-    sesion.canvas.height = sesion.video.videoHeight;
-    sesion.canvasCtx.drawImage(
-      sesion.video,
-      0,
-      0,
-      sesion.canvas.width,
-      sesion.canvas.height,
-    );
+    // Paso A: recorte central ampliado (prioridad para QR pequeños)
+    const fraccion = fraccionesRecorte[indiceFraccion % fraccionesRecorte.length];
+    indiceFraccion += 1;
+    let codigo = escanearRecorteCentralAmpliado(fraccion);
 
-    // Paso 2: pedir a jsQR que busque un código en esos píxeles
-    const imageData = sesion.canvasCtx.getImageData(
-      0,
-      0,
-      sesion.canvas.width,
-      sesion.canvas.height,
-    );
-    const qr = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-    if (qr) {
-      procesarCodigoDetectado(qr.data, 'Código QR');
+    // Paso B: cada 3 ticks, también prueba el frame completo
+    if (!codigo && indiceFraccion % 3 === 0) {
+      codigo = escanearFrameCompleto();
     }
-  }, 100);
+
+    if (codigo) {
+      procesarCodigoDetectado(codigo, 'Código QR');
+      return;
+    }
+
+    sesion.framesSinExito += 1;
+  }, INTERVALO_JSQR_MS);
 }
 
 /**
@@ -322,6 +568,8 @@ function procesarCodigoDetectado(codigo: string, tipo: string): void {
 
   // Pausar de inmediato para no procesar el mismo código varias veces
   sesion.activa = false;
+  limpiarTimersFeedback();
+  ocultarTipsSinDeteccion();
   reproducirBeepConfirmacion();
   mostrarEstadoScanner('success', `${tipo} detectado: ${codigo}`);
 
@@ -348,6 +596,8 @@ function procesarCodigoDetectado(codigo: string, tipo: string): void {
  */
 function detenerScannerCodigo(): void {
   sesion.activa = false;
+  limpiarTimersFeedback();
+  ocultarTipsSinDeteccion();
 
   if (typeof Quagga !== 'undefined') {
     try {
@@ -381,6 +631,8 @@ function detenerScannerCodigo(): void {
   sesion.video = null;
   sesion.canvas = null;
   sesion.canvasCtx = null;
+  sesion.videoTrack = null;
+  sesion.framesSinExito = 0;
 }
 
 /**
@@ -421,16 +673,21 @@ async function iniciarSesionCamara(): Promise<void> {
       throw new Error('No se pudo crear el elemento de video.');
     }
 
-    // Preferimos cámara trasera en móviles (facingMode: environment)
+    // Preferimos cámara trasera + resolución alta (mejor detalle en QR chicos)
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: 'environment',
-        width: { ideal: 1280, min: 640, max: 1920 },
-        height: { ideal: 720, min: 480, max: 1080 },
-        aspectRatio: { ideal: 16 / 9 },
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 },
         frameRate: { ideal: 30, min: 15 },
       },
     });
+
+    const track = stream.getVideoTracks()[0] || null;
+    sesion.videoTrack = track;
+    if (track) {
+      await aplicarMejorasEnfoque(track);
+    }
 
     sesion.video.srcObject = stream;
     await new Promise<void>((resolve) => {
@@ -449,7 +706,14 @@ async function iniciarSesionCamara(): Promise<void> {
 
     await sesion.video.play();
     sesion.activa = true;
-    mostrarEstadoScanner('success', 'Scanner activo — enfoca el código hacia la cámara');
+    sesion.inicioEscaneoMs = Date.now();
+    sesion.framesSinExito = 0;
+    ocultarTipsSinDeteccion();
+    mostrarEstadoScanner(
+      'info',
+      'Scanner activo — acerca el código al marco (sobre todo si es pequeño)',
+    );
+    programarFeedbackSinDeteccion();
 
     iniciarQuagga();
     iniciarJsQr();
@@ -463,12 +727,59 @@ async function iniciarSesionCamara(): Promise<void> {
       );
     } else if (err.name === 'NotFoundError') {
       mostrarEstadoScanner('error', 'No se encontró cámara en este dispositivo.');
+    } else if (err.name === 'OverconstrainedError') {
+      // Fallback: constraints muy estrictas (1920) fallaron → pedir sin min
+      await iniciarSesionCamaraFallback();
     } else {
       mostrarEstadoScanner(
         'error',
         `Error del scanner: ${err.message || 'desconocido'}`,
       );
     }
+  }
+}
+
+/**
+ * Segunda oportunidad si el dispositivo no acepta 1920×1080.
+ */
+async function iniciarSesionCamaraFallback(): Promise<void> {
+  try {
+    prepararVideoYCanvas();
+    if (!sesion.video) {
+      throw new Error('No se pudo crear el elemento de video.');
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
+    const track = stream.getVideoTracks()[0] || null;
+    sesion.videoTrack = track;
+    if (track) {
+      await aplicarMejorasEnfoque(track);
+    }
+    sesion.video.srcObject = stream;
+    await new Promise<void>((resolve) => {
+      sesion.video!.addEventListener('loadedmetadata', () => resolve(), { once: true });
+    });
+    await sesion.video.play();
+    sesion.activa = true;
+    sesion.inicioEscaneoMs = Date.now();
+    mostrarEstadoScanner(
+      'info',
+      'Scanner activo (resolución estándar) — acerca el código al marco',
+    );
+    programarFeedbackSinDeteccion();
+    iniciarQuagga();
+    iniciarJsQr();
+  } catch (error) {
+    console.error('Fallback scanner falló:', error);
+    mostrarEstadoScanner(
+      'error',
+      'No se pudo iniciar la cámara. Escribe el código manualmente.',
+    );
   }
 }
 
@@ -495,6 +806,7 @@ function abrirScannerCodigo(opciones: AbrirScannerCodigoOpciones): void {
   if (status) {
     status.innerHTML = '';
   }
+  ocultarTipsSinDeteccion();
 
   // Listeners con once para no acumular al abrir varias veces
   modalEl.addEventListener(
