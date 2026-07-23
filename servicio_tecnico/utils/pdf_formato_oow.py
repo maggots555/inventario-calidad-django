@@ -45,7 +45,6 @@ from reportlab.platypus import (
 from config.constants import (
     AVISO_PRIVACIDAD_OOW_MX,
     AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS,
-    AVISO_PRIVACIDAD_OOW_VERSION_MX,
     VISTAS_DANO_ESTETICO_AIO,
     VISTAS_DANO_ESTETICO_ESCRITORIO,
     VISTAS_DANO_ESTETICO_LAPTOP,
@@ -648,6 +647,9 @@ class PDFFormatoServicioOOW:
 
         Args:
             compacto: True cuando va al pie de la página de daños (menos padding).
+
+        Efectos secundarios:
+            Ninguno (solo arma elementos Platypus para el PDF).
         """
         elementos = [
             self._crear_header_seccion('Aceptación y firma del cliente'),
@@ -666,51 +668,82 @@ class PDFFormatoServicioOOW:
         ))
         elementos.append(Spacer(1, 4 * mm if compacto else 8 * mm))
 
-        # Solo firma del cliente (no se registra técnico en este formato)
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Ancho fijo de la firma para que imagen, línea y texto "FIRMA CLIENTE"
+        # compartan la misma columna centrada dentro del recuadro (antes la
+        # celda era muy ancha y la imagen quedaba a la izquierda).
+        ancho_firma = 45 * mm if compacto else 50 * mm
+        alto_firma = 18 * mm if compacto else 22 * mm
         firma_cli = None
         if self.formato.firma_cliente:
             try:
                 firma_cli = RLImage(
                     self.formato.firma_cliente.path,
-                    width=45 * mm if compacto else 50 * mm,
-                    height=18 * mm if compacto else 22 * mm,
+                    width=ancho_firma,
+                    height=alto_firma,
                     kind='proportional',
+                    hAlign='CENTER',
                 )
             except Exception:
                 firma_cli = self._imagen_firma(self.formato.firma_cliente)
 
+        # Columna estrecha: firma + línea + etiqueta, todo centrado
         col_cli = [
             [firma_cli or Paragraph(' ', self._estilos['CeldaValor'])],
-            [HRFlowable(width='60%', thickness=0.6, color=COLOR_NEGRO)],
+            [HRFlowable(
+                width=ancho_firma,
+                thickness=0.6,
+                color=COLOR_NEGRO,
+                hAlign='CENTER',
+            )],
             [Paragraph('<b>FIRMA CLIENTE</b>', self._estilos['FirmaLabel'])],
         ]
+        tabla_firma = Table(col_cli, colWidths=[ancho_firma])
+        tabla_firma.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+
         pad = 6 if compacto else 10
+        # Recuadro a todo el ancho; la firma queda centrada dentro
         tabla = Table(
-            [[Table(col_cli, colWidths=[100 * mm])]],
+            [[tabla_firma]],
             colWidths=[letter[0] - 2 * MARGEN],
         )
         tabla.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('BOX', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
             ('TOPPADDING', (0, 0), (-1, -1), pad),
             ('BOTTOMPADDING', (0, 0), (-1, -1), pad),
         ]))
         elementos.append(tabla)
-
-        if self.formato.como_enteraste:
-            elementos.append(Spacer(1, 3 * mm if compacto else 6 * mm))
-            elementos.append(Paragraph(
-                f'<b>¿Cómo se enteró?</b> {self._esc(self.formato.get_como_enteraste_display())}',
-                self._estilos['CeldaValor'],
-            ))
+        # "¿Cómo se enteró?" ya no se imprime en el PDF (sigue en pantalla/BD).
         return elementos
 
     def _imagen_firma(self, campo) -> Optional[RLImage]:
+        """
+        Carga la imagen de firma desde disco con tamaño estándar.
+
+        Args:
+            campo: FileField/ImageField de Django con la firma.
+
+        Returns:
+            RLImage centrada, o None si no se puede leer el archivo.
+        """
         if not campo:
             return None
         try:
-            return RLImage(campo.path, width=50 * mm, height=22 * mm, kind='proportional')
+            # hAlign CENTER: alinea la imagen dentro de su celda padre
+            return RLImage(
+                campo.path,
+                width=50 * mm,
+                height=22 * mm,
+                kind='proportional',
+                hAlign='CENTER',
+            )
         except Exception:
             return None
 
@@ -733,13 +766,16 @@ class PDFFormatoServicioOOW:
         elementos.append(self._crear_header_seccion('Aviso de privacidad'))
         elementos.append(Spacer(1, 3 * mm))
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Elegimos el texto largo del aviso según el país (México tiene el
+        # aviso completo; otros países usan un placeholder). La versión
+        # (ej. mx-2016-09-06) se guarda en BD al finalizar, pero ya no se
+        # imprime aquí: solo dejamos la frase de aceptación digital.
         codigo = (self.pais_config.get('codigo') or 'MX').upper()
         if codigo == 'MX':
             texto = AVISO_PRIVACIDAD_OOW_MX
-            version = self.formato.version_aviso_privacidad or AVISO_PRIVACIDAD_OOW_VERSION_MX
         else:
             texto = AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS
-            version = self.formato.version_aviso_privacidad or f'{codigo.lower()}-placeholder'
 
         # Dividir en párrafos por líneas en blanco
         for bloque in texto.split('\n\n'):
@@ -751,7 +787,6 @@ class PDFFormatoServicioOOW:
 
         elementos.append(Spacer(1, 3 * mm))
         elementos.append(Paragraph(
-            f'<b>Versión del aviso aceptada:</b> {self._esc(version)}. '
             'El cliente aceptó este aviso digitalmente al finalizar el Formato OOW en SIGMA.',
             self._estilos['CeldaValor'],
         ))
