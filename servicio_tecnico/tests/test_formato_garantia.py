@@ -459,6 +459,7 @@ class FormatoGarantiaWizardViewTest(TestCase):
         self.assertIn(b'id="numeroCargador"', resp.content)
         self.assertIn(b'id="btnEscanearCargador"', resp.content)
         self.assertIn(b'scanner_codigo.js', resp.content)
+        self.assertIn(b'@zxing/library', resp.content)
         self.assertTrue(
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )

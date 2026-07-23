@@ -1,31 +1,27 @@
 "use strict";
 /**
- * Scanner universal de códigos QR y de barras (cámara del dispositivo).
+ * Scanner universal de códigos QR, Data Matrix y barras (cámara del dispositivo).
  *
  * Objetivo de negocio:
- * Abrir un modal con la cámara, detectar QR (jsQR) o barras (QuaggaJS)
- * y escribir el valor en un input HTML (p. ej. número de cargador en Garantía Dell).
+ * Abrir un modal con la cámara, detectar códigos y escribir el valor en un input
+ * (p. ej. número de cargador en Garantía Dell).
  *
  * Dependencias (CDN en el template, no npm):
- * - QuaggaJS 0.12.x → códigos de barras
+ * - QuaggaJS 0.12.x → códigos de barras 1D
  * - jsQR 1.4.x → códigos QR
+ * - @zxing/library → Data Matrix (etiquetas de cargador Dell: no son QR)
  *
  * Efectos secundarios:
  * - Solicita permiso de cámara (getUserMedia)
  * - Inyecta un modal Bootstrap en el DOM si no existe
  * - Al detectar: llena el input, dispara evento `input` y cierra el modal
  *
- * Mejoras de precisión (QR pequeños):
- * - Cámara a resolución alta + enfoque continuo si el dispositivo lo permite
- * - Escaneo del centro del marco ampliado 2× (más píxeles por módulo del QR)
- * - inversionAttempts attemptBoth (QR claros/oscuros)
- * - Feedback si pasan varios segundos sin detectar
- *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Inventario tenía esta lógica duplicada en HTML. Aquí la sacamos a un módulo
- * reutilizable: cualquier página llama `abrirScannerCodigo({ targetInput })`
- * y el código aparece solo en el textbox indicado.
+ * El código cuadrado de muchos cargadores Dell NO es un QR (no tiene los 3
+ * cuadritos de esquina). Es un Data Matrix. jsQR no lo lee; por eso usamos ZXing.
  */
+/** Lector ZXing reutilizado (crear uno por frame es caro) */
+let lectorZxingDataMatrix = null;
 function obtenerBootstrapModal(element) {
     const bs = window.bootstrap;
     return new bs.Modal(element);
@@ -47,12 +43,12 @@ const SEGUNDOS_ENTRE_TIPS = 8;
 const INTERVALO_JSQR_MS = 150;
 /**
  * Tope del canvas de análisis (lado en px).
- * Ampliar de más (p. ej. 1000×1000) hace lento a jsQR; 480 mantiene QR chicos
- * legibles sin matar el FPS del preview.
+ * Data Matrix densos (cargador Dell) necesitan más píxeles que un QR simple;
+ * 640 equilibra lectura vs fluidez.
  */
-const MAX_LADO_ANALISIS_PX = 480;
+const MAX_LADO_ANALISIS_PX = 640;
 /** Factor de ampliación del recorte central (antes de aplicar el tope) */
-const FACTOR_ZOOM_RECORTE = 2;
+const FACTOR_ZOOM_RECORTE = 2.4;
 /** Ancho máx. del escaneo “frame completo” de respaldo */
 const MAX_ANCHO_FRAME_COMPLETO = 640;
 const sesion = {
@@ -109,8 +105,9 @@ function asegurarModalScanner() {
           <div id="${TIPS_ID}" class="mt-3 text-start" hidden></div>
           <div class="alert alert-info mt-3 mb-0 text-start small">
             <i class="bi bi-info-circle" aria-hidden="true"></i>
-            <strong>Consejo:</strong> acerca el código hasta que llene casi todo el marco
-            (sobre todo si el QR es pequeño). Buena luz y mano firme ayudan.
+            <strong>Consejo:</strong> las etiquetas de cargador Dell suelen ser
+            <em>Data Matrix</em> (cuadrado sin los 3 ojos de un QR). Acerca el código
+            hasta que llene casi todo el marco; buena luz y mano firme ayudan.
           </div>
         </div>
         <div class="modal-footer">
@@ -153,8 +150,9 @@ function mostrarTipsSinDeteccion(nivel) {
         <strong><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
         No se detectó todavía</strong>
         <ul class="mb-0 mt-2 ps-3">
-          <li>Acerca el QR/código hasta que ocupe casi todo el marco azul.</li>
-          <li>Si el QR es muy pequeño, acércalo más (el zoom digital ayuda).</li>
+          <li>Acerca el código hasta que ocupe casi todo el marco azul.</li>
+          <li>En cargadores Dell el código es <strong>Data Matrix</strong> (no QR):
+              se ve como una cuadrícula densa, sin 3 cuadritos grandes en las esquinas.</li>
           <li>Evita reflejos y sombra; busca luz pareja.</li>
           <li>Mantén el dispositivo estable 1–2 segundos.</li>
         </ul>
@@ -252,8 +250,49 @@ function prepararVideoYCanvas() {
     sesion.canvas = canvas;
     sesion.canvasCtx = ctx;
 }
+function obtenerZXing() {
+    const w = window;
+    return w.ZXing || null;
+}
+/**
+ * Lector ZXing solo para Data Matrix (cargadores Dell), con TRY_HARDER.
+ * Se crea una vez y se reutiliza en cada frame.
+ */
+function obtenerLectorDataMatrix() {
+    if (lectorZxingDataMatrix) {
+        return lectorZxingDataMatrix;
+    }
+    const zxing = obtenerZXing();
+    if (!zxing) {
+        return null;
+    }
+    const hints = new Map();
+    hints.set(zxing.DecodeHintType.POSSIBLE_FORMATS, [zxing.BarcodeFormat.DATA_MATRIX]);
+    hints.set(zxing.DecodeHintType.TRY_HARDER, true);
+    lectorZxingDataMatrix = new zxing.BrowserMultiFormatReader(hints);
+    return lectorZxingDataMatrix;
+}
 function libreriasScannerDisponibles() {
+    // Quagga + jsQR obligatorios; ZXing recomendado para Data Matrix Dell
     return typeof Quagga !== 'undefined' && typeof jsQR === 'function';
+}
+/**
+ * Intenta leer Data Matrix desde el canvas ya dibujado (ZXing).
+ * Si no hay código, ZXing lanza excepción → devolvemos null (es normal).
+ */
+function intentarDataMatrixDesdeCanvas(canvas) {
+    const lector = obtenerLectorDataMatrix();
+    if (!lector) {
+        return null;
+    }
+    try {
+        const result = lector.decodeFromCanvas(canvas);
+        const texto = result.getText();
+        return texto && texto.trim() ? texto.trim() : null;
+    }
+    catch {
+        return null;
+    }
 }
 /**
  * Intenta activar enfoque continuo / autoenfoque en la pista de video.
@@ -365,16 +404,13 @@ function intentarJsQr(imageData, intentarInvertir) {
     return qr ? qr.data : null;
 }
 /**
- * Dibuja un recorte centrado del video, ampliado (zoom digital), y lo pasa a jsQR.
+ * Dibuja un recorte centrado ampliado y prueba:
+ * 1) Data Matrix (ZXing) — etiquetas de cargador Dell
+ * 2) QR (jsQR) — códigos QR normales
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Un QR pequeño en la foto completa tiene pocos píxeles por “cuadrito”.
- * Si recortamos el centro y lo agrandamos, esos cuadritos se ven más grandes
- * y jsQR los lee mucho mejor — sin cambiar de cámara.
- *
- * @param fraccionLado - fracción del lado menor del video (0.35–0.7)
- * @param intentarInvertir - modo invertido (más CPU)
- * @returns texto del QR o null
+ * El Data Matrix de Dell es denso y pequeño. Recortamos el centro y lo agrandamos
+ * para que cada “puntito” tenga más píxeles; luego ZXing intenta leerlo.
  */
 function escanearRecorteCentralAmpliado(fraccionLado, intentarInvertir) {
     const video = sesion.video;
@@ -391,19 +427,25 @@ function escanearRecorteCentralAmpliado(fraccionLado, intentarInvertir) {
     const lado = Math.floor(Math.min(vw, vh) * fraccionLado);
     const sx = Math.floor((vw - lado) / 2);
     const sy = Math.floor((vh - lado) / 2);
-    // Tope de tamaño: precisión OK + video fluido
-    const dest = Math.min(MAX_LADO_ANALISIS_PX, Math.max(240, Math.floor(lado * FACTOR_ZOOM_RECORTE)));
+    const dest = Math.min(MAX_LADO_ANALISIS_PX, Math.max(320, Math.floor(lado * FACTOR_ZOOM_RECORTE)));
     canvas.width = dest;
     canvas.height = dest;
-    // imageSmoothingEnabled false = pixels nítidos al ampliar (mejor para QR)
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(video, sx, sy, lado, lado, 0, 0, dest, dest);
+    // Prioridad: Data Matrix (cargador Dell) — jsQR nunca lo va a ver
+    const dataMatrix = intentarDataMatrixDesdeCanvas(canvas);
+    if (dataMatrix) {
+        return { codigo: dataMatrix, tipo: 'Data Matrix' };
+    }
     const imageData = ctx.getImageData(0, 0, dest, dest);
-    return intentarJsQr(imageData, intentarInvertir);
+    const qr = intentarJsQr(imageData, intentarInvertir);
+    if (qr) {
+        return { codigo: qr, tipo: 'Código QR' };
+    }
+    return null;
 }
 /**
- * Escaneo de respaldo: frame reducido (QR grandes / ya cercanos).
- * Nunca a resolución nativa: eso era una causa fuerte de lag.
+ * Escaneo de respaldo: frame reducido (QR/Data Matrix ya cercanos).
  */
 function escanearFrameCompleto(intentarInvertir) {
     const video = sesion.video;
@@ -421,11 +463,19 @@ function escanearFrameCompleto(intentarInvertir) {
     canvas.height = dh;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(video, 0, 0, dw, dh);
+    const dataMatrix = intentarDataMatrixDesdeCanvas(canvas);
+    if (dataMatrix) {
+        return { codigo: dataMatrix, tipo: 'Data Matrix' };
+    }
     const imageData = ctx.getImageData(0, 0, dw, dh);
-    return intentarJsQr(imageData, intentarInvertir);
+    const qr = intentarJsQr(imageData, intentarInvertir);
+    if (qr) {
+        return { codigo: qr, tipo: 'Código QR' };
+    }
+    return null;
 }
 /**
- * Loop de jsQR: un solo análisis por tick (no apilar trabajo).
+ * Loop de detección: Data Matrix (ZXing) + QR (jsQR), un análisis por tick.
  */
 function iniciarJsQr() {
     if (sesion.intervaloQr !== null) {
@@ -433,14 +483,16 @@ function iniciarJsQr() {
     }
     sesion.framesSinExito = 0;
     sesion.analizandoFrame = false;
-    // Rotamos una fracción por tick (no tres análisis seguidos)
-    const fraccionesRecorte = [0.45, 0.58, 0.70];
+    if (!obtenerLectorDataMatrix()) {
+        console.warn('ZXing no está cargado: las etiquetas Data Matrix de cargadores Dell no se leerán.');
+    }
+    // Recortes más cerrados ayudan a Data Matrix densos y pequeños
+    const fraccionesRecorte = [0.38, 0.50, 0.62];
     let indiceTick = 0;
     sesion.intervaloQr = window.setInterval(() => {
         if (!sesion.activa || !sesion.video) {
             return;
         }
-        // Si el análisis anterior aún corre, saltamos: evita cola de lag
         if (sesion.analizandoFrame) {
             return;
         }
@@ -452,14 +504,12 @@ function iniciarJsQr() {
             const fraccion = fraccionesRecorte[indiceTick % fraccionesRecorte.length];
             const probarInvertido = indiceTick % 2 === 1;
             indiceTick += 1;
-            // Prioridad: recorte central (QR pequeños) — un solo intento por tick
-            let codigo = escanearRecorteCentralAmpliado(fraccion, probarInvertido);
-            // Cada 4 ticks: frame completo ligero (QR grandes ya cerca)
-            if (!codigo && indiceTick % 4 === 0) {
-                codigo = escanearFrameCompleto(false);
+            let leido = escanearRecorteCentralAmpliado(fraccion, probarInvertido);
+            if (!leido && indiceTick % 4 === 0) {
+                leido = escanearFrameCompleto(false);
             }
-            if (codigo) {
-                procesarCodigoDetectado(codigo, 'Código QR');
+            if (leido) {
+                procesarCodigoDetectado(leido.codigo, leido.tipo);
                 return;
             }
             sesion.framesSinExito += 1;
@@ -554,6 +604,9 @@ async function iniciarSesionCamara() {
     if (!libreriasScannerDisponibles()) {
         mostrarEstadoScanner('error', 'Faltan las librerías del scanner (Quagga / jsQR). Recarga la página.');
         return;
+    }
+    if (!obtenerZXing()) {
+        mostrarEstadoScanner('warning', 'ZXing no cargó: se leerán QR/barras, pero no las etiquetas Data Matrix de cargadores Dell. Recarga la página.');
     }
     try {
         prepararVideoYCanvas();
