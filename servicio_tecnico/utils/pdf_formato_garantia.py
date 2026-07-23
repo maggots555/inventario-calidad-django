@@ -26,6 +26,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from django.contrib.staticfiles import finders
+from reportlab.graphics.barcode import code128
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import letter
@@ -118,7 +119,10 @@ class PDFFormatoServicioGarantia:
 
             elementos: List = []
             # --- Página 1: plantilla Dell (layout papel 1:1) ---
-            elementos += self._construir_header()
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # El código de barras del DPS solo va en la hoja 1 (para escanear
+            # sin escribir a mano). Páginas 2+ usan el mismo header sin barcode.
+            elementos += self._construir_header(incluir_barcode=True)
             elementos.append(Spacer(1, 2 * mm))
             elementos += self._construir_cabecera_orden()
             elementos.append(Spacer(1, 2.5 * mm))
@@ -383,9 +387,55 @@ class PDFFormatoServicioGarantia:
         except Exception:
             return None
 
-    def _construir_header(self) -> List:
+    def _crear_barcode_dps(self):
+        """
+        Genera un código de barras Code128 del número DPS.
+
+        Objetivo de negocio:
+            Permite escanear el DPS (ej. 467877954) con pistola/celular
+            sin tener que escribirlo a mano en sistemas externos.
+
+        Returns:
+            Flowable Code128 o None si no hay DPS válido que codificar.
+
+        Efectos secundarios:
+            Ninguno; solo construye un widget ReportLab en memoria.
+        """
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # _dps() puede devolver '—' cuando la orden aún no tiene número.
+        # Code128 no acepta ese guión tipográfico; mejor no dibujar nada.
+        dps = (self._dps() or '').strip()
+        if not dps or dps == '—':
+            return None
+
+        try:
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # barHeight = altura de las rayas; barWidth = grosor de cada raya.
+            # Más pequeño (~5.5 mm) se ve más limpio arriba del banner y sigue
+            # siendo escaneable. humanReadable=0 evita repetir el número DPS.
+            return code128.Code128(
+                dps,
+                barHeight=5.5 * mm,
+                barWidth=0.7,
+                humanReadable=0,
+            )
+        except Exception:
+            # Si el DPS tiene caracteres raros, no rompemos el PDF entero.
+            logger.warning(
+                'No se pudo generar barcode DPS para valor=%r',
+                dps,
+                exc_info=True,
+            )
+            return None
+
+    def _construir_header(self, incluir_barcode: bool = False) -> List:
         """
         Cabecera Dell | ORDEN DE SERVICIO + tipos CIS/WIS/OOW/ON SITE | SIC.
+
+        Args:
+            incluir_barcode: Si True, coloca Code128 del DPS encima del
+                banner gris (solo página 1 del PDF). En páginas 2+ se deja
+                False para no repetir el barcode.
 
         En garantía Dell marcamos CIS (como el papel del centro de servicio).
         """
@@ -421,10 +471,29 @@ class PDFFormatoServicioGarantia:
             ('BOTTOMPADDING', (0, 1), (-1, 1), 3),
         ]))
 
+        # Columna central: barcode (opcional, solo hoja 1) + banner gris.
+        filas_centro: List = []
+        if incluir_barcode:
+            barcode = self._crear_barcode_dps()
+            if barcode is not None:
+                filas_centro.append([barcode])
+        filas_centro.append([banner])
+
+        centro = Table(filas_centro, colWidths=[95 * mm])
+        centro.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            # Separación visual entre barcode y banner «ORDEN DE SERVICIO».
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 3 * mm),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ]))
+
         izq = logo_dell or Paragraph('<b>Dell</b>', self._estilos['CeldaLabel'])
         der = logo_sic or Paragraph('<b>SIC</b>', self._estilos['CeldaLabel'])
         fila = Table(
-            [[izq, banner, der]],
+            [[izq, centro, der]],
             colWidths=[28 * mm, 95 * mm, 40 * mm],
         )
         fila.setStyle(TableStyle([

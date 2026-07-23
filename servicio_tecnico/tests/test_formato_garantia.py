@@ -352,6 +352,41 @@ class FormatoGarantiaServiceTest(TestCase):
         )
         self.assertIsInstance(FormatoServicioGarantia.objects.get(pk=final.pk), FormatoServicioGarantia)
 
+    def test_barcode_dps_solo_en_header_pagina_1(self):
+        """
+        Code128 del DPS: se genera con valor válido y solo se pide en hoja 1.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        No podemos "ver" el dibujo del barcode en el PDF fácilmente, pero sí
+        comprobamos que el helper lo crea y que el header de otras páginas
+        tiene una fila menos en el centro (solo el banner, sin barcode).
+        """
+        from reportlab.graphics.barcode.code128 import Code128
+
+        from servicio_tecnico.utils.pdf_formato_garantia import PDFFormatoServicioGarantia
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        gen = PDFFormatoServicioGarantia(formato)
+
+        # Con DPS real (orden_cliente del setUp) debe devolver Code128.
+        self.assertEqual(gen._dps(), '467826738')
+        barcode = gen._crear_barcode_dps()
+        self.assertIsInstance(barcode, Code128)
+
+        # Página 1: columna central = barcode + banner (2 filas).
+        centro_p1 = gen._construir_header(incluir_barcode=True)[0]._cellvalues[0][1]
+        self.assertEqual(len(centro_p1._cellvalues), 2)
+        self.assertIsInstance(centro_p1._cellvalues[0][0], Code128)
+
+        # Páginas 2+: solo banner (1 fila), sin barcode.
+        centro_otras = gen._construir_header(incluir_barcode=False)[0]._cellvalues[0][1]
+        self.assertEqual(len(centro_otras._cellvalues), 1)
+        self.assertNotIsInstance(centro_otras._cellvalues[0][0], Code128)
+
+        # Sin DPS válido → None (no rompe el PDF).
+        gen._dps = lambda: '—'  # type: ignore[method-assign]
+        self.assertIsNone(gen._crear_barcode_dps())
+
     def test_datos_orden_incluye_direccion(self):
         from servicio_tecnico.services.formato_garantia import datos_orden_para_wizard
 
