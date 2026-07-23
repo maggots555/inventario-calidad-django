@@ -1865,8 +1865,16 @@ body:not(.sidebar-loading) .main-wrapper {
     /* Ocultado permanentemente */
 }
 
-/* Responsive - Tablet y móvil */
-@media (max-width: 992px) {
+/*
+ * Responsive — tablets (landscape ~1024–1280px) y móviles.
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes el corte era 992px. En tablets landscape el viewport suele ser
+ * mayor (p. ej. 1024–1280px), así que la sidebar seguía visible y, junto
+ * con margin-left del contenido, permitía scroll horizontal (hueco vacío
+ * a la derecha). Subimos el umbral a 1280px: en tablet/móvil la sidebar
+ * queda fuera de pantalla y la navegación es la navbar superior.
+ */
+@media (max-width: 1280px) {
     .app-sidebar {
         transform: translateX(-100%);
         width: 260px;
@@ -1891,6 +1899,21 @@ body:not(.sidebar-loading) .main-wrapper {
 
     .sidebar-toggle {
         display: none;
+    }
+
+    /*
+     * Bloquear scroll lateral en tablet/móvil.
+     * Antes solo se aplicaba bajo 768px; en tablet PWA el documento
+     * podía ser más ancho que la pantalla y arrastrarse de lado.
+     */
+    html {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    body {
+        overflow-x: hidden;
+        max-width: 100%;
     }
 }
 
@@ -3406,15 +3429,22 @@ footer::after {
         height: 46px;
     }
 
-    /* Ajustar mega-menu position para que no se salga */
-    .dropdown-mega {
+    /*
+     * Mega-menús: anclar dentro del viewport.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Antes .dropdown-mega-3col usaba right: -100px y min-width: 600px,
+     * lo que empujaba el documento más allá del borde derecho y generaba
+     * scroll horizontal en tablets. Ahora se quedan dentro de la pantalla.
+     */
+    .dropdown-mega,
+    .dropdown-mega-3col {
         left: auto;
         right: 0;
-    }
-
-    .dropdown-mega-3col {
-        min-width: 600px;
-        right: -100px;
+        /* Sin min-width fijo: el ancho no puede forzar scroll lateral */
+        min-width: 0;
+        max-width: calc(100vw - 1rem);
+        width: auto;
+        box-sizing: border-box;
     }
 
     .navbar-user-info {
@@ -3619,15 +3649,19 @@ body.navbar-menu-open {
 
 @media (max-width: 768px) {
 
-    /* PREVENCIÓN GLOBAL DE OVERFLOW HORIZONTAL EN MÓVILES */
+    /*
+     * Overflow horizontal ya se bloquea en ≤1280px (ver bloque sidebar).
+     * Aquí se refuerza en móviles pequeños y se usan max-width: 100%
+     * (no 100vw) para evitar el clásico desborde por barra de scroll.
+     */
     html {
         overflow-x: hidden;
-        max-width: 100vw;
+        max-width: 100%;
     }
 
     body {
         overflow-x: hidden;
-        max-width: 100vw;
+        max-width: 100%;
     }
 
     .navbar-container {
