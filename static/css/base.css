@@ -2947,23 +2947,6 @@ footer::after {
         height: 44px;
     }
 
-    /*
-     * Mega-menús: anclar dentro del viewport.
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Antes .dropdown-mega-3col usaba right: -100px y min-width: 600px,
-     * lo que empujaba el documento más allá del borde derecho y generaba
-     * scroll horizontal en tablets. Ahora se quedan dentro de la pantalla.
-     */
-    .dropdown-mega,
-    .dropdown-mega-3col {
-        left: auto;
-        right: 0;
-        min-width: 0;
-        max-width: calc(100vw - 1rem);
-        width: auto;
-        box-sizing: border-box;
-    }
-
     .navbar-user-info {
         display: none;
     }
@@ -2979,6 +2962,53 @@ footer::after {
     .navbar-user-avatar {
         width: 38px;
         height: 38px;
+    }
+}
+
+/*
+ * Mega-menús SOLO en tablet landscape con iconos (993–1200px).
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * No incluir ≤992: ahí el menú es hamburguesa y los dropdowns van
+ * position:static dentro del panel. Si dejáramos fixed, rompería el móvil.
+ *
+ * Antes: absolute + right:0 + ancho ~viewport → el panel se salía por la
+ * izquierda al abrir Servicio Técnico / Almacén.
+ * Ahora: fixed al viewport, debajo de la navbar, siempre visible completo.
+ */
+@media (max-width: 1200px) and (min-width: 993px) {
+    .navbar-dropdown.dropdown-mega,
+    .navbar-dropdown.dropdown-mega-3col {
+        position: fixed;
+        left: max(0.75rem, env(safe-area-inset-left, 0px));
+        right: max(0.75rem, env(safe-area-inset-right, 0px));
+        top: var(--navbar-total-height);
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        max-height: calc(100dvh - var(--navbar-total-height) - 0.75rem);
+        transform: none;
+        box-sizing: border-box;
+    }
+
+    .navbar-menu-item:hover .navbar-dropdown.dropdown-mega,
+    .navbar-menu-item.active .navbar-dropdown.dropdown-mega,
+    .navbar-menu-item:hover .navbar-dropdown.dropdown-mega-3col,
+    .navbar-menu-item.active .navbar-dropdown.dropdown-mega-3col {
+        transform: none;
+    }
+
+    /* 3 columnas → 2 en tablet landscape para no apretar el contenido */
+    .dropdown-mega-3col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dropdown-mega-3col .dropdown-column:nth-child(2) {
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .dropdown-mega-3col .dropdown-column:nth-child(3) {
+        border-right: none;
+        grid-column: 1 / -1;
     }
 }
 
