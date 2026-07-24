@@ -3100,7 +3100,17 @@ footer::after {
     }
 
     .navbar-container {
-        padding: 0 1.5rem;
+        padding: 0 1rem;
+        /*
+         * EXPLICACIÓN PARA PRINCIPIANTES:
+         * Con space-between y 3 piezas (logo | hamburguesa | usuario),
+         * la hamburguesa queda en el centro y se ve rara. Usamos flex-start
+         * y margin-right:auto en el toggle para pegarlo al logo y empujar
+         * el bloque de usuario a la derecha.
+         */
+        justify-content: flex-start;
+        gap: 0.35rem;
+        align-items: center;
     }
 
     /* Restaurar texto del menú en el panel móvil desplegable */
@@ -3175,6 +3185,20 @@ footer::after {
 
     .navbar-mobile-toggle {
         display: flex;
+        flex-shrink: 0;
+        /* Empuja avatar/acciones al extremo derecho; el toggle queda junto al logo */
+        margin-right: auto;
+        margin-left: 0.15rem;
+        padding: 0.35rem;
+        min-width: 44px;
+        min-height: 44px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .navbar-user-section {
+        flex-shrink: 0;
+        margin-left: 0;
     }
 
     .navbar-mobile-toggle.active span:nth-child(1) {
