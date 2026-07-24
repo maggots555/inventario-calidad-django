@@ -181,3 +181,37 @@
     background-color: rgba(34, 197, 94, 0.25) !important;
     color: #e2e8f0;
 }
+
+/* Interruptor plantilla reparación a nivel componente.
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   El marco (.diag-toggle-plantilla) NO lleva form-check; el switch va dentro.
+   Así el padding del borde envuelve bien el botón y no se sale a la izquierda. */
+.diag-toggle-plantilla {
+    background-color: var(--gray-50, #f8fafc);
+    border-color: var(--border-color, #e2e8f0) !important;
+}
+
+.diag-toggle-plantilla .form-check {
+    padding-left: 2.5em;
+    min-height: 1.5rem;
+}
+
+.diag-toggle-plantilla .form-check .form-check-input {
+    margin-left: -2.5em;
+}
+
+[data-bs-theme="dark"] .diag-toggle-plantilla {
+    background-color: var(--card-bg, #1e293b) !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .diag-toggle-plantilla .form-text {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] #avisoPlantillaNivelComponente {
+    background-color: rgba(13, 115, 119, 0.2);
+    border-color: #0d7377;
+    color: #e2e8f0;
+}

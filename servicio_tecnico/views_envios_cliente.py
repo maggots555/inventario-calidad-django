@@ -822,6 +822,17 @@ def enviar_diagnostico_cliente(request, orden_id):
         destinatarios_copia = list(set(copia_empleados + copia_tecnico))
         
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El interruptor del modal manda plantilla_nivel_componente=1.
+        # Si viene activo, Celery usa la plantilla explicativa de reparación
+        # a nivel componente; si no, la plantilla estándar de diagnóstico.
+        plantilla_flag = request.POST.get('plantilla_nivel_componente', '').strip()
+        tipo_plantilla = (
+            'nivel_componente'
+            if plantilla_flag in ('1', 'true', 'on', 'nivel_componente')
+            else 'estandar'
+        )
         
         email_empleado = ''
         nombre_empleado = ''
@@ -845,6 +856,7 @@ def enviar_diagnostico_cliente(request, orden_id):
             email_empleado=email_empleado,
             nombre_empleado=nombre_empleado,
             usuario_id=usuario_id,
+            tipo_plantilla=tipo_plantilla,
             db_alias=get_pais_actual()['db_alias'],
         )
         

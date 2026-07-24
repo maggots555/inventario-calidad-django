@@ -780,6 +780,9 @@ function initDiagnosticoModal() {
     const inputComponentesJSON = document.getElementById('inputComponentesJSON');
     const btnRefrescarPreview = document.getElementById('btnRefrescarPreviewDiag');
     const iframePreview = document.getElementById('iframePreviewDiagnostico');
+    // Interruptor: plantilla estándar vs reparación a nivel componente
+    const togglePlantillaNivelComponente = document.getElementById('togglePlantillaNivelComponente');
+    const avisoPlantillaNivelComponente = document.getElementById('avisoPlantillaNivelComponente');
     // Checkboxes
     const checkboxSelectAllImgs = document.getElementById('seleccionarTodasImagenesDiag');
     // Botón y dropdown para agregar componentes adicionales
@@ -795,6 +798,29 @@ function initDiagnosticoModal() {
     // Si no hay modal en la página, no ejecutar nada
     if (!form)
         return;
+    // ====================================================================
+    // 0. Interruptor de plantilla (reparación a nivel componente)
+    // ====================================================================
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Muestra u oculta el aviso azul cuando el técnico activa el interruptor.
+     * No envía nada por sí solo: solo cambia el flag que viaja en el FormData.
+     */
+    function actualizarAvisoPlantillaNivelComponente() {
+        if (!avisoPlantillaNivelComponente || !togglePlantillaNivelComponente) {
+            return;
+        }
+        if (togglePlantillaNivelComponente.checked) {
+            avisoPlantillaNivelComponente.classList.remove('d-none');
+        }
+        else {
+            avisoPlantillaNivelComponente.classList.add('d-none');
+        }
+    }
+    if (togglePlantillaNivelComponente) {
+        togglePlantillaNivelComponente.addEventListener('change', actualizarAvisoPlantillaNivelComponente);
+        actualizarAvisoPlantillaNivelComponente();
+    }
     // ====================================================================
     // 1. Actualización en tiempo real del asunto
     // ====================================================================
@@ -2058,11 +2084,19 @@ function initDiagnosticoModal() {
                 if (!continuar)
                     return;
             }
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Si el interruptor está ON, avisamos en el confirm y mandamos el flag
+            // para que Celery use la plantilla de reparación a nivel componente.
+            const usaPlantillaNivelComponente = Boolean(togglePlantillaNivelComponente && togglePlantillaNivelComponente.checked);
+            const etiquetaPlantilla = usaPlantillaNivelComponente
+                ? 'Reparación a nivel componente'
+                : 'Estándar (diagnóstico normal)';
             // Confirmación final
             const confirmMsg = `¿Enviar diagnóstico al cliente?\n\n` +
                 `📋 Folio: ${folio}\n` +
                 `🔧 Componentes: ${componentesSeleccionados.length} seleccionados\n` +
-                `📸 Imágenes: ${document.querySelectorAll('.checkbox-imagen-diag:checked').length} seleccionadas\n\n` +
+                `📸 Imágenes: ${document.querySelectorAll('.checkbox-imagen-diag:checked').length} seleccionadas\n` +
+                `✉️ Plantilla: ${etiquetaPlantilla}\n\n` +
                 `El estado de la orden cambiará a "Diagnóstico enviado al cliente".`;
             if (!confirm(confirmMsg))
                 return;
@@ -2071,6 +2105,13 @@ function initDiagnosticoModal() {
             // Agregar JSON de componentes
             const componentesJSON = JSON.stringify(construirComponentesJSON());
             formData.set('componentes', componentesJSON);
+            // Asegurar el flag aunque el checkbox no entre en FormData por algún motivo
+            if (usaPlantillaNivelComponente) {
+                formData.set('plantilla_nivel_componente', '1');
+            }
+            else {
+                formData.delete('plantilla_nivel_componente');
+            }
             // Mostrar estado de loading
             btnEnviar.disabled = true;
             const textoOriginal = btnEnviar.innerHTML;

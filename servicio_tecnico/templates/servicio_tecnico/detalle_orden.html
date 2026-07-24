@@ -3997,6 +3997,48 @@
                     
                     <hr class="my-3">
                     
+                    <!--
+                      SECCIÓN 1b: PLANTILLA DE CORREO
+                      EXPLICACIÓN PARA PRINCIPIANTES:
+                      Va justo después del asunto. Interruptor apagado = correo normal.
+                      Encendido = plantilla de reparación a nivel componente (FAQ + fotos).
+                      El PDF no cambia.
+                    -->
+                    <div class="mb-3" id="seccionPlantillaNivelComponente">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-gear text-success fs-5 me-2"></i>
+                            <h6 class="mb-0 text-success fw-bold">Plantilla del correo</h6>
+                        </div>
+                        
+                        <!-- Contenedor con borde; el form-switch va DENTRO (no en el marco)
+                             para que Bootstrap no empuje el botón fuera del padding. -->
+                        <div class="p-3 border rounded diag-toggle-plantilla">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="togglePlantillaNivelComponente"
+                                       name="plantilla_nivel_componente"
+                                       value="1">
+                                <label class="form-check-label fw-semibold" for="togglePlantillaNivelComponente">
+                                    Reparación a nivel componente
+                                </label>
+                            </div>
+                            <div class="form-text mt-2 mb-0 ps-1">
+                                Al activarlo, el correo usará la plantilla explicativa de reparación
+                                a nivel componente (FAQ + fotos del proceso). El PDF de diagnóstico no cambia.
+                            </div>
+                            <div id="avisoPlantillaNivelComponente"
+                                 class="alert alert-info py-2 px-3 mt-2 mb-0 d-none"
+                                 role="status">
+                                <i class="bi bi-info-circle"></i>
+                                Se enviará la plantilla de <strong>reparación a nivel componente</strong>.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-3">
+                    
                     <!-- SECCIÓN 2: DESTINATARIO PRINCIPAL -->
                     <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">

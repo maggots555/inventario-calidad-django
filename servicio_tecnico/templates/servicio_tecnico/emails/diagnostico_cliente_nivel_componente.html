@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico — Reparación a nivel componente - {{ folio }}</title>
+    <!-- EXPLICACIÓN PARA PRINCIPIANTES:
+         Misma estructura visual que diagnostico_cliente.html (header, info equipo,
+         adjuntos, footer). El cuerpo explica reparación a nivel componente + FAQ
+         + galería del proceso (imágenes inline cid:rhitso_*). -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+            color: #051d63;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+        
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+        
+        .logo {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 18px;
+            line-height: 1.8;
+        }
+        
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1565c0;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 180px;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 15px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        .info-value.highlight {
+            color: #1565c0;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .message-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .message-title {
+            font-weight: 700;
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        
+        .message-content {
+            color: #664d03;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .faq-section {
+            margin: 28px 0;
+            padding: 22px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .faq-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0d7377;
+            margin-bottom: 18px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #0d7377;
+        }
+        
+        .faq-item {
+            margin-bottom: 16px;
+        }
+        
+        .faq-question {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
+        
+        .faq-answer {
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.7;
+        }
+        
+        .proceso-section {
+            margin: 30px 0 10px;
+            text-align: center;
+        }
+        
+        .proceso-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0d7377;
+            margin-bottom: 18px;
+        }
+        
+        .proceso-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 auto 8px;
+        }
+        
+        .proceso-table td {
+            width: 50%;
+            vertical-align: top;
+            padding: 10px 12px 18px;
+            text-align: center;
+        }
+        
+        .proceso-img {
+            width: 100%;
+            max-width: 280px;
+            height: auto;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto 8px;
+        }
+        
+        .proceso-caption {
+            font-size: 14px;
+            color: #334155;
+            font-style: italic;
+        }
+        
+        .proceso-hr {
+            border: none;
+            border-top: 1px solid #cbd5e1;
+            margin: 4px 0 12px;
+        }
+        
+        .cta-proceso {
+            text-align: center;
+            margin: 24px 0 10px;
+        }
+        
+        .btn-teal {
+            display: inline-block;
+            padding: 10px 22px;
+            background-color: #0d7377;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .btn-whatsapp {
+            display: inline-block;
+            padding: 12px 28px;
+            background-color: #0d7377;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        
+        .cta-texto {
+            margin: 18px 0 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #0d7377;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            line-height: 1.5;
+        }
+        
+        .attachments-box {
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+            border: 1px solid #a5d6a7;
+        }
+        
+        .attachments-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        
+        .attachments-count {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1b5e20;
+            margin: 5px 0;
+        }
+        
+        .attachments-text {
+            font-size: 14px;
+            color: #388e3c;
+        }
+        
+        .attachments-detail {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #2e7d32;
+            text-align: left;
+            padding: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 8px;
+        }
+        
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #0d7377;
+        }
+        
+        .help-title {
+            font-weight: 700;
+            color: #0d7377;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.8;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .signature {
+            margin-bottom: 15px;
+        }
+        
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .social-icon {
+            font-size: 18px;
+        }
+        
+        @media only screen and (max-width: 600px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .info-row { flex-direction: column; }
+            .info-label { min-width: unset; margin-bottom: 3px; }
+            .header { padding: 20px; }
+            .logo { font-size: 18px; }
+            .subtitle { font-size: 14px; }
+            
+            .proceso-table td {
+                display: block;
+                width: 100%;
+            }
+            
+            .social-links {
+                gap: 8px;
+                padding: 0 5px;
+            }
+            
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+                gap: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">🔧 DIAGNÓSTICO — REPARACIÓN A NIVEL COMPONENTE</div>
+            <div class="subtitle">Folio: {{ folio }}</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Buen día estimado usuario
+            </div>
+            
+            <div class="intro-text">
+                Me dirijo de <strong>{{ empresa_nombre }}</strong>, para hacer de su conocimiento el diagnóstico
+                realizado por nuestro Ingeniero a su equipo de cómputo (documento adjunto).
+            </div>
+            
+            <div class="intro-text">
+                Al identificar en el diagnóstico que el daño es en una de las partes principales del equipo,
+                la <strong>Tarjeta Madre</strong> la cual es una de las partes más importantes y caras de un equipo
+                (representa aprox el <strong>55%</strong> del costo del equipo) y por ello es que queremos explicarle
+                acerca del proceso de <strong>reparación a nivel componente</strong> con el cual contamos y que
+                implicaría una inversión menor y un ahorro sustancial en costo y tiempo VS el reemplazo completo
+                de esta parte.
+            </div>
+            
+            <div class="intro-text">
+                En caso de aceptar este proceso, se deben ir reemplazando los componentes dañados
+                (por ejemplo fuentes de alimentación) para dejarlo funcional y hay un alto porcentaje de éxito
+                (<strong>90%</strong>); el costo como ya mencionamos es mucho menor VS el costo de la parte de Stock
+                y el tiempo de entrega de igual forma es mucho más rápido
+                (<strong>(2 a 6 días hábiles</strong> después de su OK para este proceso aproximadamente),
+                también contará con los <strong>30 días naturales de garantía</strong> que ofrecemos, y recibirá además
+                evidencia fotográfica del(os) microcomponente(s) dañado(s) y del funcionamiento de su equipo
+                después del reemplazo de estos.
+            </div>
+            
+            <div class="equipment-info">
+                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
+                
+                <div class="info-row">
+                    <div class="info-label">📑 Folio Diagnóstico:</div>
+                    <div class="info-value highlight">{{ folio }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🎯 Número de Orden:</div>
+                    <div class="info-value highlight">
+                        {% if detalle.orden_cliente %}
+                            {{ detalle.orden_cliente }}
+                        {% else %}
+                            {{ orden.numero_orden_interno }}
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">💻 Equipo:</div>
+                    <div class="info-value">
+                        {{ detalle.tipo_equipo }} {{ detalle.marca }} 
+                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🔢 Número de Serie:</div>
+                    <div class="info-value">{{ detalle.numero_serie }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">📅 Fecha de Ingreso:</div>
+                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
+                </div>
+            </div>
+            
+            {% if mensaje_personalizado %}
+            <div class="message-box">
+                <div class="message-title">💬 Mensaje Adicional</div>
+                <div class="message-content">
+                    {{ mensaje_personalizado|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="faq-section">
+                <div class="faq-title">Preguntas frecuentes</div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        ¿Todos los equipos bajo este escenario de daño en Tarjeta Madre pasan en automático
+                        a esta reparación por componente?
+                    </div>
+                    <div class="faq-answer">
+                        <strong>NO</strong>, requerimos su aprobación escrita vía email en respuesta al diagnóstico enviado.
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        ¿Qué pasa si en este proceso se determina que la Tarjeta madre es IRREPARABLE?
+                    </div>
+                    <div class="faq-answer">
+                        Como todo hay un rango de fallo por lo que si su Tarjeta madre tiene un daño muy profundo
+                        y no es candidata a reparación, esto <strong>no representará ningún costo adicional</strong>
+                        para usted y se lo informaremos a la brevedad.
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        ¿Si no es reparable entonces qué puedo esperar?
+                    </div>
+                    <div class="faq-answer">
+                        Recibirá un email informando esto y en paralelo una cotización por la parte completa
+                        y tiempo de entrega, ya que estas partes vienen de diferentes Stocks que tenemos en
+                        USA o China (siempre seleccionamos el de mejor disponibilidad, tiempo de espera y costo
+                        de arancel) y en base a ello usted pueda tomar la decisión de reemplazar la parte y
+                        esperar o no.
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        ¿Cuanto cuesta la reparación a nivel componente?
+                    </div>
+                    <div class="faq-answer">
+                        El costo de la reparación depende del nivel de daño que se encuentre; cuando le enviemos
+                        la propuesta económica se le detallará el mismo.
+                    </div>
+                </div>
+                
+                <div class="faq-item">
+                    <div class="faq-question">
+                        ¿En caso de que no se pueda reparar la Tarjeta Madre, es posible recuperar
+                        la información del equipo?
+                    </div>
+                    <div class="faq-answer">
+                        Sí, dado que el almacenamiento es independiente en algunos modelos, es posible recuperar
+                        su información si es que así lo requiere
+                        <strong>(solo en caso de SSD formateados es imposible recuperar datos)</strong>.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Galería del proceso: tablas 2 columnas (mejor soporte en clientes de correo) -->
+            <div class="proceso-section">
+                <div class="proceso-title">Proceso de reparación a nivel componente</div>
+                
+                <table class="proceso-table" role="presentation" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td>
+                            <img src="cid:rhitso_reballing" alt="Reballing" class="proceso-img" />
+                            <div class="proceso-caption">Reballing</div>
+                        </td>
+                        <td>
+                            <img src="cid:rhitso_pistas" alt="Recuperación de pistas" class="proceso-img" />
+                            <div class="proceso-caption">Recuperación de pistas</div>
+                        </td>
+                    </tr>
+                </table>
+                <hr class="proceso-hr" />
+                
+                <table class="proceso-table" role="presentation" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td>
+                            <img src="cid:rhitso_ultrasonica" alt="Baño en tina ultrasonica" class="proceso-img" />
+                            <div class="proceso-caption">Baño en tina ultrasonica</div>
+                        </td>
+                        <td>
+                            <img src="cid:rhitso_revision" alt="Revisión de cada componente" class="proceso-img" />
+                            <div class="proceso-caption">Revisión de cada componente</div>
+                        </td>
+                    </tr>
+                </table>
+                <hr class="proceso-hr" />
+                
+                <table class="proceso-table" role="presentation" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td>
+                            <img src="cid:rhitso_datos" alt="Recuperación de información" class="proceso-img" />
+                            <div class="proceso-caption">Recuperación de información</div>
+                        </td>
+                        <td>
+                            <img src="cid:rhitso_integridad" alt="Verificación de integridad" class="proceso-img" />
+                            <div class="proceso-caption">Verificación de integridad</div>
+                        </td>
+                    </tr>
+                </table>
+                
+                <div class="cta-proceso">
+                    <a href="https://sic.com.mx/reparacion-tarjeta-madre/"
+                       class="btn-teal"
+                       target="_blank"
+                       rel="noopener noreferrer">Más información</a>
+                    
+                    <p class="cta-texto">
+                        PARA CONTACTARNOS PUEDE DAR CLIC EN EL SIGUIENTE BOTÓN Y CON GUSTO LE ATENDEREMOS
+                    </p>
+                    
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}"
+                       class="btn-whatsapp"
+                       target="_blank"
+                       rel="noopener noreferrer">
+                        <img src="cid:icon_whatsapp"
+                             alt="WhatsApp"
+                             style="width: 18px; height: 18px; vertical-align: middle; margin-right: 8px;">
+                        Whatsapp
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="attachments-box">
+                <div class="attachments-title">📎 ARCHIVOS ADJUNTOS</div>
+                <div class="attachments-count">{{ cantidad_imagenes|add:1 }}</div>
+                <div class="attachments-text">
+                    archivo{{ cantidad_imagenes|add:1|pluralize }} adjunto{{ cantidad_imagenes|add:1|pluralize }} a este correo
+                </div>
+                <div class="attachments-detail">
+                    <strong>📄 1 PDF</strong> — Diagnóstico completo con observaciones técnicas<br>
+                    {% if cantidad_imagenes > 0 %}
+                    <strong>📸 {{ cantidad_imagenes }} imagen{{ cantidad_imagenes|pluralize:"es" }}</strong> — Fotografías del diagnóstico
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">ℹ️ Información Importante</div>
+                <div class="help-text">
+                    <strong>•</strong> El documento PDF adjunto contiene el diagnóstico detallado de su equipo.<br>
+                    <strong>•</strong> La reparación a nivel componente requiere su <strong>aprobación escrita</strong> por email.<br>
+                    <strong>•</strong> El tiempo estimado tras su OK es de 2 a 6 días hábiles aproximadamente.<br>
+                    <strong>•</strong> Si tiene alguna pregunta, no dude en contactarnos.
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    Gracias por confiar en nuestros servicios.
+                </p>
+            </div>
+
+            {% if seguimiento_url %}
+            <div style="margin-top: 20px; padding: 16px 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; border-left: 4px solid #0284c7; text-align: center;">
+                <p style="margin: 0 0 10px; font-size: 14px; color: #0c4a6e;">
+                    🔍 Consulta el <strong>estado de tu equipo</strong> en cualquier momento:
+                </p>
+                <a href="{{ seguimiento_url }}" style="display: inline-block; padding: 10px 24px; background-color: #0284c7; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">Ver seguimiento de mi equipo</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Servicio Técnico
+                </div>
+                {% if email_empleado %}
+                <div class="signature-role" style="margin-top: 10px; font-size: 14px;">
+                    ✉️ Contacto: {{ email_empleado }}
+                </div>
+                {% endif %}
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para seguimiento de su orden, contacte directamente a 
+                    {% if nombre_empleado %}
+                        <strong>{{ nombre_empleado }}</strong>
+                        {% if email_empleado %}
+                            (<a href="mailto:{{ email_empleado }}" style="color: #ffffff;">{{ email_empleado }}</a>)
+                        {% endif %}
+                    {% else %}
+                        su responsable de seguimiento
+                    {% endif %}.
+                </div>
+            </div>
+            
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+            
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sic.com.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

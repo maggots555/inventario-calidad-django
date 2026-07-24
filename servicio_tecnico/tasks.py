@@ -768,7 +768,8 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
 def enviar_diagnostico_cliente_task(
     self, orden_id, folio, componentes_data, imagenes_ids,
     destinatarios_copia, mensaje_personalizado,
-    email_empleado, nombre_empleado, usuario_id=None, db_alias='default'
+    email_empleado, nombre_empleado, usuario_id=None,
+    tipo_plantilla='estandar', db_alias='default'
 ):
     """
     Tarea Celery: genera PDF de diagnóstico, comprime imágenes, guarda sugerencias
@@ -791,6 +792,7 @@ def enviar_diagnostico_cliente_task(
         email_empleado        : Email del empleado que envía
         nombre_empleado       : Nombre del empleado que envía
         usuario_id            : ID del usuario (para historial)
+        tipo_plantilla        : 'estandar' o 'nivel_componente' (elige el HTML del correo)
         db_alias              : Alias de BD del país activo (multi-tenant Celery)
     """
     import io
@@ -985,12 +987,20 @@ def enviar_diagnostico_cliente_task(
             'nombre_empleado': nombre_empleado,
             'whatsapp_empleado': whatsapp_empleado,
             'seguimiento_url': seguimiento_url,
+            'tipo_plantilla': tipo_plantilla,
         }
 
-        html_content = render_to_string(
-            'servicio_tecnico/emails/diagnostico_cliente.html',
-            context_email
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # tipo_plantilla llega desde el interruptor del modal.
+        # 'nivel_componente' usa la plantilla con FAQ + fotos del proceso RHITSO.
+        usa_plantilla_nivel_componente = (tipo_plantilla == 'nivel_componente')
+        template_email = (
+            'servicio_tecnico/emails/diagnostico_cliente_nivel_componente.html'
+            if usa_plantilla_nivel_componente
+            else 'servicio_tecnico/emails/diagnostico_cliente.html'
         )
+
+        html_content = render_to_string(template_email, context_email)
 
         asunto = f'DIAGNOSTICO FOLIO {folio}'
         email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
@@ -1037,6 +1047,71 @@ def enviar_diagnostico_cliente_task(
         except Exception as e:
             logger.warning(f"[DIAGNOSTICO] Error al adjuntar iconos: {e}")
 
+        # Galería del proceso (solo plantilla reparación a nivel componente).
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Las imágenes van "inline" con Content-ID para que el HTML las muestre
+        # con src="cid:rhitso_reballing" sin que el cliente tenga que abrir adjuntos.
+        # Redimensionamos a máx. 640px para no inflar el correo.
+        if usa_plantilla_nivel_componente:
+            imagenes_proceso_rhitso = [
+                ('rhitso_reballing', 'images/rhitso/reballing.jpg', 'jpeg'),
+                ('rhitso_pistas', 'images/rhitso/pistas.jpg', 'jpeg'),
+                ('rhitso_ultrasonica', 'images/rhitso/soldadura.jpg', 'jpeg'),
+                ('rhitso_revision', 'images/rhitso/revision.jpg', 'jpeg'),
+                ('rhitso_datos', 'images/rhitso/datos.jpg', 'jpeg'),
+                ('rhitso_integridad', 'images/rhitso/datos1.png', 'png'),
+            ]
+            for cid_name, static_rel, subtype in imagenes_proceso_rhitso:
+                try:
+                    img_path = finders.find(static_rel)
+                    if not img_path:
+                        logger.warning(
+                            f"[DIAGNOSTICO] Imagen RHITSO no encontrada: {static_rel}"
+                        )
+                        continue
+
+                    # Comprimir / redimensionar para clientes de correo
+                    img = Image.open(img_path)
+                    if img.mode in ('RGBA', 'LA', 'P') and subtype == 'jpeg':
+                        fondo = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        fondo.paste(
+                            img,
+                            mask=img.split()[-1] if img.mode == 'RGBA' else None,
+                        )
+                        img = fondo
+                    elif img.mode not in ('RGB', 'L') and subtype == 'png':
+                        img = img.convert('RGBA')
+
+                    max_lado = 640
+                    if max(img.size) > max_lado:
+                        ratio = max_lado / max(img.size)
+                        nuevo_tamano = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                        img = img.resize(nuevo_tamano, Image.Resampling.LANCZOS)
+
+                    buffer_img = io.BytesIO()
+                    if subtype == 'jpeg':
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        img.save(buffer_img, format='JPEG', quality=75, optimize=True)
+                    else:
+                        img.save(buffer_img, format='PNG', optimize=True)
+                    buffer_img.seek(0)
+
+                    mime_img = MIMEImage(buffer_img.getvalue(), _subtype=subtype)
+                    mime_img.add_header('Content-ID', f'<{cid_name}>')
+                    mime_img.add_header(
+                        'Content-Disposition',
+                        'inline',
+                        filename=f'{cid_name}.{subtype}',
+                    )
+                    email_msg.attach(mime_img)
+                except Exception as e:
+                    logger.warning(
+                        f"[DIAGNOSTICO] Error al adjuntar imagen proceso {cid_name}: {e}"
+                    )
+
         # Adjuntar PDF
         with open(resultado_pdf['ruta'], 'rb') as f:
             email_msg.attach(resultado_pdf['archivo'], f.read(), 'application/pdf')
@@ -1046,7 +1121,10 @@ def enviar_diagnostico_cliente_task(
             email_msg.attach(img_data['nombre'], img_data['contenido'], 'image/jpeg')
 
         email_msg.send(fail_silently=False)
-        logger.info(f"[DIAGNOSTICO] Correo enviado a {email_cliente}")
+        logger.info(
+            f"[DIAGNOSTICO] Correo enviado a {email_cliente} "
+            f"(plantilla={tipo_plantilla})"
+        )
 
         # ===================================================================
         # PASO 5b: GUARDAR PDF EN EL ENLACE PÚBLICO (para push y PWA)
@@ -1111,6 +1189,8 @@ def enviar_diagnostico_cliente_task(
                 f"📧 Diagnóstico enviado al cliente (background) ({email_cliente})\n"
                 f"📋 Folio: {folio}\n"
                 f"📄 PDF adjunto: {resultado_pdf['archivo']}\n"
+                f"✉️ Plantilla: "
+                f"{'Reparación a nivel componente' if tipo_plantilla == 'nivel_componente' else 'Estándar'}\n"
                 f"🔧 Componentes marcados (sugerencias Almacén): {componentes_marcados}\n"
                 f"📸 Imágenes adjuntas: {len(imagenes_comprimidas)}"
             )
