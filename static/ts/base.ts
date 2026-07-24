@@ -329,16 +329,40 @@ function inicializarNavbarModerno() {
         });
     }
 
+    /**
+     * Cierra todos los submenús del navbar (clase .active).
+     * EXPLICACIÓN PARA PRINCIPIANTES: en tablet el menú se abre con .active
+     * (el hover no es fiable al tocar). Hay que quitar esa clase al elegir
+     * un enlace o al volver a pulsar el botón del módulo.
+     */
+    function cerrarTodosLosDropdownsNavbar(): void {
+        document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
+    }
+
+    /** Tablet landscape / menú por iconos: necesita .active (sin hover fiable) */
+    const esVistaTabletIconos = (): boolean => {
+        const w = window.innerWidth;
+        return w > 992 && w <= 1200;
+    };
+
     const dropdownLinks = document.querySelectorAll('.navbar-menu-link[data-dropdown]');
 
     dropdownLinks.forEach(function(link: Element) {
         link.addEventListener('click', function(this: HTMLElement, e: Event) {
             e.preventDefault();
 
-            if (esVistaMovil()) {
-                const parentItem = this.closest('.navbar-menu-item');
-                if (parentItem) {
-                    parentItem.classList.toggle('active');
+            const parentItem = this.closest('.navbar-menu-item');
+            if (!parentItem) return;
+
+            // Móvil y tablet: abrir/cerrar al tocar el botón del módulo
+            if (esVistaMovil() || esVistaTabletIconos()) {
+                const yaEstabaAbierto = parentItem.classList.contains('active');
+                cerrarTodosLosDropdownsNavbar();
+                // Si no estaba abierto, abrirlo (toggle). Si sí, queda cerrado.
+                if (!yaEstabaAbierto) {
+                    parentItem.classList.add('active');
                 }
             }
         });
@@ -347,15 +371,15 @@ function inicializarNavbarModerno() {
     document.addEventListener('click', function(e: Event) {
         const target = e.target as HTMLElement;
         if (target && !target.closest('.navbar-menu-item') && !target.closest('#navbarToggle')) {
-            document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
-                item.classList.remove('active');
-            });
+            cerrarTodosLosDropdownsNavbar();
         }
     });
 
+    // Enlaces reales del menú (no el botón del módulo): al pulsar, cerrar todo
     const navbarLinks = navbarMenu ? navbarMenu.querySelectorAll('a:not([data-dropdown])') : [];
     navbarLinks.forEach(function(link) {
         link.addEventListener('click', function() {
+            cerrarTodosLosDropdownsNavbar();
             if (esVistaMovil()) {
                 setMenuMovilAbierto(false);
             }
@@ -365,9 +389,7 @@ function inicializarNavbarModerno() {
     window.addEventListener('resize', function() {
         if (!esVistaMovil()) {
             setMenuMovilAbierto(false);
-            document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
-                item.classList.remove('active');
-            });
+            cerrarTodosLosDropdownsNavbar();
         }
     });
 }
