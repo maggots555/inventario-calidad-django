@@ -2968,43 +2968,68 @@ footer::after {
 /*
  * Mega-menús SOLO en tablet landscape con iconos (993–1200px).
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * No incluir ≤992: ahí el menú es hamburguesa y los dropdowns van
- * position:static dentro del panel.
- *
- * Densidad utilitaria: tarjeta centrada (~560–640px), no capa full-bleed.
- * Tipografía y padding más compactos que desktop, sin perder legibilidad.
+ * El menú debe “salir” del botón (position:absolute bajo el ítem),
+ * no flotar centrado en toda la pantalla (eso se veía desconectado).
+ * Ancho acotado para no salirse del viewport.
  */
 @media (max-width: 1200px) and (min-width: 993px) {
+    .navbar-menu,
+    .navbar-menu-item,
+    .navbar-container,
+    .modern-navbar {
+        overflow: visible;
+    }
+
+    /* Todos los dropdowns: pegados al botón (poca separación vertical) */
+    .navbar-dropdown {
+        top: calc(100% + 0.2rem);
+        left: 0;
+        transform: translateY(-6px);
+    }
+
+    .navbar-menu-item:hover .navbar-dropdown,
+    .navbar-menu-item.active .navbar-dropdown {
+        transform: translateY(0);
+    }
+
     .navbar-dropdown.dropdown-mega,
     .navbar-dropdown.dropdown-mega-3col {
-        position: fixed;
-        left: 50%;
+        position: absolute;
+        left: 0;
         right: auto;
-        top: var(--navbar-total-height);
-        width: min(560px, calc(100vw - 1.5rem));
+        top: calc(100% + 0.2rem);
+        width: min(560px, calc(100vw - 2rem));
         min-width: 0;
-        max-width: none;
+        max-width: min(560px, calc(100vw - 2rem));
         max-height: min(70vh, calc(100dvh - var(--navbar-total-height) - 1rem));
-        /* Centrado horizontal + leve offset al cerrar (animación) */
-        transform: translateX(-50%) translateY(-8px);
+        transform: translateY(-6px);
         box-sizing: border-box;
         padding: 0.35rem 0;
+        overflow-x: hidden;
         overflow-y: auto;
         border-radius: 10px;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
     }
 
-    /* Almacén (3 col) un poco más ancho */
+    /* Almacén (3 col): más estrecho para que quepa con left:0 bajo el botón */
     .navbar-dropdown.dropdown-mega-3col {
-        width: min(640px, calc(100vw - 1.5rem));
+        width: min(480px, calc(100vw - 2rem));
+        max-width: min(480px, calc(100vw - 2rem));
     }
 
     .navbar-menu-item:hover .navbar-dropdown.dropdown-mega,
     .navbar-menu-item.active .navbar-dropdown.dropdown-mega,
     .navbar-menu-item:hover .navbar-dropdown.dropdown-mega-3col,
     .navbar-menu-item.active .navbar-dropdown.dropdown-mega-3col {
-        transform: translateX(-50%) translateY(0);
+        transform: translateY(0);
     }
+
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Ya no usamos right:0 en Almacén: con panel ancho se cortaba por la
+     * izquierda. Todos los mega-menús quedan con left:0 (salen del botón)
+     * y Almacén usa ancho ~480px para caber en tablet.
+     */
 
     /* Contenido denso dentro del flyout */
     .navbar-dropdown.dropdown-mega .dropdown-header,
