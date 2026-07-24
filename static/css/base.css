@@ -2155,9 +2155,14 @@ footer::after {
     z-index: 1000;
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
     width: 100%;
-    /* overflow-x removido de aquí - se aplicará solo en móviles */
+    max-width: 100%;
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * No usamos overflow-x:hidden aquí: junto con overflow-y:visible
+     * el navegador acaba recortando también en Y y corta los dropdowns.
+     * El ajuste de espacio lo hacen gaps/labels/breakpoints más densos.
+     */
     overflow-y: visible;
-    /* Asegurar que dropdowns sean visibles */
 }
 
 .navbar-container {
@@ -2168,25 +2173,29 @@ footer::after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1.5rem;
-    gap: 1.5rem;
+    /* Base más densa: menos padding/gap para que quepa en laptops al 100% */
+    padding: 0 1rem;
+    gap: 0.75rem;
     box-sizing: border-box;
-    /* Incluir padding en el ancho */
+    min-width: 0;
 }
 
 /* ===== LOGO Y BRAND ===== */
 .navbar-brand-section {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
+    /* Puede ceder espacio si el viewport se estrecha (antes era flex-shrink: 0) */
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .navbar-brand-link {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     text-decoration: none;
     transition: transform 0.3s ease;
+    min-width: 0;
 }
 
 .navbar-brand-link:hover {
@@ -2194,8 +2203,8 @@ footer::after {
 }
 
 .navbar-logo {
-    width: 65px;
-    height: 65px;
+    width: 56px;
+    height: 56px;
     background: linear-gradient(135deg, #3498db, #2980b9);
     border-radius: 12px;
     display: flex;
@@ -2203,6 +2212,7 @@ footer::after {
     justify-content: center;
     box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
     transition: all 0.3s ease;
+    flex-shrink: 0;
 }
 
 .navbar-brand-link:hover .navbar-logo {
@@ -2215,23 +2225,34 @@ footer::after {
     color: white;
 }
 
+.navbar-brand-text {
+    min-width: 0;
+}
+
 .navbar-brand-text h1 {
-    font-size: 1rem; /* Reducido 20%: 1.25 * 0.8 = 1rem */
+    font-size: 0.95rem;
     font-weight: 700;
     margin: 0;
     color: #ffffff;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .navbar-brand-text span {
-    font-size: 0.6rem; /* Reducido 20%: 0.75 * 0.8 = 0.6rem */
+    font-size: 0.55rem;
     color: #bdc3c7;
     display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
 }
 
 /* Reducir también los íconos dentro del texto descriptivo */
 .navbar-brand-text span i {
-    font-size: 0.6rem; /* Íconos del mismo tamaño que el texto */
+    font-size: 0.55rem;
 }
 
 /* ===== ESTILOS ESPECÍFICOS PARA LOGO SVG ===== */
@@ -2303,27 +2324,31 @@ footer::after {
 .navbar-menu {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    flex: 1;
+    gap: 0.25rem;
+    flex: 1 1 auto;
     justify-content: flex-start;
-    margin-left: 2rem;
+    margin-left: 0.75rem;
+    min-width: 0;
 }
 
 .navbar-menu-item {
     position: relative;
+    flex-shrink: 0;
 }
 
 .navbar-menu-link {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.8rem;
+    gap: 0.3rem;
+    padding: 0.45rem 0.55rem;
     color: #ecf0f1;
     text-decoration: none;
-    font-size: 0.76rem; /* Reducido 20%: 0.95 * 0.8 = 0.76rem */
+    font-size: 0.72rem;
     font-weight: 500;
     border-radius: 8px;
     transition: all 0.3s ease;
+    /* Evita que "Almacén" u otros labels salten a 2 líneas y empujen la barra */
+    white-space: nowrap;
 }
 
 .navbar-menu-link:hover {
@@ -2332,12 +2357,12 @@ footer::after {
 }
 
 .navbar-menu-link i:first-child {
-    font-size: 0.88rem; /* Reducido 20%: 1.1 * 0.8 = 0.88rem */
+    font-size: 0.85rem;
 }
 
 /* Reducir también todos los íconos del navbar-menu-link */
 .navbar-menu-link i {
-    font-size: 0.88rem; /* Todos los íconos reducidos 20% */
+    font-size: 0.85rem;
 }
 
 /* ===== DROPDOWNS ===== */
@@ -2468,11 +2493,9 @@ footer::after {
 .navbar-user-section {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.65rem;
     flex-shrink: 0;
-    /* Evitar compresión excesiva */
     min-width: 0;
-    /* Permitir overflow controlado */
 }
 
 .navbar-user-info {
@@ -2481,32 +2504,36 @@ footer::after {
     align-items: flex-end;
     gap: 0.1rem;
     min-width: 0;
-    /* Para permitir truncar texto si es necesario */
+    max-width: 200px;
 }
 
 /* Wrapper para nombre + bandera */
 .user-name-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     line-height: 1.2;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .user-name {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #ffffff;
     white-space: nowrap;
-    /* Evitar saltos de línea */
     overflow: hidden;
     text-overflow: ellipsis;
-    /* Truncar con ... si es muy largo */
+    max-width: 140px;
 }
 
 .user-role {
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     color: #95a5a6;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
 }
 
 /* Destacar el cargo con color verde "conectado" */
@@ -2700,85 +2727,59 @@ footer::after {
     transition: all 0.3s ease;
 }
 
-/* ===== RESPONSIVE DESIGN — BREAKPOINTS INTERMEDIOS ===== */
+/* ===== RESPONSIVE DESIGN — BREAKPOINTS INTERMEDIOS (DESKTOP) =====
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * La navbar tiene muchos elementos en una sola fila. Si no comprimimos
+ * a tiempo, en laptops al 100% de zoom se desborda (hay que ir al 80%).
+ * Cada media query quita/reduce algo más al estrechar el viewport.
+ * El hamburger (≤992px) no se toca aquí.
+ * ============================================================================= */
 
-/* ---------- 1440px: Pantallas 15" ---------- */
-@media (max-width: 1440px) {
-    .navbar-container {
-        padding: 0 1rem;
-        gap: 1rem;
-    }
-
-    .navbar-menu {
-        margin-left: 1rem;
-        gap: 0.25rem;
-    }
-
-    .navbar-menu-link {
-        padding: 0.45rem 0.6rem;
-        font-size: 0.72rem;
+/* ---------- ≤1680px: ocultar subtítulo del brand (redundante con el menú) ---------- */
+@media (max-width: 1680px) {
+    .navbar-brand-text span {
+        display: none;
     }
 
     .navbar-brand-text h1 {
         font-size: 0.9rem;
     }
 
-    .navbar-brand-text span {
-        font-size: 0.55rem;
-    }
-
-    .navbar-brand-text span i {
-        font-size: 0.55rem;
-    }
-
-    .navbar-logo,
-    .navbar-logo-svg {
-        width: 55px;
-        height: 55px;
-    }
-
-    .user-name {
-        font-size: 0.85rem;
-        max-width: 150px;
-    }
-
-    .user-role {
-        font-size: 0.7rem;
-    }
-
-    .navbar-user-section {
-        gap: 0.75rem;
-    }
-}
-
-/* ---------- 1280px: Pantallas 14" — ocultar subtítulo del brand ---------- */
-@media (max-width: 1280px) {
-    .navbar-brand-text span {
-        display: none;
-    }
-
-    .navbar-brand-text h1 {
-        font-size: 0.85rem;
+    .navbar-container {
+        gap: 0.6rem;
+        padding: 0 0.85rem;
     }
 
     .navbar-menu {
-        margin-left: 0.75rem;
-        gap: 0.15rem;
+        margin-left: 0.5rem;
+        gap: 0.2rem;
+    }
+}
+
+/* ---------- ≤1440px: pantallas 15" / laptops típicas ---------- */
+@media (max-width: 1440px) {
+    .navbar-container {
+        padding: 0 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .navbar-menu {
+        margin-left: 0.35rem;
+        gap: 0.1rem;
     }
 
     .navbar-menu-link {
-        padding: 0.4rem 0.5rem;
-        font-size: 0.7rem;
-        gap: 0.3rem;
+        padding: 0.4rem 0.45rem;
+        font-size: 0.68rem;
+        gap: 0.25rem;
     }
 
     .navbar-menu-link i {
         font-size: 0.8rem;
     }
 
-    /* Ocultar el chevron para ahorrar espacio */
-    .navbar-menu-link .menu-chevron {
-        display: none;
+    .navbar-brand-text h1 {
+        font-size: 0.85rem;
     }
 
     .navbar-logo,
@@ -2793,14 +2794,16 @@ footer::after {
     }
 
     .user-role {
-        font-size: 0.65rem;
-        max-width: 140px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 0.62rem;
+        max-width: 160px;
     }
 
     .navbar-user-section {
         gap: 0.5rem;
+    }
+
+    .navbar-user-info {
+        max-width: 170px;
     }
 
     .navbar-user-avatar {
@@ -2815,11 +2818,78 @@ footer::after {
         min-height: 34px;
         font-size: 1rem;
     }
+
+    .navbar-actions {
+        gap: 0.35rem;
+    }
 }
 
-/* ---------- 1100px: Solo iconos en el menú (sin texto) ---------- */
-@media (max-width: 1100px) {
-    /* Ocultar texto, dejar solo iconos */
+/* ---------- ≤1280px: pantallas 14" — sin chevrons, más compacto ---------- */
+@media (max-width: 1280px) {
+    .navbar-brand-text h1 {
+        font-size: 0.8rem;
+    }
+
+    .navbar-menu {
+        margin-left: 0.25rem;
+        gap: 0.05rem;
+    }
+
+    .navbar-menu-link {
+        padding: 0.35rem 0.4rem;
+        font-size: 0.65rem;
+    }
+
+    .navbar-menu-link i {
+        font-size: 0.75rem;
+    }
+
+    /* Ocultar chevrons para ahorrar ~15px por ítem */
+    .navbar-menu-link .menu-chevron {
+        display: none;
+    }
+
+    .navbar-logo,
+    .navbar-logo-svg {
+        width: 46px;
+        height: 46px;
+    }
+
+    .user-name {
+        font-size: 0.75rem;
+        max-width: 100px;
+    }
+
+    .user-role {
+        font-size: 0.6rem;
+        max-width: 130px;
+    }
+
+    .navbar-user-section {
+        gap: 0.4rem;
+    }
+
+    .navbar-user-info {
+        max-width: 140px;
+    }
+
+    .navbar-user-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .navbar-action-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 0.95rem;
+    }
+}
+
+/* ---------- ≤1200px: solo iconos en el menú (antes era 1100) ---------- */
+@media (max-width: 1200px) {
+    /* Ocultar texto de módulos; el title= del <a> actúa como tooltip */
     .navbar-menu-link .menu-text {
         display: none;
     }
@@ -2832,33 +2902,28 @@ footer::after {
         padding: 0.5rem;
         font-size: 0;
         justify-content: center;
+        border-radius: 10px;
+        width: 40px;
+        height: 40px;
     }
 
     .navbar-menu-link i:first-child {
         font-size: 1.1rem;
     }
 
-    /* Los items del menú actúan como botones de icono */
     .navbar-menu-item {
         position: relative;
     }
 
-    /* Tooltip nativo vía title + mejora visual */
-    .navbar-menu-link {
-        border-radius: 10px;
-        width: 40px;
-        height: 40px;
-    }
-
     .navbar-menu {
-        margin-left: 0.5rem;
-        gap: 0.25rem;
+        margin-left: 0.35rem;
+        gap: 0.2rem;
     }
 
     .navbar-logo,
     .navbar-logo-svg {
-        width: 46px;
-        height: 46px;
+        width: 44px;
+        height: 44px;
     }
 
     /*
@@ -2872,7 +2937,6 @@ footer::after {
     .dropdown-mega-3col {
         left: auto;
         right: 0;
-        /* Sin min-width fijo: el ancho no puede forzar scroll lateral */
         min-width: 0;
         max-width: calc(100vw - 1rem);
         width: auto;

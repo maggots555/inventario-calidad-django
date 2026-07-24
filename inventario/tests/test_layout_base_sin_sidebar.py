@@ -82,3 +82,20 @@ class LayoutBaseSinSidebarTest(TestCase):
         self.assertIn('id="mainWrapper"', html)
         self.assertNotIn('sidebar-collapsed', html)
         self.assertNotIn('sidebar-loading', html)
+
+    def test_navbar_almacen_usa_etiqueta_corta_en_desktop(self):
+        """
+        En desktop el menú muestra "Almacén"; el texto largo va a menu-text-full (móvil).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Esto ahorra ancho horizontal para que la barra quepa al 100% de zoom
+        en laptops típicas, igual que "Config" vs "Configuración".
+        """
+        html = render_to_string('base.html', {}, request=self._request_autenticado())
+
+        # Label corta visible en desktop
+        self.assertIn('class="menu-text">Almacén</span>', html)
+        # Label completa para el panel móvil
+        self.assertIn('class="menu-text-full">Almacén/Compras</span>', html)
+        # No debe repetir el texto largo en menu-text (evitar overflow)
+        self.assertNotIn('class="menu-text">Almacén/Compras</span>', html)
