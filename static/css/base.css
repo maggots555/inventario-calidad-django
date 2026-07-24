@@ -3123,15 +3123,7 @@ footer::after {
     }
 
     .navbar-menu-link .menu-chevron {
-        display: inline;
-    }
-
-    /* Reset del modo iconos (≤1200); tipografía/padding se definen más abajo */
-    .navbar-menu-link {
-        width: auto;
-        height: auto;
-        min-width: 0;
-        min-height: 44px;
+        display: inline-flex;
     }
 
     /* Ajustar información de usuario en móviles */
@@ -3140,7 +3132,13 @@ footer::after {
         display: none;
     }
 
-    /* Menú desplegable móvil — panel fijo denso con scroll táctil */
+    /*
+     * Menú hamburguesa — lista uniforme.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Las filas deben ocupar todo el ancho (width:100%) para que las flechas
+     * queden alineadas a la derecha. Si el link mide solo “icono+texto”,
+     * cada chevron queda a distinta altura horizontal (“sierra”).
+     */
     .navbar-menu {
         position: fixed;
         top: var(--navbar-total-height);
@@ -3153,7 +3151,7 @@ footer::after {
         align-items: stretch;
         gap: 0;
         margin-left: 0;
-        padding: 0.5rem 0;
+        padding: 0.35rem 0;
         padding-bottom: calc(1rem + var(--safe-area-bottom));
         overflow-y: auto;
         overflow-x: hidden;
@@ -3163,7 +3161,6 @@ footer::after {
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        /* Sin transform: en móviles rompe el scroll dentro del contenedor */
         transition: opacity 0.3s ease, visibility 0.3s ease;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         z-index: 1100;
@@ -3215,28 +3212,67 @@ footer::after {
 
     .navbar-menu-item {
         width: 100%;
+        margin: 0;
+        flex-shrink: 0;
+        /* Separador sutil entre módulos (lista uniforme) */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    /*
-     * Filas de módulo: densas pero táctiles (≥44px).
-     * EXPLICACIÓN PARA PRINCIPIANTES: antes el padding era grande y el
-     * texto chico; ahora tipografía y aire van a la par.
-     */
+    .navbar-menu-item:last-child {
+        border-bottom: none;
+    }
+
     .navbar-menu-link {
-        padding: 0.55rem 1rem;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+        height: auto;
+        min-width: 0;
+        min-height: 48px;
+        padding: 0.65rem 1rem;
         font-size: 0.875rem;
+        font-weight: 500;
         border-radius: 0;
-        justify-content: space-between;
-        min-height: 44px;
-        gap: 0.5rem;
+        gap: 0.65rem;
+        color: #ecf0f1;
+        transition: background 0.2s ease;
     }
 
+    .navbar-menu-link:hover,
+    .navbar-menu-item.active > .navbar-menu-link {
+        background: rgba(255, 255, 255, 0.06);
+        color: #ffffff;
+    }
+
+    /* Columna fija de icono → textos alineados */
     .navbar-menu-link i:first-child {
-        font-size: 1rem;
+        flex: 0 0 1.25rem;
+        width: 1.25rem;
+        font-size: 1.05rem;
+        text-align: center;
+        line-height: 1;
     }
 
+    .navbar-menu-link .menu-text-full {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: left;
+    }
+
+    /* Chevron siempre al borde derecho (anula Bootstrap ms-1) */
     .navbar-menu-link .menu-chevron {
-        font-size: 0.75rem;
+        flex: 0 0 auto;
+        margin-left: auto !important;
+        margin-right: 0;
+        font-size: 0.8rem;
+        opacity: 0.75;
+        transition: transform 0.2s ease;
+    }
+
+    .navbar-menu-item.active > .navbar-menu-link .menu-chevron {
+        transform: rotate(180deg);
+        opacity: 1;
     }
 
     .navbar-dropdown {
@@ -3247,24 +3283,25 @@ footer::after {
         overflow: hidden;
         transform: none;
         box-shadow: none;
-        background: rgba(0, 0, 0, 0.2);
-        margin: 0 0.75rem;
-        border-radius: 8px;
-        transition: all 0.3s ease;
+        background: rgba(0, 0, 0, 0.22);
+        /* Cerrado: sin márgenes (evita huecos irregulares entre filas) */
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+        transition: opacity 0.2s ease, max-height 0.25s ease;
     }
 
     .navbar-menu-item.active .navbar-dropdown {
         opacity: 1;
         visibility: visible;
-        /* Sin límite de altura: el scroll lo maneja el panel padre (.navbar-menu) */
         max-height: none;
         overflow: visible;
-        margin-top: 0.35rem;
-        margin-bottom: 0.35rem;
+        margin: 0 0.75rem 0.5rem;
         padding: 0.25rem 0;
+        border-radius: 8px;
     }
 
-    /* Submenús anidados: misma densidad que el flyout tablet */
+    /* Submenús anidados: misma densidad */
     .navbar-menu .dropdown-header {
         padding: 0.35rem 0.85rem;
         font-size: 0.7rem;
