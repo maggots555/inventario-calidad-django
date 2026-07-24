@@ -2969,35 +2969,81 @@ footer::after {
  * Mega-menús SOLO en tablet landscape con iconos (993–1200px).
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * No incluir ≤992: ahí el menú es hamburguesa y los dropdowns van
- * position:static dentro del panel. Si dejáramos fixed, rompería el móvil.
+ * position:static dentro del panel.
  *
- * Antes: absolute + right:0 + ancho ~viewport → el panel se salía por la
- * izquierda al abrir Servicio Técnico / Almacén.
- * Ahora: fixed al viewport, debajo de la navbar, siempre visible completo.
+ * Densidad utilitaria: tarjeta centrada (~560–640px), no capa full-bleed.
+ * Tipografía y padding más compactos que desktop, sin perder legibilidad.
  */
 @media (max-width: 1200px) and (min-width: 993px) {
     .navbar-dropdown.dropdown-mega,
     .navbar-dropdown.dropdown-mega-3col {
         position: fixed;
-        left: max(0.75rem, env(safe-area-inset-left, 0px));
-        right: max(0.75rem, env(safe-area-inset-right, 0px));
+        left: 50%;
+        right: auto;
         top: var(--navbar-total-height);
-        width: auto;
+        width: min(560px, calc(100vw - 1.5rem));
         min-width: 0;
         max-width: none;
-        max-height: calc(100dvh - var(--navbar-total-height) - 0.75rem);
-        transform: none;
+        max-height: min(70vh, calc(100dvh - var(--navbar-total-height) - 1rem));
+        /* Centrado horizontal + leve offset al cerrar (animación) */
+        transform: translateX(-50%) translateY(-8px);
         box-sizing: border-box;
+        padding: 0.35rem 0;
+        overflow-y: auto;
+        border-radius: 10px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Almacén (3 col) un poco más ancho */
+    .navbar-dropdown.dropdown-mega-3col {
+        width: min(640px, calc(100vw - 1.5rem));
     }
 
     .navbar-menu-item:hover .navbar-dropdown.dropdown-mega,
     .navbar-menu-item.active .navbar-dropdown.dropdown-mega,
     .navbar-menu-item:hover .navbar-dropdown.dropdown-mega-3col,
     .navbar-menu-item.active .navbar-dropdown.dropdown-mega-3col {
-        transform: none;
+        transform: translateX(-50%) translateY(0);
     }
 
-    /* 3 columnas → 2 en tablet landscape para no apretar el contenido */
+    /* Contenido denso dentro del flyout */
+    .navbar-dropdown.dropdown-mega .dropdown-header,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-header {
+        padding: 0.35rem 0.85rem;
+        font-size: 0.7rem;
+        margin-bottom: 0.1rem;
+    }
+
+    .navbar-dropdown.dropdown-mega .dropdown-item,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-item {
+        padding: 0.4rem 0.85rem;
+        font-size: 0.82rem;
+        gap: 0.5rem;
+        min-height: 36px;
+    }
+
+    .navbar-dropdown.dropdown-mega .dropdown-item:hover,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-item:hover {
+        padding-left: 1rem;
+    }
+
+    .navbar-dropdown.dropdown-mega .dropdown-item i,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-item i {
+        font-size: 0.9rem;
+        width: 18px;
+    }
+
+    .navbar-dropdown.dropdown-mega .dropdown-section,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-section {
+        padding: 0.35rem 0;
+    }
+
+    .navbar-dropdown.dropdown-mega .dropdown-column,
+    .navbar-dropdown.dropdown-mega-3col .dropdown-column {
+        padding: 0.25rem 0;
+    }
+
+    /* 3 columnas → 2 en tablet landscape */
     .dropdown-mega-3col {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -3045,32 +3091,21 @@ footer::after {
         display: inline;
     }
 
+    /* Reset del modo iconos (≤1200); tipografía/padding se definen más abajo */
     .navbar-menu-link {
-        font-size: 0.76rem;
         width: auto;
         height: auto;
+        min-width: 0;
+        min-height: 44px;
     }
 
     /* Ajustar información de usuario en móviles */
     .navbar-user-info {
-        display: flex;
-        /* Mantener visible pero más compacto */
-        gap: 0.05rem;
-    }
-    
-    .user-name {
-        font-size: 0.8rem;
-        max-width: 120px; /* Limitar ancho para evitar overflow */
-    }
-    
-    .user-role {
-        font-size: 0.65rem;
-        max-width: 150px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        /* En hamburguesa el avatar basta; el nombre ocupa mucho en barra angosta */
+        display: none;
     }
 
-    /* Menú desplegable móvil — panel fijo con scroll táctil independiente */
+    /* Menú desplegable móvil — panel fijo denso con scroll táctil */
     .navbar-menu {
         position: fixed;
         top: var(--navbar-total-height);
@@ -3083,8 +3118,8 @@ footer::after {
         align-items: stretch;
         gap: 0;
         margin-left: 0;
-        padding: 1rem 0;
-        padding-bottom: calc(1.5rem + var(--safe-area-bottom));
+        padding: 0.5rem 0;
+        padding-bottom: calc(1rem + var(--safe-area-bottom));
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -3133,11 +3168,26 @@ footer::after {
         width: 100%;
     }
 
+    /*
+     * Filas de módulo: densas pero táctiles (≥44px).
+     * EXPLICACIÓN PARA PRINCIPIANTES: antes el padding era grande y el
+     * texto chico; ahora tipografía y aire van a la par.
+     */
     .navbar-menu-link {
-        padding: 0.8rem 1.2rem; /* Reducido 20% del padding */
-        font-size: 0.76rem; /* Mantener consistencia con desktop */
+        padding: 0.55rem 1rem;
+        font-size: 0.875rem;
         border-radius: 0;
         justify-content: space-between;
+        min-height: 44px;
+        gap: 0.5rem;
+    }
+
+    .navbar-menu-link i:first-child {
+        font-size: 1rem;
+    }
+
+    .navbar-menu-link .menu-chevron {
+        font-size: 0.75rem;
     }
 
     .navbar-dropdown {
@@ -3149,7 +3199,7 @@ footer::after {
         transform: none;
         box-shadow: none;
         background: rgba(0, 0, 0, 0.2);
-        margin: 0 1rem;
+        margin: 0 0.75rem;
         border-radius: 8px;
         transition: all 0.3s ease;
     }
@@ -3160,9 +3210,36 @@ footer::after {
         /* Sin límite de altura: el scroll lo maneja el panel padre (.navbar-menu) */
         max-height: none;
         overflow: visible;
-        margin-top: 0.5rem;
-        margin-bottom: 0.5rem;
-        padding: 0.5rem 0;
+        margin-top: 0.35rem;
+        margin-bottom: 0.35rem;
+        padding: 0.25rem 0;
+    }
+
+    /* Submenús anidados: misma densidad que el flyout tablet */
+    .navbar-menu .dropdown-header {
+        padding: 0.35rem 0.85rem;
+        font-size: 0.7rem;
+        margin-bottom: 0.05rem;
+    }
+
+    .navbar-menu .dropdown-item {
+        padding: 0.4rem 0.85rem;
+        font-size: 0.82rem;
+        gap: 0.5rem;
+        min-height: 40px;
+    }
+
+    .navbar-menu .dropdown-item:hover {
+        padding-left: 1rem;
+    }
+
+    .navbar-menu .dropdown-item i {
+        font-size: 0.9rem;
+        width: 18px;
+    }
+
+    .navbar-menu .dropdown-section {
+        padding: 0.3rem 0;
     }
 
     /* Mega-menu en móvil: volver a una sola columna */
@@ -3183,9 +3260,8 @@ footer::after {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* Mejorar botones de acción en tablets */
     .navbar-actions {
-        gap: 0.5rem;
+        gap: 0.35rem;
     }
 
     /* PREVENCIÓN DE OVERFLOW HORIZONTAL SOLO EN MÓVILES */
@@ -3283,6 +3359,20 @@ body.navbar-menu-open {
     
     /* Ocultar info de usuario en móvil — el avatar ya identifica al usuario */
     .navbar-user-info {
+        display: none;
+    }
+
+    /*
+     * Aliviar barra: Scanner QR también está en Inventario.
+     * EXPLICACIÓN PARA PRINCIPIANTES: en pantallas angostas sobran botones;
+     * quitamos el atajo QR de la barra (sigue en el menú Inventario).
+     */
+    .navbar-actions a.navbar-action-btn:has(.bi-qr-code-scan) {
+        display: none;
+    }
+
+    /* Panel Admin (solo superuser): también está en Config / engrane condicional */
+    .navbar-actions a.navbar-action-btn[title="Panel Admin"] {
         display: none;
     }
 
