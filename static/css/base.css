@@ -1367,17 +1367,20 @@ a:hover {
 }
 
 /*
- * Responsive — tablets y móviles: bloquear scroll horizontal.
- * EXPLICACIÓN PARA PRINCIPIANTES: en PWA/tablet a veces el documento
- * queda más ancho que la pantalla; overflow-x:hidden evita arrastrar de lado.
+ * Responsive — tablets landscape: bloquear scroll horizontal SOLO en el
+ * contenido, no en html/body.
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Si ponemos overflow-x:hidden en html/body, también se cortan los
+ * dropdowns de la navbar (aparecía “EPORTES” en vez de “REPORTES”).
+ * El freno va en .main-wrapper; html/body se restringe desde ≤992.
  */
 @media (max-width: 1280px) {
-    html {
+    .main-wrapper {
         overflow-x: hidden;
         max-width: 100%;
     }
 
-    body {
+    .modern-footer {
         overflow-x: hidden;
         max-width: 100%;
     }
@@ -2889,7 +2892,13 @@ footer::after {
 
 /* ---------- ≤1200px: solo iconos en el menú (antes era 1100) ---------- */
 @media (max-width: 1200px) {
-    /* Ocultar texto de módulos; el title= del <a> actúa como tooltip */
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * En tablet landscape (~1024–1180) se muestran solo iconos.
+     * Antes eran 40px con gap mínimo y font-size:0 → iconos ST/Almacén
+     * se veían recortados. Ahora 44px (accesible), más separación y
+     * overflow visible para que el hover no se corte.
+     */
     .navbar-menu-link .menu-text {
         display: none;
     }
@@ -2898,26 +2907,38 @@ footer::after {
         display: none;
     }
 
-    .navbar-menu-link {
-        padding: 0.5rem;
-        font-size: 0;
-        justify-content: center;
-        border-radius: 10px;
-        width: 40px;
-        height: 40px;
-    }
-
-    .navbar-menu-link i:first-child {
-        font-size: 1.1rem;
+    .navbar-menu {
+        margin-left: 0.35rem;
+        gap: 0.4rem;
+        overflow: visible;
+        min-width: 0;
     }
 
     .navbar-menu-item {
         position: relative;
+        flex-shrink: 0;
+        overflow: visible;
     }
 
-    .navbar-menu {
-        margin-left: 0.35rem;
-        gap: 0.2rem;
+    .navbar-menu-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.35rem;
+        /* No usar font-size:0: puede recortar iconos Bootstrap Icons */
+        font-size: 1rem;
+        border-radius: 10px;
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        box-sizing: border-box;
+        overflow: visible;
+    }
+
+    .navbar-menu-link i:first-child {
+        font-size: 1.15rem;
+        line-height: 1;
     }
 
     .navbar-logo,
@@ -2963,6 +2984,20 @@ footer::after {
 
 /* ===== RESPONSIVE DESIGN — MÓVIL (hamburger) ===== */
 @media (max-width: 992px) {
+    /*
+     * Aquí sí bloqueamos overflow en html/body: el menú ya es panel portal
+     * y no usa dropdowns absolutos en la barra (evita scroll lateral en PWA).
+     */
+    html {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    body {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
     .navbar-container {
         padding: 0 1.5rem;
     }
@@ -3146,7 +3181,7 @@ body.navbar-menu-open {
 @media (max-width: 768px) {
 
     /*
-     * Overflow horizontal ya se bloquea en ≤1280px (ver bloque main-wrapper).
+     * Overflow horizontal ya se bloquea en ≤992px (hamburger).
      * Aquí se refuerza en móviles pequeños y se usan max-width: 100%
      * (no 100vw) para evitar el clásico desborde por barra de scroll.
      */
