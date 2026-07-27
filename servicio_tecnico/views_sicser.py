@@ -30,10 +30,10 @@ def consultar_sicser(request):
 
     Fase 1: listar y abrir formato digital en SICSER.
     Fase 2: importar registros como órdenes nuevas en SIGMA (botón por fila).
-    UI: badges de «nuevas» en pestañas + pestaña Importadas (histórico local).
+    UI: badges de «nuevas» en pestañas + Importadas hoy / Histórico (local).
 
     Parámetros GET:
-        tab (str): 'oow', 'garantia' o 'importadas' — pestaña activa.
+        tab (str): 'oow', 'garantia', 'importadas_hoy' o 'importadas' — pestaña activa.
         q (str): Texto de búsqueda (folio, service tag, cliente, DPS).
         refrescar (str): Si es '1', omite caché y vuelve a consultar SICSER.
 
@@ -57,7 +57,7 @@ def consultar_sicser(request):
     pais = get_pais_actual()
     codigo_pais = pais.get('codigo', 'MX')
     tab = request.GET.get('tab', 'oow').strip().lower()
-    if tab not in ('oow', 'garantia', 'importadas'):
+    if tab not in ('oow', 'garantia', 'importadas', 'importadas_hoy'):
         tab = 'oow'
 
     texto_busqueda = request.GET.get('q', '').strip()
@@ -146,11 +146,22 @@ def consultar_sicser(request):
     ]
 
     total_importadas = contar_ordenes_importadas_sicser()
+    total_importadas_hoy = contar_ordenes_importadas_sicser(solo_hoy=True)
     filas_importadas = []
-    if tab == 'importadas':
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # importadas_hoy = click de importar en SIGMA hoy (fecha_importacion_sicser).
+    # importadas = histórico completo (todas las ya creadas desde SICSER).
+    if tab == 'importadas_hoy':
         filas_importadas = listar_ordenes_importadas_sicser(
             texto_busqueda=texto_busqueda,
             limite=100,
+            solo_hoy=True,
+        )
+    elif tab == 'importadas':
+        filas_importadas = listar_ordenes_importadas_sicser(
+            texto_busqueda=texto_busqueda,
+            limite=100,
+            solo_hoy=False,
         )
 
     context = {
@@ -169,6 +180,7 @@ def consultar_sicser(request):
         'nuevas_oow': nuevas_oow,
         'nuevas_garantia': nuevas_garantia,
         'total_importadas': total_importadas,
+        'total_importadas_hoy': total_importadas_hoy,
         'api_oow_ok': api_oow_ok,
         'api_garantia_ok': api_garantia_ok,
         'error_oow': error_oow,

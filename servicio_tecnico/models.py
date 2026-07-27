@@ -934,7 +934,20 @@ class DetalleEquipo(models.Model):
         blank=True,
         help_text="Código CIS (DROP, SAT, GDL, MTR…) del folio OOW o inferido por ciudad en garantías"
     )
-    
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # fecha_ingreso de la orden suele ser la fecha que trae SICSER (recepción).
+    # Este campo guarda CUÁNDO se pulsó «Importar» en SIGMA, para la pestaña
+    # «Importadas hoy» sin confundirla con la fecha de ingreso del CIS.
+    fecha_importacion_sicser = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Momento en que se importó el registro desde SICSER a SIGMA. "
+            "Independiente de fecha_ingreso (fecha SICSER / recepción)."
+        ),
+    )
+
     # ✅ NUEVO CAMPO: Email del Cliente (Noviembre 2025)
     # Agregado para facilitar el envío de fotos de ingreso y notificaciones
     email_cliente = models.EmailField(

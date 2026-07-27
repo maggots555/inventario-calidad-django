@@ -298,43 +298,40 @@ def mapa_importaciones_sicser() -> tuple[dict[str, dict], dict[str, dict]]:
     return mapa_oow, mapa_garantia
 
 
-def listar_ordenes_importadas_sicser(
+def _queryset_ordenes_importadas_sicser(
     texto_busqueda: str = '',
-    limite: int = 100,
-) -> list[dict]:
+    solo_hoy: bool = False,
+):
     """
-    Lista órdenes ya creadas en SIGMA desde SICSER (histórico local).
-
-    Objetivo de negocio:
-        Mostrar en la pestaña Importadas las órdenes que ya existen en SIGMA,
-        aunque el registro ya no aparezca en la API de SICSER.
+    QuerySet base de órdenes importadas desde SICSER.
 
     Args:
-        texto_busqueda: Filtro opcional por folio, DPS, service tag, cliente u orden.
-        limite: Máximo de filas a devolver (más recientes primero).
+        texto_busqueda: Filtro opcional por folio, DPS, service tag, cliente, etc.
+        solo_hoy: Si True, solo las importadas a SIGMA en el día local actual
+            (usa fecha_importacion_sicser, no fecha_ingreso).
 
     Returns:
-        list[dict]: Filas listas para el template (origen, folio, ids, URLs).
+        QuerySet[DetalleEquipo]: Ordenado según el modo (hoy vs histórico).
     """
     from django.db.models import Q
 
-    from .sicser_client import (
-        etiqueta_cis_legible,
-        parsear_codigo_cis_para_url,
-        parsear_codigo_pais_desde_folio_oow,
-        url_formato_garantia,
-        url_formato_oow,
-    )
-
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # El histórico vive en DetalleEquipo: si sicser_origen y sicser_id_externo
-    # están llenos, la orden se creó desde SICSER (manual o futura sync).
+    # están llenos, la orden se creó desde SICSER.
+    # «Hoy» usa fecha_importacion_sicser (= click Importar), NO fecha_ingreso
+    # (esa suele ser la fecha de recepción en SICSER y puede ser de otro día).
     queryset = (
         DetalleEquipo.objects
         .filter(sicser_origen__in=['oow', 'garantia'], sicser_id_externo__gt='')
         .select_related('orden', 'orden__sucursal')
-        .order_by('-orden__fecha_ingreso')
     )
+
+    if solo_hoy:
+        queryset = queryset.filter(
+            fecha_importacion_sicser__date=timezone.localdate(),
+        ).order_by('-fecha_importacion_sicser')
+    else:
+        queryset = queryset.order_by('-orden__fecha_ingreso')
 
     filtro = (texto_busqueda or '').strip()
     if filtro:
@@ -349,6 +346,42 @@ def listar_ordenes_importadas_sicser(
             | Q(sicser_estado__icontains=filtro)
             | Q(sicser_cis__icontains=filtro)
         )
+
+    return queryset
+
+
+def listar_ordenes_importadas_sicser(
+    texto_busqueda: str = '',
+    limite: int = 100,
+    solo_hoy: bool = False,
+) -> list[dict]:
+    """
+    Lista órdenes ya creadas en SIGMA desde SICSER (histórico local o solo hoy).
+
+    Objetivo de negocio:
+        Mostrar en las pestañas Importadas / Importadas hoy las órdenes que ya
+        existen en SIGMA, aunque el registro ya no aparezca en la API de SICSER.
+
+    Args:
+        texto_busqueda: Filtro opcional por folio, DPS, service tag, cliente u orden.
+        limite: Máximo de filas a devolver (más recientes primero).
+        solo_hoy: Si True, filtra por fecha_importacion_sicser = día local actual.
+
+    Returns:
+        list[dict]: Filas listas para el template (origen, folio, ids, URLs).
+    """
+    from .sicser_client import (
+        etiqueta_cis_legible,
+        parsear_codigo_cis_para_url,
+        parsear_codigo_pais_desde_folio_oow,
+        url_formato_garantia,
+        url_formato_oow,
+    )
+
+    queryset = _queryset_ordenes_importadas_sicser(
+        texto_busqueda=texto_busqueda,
+        solo_hoy=solo_hoy,
+    )
 
     filas: list[dict] = []
     for detalle in queryset[:limite]:
@@ -382,6 +415,7 @@ def listar_ordenes_importadas_sicser(
             'service_tag': detalle.numero_serie,
             'nombre_cliente': detalle.nombre_cliente,
             'fecha_ingreso': detalle.orden.fecha_ingreso,
+            'fecha_importacion_sicser': detalle.fecha_importacion_sicser,
             'sucursal': detalle.orden.sucursal.nombre if detalle.orden.sucursal else '',
             'ciudad': (detalle.sicser_ciudad or '').strip(),
             'estado': (detalle.sicser_estado or '').strip(),
@@ -393,17 +427,17 @@ def listar_ordenes_importadas_sicser(
     return filas
 
 
-def contar_ordenes_importadas_sicser() -> int:
+def contar_ordenes_importadas_sicser(solo_hoy: bool = False) -> int:
     """
     Cuenta cuántas órdenes de SIGMA fueron importadas desde SICSER.
 
+    Args:
+        solo_hoy: Si True, solo las importadas en el día local actual.
+
     Returns:
-        int: Total de DetalleEquipo con origen SICSER.
+        int: Total de DetalleEquipo con origen SICSER (o solo las de hoy).
     """
-    return DetalleEquipo.objects.filter(
-        sicser_origen__in=['oow', 'garantia'],
-        sicser_id_externo__gt='',
-    ).count()
+    return _queryset_ordenes_importadas_sicser(solo_hoy=solo_hoy).count()
 
 
 def _calcular_gama(marca: str, modelo: str) -> str:
@@ -491,6 +525,8 @@ def importar_orden_oow_desde_sicser(
         sicser_id_externo=id_externo,
         sicser_origen='oow',
         sicser_cis=registro.codigo_cis_url or '',
+        # Momento real del click «Importar» en SIGMA (no la fecha SICSER).
+        fecha_importacion_sicser=timezone.now(),
         email_cliente=email,
         nombre_cliente=registro.nombre_cliente[:200],
         rfc_cliente=registro.rfc[:13],
@@ -599,6 +635,8 @@ def importar_orden_garantia_desde_sicser(
         sicser_ciudad=(registro.ciudad or '')[:100],
         sicser_estado=(registro.estado or '')[:100],
         sicser_cis=registro.codigo_cis_url or '',
+        # Momento real del click «Importar» en SIGMA (no la fecha SICSER).
+        fecha_importacion_sicser=timezone.now(),
         email_cliente=email,
         nombre_cliente=nombre_cliente,
         telefono_cliente=(registro.telefono or '')[:20],

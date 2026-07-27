@@ -51,7 +51,7 @@
                            placeholder="Folio, service tag, cliente, DPS..."
                            autocomplete="off">
                 </div>
-                {% if puede_importar and sucursales and tab_activa != 'importadas' %}
+                {% if puede_importar and sucursales and tab_activa != 'importadas' and tab_activa != 'importadas_hoy' %}
                 <div class="col-12 col-md-6 col-xl-3">
                     <label for="sicser-sucursal-import" class="form-label fw-semibold small mb-1">
                         <i class="bi bi-building" aria-hidden="true"></i> Sucursal al importar
@@ -118,10 +118,18 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link {% if tab_activa == 'importadas_hoy' %}active{% endif %}"
+                   href="?tab=importadas_hoy{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
+                    <i class="bi bi-calendar-day" aria-hidden="true"></i>
+                    <span class="sicser-tab-label">Importadas hoy</span>
+                    <span class="badge sicser-badge-importadas">{{ total_importadas_hoy }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {% if tab_activa == 'importadas' %}active{% endif %}"
                    href="?tab=importadas{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
-                    <i class="bi bi-check2-square" aria-hidden="true"></i>
-                    <span class="sicser-tab-label">Importadas</span>
+                    <i class="bi bi-clock-history" aria-hidden="true"></i>
+                    <span class="sicser-tab-label">Histórico importadas</span>
                     <span class="badge sicser-badge-importadas">{{ total_importadas }}</span>
                 </a>
             </li>
@@ -412,12 +420,17 @@
     </div>
     {% endif %}
 
-    <!-- ========== Pestaña Importadas ========== -->
-    {% if tab_activa == 'importadas' %}
+    <!-- ========== Pestañas Importadas hoy / Histórico ========== -->
+    {% if tab_activa == 'importadas' or tab_activa == 'importadas_hoy' %}
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span><i class="bi bi-check2-square" aria-hidden="true"></i> Órdenes ya importadas a SIGMA</span>
+            {% if tab_activa == 'importadas_hoy' %}
+            <span><i class="bi bi-calendar-day" aria-hidden="true"></i> Órdenes importadas a SIGMA hoy</span>
+            <span class="badge bg-secondary">{{ filas_importadas|length }} mostradas · {{ total_importadas_hoy }} hoy</span>
+            {% else %}
+            <span><i class="bi bi-clock-history" aria-hidden="true"></i> Histórico de órdenes importadas a SIGMA</span>
             <span class="badge bg-secondary">{{ filas_importadas|length }} mostradas · {{ total_importadas }} en total</span>
+            {% endif %}
         </div>
         <div class="card-body p-0">
             {% if filas_importadas %}
@@ -469,9 +482,17 @@
                             <span class="text-muted">—</span>
                             {% endif %}
                         </div>
-                        <div class="sicser-meta-item sicser-meta-item--full">
+                        <div class="sicser-meta-item">
                             <span class="sicser-item-card__label">Fecha ingreso</span>
                             <span class="text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Importada en SIGMA</span>
+                            {% if fila.fecha_importacion_sicser %}
+                            <span class="text-muted">{{ fila.fecha_importacion_sicser|date:"d/m/Y H:i" }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="sicser-item-card__acciones sicser-acciones" role="group" aria-label="Acciones de la orden importada">
@@ -495,6 +516,7 @@
                                 <th class="d-none d-xxl-table-cell">Ciudad</th>
                                 <th>CIS</th>
                                 <th class="d-none d-xxl-table-cell">Fecha ingreso</th>
+                                <th class="d-none d-xxl-table-cell">Importada SIGMA</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -539,6 +561,13 @@
                                     {% endif %}
                                 </td>
                                 <td class="small text-muted d-none d-xxl-table-cell">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                                <td class="small text-muted d-none d-xxl-table-cell">
+                                    {% if fila.fecha_importacion_sicser %}
+                                    {{ fila.fecha_importacion_sicser|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
                                 <td class="text-center sicser-acciones">
                                     {% include 'servicio_tecnico/partials/sicser_acciones_importadas.html' %}
                                 </td>
@@ -554,6 +583,8 @@
                 <i class="bi bi-inbox display-4 d-block mb-2" aria-hidden="true"></i>
                 {% if texto_busqueda %}
                 No hay importadas que coincidan con «{{ texto_busqueda }}».
+                {% elif tab_activa == 'importadas_hoy' %}
+                Hoy aún no has importado órdenes desde SICSER.
                 {% else %}
                 Aún no hay órdenes importadas desde SICSER.
                 {% endif %}
@@ -566,7 +597,8 @@
     <p class="small text-muted mt-3 mb-0 sicser-ayuda">
         <i class="bi bi-info-circle" aria-hidden="true"></i>
         Los badges <strong>nuevas</strong> son registros en SICSER aún no importados.
-        La pestaña <strong>Importadas</strong> muestra el histórico en SIGMA aunque ya no aparezcan en SICSER.
+        <strong>Importadas hoy</strong> usa la fecha en que se importó a SIGMA (no la fecha de ingreso SICSER).
+        <strong>Histórico importadas</strong> muestra todas las ya creadas en SIGMA aunque ya no aparezcan en SICSER.
         En garantías, el <strong>CIS</strong> se estima por ciudad/estado (la API no lo envía).
     </p>
 </div>

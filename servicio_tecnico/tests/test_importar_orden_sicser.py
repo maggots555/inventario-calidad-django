@@ -225,3 +225,245 @@ class ImportarGarantiaDuplicadoMensajeTest(TestCase):
         mensaje = str(ctx.exception)
         self.assertIn('467801924', mensaje)
         self.assertIn(self.orden.numero_orden_interno, mensaje)
+
+
+class FechaImportacionSicserTest(TestCase):
+    """
+    fecha_importacion_sicser = momento del click Importar en SIGMA.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    fecha_ingreso puede ser la fecha antigua de SICSER. La pestaña «Hoy»
+    solo debe mirar fecha_importacion_sicser.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        """Sucursal + usuario técnico mínimos para crear órdenes de prueba."""
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Fecha Import SICSER',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='fecha_import_sicser',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Fecha Import SICSER',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='fecha.import@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+
+    def _crear_detalle_importado(
+        self,
+        *,
+        id_externo: str,
+        orden_cliente: str,
+        fecha_ingreso,
+        fecha_importacion,
+    ):
+        """
+        Crea una orden + detalle con origen SICSER y fechas controladas.
+
+        Args:
+            id_externo: sicser_id_externo único.
+            orden_cliente: Número de cliente SIGMA.
+            fecha_ingreso: Fecha de recepción / SICSER en la orden.
+            fecha_importacion: Momento de importación a SIGMA (o None).
+
+        Returns:
+            DetalleEquipo: Registro creado.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+            fecha_ingreso=fecha_ingreso,
+        )
+        return DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=orden_cliente,
+            sicser_origen='garantia',
+            sicser_id_externo=id_externo,
+            folio_sicser=id_externo,
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude',
+            numero_serie=f'ST{id_externo}'[:20],
+            email_cliente='a@b.com',
+            falla_principal='Prueba fecha importación',
+            gama='media',
+            fecha_importacion_sicser=fecha_importacion,
+        )
+
+    def test_importar_garantia_llena_fecha_importacion_sicser(self):
+        """
+        Al importar, se guarda timezone.now() aunque fecha_ingreso sea antigua.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from servicio_tecnico.sicser_import import importar_orden_garantia_desde_sicser
+
+        # Fecha SICSER = hace 3 días (no debe confundirse con la de importación)
+        hace_tres_dias = timezone.now() - timedelta(days=3)
+        registro = MagicMock()
+        registro.numero_dps = 555001001
+        registro.service_tag = 'STHOY001'
+        registro.especificaciones = 'Latitude 5420'
+        registro.email_contacto = 'cli@test.local'
+        registro.contacto = 'Cliente Hoy'
+        registro.empresa = 'Empresa'
+        registro.codigo_cis_url = 'SAT'
+        registro.ciudad = 'CDMX'
+        registro.estado = 'CDMX'
+        registro.telefono = '5551234567'
+        registro.direccion = ''
+        registro.instrucciones_dell = 'No enciende'
+        registro.nombre_grupo = 'CIS'
+        registro.fecha_recepcion = hace_tres_dias.strftime('%Y-%m-%d %H:%M:%S')
+
+        antes = timezone.now()
+        resultado = importar_orden_garantia_desde_sicser(registro, self.user)
+        despues = timezone.now()
+
+        detalle = resultado.orden.detalle_equipo
+        self.assertIsNotNone(detalle.fecha_importacion_sicser)
+        self.assertGreaterEqual(detalle.fecha_importacion_sicser, antes)
+        self.assertLessEqual(detalle.fecha_importacion_sicser, despues)
+        # La fecha de ingreso debe seguir siendo la de SICSER (ayer/hace días)
+        self.assertEqual(detalle.orden.fecha_ingreso.date(), hace_tres_dias.date())
+
+    def test_listar_solo_hoy_usa_fecha_importacion_no_ingreso(self):
+        """
+        Ingreso ayer + importación hoy → aparece en solo_hoy.
+        Importación ayer → no aparece en solo_hoy; sí en histórico.
+        Sin fecha_importacion → solo histórico.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from servicio_tecnico.sicser_import import (
+            contar_ordenes_importadas_sicser,
+            listar_ordenes_importadas_sicser,
+        )
+
+        ahora = timezone.now()
+        ayer = ahora - timedelta(days=1)
+
+        # Caso A: fecha_ingreso antigua, importada hoy → SÍ en Hoy
+        self._crear_detalle_importado(
+            id_externo='1001',
+            orden_cliente='1001',
+            fecha_ingreso=ayer,
+            fecha_importacion=ahora,
+        )
+        # Caso B: importada ayer → NO en Hoy
+        self._crear_detalle_importado(
+            id_externo='1002',
+            orden_cliente='1002',
+            fecha_ingreso=ayer,
+            fecha_importacion=ayer,
+        )
+        # Caso C: registro viejo sin fecha_importacion → NO en Hoy
+        self._crear_detalle_importado(
+            id_externo='1003',
+            orden_cliente='1003',
+            fecha_ingreso=ayer,
+            fecha_importacion=None,
+        )
+
+        ids_hoy = {
+            f['sicser_id_externo']
+            for f in listar_ordenes_importadas_sicser(solo_hoy=True)
+        }
+        ids_historico = {
+            f['sicser_id_externo']
+            for f in listar_ordenes_importadas_sicser(solo_hoy=False)
+        }
+
+        self.assertEqual(ids_hoy, {'1001'})
+        self.assertEqual(ids_historico, {'1001', '1002', '1003'})
+        self.assertEqual(contar_ordenes_importadas_sicser(solo_hoy=True), 1)
+        self.assertEqual(contar_ordenes_importadas_sicser(solo_hoy=False), 3)
+
+
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class ConsultarSicserPestanasImportadasTest(TestCase):
+    """Humo HTTP de las pestañas importadas_hoy e importadas."""
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        """Usuario con permiso de ver órdenes + RequestFactory (sin middleware)."""
+        self.factory = RequestFactory()
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Tabs SICSER',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='tabs_sicser',
+            password='testpass123',
+        )
+        Empleado.objects.create(
+            nombre_completo='Tabs SICSER',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tabs.sicser@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        ct = ContentType.objects.get_for_model(OrdenServicio)
+        perm = Permission.objects.get(
+            content_type=ct,
+            codename='view_ordenservicio',
+        )
+        self.user.user_permissions.add(perm)
+        self.listado = reverse('servicio_tecnico:consultar_sicser')
+
+    @patch('servicio_tecnico.sicser_client.fetch_listado_garantias')
+    @patch('servicio_tecnico.sicser_client.fetch_listado_oow')
+    def test_tabs_importadas_hoy_e_historico_responden_200(
+        self,
+        mock_oow,
+        mock_garantia,
+    ):
+        """
+        Ambas pestañas locales responden 200 sin depender de la API real.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Usamos RequestFactory (no Client) para no pasar por middleware que
+        redirige (cambio de contraseña, etc.) y solo probar la vista.
+        """
+        mock_oow.return_value = ([], 0)
+        mock_garantia.return_value = ([], 0)
+
+        for tab in ('importadas_hoy', 'importadas'):
+            with self.subTest(tab=tab):
+                request = self.factory.get(self.listado, {'tab': tab})
+                request.user = self.user
+                response = views_sicser.consultar_sicser(request)
+                self.assertEqual(response.status_code, 200)
+                html = response.content.decode()
+                # Marcas de ambas pestañas en el nav
+                self.assertIn('tab=importadas_hoy', html)
+                self.assertIn('Histórico importadas', html)
+                if tab == 'importadas_hoy':
+                    self.assertIn('Órdenes importadas a SIGMA hoy', html)
+                else:
+                    self.assertIn('Histórico de órdenes importadas a SIGMA', html)
