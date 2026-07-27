@@ -1751,7 +1751,20 @@ footer::after {
     padding: 2rem 0;
     /* Espacio arriba y abajo para que no se vea apretado */
     padding-left: 0rem;
-    /* Mover hacia la derecha para centrar mejor */
+}
+
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * En desktop el logo SIGMA quedaba muy cerca de «Acceso Rápido».
+ * Con margin-left negativo lo empujamos un poco a la izquierda (aprovecha
+ * el gutter de Bootstrap) y con padding-right abrimos aire hacia la derecha.
+ * Solo aplica desde tablet/desktop; en móvil el footer se apila centrado.
+ */
+@media (min-width: 768px) {
+    .footer-brand {
+        margin-left: -7.25rem;
+        padding-right: 1.75rem;
+    }
 }
 
 .footer-logo {
@@ -2003,6 +2016,9 @@ footer::after {
         align-items: center;
         text-align: center;
         margin-bottom: 2rem;
+        /* EXPLICACIÓN: anular el empujón desktop para que en móvil quede centrado */
+        margin-left: 0;
+        padding-right: 0;
     }
 
     .footer-section {
