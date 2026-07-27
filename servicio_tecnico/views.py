@@ -1107,7 +1107,16 @@ def detalle_orden(request, orden_id):
         elif form_type == 'guardar_mano_obra':
             form_guardar_mo = GuardarManoObraForm(request.POST, instance=orden)
             if form_guardar_mo.is_valid():
+                from servicio_tecnico.utils_gama import (
+                    aplicar_gama_por_mano_obra,
+                    etiqueta_gama,
+                )
+
                 costo_anterior = orden.costo_mano_obra
+                # Gama previa (estimado por modelo) para el mensaje al usuario
+                gama_antes = getattr(
+                    getattr(orden, 'detalle_equipo', None), 'gama', None
+                )
                 orden_actualizada = form_guardar_mo.save()
                 nuevo_costo = orden_actualizada.costo_mano_obra
 
@@ -1117,11 +1126,23 @@ def detalle_orden(request, orden_id):
                     cotizacion_mo.costo_mano_obra = nuevo_costo
                     cotizacion_mo.save(update_fields=['costo_mano_obra'])
 
-                messages.success(
-                    request,
+                # Cascada: MO > 0 redefine la gama del equipo (fuente de verdad)
+                gama_aplicada = aplicar_gama_por_mano_obra(
+                    orden_actualizada,
+                    nuevo_costo,
+                    usuario=empleado_actual,
+                )
+
+                msg_mo = (
                     f'✅ Mano de obra guardada: ${costo_anterior} → ${nuevo_costo}. '
                     f'La cotización no se crea automáticamente.'
                 )
+                if gama_aplicada:
+                    msg_mo += (
+                        f' Gama actualizada: {etiqueta_gama(gama_antes)} → '
+                        f'{etiqueta_gama(gama_aplicada)} (según costo).'
+                    )
+                messages.success(request, msg_mo)
                 HistorialOrden.objects.create(
                     orden=orden_actualizada,
                     tipo_evento='cotizacion',
@@ -1155,6 +1176,11 @@ def detalle_orden(request, orden_id):
 
             # Si el usuario envió un valor de MO en el mismo POST, lo guardamos
             # en la orden antes de crear la cotización (opcional, por comodidad).
+            from servicio_tecnico.utils_gama import (
+                aplicar_gama_por_mano_obra,
+                etiqueta_gama,
+            )
+
             costo_mo_post = request.POST.get('costo_mano_obra', '').strip()
             if costo_mo_post:
                 form_mo_previo = GuardarManoObraForm(request.POST, instance=orden)
@@ -1164,17 +1190,32 @@ def detalle_orden(request, orden_id):
                     messages.error(request, '❌ Valor de mano de obra inválido. No se generó la cotización.')
                     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
+            # Cascada: si hay MO > 0 (recién enviada o ya en la orden), actualizar gama
+            gama_antes = getattr(
+                getattr(orden, 'detalle_equipo', None), 'gama', None
+            )
+            gama_aplicada = aplicar_gama_por_mano_obra(
+                orden,
+                orden.costo_mano_obra,
+                usuario=empleado_actual,
+            )
+
             # Crear Cotizacion copiando la MO ya registrada en la orden
             cotizacion = Cotizacion.objects.create(
                 orden=orden,
                 costo_mano_obra=orden.costo_mano_obra or Decimal('0.00'),
             )
 
-            messages.success(
-                request,
+            msg_cot = (
                 f'✅ Cotización generada con mano de obra: ${cotizacion.costo_mano_obra}. '
                 f'Ahora puedes agregar piezas. El estado de la orden no se cambió automáticamente.'
             )
+            if gama_aplicada:
+                msg_cot += (
+                    f' Gama actualizada: {etiqueta_gama(gama_antes)} → '
+                    f'{etiqueta_gama(gama_aplicada)} (según costo).'
+                )
+            messages.success(request, msg_cot)
             HistorialOrden.objects.create(
                 orden=orden,
                 tipo_evento='cotizacion',
@@ -1244,13 +1285,35 @@ def detalle_orden(request, orden_id):
 
                     cotizacion = orden.cotizacion
                     costo_anterior = cotizacion.costo_mano_obra
+                    gama_antes = getattr(
+                        getattr(orden, 'detalle_equipo', None), 'gama', None
+                    )
                     # Sincronizar ambos: cotización y orden (fuente de verdad de la MO)
                     cotizacion.costo_mano_obra = nuevo_costo
                     cotizacion.save(update_fields=['costo_mano_obra'])
                     orden.costo_mano_obra = nuevo_costo
                     orden.save(update_fields=['costo_mano_obra'])
 
-                    messages.success(request, f'✅ Mano de obra actualizada: ${costo_anterior} → ${nuevo_costo}')
+                    # Cascada: MO redefine la gama del equipo
+                    from servicio_tecnico.utils_gama import (
+                        aplicar_gama_por_mano_obra,
+                        etiqueta_gama,
+                    )
+                    gama_aplicada = aplicar_gama_por_mano_obra(
+                        orden,
+                        nuevo_costo,
+                        usuario=empleado_actual,
+                    )
+
+                    msg_edit = (
+                        f'✅ Mano de obra actualizada: ${costo_anterior} → ${nuevo_costo}'
+                    )
+                    if gama_aplicada:
+                        msg_edit += (
+                            f'. Gama actualizada: {etiqueta_gama(gama_antes)} → '
+                            f'{etiqueta_gama(gama_aplicada)} (según costo).'
+                        )
+                    messages.success(request, msg_edit)
 
                     HistorialOrden.objects.create(
                         orden=orden,

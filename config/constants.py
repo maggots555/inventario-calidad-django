@@ -48,6 +48,20 @@ GAMA_EQUIPO_CHOICES = [
 ]
 
 # ============================================================================
+# UMBRALES DE GAMA POR MANO DE OBRA (cascada)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Al crear la orden, la gama se estima por marca/modelo (catálogo ReferenciaGamaEquipo).
+# Cuando el técnico registra costo de mano de obra > 0, ESE costo pasa a ser la
+# fuente de verdad y sobrescribe la gama del equipo.
+#
+# Ejemplos: $661 → media; $1002 → alta.
+# Si el costo es 0 (aún no registrado), no se cambia la gama del modelo.
+GAMA_POR_MANO_OBRA_UMBRAL_MEDIA = 400   # >= 400 y < 800 → media
+GAMA_POR_MANO_OBRA_UMBRAL_ALTA = 800    # >= 800 → alta
+# < 400 → baja
+
+# ============================================================================
 # ESTADOS DE ORDEN DE SERVICIO - Workflow completo
 # Actualizado: Octubre 2025 - Se agregaron 10 nuevos estados (de 11 a 21)
 # Actualizado: Diciembre 2025 - Agregado estado 'almacen' para órdenes creadas desde Almacén
