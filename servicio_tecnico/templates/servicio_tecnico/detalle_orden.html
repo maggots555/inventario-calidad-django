@@ -456,7 +456,8 @@
                                         data-modelo="{{ orden.detalle_equipo.modelo }}"
                                         data-gama="{{ orden.detalle_equipo.gama }}"
                                         data-equipo-enciende="{{ orden.detalle_equipo.equipo_enciende|yesno:'true,false' }}"
-                                        data-falla-selector="#id_falla_principal">
+                                        data-falla-selector="#id_falla_principal"
+                                        data-orden-id="{{ orden.id }}">
                                     <i class="bi bi-stars"></i>
                                     Mejorar Diag. con IA
                                 </button>
@@ -472,7 +473,7 @@
                             {# Hint del botón Mejorar #}
                             <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
                                 <i class="bi bi-info-circle"></i>
-                                Revisa y mejora la redacción del diagnóstico sin cambiar el contenido técnico.
+                                Al aceptar la mejora, el diagnóstico se guarda solo (sin usar Guardar configuración).
                             </small>
                             {% endif %}
 
@@ -8352,48 +8353,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="bi bi-info-circle-fill"></i>
                     <strong>La IA solo mejora la redacción.</strong>
                     No cambia el contenido técnico ni agrega información que no hayas escrito.
-                    Tú decides si aceptas el resultado.
+                    Al aceptar, el texto se aplica al campo y se guarda en la orden.
                 </div>
 
                 <!-- ======================================================
-                     FASE 1: Configuración (selector de modelo + Generar)
-                     Visible al abrir el modal. Se oculta al generar.
-                     ====================================================== -->
-                <div id="ollamaFaseConfig" class="p-3 border-bottom">
-                    <div class="row align-items-end g-3">
-                        <div class="col-12 col-md-8">
-                            <label for="ollamaModeloSelector" class="form-label fw-semibold mb-1">
-                                <i class="bi bi-cpu"></i> Modelo de IA
-                            </label>
-                            <select id="ollamaModeloSelector" class="form-select">
-                                {% for modelo in ollama_models %}
-                                <option value="{{ modelo }}">{{ modelo }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">Selecciona el modelo — <strong>[Gemini]</strong> usa la API de Google, <strong>[Ollama]</strong> usa el servidor local.</small>
-                        </div>
-                        <div class="col-12 col-md-4 d-grid">
-                            <button type="button" id="btnGenerarMejora"
-                                    class="btn btn-outline-purple">
-                                <i class="bi bi-stars"></i> Generar mejora
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ======================================================
-                     FASE 2: Resultado (dos paneles, oculto hasta Generar)
+                     Resultado: comparación original vs mejorado.
+                     Al abrir el modal se genera de inmediato (cascada
+                     automática Gemini → Ollama; sin selector de modelo).
                      ====================================================== -->
                 <div id="ollamaFaseResultado" class="d-none">
 
-                    <!-- Barra de modelo activo + botón cambiar modelo -->
+                    <!-- Barra: modelo que resolvió la cascada (o "Automático…") -->
                     <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2" style="font-size: 0.85rem;">
                         <span class="text-muted">Modelo:</span>
-                        <span id="ollamaModeloActivo" class="badge ollama-badge-ia"></span>
-                        <button type="button" id="btnCambiarModelo"
-                                class="btn btn-sm btn-outline-secondary ms-auto">
-                            <i class="bi bi-arrow-left"></i> Cambiar modelo
-                        </button>
+                        <span id="ollamaModeloActivo" class="badge ollama-badge-ia">Automático (Gemini → Ollama)</span>
                     </div>
 
                     <!-- Contenedor de dos paneles -->
@@ -8433,8 +8406,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="spinner-border text-purple mb-3" role="status" style="width: 2.5rem; height: 2.5rem;">
                                     <span class="visually-hidden">Procesando...</span>
                                 </div>
-                                <p class="text-muted mb-1" style="font-size: 0.9rem;">Analizando y mejorando tu diagnóstico...</p>
-                                <small class="text-muted">Esto puede tardar unos segundos</small>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem;">Probando modelos automáticamente...</p>
+                                <small class="text-muted">Cascada Gemini → Ollama. Esto puede tardar unos segundos.</small>
                             </div>
 
                             <!-- Texto mejorado (oculto hasta que Ollama responda) -->
@@ -8484,7 +8457,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </button>
                         <button type="button" id="btnAceptarMejora"
                                 class="btn btn-success" disabled>
-                            <i class="bi bi-check-circle"></i> Aceptar y aplicar
+                            <i class="bi bi-check-circle"></i> Aceptar, aplicar y guardar
                         </button>
                     </div>
                 </div>
@@ -8529,26 +8502,6 @@ document.addEventListener('DOMContentLoaded', function() {
         color: #0c5460;
         font-size: 0.82rem;
         padding: 0.55rem 1rem;
-    }
-
-    /* ================================================================
-       FASE 1 — Selector de modelo
-       ================================================================ */
-    #ollamaFaseConfig {
-        background-color: #fafafa;
-        border-bottom: 1px solid #e9ecef;
-    }
-
-    #ollamaFaseConfig .form-select {
-        border-color: #d0d7de;
-        border-radius: 6px;
-        font-size: 0.875rem;
-        font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-        letter-spacing: -0.01em;
-    }
-    #ollamaFaseConfig .form-select:focus {
-        border-color: #764ba2;
-        box-shadow: 0 0 0 3px rgba(118,75,162,0.12);
     }
 
     /* ================================================================
@@ -8688,22 +8641,7 @@ document.addEventListener('DOMContentLoaded', function() {
         color: #7dd3fc !important;
     }
 
-    /* Fase 1 */
-    [data-bs-theme="dark"] #ollamaFaseConfig {
-        background-color: #162032 !important;
-        border-bottom-color: #334155 !important;
-    }
-    [data-bs-theme="dark"] #ollamaFaseConfig .form-select {
-        background-color: #0f172a;
-        border-color: #334155;
-        color: var(--text-primary);
-    }
-    [data-bs-theme="dark"] #ollamaFaseConfig .form-select:focus {
-        border-color: #a78bfa;
-        box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
-    }
-
-    /* Barra de modelo activo (Fase 2) */
+    /* Barra de modelo activo */
     [data-bs-theme="dark"] #ollamaFaseResultado > div:first-child {
         background-color: #1a1535 !important;
         border-bottom-color: #2d2350 !important;

@@ -50,6 +50,10 @@ class CompatibilidadFase2ReexportsTest(SimpleTestCase):
             views_ia_diagnostico.pulir_diagnostico_sic_ia,
         )
         self.assertIs(
+            st_views.guardar_diagnostico_sic_ia,
+            views_ia_diagnostico.guardar_diagnostico_sic_ia,
+        )
+        self.assertIs(
             st_views.transcribir_audio_diagnostico,
             views_ia_diagnostico.transcribir_audio_diagnostico,
         )
@@ -101,6 +105,11 @@ class CompatibilidadFase2ReexportsTest(SimpleTestCase):
                 'servicio_tecnico:pulir_diagnostico_sic_ia',
                 None,
                 views_ia_diagnostico.pulir_diagnostico_sic_ia,
+            ),
+            (
+                'servicio_tecnico:guardar_diagnostico_sic_ia',
+                None,
+                views_ia_diagnostico.guardar_diagnostico_sic_ia,
             ),
             (
                 'servicio_tecnico:transcribir_audio_diagnostico',

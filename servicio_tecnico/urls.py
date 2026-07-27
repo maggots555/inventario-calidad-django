@@ -297,6 +297,12 @@ urlpatterns = [
          views.pulir_diagnostico_sic_ia,
          name='pulir_diagnostico_sic_ia'),
 
+    # Guardar el diagnóstico SIC aceptado desde el modal de mejora con IA
+    # (sin pasar por "Guardar configuración" del formulario completo).
+    path('api/guardar-diagnostico-sic/',
+         views.guardar_diagnostico_sic_ia,
+         name='guardar_diagnostico_sic_ia'),
+
     # Transcripción de audio a texto para el campo Diagnóstico SIC.
     # Fallback del servidor cuando Web Speech API no está disponible en el navegador.
     # Usa Ollama (Whisper) como primer intento y Gemini como respaldo.

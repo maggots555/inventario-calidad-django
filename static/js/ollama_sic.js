@@ -1,20 +1,16 @@
 "use strict";
 /**
- * ollama_sic.ts — Mejora de Diagnóstico SIC con IA (Ollama)
+ * ollama_sic.ts — Mejora de Diagnóstico SIC con IA (cascada automática)
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Este archivo maneja toda la lógica del botón "Mejorar Diag. con IA" en el
- * detalle de la orden de servicio. El flujo tiene DOS FASES:
+ * Este archivo maneja el botón "Mejorar Diag. con IA" en el detalle de la orden.
  *
- * FASE 1 — Configuración (al abrir el modal):
- *   - Se muestra el selector de modelo y el botón "Generar mejora"
- *   - El técnico elige el modelo que quiere probar
- *   - Al hacer clic en "Generar", pasa a la Fase 2
- *
- * FASE 2 — Resultado:
- *   - Panel izquierdo: texto original del técnico (referencia inmutable)
- *   - Panel derecho: spinner → texto mejorado por el modelo seleccionado
- *   - Acciones: Aceptar / Reintentar / Cambiar modelo (vuelve a Fase 1)
+ * Flujo (sin selector de modelo):
+ *   1. El técnico hace clic → se abre el modal de comparación
+ *   2. De inmediato se llama al API en modo automático (sin campo modelo)
+ *   3. El backend prueba Gemini en orden y, si fallan, cae a Ollama
+ *   4. Se muestra original vs mejorado + el modelo que resolvió
+ *   5. Acciones: Aceptar (aplica + GUARDA en BD) / Reintentar / Descartar
  *
  * DOBLE VALIDACIÓN del botón principal:
  *   - El diagnóstico debe tener ≥20 caracteres
@@ -26,6 +22,7 @@
 // Constantes de configuración
 const OLLAMA_MIN_CHARS = 20;
 const OLLAMA_ENDPOINT = '/servicio-tecnico/api/pulir-diagnostico-sic/';
+const GUARDAR_DIAG_ENDPOINT = '/servicio-tecnico/api/guardar-diagnostico-sic/';
 // ============================================================================
 // FUNCIÓN: Obtener el CSRF token desde las cookies
 // Soporta el nombre personalizado del proyecto (sigma_csrftoken) y el estándar.
@@ -47,14 +44,9 @@ function getOllamaCsrfToken() {
 function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
     // Instanciar el modal de Bootstrap
     const modal = new bootstrap.Modal(modalEl);
-    // --- Referencias FASE 1 (configuración) ---
-    const faseConfig = modalEl.querySelector('#ollamaFaseConfig');
-    const selectorModelo = modalEl.querySelector('#ollamaModeloSelector');
-    const btnGenerar = modalEl.querySelector('#btnGenerarMejora');
-    // --- Referencias FASE 2 (resultado) ---
+    // --- Referencias del modal de resultado (ya no hay fase de selector) ---
     const faseResultado = modalEl.querySelector('#ollamaFaseResultado');
     const modeloActivo = modalEl.querySelector('#ollamaModeloActivo');
-    const btnCambiarMod = modalEl.querySelector('#btnCambiarModelo');
     const panelOriginal = modalEl.querySelector('#diagOriginalTexto');
     const spinnerMejorado = modalEl.querySelector('#diagMejoradoSpinner');
     const textMejorado = modalEl.querySelector('#diagMejoradoContenido');
@@ -67,23 +59,26 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
     const btnAceptar = modalEl.querySelector('#btnAceptarMejora');
     const btnReintentar = modalEl.querySelector('#btnReintentar');
     // Guardia: si falta cualquier elemento no registrar nada
-    if (!faseConfig || !selectorModelo || !btnGenerar ||
-        !faseResultado || !modeloActivo || !btnCambiarMod ||
+    if (!faseResultado || !modeloActivo ||
         !panelOriginal || !spinnerMejorado || !textMejorado ||
         !alertaError || !textoError || !diagModeloBadge ||
         !diagEstadisticas ||
         !botonesResultado || !btnAceptar || !btnReintentar) {
-        console.warn('[OllamaIA] Faltan elementos del modal — verificar el template.');
+        console.warn('[DiagIA] Faltan elementos del modal — verificar el template.');
         return;
+    }
+    if (!datosEquipo.ordenId) {
+        console.warn('[DiagIA] Falta data-orden-id en el botón — no se podrá guardar al aceptar.');
     }
     // Estado interno del módulo
     let textoOriginal = '';
     let textoPropuesto = '';
     let cargando = false;
+    let guardando = false;
     // ========================================================================
     // VALOR GUARDADO EN BASE DE DATOS
     // Al inicializar, registramos el texto actual como el "guardado".
-    // Se actualiza cuando el formulario se guarda exitosamente.
+    // Se actualiza cuando el formulario se guarda o al aceptar mejora IA.
     // ========================================================================
     let textoGuardadoEnBD = textarea.value.trim();
     // ========================================================================
@@ -107,29 +102,19 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             botonMejorar.title = `Escribe al menos ${faltan} caracteres más para habilitar`;
         }
         else {
-            botonMejorar.title = 'Mejorar la redacción del diagnóstico con IA';
+            botonMejorar.title = 'Mejorar la redacción del diagnóstico con IA (cascada automática)';
         }
     }
     // ========================================================================
-    // MOSTRAR FASE 1 — Configuración (selector de modelo)
-    // ========================================================================
-    function mostrarFaseConfig() {
-        faseConfig.classList.remove('d-none');
-        faseResultado.classList.add('d-none');
-        botonesResultado.style.setProperty('display', 'none', 'important');
-    }
-    // ========================================================================
-    // MOSTRAR FASE 2 — Resultado (dos paneles)
+    // MOSTRAR RESULTADO — Dos paneles visibles + botones del footer
     // ========================================================================
     function mostrarFaseResultado() {
-        faseConfig.classList.add('d-none');
         faseResultado.classList.remove('d-none');
         botonesResultado.style.removeProperty('display');
         botonesResultado.style.display = 'flex';
     }
     // ========================================================================
     // ESTADO: CARGANDO — Spinner en el panel derecho
-    // Usamos classList con d-none/d-flex de Bootstrap para evitar conflictos.
     // ========================================================================
     function mostrarEstadoCargando() {
         spinnerMejorado.classList.remove('d-none');
@@ -140,6 +125,8 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
         btnReintentar.disabled = true;
         diagModeloBadge.style.display = 'none';
         diagEstadisticas.style.display = 'none';
+        // Mientras busca, el badge superior indica cascada automática
+        modeloActivo.textContent = 'Automático (Gemini → Ollama)';
     }
     // ========================================================================
     // ESTADO: RESULTADO EXITOSO — Texto mejorado en el panel derecho
@@ -153,11 +140,15 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
         btnAceptar.disabled = false;
         btnReintentar.disabled = false;
         if (modelo) {
+            modeloActivo.textContent = modelo;
             diagModeloBadge.textContent = `Modelo: ${modelo}`;
             diagModeloBadge.style.display = 'inline-block';
         }
         // Mostrar barra de estadísticas si el backend las incluye
-        if (stats && stats.tiempo_ms !== undefined && stats.chars_original !== undefined && stats.chars_mejorado !== undefined) {
+        if (stats &&
+            stats.tiempo_ms !== undefined &&
+            stats.chars_original !== undefined &&
+            stats.chars_mejorado !== undefined) {
             const segs = (stats.tiempo_ms / 1000).toFixed(1);
             const diff = stats.chars_mejorado - stats.chars_original;
             const diffStr = diff >= 0 ? `+${diff}` : `${diff}`;
@@ -187,25 +178,22 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
         btnReintentar.disabled = false;
         diagModeloBadge.style.display = 'none';
         diagEstadisticas.style.display = 'none';
+        modeloActivo.textContent = 'Sin modelo disponible';
     }
     // ========================================================================
-    // LLAMAR A OLLAMA VÍA AJAX
-    // Siempre usa textoOriginal (capturado al abrir el modal) como referencia.
-    // El modelo se lee en el momento de llamar (para que Reintentar pueda
-    // cambiar de modelo sin volver a la Fase 1 si el técnico lo desea).
+    // LLAMAR AL API EN MODO AUTOMÁTICO (cascada Gemini → Ollama)
+    // No enviamos "modelo": el backend recorre GEMINI_MODELS y cae a Ollama.
     // ========================================================================
-    async function llamarOllama(modeloSeleccionado) {
+    async function llamarCascadaAutomatica() {
         var _a, _b;
         cargando = true;
         mostrarEstadoCargando();
-        // Actualizar badge del modelo activo en la barra superior
-        modeloActivo.textContent = modeloSeleccionado;
         // Leer la falla principal del equipo para enriquecer el prompt
         const fallaEl = document.querySelector(datosEquipo.fallaIdSelector);
         const fallaPrincipal = fallaEl ? fallaEl.value.trim() : '';
         const formData = new FormData();
         formData.append('diagnostico_sic', textoOriginal);
-        formData.append('modelo', modeloSeleccionado);
+        // EXPLICACIÓN PARA PRINCIPIANTES: no mandamos "modelo" → cascada automática
         formData.append('tipo_equipo', datosEquipo.tipoEquipo);
         formData.append('marca', datosEquipo.marca);
         formData.append('modelo_equipo', datosEquipo.modelo);
@@ -223,7 +211,11 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             const data = await response.json();
             if (data.success && data.diagnostico_mejorado) {
                 textoPropuesto = data.diagnostico_mejorado;
-                mostrarResultado(data.diagnostico_mejorado, (_a = data.modelo_usado) !== null && _a !== void 0 ? _a : modeloSeleccionado, { tiempo_ms: data.tiempo_ms, chars_original: data.chars_original, chars_mejorado: data.chars_mejorado });
+                mostrarResultado(data.diagnostico_mejorado, (_a = data.modelo_usado) !== null && _a !== void 0 ? _a : 'IA', {
+                    tiempo_ms: data.tiempo_ms,
+                    chars_original: data.chars_original,
+                    chars_mejorado: data.chars_mejorado,
+                });
             }
             else {
                 mostrarError((_b = data.error) !== null && _b !== void 0 ? _b : 'Error desconocido al procesar la solicitud.');
@@ -232,11 +224,61 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
         catch (err) {
             const mensaje = err instanceof Error
                 ? `Error de red: ${err.message}`
-                : 'Error de conexión. Verifica que Ollama esté disponible.';
+                : 'Error de conexión con el servidor de IA.';
             mostrarError(mensaje);
         }
         finally {
             cargando = false;
+        }
+    }
+    // ========================================================================
+    // GUARDAR EN BD el diagnóstico aceptado (solo ese campo)
+    // ========================================================================
+    async function guardarDiagnosticoAceptado(texto) {
+        var _a;
+        if (!datosEquipo.ordenId) {
+            mostrarError('No se pudo identificar la orden para guardar el diagnóstico.');
+            return false;
+        }
+        guardando = true;
+        btnAceptar.disabled = true;
+        btnReintentar.disabled = true;
+        const etiquetaOriginal = btnAceptar.innerHTML;
+        btnAceptar.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Guardando...';
+        const formData = new FormData();
+        formData.append('orden_id', datosEquipo.ordenId);
+        formData.append('diagnostico_sic', texto);
+        try {
+            const response = await fetch(GUARDAR_DIAG_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getOllamaCsrfToken(),
+                },
+                body: formData,
+            });
+            const data = await response.json();
+            if (data.success) {
+                return true;
+            }
+            mostrarError((_a = data.error) !== null && _a !== void 0 ? _a : 'No se pudo guardar el diagnóstico.');
+            btnAceptar.innerHTML = etiquetaOriginal;
+            btnAceptar.disabled = false;
+            btnReintentar.disabled = false;
+            return false;
+        }
+        catch (err) {
+            const mensaje = err instanceof Error
+                ? `Error de red al guardar: ${err.message}`
+                : 'Error de conexión al guardar el diagnóstico.';
+            mostrarError(mensaje);
+            btnAceptar.innerHTML = etiquetaOriginal;
+            btnAceptar.disabled = false;
+            btnReintentar.disabled = false;
+            return false;
+        }
+        finally {
+            guardando = false;
         }
     }
     // ========================================================================
@@ -252,52 +294,44 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             evaluarEstadoBoton();
         });
     }
-    // Clic en "Mejorar Diag. con IA" — abre el modal en Fase 1 (configuración)
+    // Clic en "Mejorar Diag. con IA" — abre modal y genera de inmediato
     botonMejorar.addEventListener('click', () => {
-        if (cargando)
+        if (cargando || guardando)
             return;
         // Capturar el texto actual como referencia inmutable para esta sesión
         textoOriginal = textarea.value.trim();
         textoPropuesto = '';
         // Poblar el panel izquierdo con el texto original
         panelOriginal.textContent = textoOriginal;
-        // Resetear a Fase 1 (el técnico elige modelo y hace clic en Generar)
-        mostrarFaseConfig();
-        modal.show();
-    });
-    // Clic en "Generar mejora" — lanza la llamada a Ollama y pasa a Fase 2
-    btnGenerar.addEventListener('click', () => {
-        if (cargando)
-            return;
-        const modelo = selectorModelo.value;
         mostrarFaseResultado();
-        void llamarOllama(modelo);
+        modal.show();
+        void llamarCascadaAutomatica();
     });
-    // Clic en "Cambiar modelo" — vuelve a Fase 1 sin cerrar el modal
-    btnCambiarMod.addEventListener('click', () => {
-        if (cargando)
-            return;
-        mostrarFaseConfig();
-    });
-    // Botón REINTENTAR: vuelve a llamar a Ollama con el mismo modelo
-    // (el técnico puede cambiar el selector antes de reintentar si lo desea)
+    // Botón REINTENTAR: vuelve a lanzar la cascada automática
     btnReintentar.addEventListener('click', () => {
-        if (cargando)
+        if (cargando || guardando)
             return;
-        const modelo = selectorModelo.value;
-        void llamarOllama(modelo);
+        void llamarCascadaAutomatica();
     });
-    // Botón ACEPTAR: copia el texto mejorado al textarea y cierra el modal
+    // Botón ACEPTAR: aplica al textarea + guarda en BD + cierra el modal
     btnAceptar.addEventListener('click', () => {
-        if (textoPropuesto) {
+        if (cargando || guardando || !textoPropuesto)
+            return;
+        void (async () => {
+            const ok = await guardarDiagnosticoAceptado(textoPropuesto);
+            if (!ok) {
+                // El texto aún no se aplicó al textarea; el técnico puede reintentar
+                return;
+            }
+            // Aplicar al campo visible y marcar como "ya guardado en BD"
             textarea.value = textoPropuesto;
-            // Notificar a otros listeners del cambio (ej: contador de caracteres)
+            textoGuardadoEnBD = textoPropuesto;
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            // Breve destello verde para confirmar que el texto fue aplicado
             textarea.classList.add('border-success');
             setTimeout(() => textarea.classList.remove('border-success'), 2000);
-        }
-        modal.hide();
+            evaluarEstadoBoton();
+            modal.hide();
+        })();
     });
     // Evaluación inicial del botón principal
     evaluarEstadoBoton();
@@ -306,8 +340,8 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
 // INICIALIZACIÓN — Ejecutar cuando el DOM esté completamente cargado
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function () {
-    var _a, _b, _c, _d, _e, _f;
-    // Solo inicializar si el botón existe (renderiza solo con OLLAMA_ENABLED=True)
+    var _a, _b, _c, _d, _e, _f, _g;
+    // Solo inicializar si el botón existe (renderiza solo con AI_ENABLED=True)
     const botonMejorar = document.querySelector('#btnMejorarDiagIA');
     if (!botonMejorar)
         return;
@@ -325,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
         gama: (_d = botonMejorar.dataset['gama']) !== null && _d !== void 0 ? _d : '',
         equipoEnciende: (_e = botonMejorar.dataset['equipoEnciende']) !== null && _e !== void 0 ? _e : 'true',
         fallaIdSelector: (_f = botonMejorar.dataset['fallaSelector']) !== null && _f !== void 0 ? _f : '#id_falla_principal',
+        ordenId: (_g = botonMejorar.dataset['ordenId']) !== null && _g !== void 0 ? _g : '',
     };
     iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo);
 });

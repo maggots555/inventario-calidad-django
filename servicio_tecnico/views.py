@@ -199,6 +199,7 @@ from .views_concentrado import (  # noqa: F401
     exportar_concentrado_pdf,
 )
 from .views_ia_diagnostico import (  # noqa: F401
+    guardar_diagnostico_sic_ia,
     pulir_diagnostico_sic_ia,
     transcribir_audio_diagnostico,
 )
@@ -2063,7 +2064,8 @@ def detalle_orden(request, orden_id):
 # ============================================================================
 
 # ============================================================================
-# IA DIAGNÓSTICO (pulir): vive en views_ia_diagnostico.py (reexport al inicio).
+# IA DIAGNÓSTICO (pulir / guardar / transcribir): vive en views_ia_diagnostico.py
+# (reexport al inicio). No redefinir aquí.
 # ============================================================================
 
 # ============================================================================

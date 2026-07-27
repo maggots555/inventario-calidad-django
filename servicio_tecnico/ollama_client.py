@@ -959,88 +959,196 @@ def mejorar_diagnostico_dispatch(
     modelo_override: str = "",
 ) -> dict:
     """
-    Dispatcher central: detecta el proveedor de IA según el nombre del modelo
-    y delega la llamada al cliente correcto (Gemini o Ollama).
+    Dispatcher de mejora de diagnóstico SIC con cascada automática.
 
-    Regla de detección:
-        - Si el modelo empieza con "gemini" (ej: gemini-3.6-flash) → API de Google Gemini
-        - Cualquier otro nombre → Ollama (local o remoto via Tailscale)
+    Objetivo de negocio:
+        El técnico pulsa "Mejorar diag. con IA" y obtiene una sugerencia de
+        redacción sin elegir modelo. El sistema prueba Gemini en orden y,
+        si ninguno responde, cae a Ollama como último recurso.
 
-    Esto permite al frontend enviar cualquier modelo del selector unificado
-    sin necesidad de saber a qué proveedor pertenece.
+    ESTRATEGIA (sin override o con override Gemini) — igual que inspección visual:
+        1. Ciclo Gemini: cada modelo de GEMINI_MODELS en orden del .env.
+           - Éxito → retorna de inmediato (respeta GEMINI_TIMEOUT; no acorta).
+           - Error recuperable → siguiente Gemini.
+           - Error irrecuperable → rompe el ciclo y salta a Ollama.
+        2. Fallback Ollama (OLLAMA_MODEL) si Gemini falló o está deshabilitado.
+        3. Si Ollama también falla → {'success': False, 'error': '...'}.
+
+    Con override Ollama explícito (compatibilidad):
+        - Ruteo directo a ese modelo Ollama, sin cascada Gemini.
 
     Args:
         diagnostico_sic: Texto original del técnico
         tipo_equipo, marca, modelo, gama, equipo_enciende, falla_principal:
             Datos de contexto del equipo
-        modelo_override: Nombre del modelo seleccionado en la UI
+        modelo_override: Vacío = modo automático. Con prefijo/nombre = override.
 
     Returns:
-        dict con estructura estándar:
+        dict:
             {'success': True, 'diagnostico_mejorado': '...', 'modelo_usado': '...'}
             {'success': False, 'error': '...mensaje...'}
+
+    Efectos secundarios:
+        Llamadas HTTP a Gemini y/o Ollama; solo logging, sin escritura en BD.
     """
     from django.conf import settings
 
-    # Determinar el nombre limpio del modelo para la detección del proveedor
-    # (puede venir con prefijo visual "[Gemini] " o "[Ollama] " desde la UI)
-    nombre_modelo = modelo_override.strip()
+    # EXPLICACIÓN PARA PRINCIPIANTES: mismos tipos que analizar_imagenes_ingreso_dispatch.
+    # Si Gemini dice "rate limit" o "timeout", tiene sentido probar el siguiente modelo.
+    # Si la API key es inválida, no sirve seguir con más Gemini → vamos a Ollama.
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
 
-    # Remover prefijos visuales si los trae la UI antes de detectar el proveedor
-    nombre_limpio = nombre_modelo
+    kwargs_base = dict(
+        diagnostico_sic=diagnostico_sic,
+        tipo_equipo=tipo_equipo,
+        marca=marca,
+        modelo=modelo,
+        gama=gama,
+        equipo_enciende=equipo_enciende,
+        falla_principal=falla_principal,
+    )
+
+    # ── Limpiar prefijos visuales del selector legado ─────────────────────────
+    nombre_limpio = modelo_override.strip()
+    proveedor_override = None  # 'gemini', 'ollama', o None (modo automático)
+
     for prefijo in ('[Gemini] ', '[Ollama] '):
         if nombre_limpio.startswith(prefijo):
             nombre_limpio = nombre_limpio[len(prefijo):]
+            proveedor_override = 'gemini' if prefijo == '[Gemini] ' else 'ollama'
             break
 
-    # ── DETECCIÓN DEL PROVEEDOR ──
-    # Si el nombre del modelo empieza con "gemini", va a la API de Google.
-    # Caso contrario, siempre va a Ollama (modelo local/Tailscale).
-    es_gemini = nombre_limpio.lower().startswith('gemini')
-
-    if es_gemini:
-        # Verificar que Gemini está habilitado antes de llamar al cliente
-        if not getattr(settings, 'GEMINI_ENABLED', False):
-            return {
-                'success': False,
-                'error': (
-                    'El modelo Gemini no está habilitado en este entorno. '
-                    'Activa GEMINI_ENABLED=True en la configuración.'
-                )
-            }
-        from . import gemini_client
-        logger.info(f"[Dispatcher] Modelo '{nombre_limpio}' → Proveedor: Gemini")
-        return gemini_client.mejorar_diagnostico(
-            diagnostico_sic=diagnostico_sic,
-            tipo_equipo=tipo_equipo,
-            marca=marca,
-            modelo=modelo,
-            gama=gama,
-            equipo_enciende=equipo_enciende,
-            falla_principal=falla_principal,
-            modelo_override=nombre_limpio,  # pasamos el nombre limpio (sin prefijo)
+    # Si llega un nombre sin prefijo (compatibilidad), inferimos el proveedor
+    if nombre_limpio and proveedor_override is None:
+        proveedor_override = (
+            'gemini' if nombre_limpio.lower().startswith('gemini') else 'ollama'
         )
-    else:
-        # Verificar que Ollama está habilitado
+
+    # ── Override Ollama explícito: sin cascada ───────────────────────────────
+    if proveedor_override == 'ollama':
         if not getattr(settings, 'OLLAMA_ENABLED', False):
             return {
                 'success': False,
                 'error': (
                     'El servicio de Ollama no está habilitado en este entorno. '
                     'Activa OLLAMA_ENABLED=True en la configuración.'
-                )
+                ),
             }
-        logger.info(f"[Dispatcher] Modelo '{nombre_limpio}' → Proveedor: Ollama")
-        return mejorar_diagnostico(
-            diagnostico_sic=diagnostico_sic,
-            tipo_equipo=tipo_equipo,
-            marca=marca,
-            modelo=modelo,
-            gama=gama,
-            equipo_enciende=equipo_enciende,
-            falla_principal=falla_principal,
-            modelo_override=nombre_limpio,  # pasamos el nombre limpio (sin prefijo)
+        logger.info(
+            f"[DiagIA][Dispatch] Ollama seleccionado explícitamente: {nombre_limpio}"
         )
+        return mejorar_diagnostico(**kwargs_base, modelo_override=nombre_limpio)
+
+    # ── Lista de modelos Gemini a intentar ───────────────────────────────────
+    gemini_models_configurados = list(getattr(settings, 'GEMINI_MODELS', []) or [])
+
+    if nombre_limpio and proveedor_override == 'gemini':
+        # Override Gemini: el elegido primero; el resto como fallback
+        restantes = [m for m in gemini_models_configurados if m != nombre_limpio]
+        modelos_a_intentar = [nombre_limpio] + restantes
+        logger.info(
+            f"[DiagIA][Dispatch] Override Gemini: {nombre_limpio} (primero), "
+            f"fallback: {restantes or 'ninguno'}"
+        )
+    else:
+        # Modo automático (botón sin selector): orden completo de GEMINI_MODELS
+        modelos_a_intentar = gemini_models_configurados
+        logger.info(
+            f"[DiagIA][Dispatch] Modo automático — modelos Gemini: {modelos_a_intentar}"
+        )
+
+    # ── Ciclo Gemini ─────────────────────────────────────────────────────────
+    if getattr(settings, 'GEMINI_ENABLED', False) and modelos_a_intentar:
+        try:
+            from . import gemini_client
+        except ImportError as e:
+            logger.error(f"[DiagIA][Dispatch] No se pudo importar gemini_client: {e}")
+            modelos_a_intentar = []
+
+        ultimo_error = 'Sin detalles'
+
+        for idx, modelo_gemini in enumerate(modelos_a_intentar, start=1):
+            logger.info(
+                f"[DiagIA][Dispatch] Gemini intento {idx}/{len(modelos_a_intentar)}: "
+                f"{modelo_gemini}"
+            )
+
+            try:
+                resultado = gemini_client.mejorar_diagnostico(
+                    **kwargs_base,
+                    modelo_override=modelo_gemini,
+                )
+            except Exception as e_exc:
+                # Excepción fuera del flujo normal → tratamos como recuperable
+                ultimo_error = f'Excepción inesperada: {type(e_exc).__name__}: {e_exc}'
+                logger.error(
+                    f"[DiagIA][Dispatch] Excepción con {modelo_gemini}: {ultimo_error}",
+                    exc_info=True,
+                )
+                continue
+
+            # Primer éxito: paramos aquí (timeouts normales del .env, sin acortar)
+            if resultado.get('success'):
+                logger.info(
+                    f"[DiagIA][Dispatch] Éxito con {modelo_gemini} "
+                    f"(intento {idx}/{len(modelos_a_intentar)})"
+                )
+                return resultado
+
+            error_type = resultado.get('error_type', 'hard_error')
+            ultimo_error = resultado.get('error', 'sin detalles')
+
+            if error_type in ERRORES_REINTENTABLES:
+                logger.warning(
+                    f"[DiagIA][Dispatch] {modelo_gemini} → [{error_type}] "
+                    f"{ultimo_error} — Probando siguiente modelo Gemini..."
+                )
+                continue
+
+            logger.error(
+                f"[DiagIA][Dispatch] {modelo_gemini} → [{error_type}] "
+                f"{ultimo_error} — Error irrecuperable, deteniendo ciclo Gemini."
+            )
+            break
+        else:
+            logger.warning(
+                f"[DiagIA][Dispatch] Todos los modelos Gemini agotados "
+                f"({len(modelos_a_intentar)} intentos). Último error: {ultimo_error}"
+            )
+    else:
+        if not getattr(settings, 'GEMINI_ENABLED', False):
+            logger.info("[DiagIA][Dispatch] Gemini deshabilitado (GEMINI_ENABLED=False).")
+        else:
+            logger.info("[DiagIA][Dispatch] GEMINI_MODELS vacío — sin modelos configurados.")
+
+    # ── Fallback final: Ollama ───────────────────────────────────────────────
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        logger.info("[DiagIA][Dispatch] Fallback a Ollama (último recurso)...")
+        try:
+            # Sin modelo_override → usa OLLAMA_MODEL de settings
+            resultado_ollama = mejorar_diagnostico(**kwargs_base)
+            if resultado_ollama.get('success'):
+                return resultado_ollama
+            logger.warning(
+                f"[DiagIA][Dispatch] Ollama también falló: "
+                f"{resultado_ollama.get('error', 'sin detalles')}"
+            )
+            return resultado_ollama
+        except Exception as e:
+            logger.error(
+                f"[DiagIA][Dispatch] Excepción en fallback Ollama: {e}",
+                exc_info=True,
+            )
+            return {
+                'success': False,
+                'error': f'Error inesperado en Ollama: {e}',
+            }
+
+    logger.warning("[DiagIA][Dispatch] Todos los proveedores de IA fallaron.")
+    return {
+        'success': False,
+        'error': 'No se pudo mejorar el diagnóstico con ningún proveedor de IA disponible.',
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

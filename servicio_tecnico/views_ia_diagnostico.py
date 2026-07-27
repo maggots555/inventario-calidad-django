@@ -23,16 +23,15 @@ logger = logging.getLogger(__name__)
 
 # ============================================================================
 # VISTA AJAX: pulir_diagnostico_sic_ia
-# Endpoint que recibe el diagnóstico escrito por el técnico, lo envía al
-# proveedor de IA seleccionado (Ollama o Gemini) y devuelve la versión
+# Endpoint que recibe el diagnóstico escrito por el técnico, lo envía a la
+# cascada automática de IA (Gemini → … → Ollama) y devuelve la versión
 # mejorada para que el técnico decida si la acepta.
 #
 # FLUJO:
 # 1. Frontend hace POST con el diagnóstico original y datos del equipo
+#    (sin selector de modelo: modo automático)
 # 2. Esta vista llama a ollama_client.mejorar_diagnostico_dispatch()
-# 3. El dispatcher detecta el proveedor según el nombre del modelo
-#    - "gemini-*"  → llama a gemini_client.mejorar_diagnostico()
-#    - cualquier otro → llama a ollama_client.mejorar_diagnostico()
+# 3. El dispatcher prueba GEMINI_MODELS en orden; si fallan → Ollama
 # 4. Devuelve JSON con el texto mejorado o un mensaje de error
 # 5. El frontend muestra el modal de comparación (antes vs después)
 #
@@ -45,15 +44,18 @@ logger = logging.getLogger(__name__)
 @require_http_methods(["POST"])
 def pulir_diagnostico_sic_ia(request):
     """
-    API AJAX: Mejora la redacción del diagnóstico SIC usando IA (Ollama o Gemini).
+    API AJAX: Mejora la redacción del diagnóstico SIC usando IA (cascada automática).
 
-    El proveedor se selecciona automáticamente según el nombre del modelo:
-        - Nombres que empiecen con "gemini" → API de Google Gemini
-        - Cualquier otro nombre → Ollama (local/Tailscale)
+    Modo por defecto (sin campo modelo o vacío):
+        Prueba cada modelo de GEMINI_MODELS; si ninguno responde, cae a Ollama.
+
+    Override opcional (compatibilidad):
+        - Nombres que empiecen con "gemini" → ciclo Gemini + fallback Ollama
+        - Cualquier otro nombre → solo ese modelo Ollama
 
     Recibe vía POST:
         - diagnostico_sic (str): Texto original del técnico (mínimo 20 caracteres)
-        - modelo (str, opcional): Modelo a usar (override del default en settings)
+        - modelo (str, opcional): Vacío = automático. Con valor = override legado.
         - tipo_equipo (str, opcional): Tipo de equipo (Laptop, PC, AIO...)
         - marca (str, opcional): Marca del equipo
         - modelo_equipo (str, opcional): Modelo del equipo
@@ -84,8 +86,8 @@ def pulir_diagnostico_sic_ia(request):
             'error': 'El diagnóstico debe tener al menos 20 caracteres para poder mejorarlo.'
         }, status=400)
 
-    # Modelo seleccionado por el usuario desde el selector del modal
-    # El dispatcher determinará el proveedor según el nombre del modelo
+    # Vacío = cascada automática (flujo normal del botón sin selector).
+    # Si llega un valor, el dispatcher lo trata como override (compatibilidad).
     modelo_override = request.POST.get('modelo', '').strip()
 
     # Datos de contexto del equipo (opcionales — mejoran la calidad del prompt)
@@ -99,7 +101,7 @@ def pulir_diagnostico_sic_ia(request):
 
     logger.info(
         f"[IA-Diag] Solicitud de mejora SIC | Usuario: {request.user.username} | "
-        f"Modelo: {modelo_override or 'default'} | "
+        f"Modelo: {modelo_override or 'automático (cascada)'} | "
         f"Equipo: {marca} {modelo_equipo} | Longitud diagnóstico: {len(diagnostico_sic)} chars"
     )
 
@@ -107,7 +109,7 @@ def pulir_diagnostico_sic_ia(request):
     import time as _time
     _t_inicio = _time.monotonic()
 
-    # Llamar al dispatcher — enruta a Gemini u Ollama según el nombre del modelo
+    # Cascada Gemini → Ollama (o override si el POST trae modelo)
     resultado = mejorar_diagnostico_dispatch(
         diagnostico_sic=diagnostico_sic,
         tipo_equipo=tipo_equipo,
@@ -132,6 +134,103 @@ def pulir_diagnostico_sic_ia(request):
         # (es un error de negocio, no un error HTTP)
         return JsonResponse(resultado, status=200)
 
+
+
+# ============================================================================
+# VISTA AJAX: guardar_diagnostico_sic_ia
+# Guarda SOLO el campo diagnostico_sic cuando el técnico acepta la mejora
+# del modal de IA, sin enviar todo el formulario "Guardar configuración".
+#
+# FLUJO:
+# 1. Frontend pone el texto mejorado en el textarea
+# 2. POST a este endpoint con orden_id + diagnostico_sic
+# 3. Actualizamos DetalleEquipo.diagnostico_sic y registramos historial
+# 4. JSON de éxito → el modal se cierra; el texto ya quedó persistido
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def guardar_diagnostico_sic_ia(request):
+    """
+    API AJAX: Persiste el diagnóstico SIC aceptado desde el modal de mejora IA.
+
+    Objetivo de negocio:
+        Evitar el doble clic (Aceptar + Guardar configuración). Al aceptar la
+        sugerencia de redacción, el texto queda guardado en BD de inmediato.
+        No modifica fechas ni otros campos de Configuración Adicional.
+
+    Recibe vía POST:
+        - orden_id (int): PK de la OrdenServicio
+        - diagnostico_sic (str): Texto a guardar (mínimo 20 caracteres)
+
+    Devuelve JSON:
+        {'success': True, 'mensaje': '...', 'diagnostico_sic': '...'}
+        {'success': False, 'error': '...'}
+
+    Efectos secundarios:
+        Actualiza DetalleEquipo.diagnostico_sic y crea un HistorialOrden.
+    """
+    from django.shortcuts import get_object_or_404
+
+    from .models import OrdenServicio
+    from .services.historial import registrar_historial
+
+    # EXPLICACIÓN PARA PRINCIPIANTES: leemos y validamos antes de tocar la BD.
+    orden_id_raw = request.POST.get('orden_id', '').strip()
+    diagnostico_sic = request.POST.get('diagnostico_sic', '').strip()
+
+    if not orden_id_raw.isdigit():
+        return JsonResponse({
+            'success': False,
+            'error': 'Falta el identificador de la orden o es inválido.',
+        }, status=400)
+
+    if len(diagnostico_sic) < 20:
+        return JsonResponse({
+            'success': False,
+            'error': 'El diagnóstico debe tener al menos 20 caracteres para guardarlo.',
+        }, status=400)
+
+    orden = get_object_or_404(OrdenServicio, pk=int(orden_id_raw))
+    detalle_equipo = getattr(orden, 'detalle_equipo', None)
+
+    if detalle_equipo is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Esta orden no tiene detalle de equipo.',
+        }, status=400)
+
+    # Guardar solo el diagnóstico (no tocamos fechas ni falla_principal)
+    detalle_equipo.diagnostico_sic = diagnostico_sic
+    detalle_equipo.save(update_fields=['diagnostico_sic'])
+
+    empleado_actual = None
+    if hasattr(request.user, 'empleado'):
+        empleado_actual = request.user.empleado
+
+    # Historial breve: queda rastro de que se aceptó una mejora IA
+    registrar_historial(
+        orden=orden,
+        tipo_evento='actualizacion',
+        usuario=empleado_actual,
+        comentario=(
+            'Diagnóstico SIC actualizado al aceptar mejora de redacción con IA '
+            f'({len(diagnostico_sic)} caracteres).'
+        ),
+        es_sistema=False,
+    )
+
+    logger.info(
+        f"[IA-Diag] Diagnóstico SIC guardado tras aceptar mejora | "
+        f"Usuario: {request.user.username} | Orden: {orden.pk} | "
+        f"Chars: {len(diagnostico_sic)}"
+    )
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': 'Diagnóstico guardado correctamente.',
+        'diagnostico_sic': diagnostico_sic,
+    })
 
 
 # ============================================================================

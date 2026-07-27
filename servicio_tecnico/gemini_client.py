@@ -150,21 +150,27 @@ def mejorar_diagnostico(
     Returns:
         dict con estructura:
             {'success': True, 'diagnostico_mejorado': '...texto...', 'modelo_usado': '...'}
-            {'success': False, 'error': '...mensaje de error...'}
+            {'success': False, 'error': '...mensaje...', 'error_type': '<tipo>'}
+
+    error_type (leído por mejorar_diagnostico_dispatch para la cascada):
+        'rate_limit' / 'server_error' / 'timeout' / 'network_error' → reintentable
+        'hard_error' / 'safety_block' / 'config_error' → irrecuperable → saltar a Ollama
     """
     # ── Validación básica del texto ──
     diagnostico_limpio = diagnostico_sic.strip()
     if len(diagnostico_limpio) < 20:
         return {
             'success': False,
-            'error': 'El diagnóstico debe tener al menos 20 caracteres para poder mejorarlo.'
+            'error': 'El diagnóstico debe tener al menos 20 caracteres para poder mejorarlo.',
+            'error_type': 'config_error',
         }
 
     # ── Verificar que Gemini está habilitado y tiene API key ──
     if not getattr(settings, 'GEMINI_ENABLED', False):
         return {
             'success': False,
-            'error': 'La integración con Gemini no está habilitada en este entorno.'
+            'error': 'La integración con Gemini no está habilitada en este entorno.',
+            'error_type': 'config_error',
         }
 
     api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
@@ -172,7 +178,8 @@ def mejorar_diagnostico(
         logger.error("[Gemini] GEMINI_API_KEY no está configurada en .env")
         return {
             'success': False,
-            'error': 'La API Key de Gemini no está configurada. Contacta al administrador.'
+            'error': 'La API Key de Gemini no está configurada. Contacta al administrador.',
+            'error_type': 'config_error',
         }
 
     # ── Selección del modelo ──
@@ -188,6 +195,8 @@ def mejorar_diagnostico(
     if model.startswith('[Gemini] '):
         model = model[len('[Gemini] '):]
 
+    # EXPLICACIÓN PARA PRINCIPIANTES: respetamos GEMINI_TIMEOUT del .env.
+    # La cascada del dispatcher NO acorta este valor; solo para en el primer éxito.
     timeout = getattr(settings, 'GEMINI_TIMEOUT', 60)
 
     # ── Construir el prompt (reutiliza construir_prompt de ollama_client) ──
@@ -269,12 +278,14 @@ def mejorar_diagnostico(
                     'error': (
                         'Gemini bloqueó la respuesta por filtros de seguridad. '
                         'Intenta reformular el diagnóstico o usa otro modelo.'
-                    )
+                    ),
+                    'error_type': 'safety_block',
                 }
             logger.warning("[Gemini] Respuesta vacía — sin candidatos")
             return {
                 'success': False,
-                'error': 'Gemini devolvió una respuesta vacía. Intenta de nuevo.'
+                'error': 'Gemini devolvió una respuesta vacía. Intenta de nuevo.',
+                'error_type': 'server_error',
             }
 
         diagnostico_mejorado = (
@@ -303,7 +314,9 @@ def mejorar_diagnostico(
                 'error': (
                     'La respuesta de Gemini fue cortada porque el diagnóstico es demasiado largo. '
                     'Intenta dividirlo en secciones más cortas.'
-                )
+                ),
+                # Irrecuperable entre Gemini: el texto es demasiado largo para todos.
+                'error_type': 'hard_error',
             }
 
         if finish_reason == 'SAFETY':
@@ -313,14 +326,16 @@ def mejorar_diagnostico(
                 'error': (
                     'Gemini bloqueó la respuesta por filtros de seguridad. '
                     'Intenta reformular el diagnóstico.'
-                )
+                ),
+                'error_type': 'safety_block',
             }
 
         if not diagnostico_mejorado:
             logger.warning("[Gemini] Texto extraído vacío después de parsear la respuesta")
             return {
                 'success': False,
-                'error': 'Gemini devolvió una respuesta vacía. Intenta de nuevo.'
+                'error': 'Gemini devolvió una respuesta vacía. Intenta de nuevo.',
+                'error_type': 'server_error',
             }
 
         logger.info(
@@ -349,45 +364,53 @@ def mejorar_diagnostico(
 
         logger.error(f"[Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}")
 
-        if e.code == 400:
-            return {
-                'success': False,
-                'error': f'Solicitud inválida a Gemini: {error_msg}'
-            }
-        elif e.code == 401 or e.code == 403:
-            return {
-                'success': False,
-                'error': (
-                    'API Key de Gemini inválida o sin permisos. '
-                    'Verifica la configuración en Google AI Studio.'
-                )
-            }
-        elif e.code == 404:
-            return {
-                'success': False,
-                'error': (
-                    f'Modelo "{model}" no encontrado en Gemini. '
-                    'Verifica el nombre del modelo en la configuración.'
-                )
-            }
-        elif e.code == 429:
+        # EXPLICACIÓN PARA PRINCIPIANTES: clasificamos el HTTP para que el
+        # dispatcher sepa si vale la pena probar el siguiente modelo Gemini.
+        if e.code == 429:
             return {
                 'success': False,
                 'error': (
                     'Se superó el límite de peticiones a Gemini (rate limit). '
                     'Espera unos segundos y vuelve a intentarlo.'
-                )
+                ),
+                'error_type': 'rate_limit',
             }
-        elif e.code >= 500:
+        if e.code in (500, 502, 503, 504):
             return {
                 'success': False,
-                'error': 'Error interno en los servidores de Google. Intenta de nuevo en unos minutos.'
+                'error': 'Error interno en los servidores de Google. Intenta de nuevo en unos minutos.',
+                'error_type': 'server_error',
             }
-        else:
+        if e.code == 400:
             return {
                 'success': False,
-                'error': f'Error de la API de Gemini (HTTP {e.code}): {error_msg}'
+                'error': f'Solicitud inválida a Gemini: {error_msg}',
+                'error_type': 'hard_error',
             }
+        if e.code in (401, 403):
+            return {
+                'success': False,
+                'error': (
+                    'API Key de Gemini inválida o sin permisos. '
+                    'Verifica la configuración en Google AI Studio.'
+                ),
+                'error_type': 'hard_error',
+            }
+        if e.code == 404:
+            return {
+                'success': False,
+                'error': (
+                    f'Modelo "{model}" no encontrado en Gemini. '
+                    'Verifica el nombre del modelo en la configuración.'
+                ),
+                # Igual que inspección visual: 4xx (salvo 429) → hard_error → Ollama.
+                'error_type': 'hard_error',
+            }
+        return {
+            'success': False,
+            'error': f'Error de la API de Gemini (HTTP {e.code}): {error_msg}',
+            'error_type': 'hard_error',
+        }
 
     except urllib.error.URLError as e:
         error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
@@ -399,11 +422,13 @@ def mejorar_diagnostico(
                 'error': (
                     f'Gemini tardó más de {timeout} segundos en responder. '
                     'Intenta de nuevo.'
-                )
+                ),
+                'error_type': 'timeout',
             }
         return {
             'success': False,
-            'error': f'Error de red al conectar con Gemini: {error_msg}'
+            'error': f'Error de red al conectar con Gemini: {error_msg}',
+            'error_type': 'network_error',
         }
 
     except TimeoutError:
@@ -413,21 +438,24 @@ def mejorar_diagnostico(
             'error': (
                 f'Gemini tardó más de {timeout} segundos en responder. '
                 'Intenta de nuevo.'
-            )
+            ),
+            'error_type': 'timeout',
         }
 
     except json.JSONDecodeError as e:
         logger.error(f"[Gemini] Error al parsear respuesta JSON: {e}")
         return {
             'success': False,
-            'error': 'Respuesta inválida de la API de Gemini. Intenta de nuevo.'
+            'error': 'Respuesta inválida de la API de Gemini. Intenta de nuevo.',
+            'error_type': 'server_error',
         }
 
     except Exception as e:
         logger.error(f"[Gemini] Error inesperado: {type(e).__name__}: {e}", exc_info=True)
         return {
             'success': False,
-            'error': f'Error inesperado al conectar con Gemini: {str(e)}'
+            'error': f'Error inesperado al conectar con Gemini: {str(e)}',
+            'error_type': 'hard_error',
         }
 
 
