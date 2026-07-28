@@ -377,19 +377,24 @@ CARACTERÍSTICAS:
 }
 
 .module-card.inventario .module-button {
-    background: linear-gradient(135deg, var(--color-inventario) 0%, var(--color-inventario-dark) 100%);
+    /* EXPLICACIÓN: sólido sin degradado (azul sobrio del tema) */
+    background: #1f6391;
+    background-image: none;
 }
 
 .module-card.scorecard .module-button {
-    background: linear-gradient(135deg, var(--color-scorecard) 0%, var(--color-scorecard-dark) 100%);
+    background: #047857;
+    background-image: none;
 }
 
 .module-card.servicio .module-button {
-    background: linear-gradient(135deg, var(--color-servicio) 0%, var(--color-servicio-dark) 100%);
+    background: #0f766e;
+    background-image: none;
 }
 
 .module-card.almacen .module-button {
-    background: linear-gradient(135deg, var(--color-almacen) 0%, var(--color-almacen-dark) 100%);
+    background: #0369a1;
+    background-image: none;
 }
 
 .module-button:hover {
