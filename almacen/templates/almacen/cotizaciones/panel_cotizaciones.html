@@ -11,8 +11,17 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
 
 {% block title %}Panel de Cotizaciones - Almacén{% endblock %}
 
+{% comment %}
+  CSS propio del panel: arregla filas .table-warning y thead.table-light en dark mode.
+  Ver static/css/panel_cotizaciones.css (comentarios EXPLICACIÓN PARA PRINCIPIANTES).
+{% endcomment %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/panel_cotizaciones.css' %}">
+{% endblock extra_css %}
+
 {% block almacen_content %}
-<div class="container-fluid py-4">
+{# Wrapper .panel-cotizaciones-page: acota los selectores CSS al panel (no a otras tablas) #}
+<div class="container-fluid py-4 panel-cotizaciones-page">
     <!-- Encabezado -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -101,7 +110,8 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                {# .panel-cot-tabla: target de overrides dark (thead + filas urgentes) #}
+                <table class="table table-hover mb-0 panel-cot-tabla">
                     <thead class="table-light">
                         <tr>
                             <th>Solicitud</th>

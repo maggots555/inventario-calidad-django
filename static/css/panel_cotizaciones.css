@@ -1,0 +1,113 @@
+/*
+ * panel_cotizaciones.css
+ * ======================
+ * Estilos del Panel de Cotizaciones (Almacén).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * -------------------------------
+ * Bootstrap pinta las filas urgentes con .table-warning (fondo crema).
+ * En dark mode, base.css fuerza texto claro (#cbd5e1) en todas las celdas,
+ * pero NO ajusta el fondo crema de .table-warning → texto ilegible.
+ *
+ * Aquí acotamos los selectores al wrapper .panel-cotizaciones-page
+ * para no afectar otras tablas del sistema. En oscuro usamos un tinte
+ * ámbar semitransparente + texto claro legible (mismo patrón que
+ * lista_compras.css y dashboard_seguimiento_piezas.css).
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+.panel-cotizaciones-page {
+    padding-bottom: 1rem;
+}
+
+/* Alineación vertical cómoda en la tabla del panel */
+.panel-cotizaciones-page .panel-cot-tabla td {
+    vertical-align: middle;
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+/*
+ * Thead con .table-light: en oscuro Bootstrap deja un gris claro
+ * que choca con el resto del tema. Lo alineamos al color de card.
+ */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla thead.table-light > tr > * {
+    --bs-table-bg: #1e293b;
+    --bs-table-color: #e2e8f0;
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+/*
+ * Filas urgentes (.table-warning): el fondo crema de Bootstrap se
+ * reemplaza por un tinte ámbar sobre slate; el texto pasa a claro.
+ * Usamos > * porque Bootstrap 5 aplica --bs-table-bg en las celdas.
+ */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning > * {
+    --bs-table-bg: rgba(234, 179, 8, 0.10);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(234, 179, 8, 0.18);
+    --bs-table-hover-color: #e2e8f0;
+    --bs-table-border-color: rgba(234, 179, 8, 0.25);
+    background-color: rgba(234, 179, 8, 0.10);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning:hover > * {
+    background-color: rgba(234, 179, 8, 0.18);
+    color: #e2e8f0;
+}
+
+/* Enlaces (número de solicitud) legibles sobre el tinte ámbar */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning a {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning a:hover {
+    color: #bfdbfe;
+}
+
+/* Textos secundarios (nombre, fecha) dentro de la fila urgente */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning small,
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Cabecera de la card de la tabla (bg-warning bg-opacity-10) */
+[data-bs-theme="dark"] .panel-cotizaciones-page .card-header.bg-warning.bg-opacity-10 {
+    background-color: rgba(234, 179, 8, 0.12) !important;
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+/*
+ * KPIs con bg-*-opacity-10: en oscuro el 10% de opacidad sobre blanco
+ * del tema claro se ve raro; reforzamos el tinte sobre el fondo slate.
+ */
+[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-warning.bg-opacity-10 {
+    background-color: rgba(234, 179, 8, 0.12) !important;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-secondary.bg-opacity-10 {
+    background-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-danger.bg-opacity-10 {
+    background-color: rgba(248, 113, 113, 0.12) !important;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-success.bg-opacity-10 {
+    background-color: rgba(52, 211, 153, 0.12) !important;
+}
+
+/* Números grandes de los KPIs: contraste explícito en oscuro */
+[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-opacity-10 .card-body h2 {
+    color: #e2e8f0;
+}
