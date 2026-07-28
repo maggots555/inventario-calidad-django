@@ -632,9 +632,10 @@
 /* NOTA: Usamos 'background' shorthand (no 'background-color') para cancelar
    cualquier background-image/gradient que pueda venir de otras reglas */
 [data-bs-theme="dark"] .alert-info {
-    background: #1e3a5f !important;
-    border-color: #3b82f6 !important;
-    color: #93c5fd !important;
+    background: #0c4a6e !important;
+    background-image: none !important;
+    border-color: #0284c7 !important;
+    color: #e0f2fe !important;
 }
 
 [data-bs-theme="dark"] .alert-warning {
@@ -1628,16 +1629,15 @@ footer::after {
     overflow: hidden;
 }
 
-.alert::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 60px;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1));
-    pointer-events: none;
-}
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES (causa del "degradado" en alerts):
+ * Antes existía .alert::before con:
+ *   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1));
+ * Ese pseudo-elemento se dibujaba ENCIMA de TODOS los .alert (info, danger,
+ * success, warning) y creaba un brillo horizontal (más claro a la derecha).
+ * Por eso cambiar solo el background del alert no bastaba: el degradado
+ * venía de otra capa. Se eliminó el ::before; el fondo queda sólido.
+ */
 
 .alert-success {
     background-color: var(--success-light);

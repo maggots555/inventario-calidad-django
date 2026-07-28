@@ -516,14 +516,14 @@
 
 /* ===== VARIABLES CSS ADICIONALES ===== */
 :root {
-    --st-primary: #667eea;
-    --st-secondary: #764ba2;
+    --st-primary: #1f6391;
+    --st-secondary: #1e4a6e;
     --st-success: #27ae60;
     --st-danger: #e74c3c;
     --st-warning: #f39c12;
     --st-info: #3498db;
     
-    --st-gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --st-gradient-1: #1f6391;
     --st-gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     --st-gradient-3: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
     --st-gradient-4: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
@@ -604,7 +604,7 @@
     font-size: 2rem;
     font-weight: 700;
     color: var(--st-primary);
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: #1f6391;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -782,7 +782,7 @@
 /*
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Antes el tab activo usaba var(--st-gradient-1) = gradiente morado
- * #667eea → #764ba2 (patrón "IA slop"). Ahora usamos el azul sólido
+ * #1f6391 → #1e4a6e (patrón "IA slop"). Ahora usamos el azul sólido
  * del tema (--primary-color: #3498db claro / #60a5fa oscuro).
  * Misma regla para #imagenesTab y #videosTabs (misma UI en detalle orden).
  */
@@ -1050,7 +1050,7 @@
 .dias-servicio {
     font-size: 2rem;
     font-weight: 700;
-    color: #667eea;
+    color: #1f6391;
 }
 
 /* =============================================================================
@@ -1466,10 +1466,15 @@ form:has(#btnSubirImagenes:disabled) textarea {
 } */
 
 /* ===== RESALTADO DE INFORMACIÓN IMPORTANTE ===== */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes usaba linear-gradient. Lo dejamos sólido (mismo criterio que forms.css).
+ */
 .alert-info.d-flex {
-    background: linear-gradient(135deg, #e0f7fa 0%, #e1f5fe 100%);
+    background: #ecfeff;
+    background-image: none;
     border: none;
-    border-left: 4px solid #0288d1;
+    border-left: 4px solid #0e7490;
 }
 
 .alert-danger.p-2 {
@@ -4094,8 +4099,8 @@ thead.sticky-top {
 
 [data-bs-theme="dark"] {
     /* ===== VARIABLES CSS DARK ===== */
-    --st-primary: #8b9ff5;
-    --st-secondary: #9b6fc5;
+    --st-primary: #60a5fa;
+    --st-secondary: #93c5fd;
     --st-success: #4ade80;
     --st-danger: #f87171;
     --st-warning: #fbbf24;
@@ -4245,9 +4250,9 @@ thead.sticky-top {
 }
 
 [data-bs-theme="dark"] .timeline-item::before {
-    background: #8b9ff5;
+    background: #60a5fa;
     border-color: #2b3035;
-    box-shadow: 0 0 0 3px rgba(139, 159, 245, 0.3);
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
 }
 
 /* ===== GALERÍA DE IMÁGENES ===== */
@@ -4294,8 +4299,8 @@ thead.sticky-top {
 /* ===== FORMULARIOS ===== */
 [data-bs-theme="dark"] .section-card form .form-control:focus,
 [data-bs-theme="dark"] .section-card form .form-select:focus {
-    border-color: #8b9ff5;
-    box-shadow: 0 0 0 0.2rem rgba(139, 159, 245, 0.25);
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.25);
 }
 
 /* ===== SCROLLBARS PERSONALIZADOS ===== */
@@ -4304,11 +4309,11 @@ thead.sticky-top {
 }
 
 [data-bs-theme="dark"] .card-body::-webkit-scrollbar-thumb {
-    background: #8b9ff5;
+    background: #60a5fa;
 }
 
 [data-bs-theme="dark"] .card-body::-webkit-scrollbar-thumb:hover {
-    background: #9b6fc5;
+    background: #93c5fd;
 }
 
 /* ===== BADGES DE DÍAS SIN ACTUALIZACIÓN ===== */
@@ -4786,11 +4791,12 @@ thead.sticky-top {
     color: #adb5bd;
 }
 
-/* Alerts con gradiente hardcodeado → override con background shorthand */
+/* Alerts info: sólido, sin degradado */
 [data-bs-theme="dark"] .alert-info.d-flex {
-    background: linear-gradient(135deg, #0c2a4a 0%, #0f3460 100%) !important;
-    border-left-color: #3b82f6 !important;
-    color: #93c5fd !important;
+    background: #0c4a6e !important;
+    background-image: none !important;
+    border-left-color: #0284c7 !important;
+    color: #e0f2fe !important;
 }
 
 [data-bs-theme="dark"] .alert-info.d-flex h6,
@@ -5357,6 +5363,7 @@ thead.sticky-top {
 /* =============================================================================
    LISTA DE ÓRDENES — REDISEÑO DE HEADERS (sin gradientes genéricos)
    Reemplaza el patrón morado #667eea→#764ba2 que se veía de IA
+   (hoy el primary ST ya es azul #1f6391 / #1e4a6e)
    ============================================================================= */
 
 /* ── Header principal de la tabla de estadísticas ── */

@@ -9,7 +9,7 @@
 
 /* Panel Venta Mostrador - Variante Diagnóstico (Complemento) */
 .panel-vm-complemento {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
 }
 
 /* Panel Venta Mostrador - Variante Directo (Principal) */
@@ -86,13 +86,13 @@
 
 /* Alerta para ventas adicionales (complemento) */
 .alert-vm-complemento {
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #1f6391;
     background-color: #f0f2ff;
     color: #4a5568;
 }
 
 .alert-vm-complemento .alert-heading {
-    color: #667eea;
+    color: #1f6391;
 }
 
 /* Alerta para venta principal (directo) */
@@ -112,14 +112,14 @@
 
 /* Botón para agregar ventas adicionales (complemento) */
 .btn-agregar-complemento {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     border: none;
     color: white;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-agregar-complemento:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+    background: #195278;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     color: white;
@@ -147,7 +147,7 @@
 
 /* Card con borde de complemento */
 .card-border-complemento {
-    border-left: 4px solid #667eea !important;
+    border-left: 4px solid #1f6391 !important;
 }
 
 /* Card con borde de venta principal */
@@ -364,7 +364,7 @@
 [data-bs-theme="dark"] .alert-vm-complemento {
     background-color: rgba(102, 126, 234, 0.15);
     color: #c8cfd8;
-    border-left-color: #667eea;
+    border-left-color: #1f6391;
 }
 
 [data-bs-theme="dark"] .alert-vm-complemento .alert-heading {

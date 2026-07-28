@@ -17,7 +17,7 @@ body {
 
 /* Header del Dashboard */
 .dashboard-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     padding: 2rem 0;
     margin-bottom: 2rem;
@@ -51,7 +51,7 @@ body {
 }
 
 .filtros-card .card-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     padding: 1rem 1.5rem;
@@ -76,13 +76,13 @@ body {
 }
 
 .form-control:focus, .form-select:focus {
-    border-color: #667eea;
+    border-color: #1f6391;
     box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
 }
 
 /* Botones de Acción */
 .btn-filtrar {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     border: none;
     padding: 0.625rem 1.5rem;
     border-radius: 8px;
@@ -161,7 +161,7 @@ body {
     box-shadow: var(--card-hover-shadow);
 }
 
-.kpi-card.primary { border-left-color: #667eea; }
+.kpi-card.primary { border-left-color: #1f6391; }
 .kpi-card.success { border-left-color: #27ae60; }
 .kpi-card.danger { border-left-color: #e74c3c; }
 .kpi-card.warning { border-left-color: #f39c12; }
@@ -222,12 +222,12 @@ body {
 }
 
 .nav-tabs .nav-link:hover {
-    color: #667eea;
+    color: #1f6391;
     background: rgba(102, 126, 234, 0.1);
 }
 
 .nav-tabs .nav-link.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
 }
@@ -357,7 +357,7 @@ body {
 
 /* Sección ML especial */
 .ml-insight-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     border-radius: var(--border-radius);
     padding: 2rem;

@@ -9,6 +9,25 @@
     padding: 0.2em 0.45em;
 }
 
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El recuadro #ordenInfo usa .alert-info. Forzamos fondo SÓLIDO aquí
+ * (sin linear-gradient) porque otras hojas o caché pueden dejar degradado.
+ */
+#ordenInfo.alert-info {
+    background: #ecfeff !important;
+    background-image: none !important;
+    border-color: #0e7490;
+    color: #155e75;
+}
+
+[data-bs-theme="dark"] #ordenInfo.alert-info {
+    background: #0c4a6e !important;
+    background-image: none !important;
+    border-color: #0284c7;
+    color: #e0f2fe;
+}
+
 .form-solicitud-page {
     padding-bottom: 5.5rem;
 }

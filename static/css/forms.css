@@ -514,16 +514,34 @@ textarea.form-control {
 }
 
 /* Alertas informativas */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes: linear-gradient azul claro (#e3f2fd → #bbdefb).
+ * Ahora: fondo sólido (sin degradado), alineado al info del tema.
+ */
 .alert-info {
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-    border-color: #2196f3;
-    color: #0d47a1;
+    background: #ecfeff !important;
+    background-image: none !important;
+    border-color: #0e7490;
+    color: #155e75;
 }
 
 .alert-info h6 {
-    color: #0d47a1;
+    color: #155e75;
     font-weight: 600;
     margin-bottom: 0.75rem;
+}
+
+/* Dark mode: sólido sobrio (forms.css carga después de base.css) */
+[data-bs-theme="dark"] .alert-info {
+    background: #0c4a6e !important;
+    background-image: none !important;
+    border-color: #0284c7;
+    color: #e0f2fe;
+}
+
+[data-bs-theme="dark"] .alert-info h6 {
+    color: #e0f2fe;
 }
 
 /* =============================================================================
@@ -709,7 +727,7 @@ html.custom-cursor-active .select2-selection * {
 [data-bs-theme="dark"] textarea.form-control:focus {
     background-color: #1e2533 !important;
     color: #e2e8f0 !important;
-    border-color: #667eea !important;
+    border-color: #1f6391 !important;
     box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.2) !important;
 }
 

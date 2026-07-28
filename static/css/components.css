@@ -2392,7 +2392,7 @@ input[readonly].form-control:focus {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
@@ -2423,7 +2423,7 @@ input[readonly].form-control:focus {
 
 /* Variación de colores de fondo para iniciales */
 .empleado-avatar-small:nth-child(3n+1) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
 }
 
 .empleado-avatar-small:nth-child(3n+2) {
@@ -2443,7 +2443,7 @@ input[readonly].form-control:focus {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     border: 3px solid #ffffff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -2471,7 +2471,7 @@ input[readonly].form-control:focus {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     border: 4px solid #ffffff;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }

@@ -95,7 +95,7 @@
    FILTROS MEJORADOS
    ============================================ */
 .filter-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     padding: 1.5rem;
     border-radius: 8px;
@@ -130,7 +130,7 @@
 
 .filter-card .btn-primary {
     background: white;
-    color: #667eea;
+    color: #1f6391;
     border: none;
     font-weight: 600;
 }
@@ -188,7 +188,7 @@
    TARJETAS DE ESTADÍSTICAS
    ============================================ */
 .stat-box {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
     padding: 1.5rem;
     border-radius: 8px;
@@ -234,7 +234,7 @@
 }
 
 .scorecard-table thead {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1f6391;
     color: white;
 }
 

@@ -10,8 +10,8 @@
    VARIABLES CSS - Colores y valores reutilizables
    ==================================================================== */
 :root {
-    --primary-gradient-start: #667eea;
-    --primary-gradient-end: #764ba2;
+    --primary-gradient-start: #1f6391;
+    --primary-gradient-end: #1e4a6e;
     --filter-gradient-start: #f5f7fa;
     --filter-gradient-end: #c3cfe2;
     --shadow-light: 0 3px 10px rgba(0,0,0,0.1);
