@@ -352,12 +352,26 @@
 }
 
 /* Buttons */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes en dark mode .btn-primary usaba un gradiente brillante (#3b82f6→#2563eb)
+ * que se veía MÁS claro/brillante que el azul del modo claro. Ahora usamos el
+ * mismo azul sobrio de las pestañas de galería (#1f6391 / #1e4a6e), sólido,
+ * sin gradiente (evita el "IA slop" y unifica claro/oscuro).
+ */
 [data-bs-theme="dark"] .btn-primary {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    background: #1e4a6e;
+    background-image: none;
+    border-color: #1e4a6e;
+    color: #ffffff;
 }
 
-[data-bs-theme="dark"] .btn-primary:hover {
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
+[data-bs-theme="dark"] .btn-primary:hover,
+[data-bs-theme="dark"] .btn-primary:focus {
+    background: #163a58;
+    background-image: none;
+    border-color: #163a58;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .btn-outline-primary {
@@ -383,13 +397,18 @@
 }
 
 [data-bs-theme="dark"] .btn-success {
-    background-color: #16a34a;
-    border-color: #16a34a;
+    /* Verde sobrio sólido (anula el gradiente del modo claro) */
+    background: #047857;
+    background-image: none;
+    border-color: #047857;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .btn-success:hover {
-    background-color: #15803d;
-    border-color: #15803d;
+    background: #065f46;
+    background-image: none;
+    border-color: #065f46;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .btn-warning {
@@ -1520,18 +1539,40 @@ footer::after {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #3498db, #2980b9);
+    /* Azul sobrio del tema (mismo que tabs de galería), sin gradiente */
+    background: #1f6391;
+    background-image: none;
+    border-color: #1f6391;
+    color: #ffffff;
     box-shadow: var(--shadow);
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #2980b9, #3498db);
+    background: #195278;
+    background-image: none;
+    border-color: #195278;
+    color: #ffffff;
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
 }
 
 .btn-success {
-    background: linear-gradient(135deg, var(--success-color), #059669);
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Antes: linear-gradient con --success-color (en oscuro #34d399 = muy brillante).
+     * Ahora: verde sólido sobrio, mismo criterio que .btn-primary.
+     */
+    background: #047857;
+    background-image: none;
+    border-color: #047857;
+    color: #ffffff;
+}
+
+.btn-success:hover {
+    background: #065f46;
+    background-image: none;
+    border-color: #065f46;
+    color: #ffffff;
 }
 
 .btn-danger {
