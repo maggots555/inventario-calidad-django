@@ -778,28 +778,44 @@
     color: #0d6efd;
 }
 
-/* ===== TABS DE IMÁGENES ===== */
-#imagenesTab .nav-link {
+/* ===== TABS DE IMÁGENES / VIDEOS ===== */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes el tab activo usaba var(--st-gradient-1) = gradiente morado
+ * #667eea → #764ba2 (patrón "IA slop"). Ahora usamos el azul sólido
+ * del tema (--primary-color: #3498db claro / #60a5fa oscuro).
+ * Misma regla para #imagenesTab y #videosTabs (misma UI en detalle orden).
+ */
+#imagenesTab .nav-link,
+#videosTabs .nav-link {
     border-radius: 0.5rem;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-#imagenesTab .nav-link:hover {
-    background-color: rgba(102, 126, 234, 0.1);
+#imagenesTab .nav-link:hover,
+#videosTabs .nav-link:hover {
+    background-color: rgba(31, 99, 145, 0.12);
+    color: #1f6391;
 }
 
-#imagenesTab .nav-link.active {
-    background: var(--st-gradient-1);
-    color: white;
+#imagenesTab .nav-link.active,
+#videosTabs .nav-link.active {
+    /* Azul más apagado del tema (theme-color / primary-dark), sin brillo */
+    background: #1f6391;
+    background-image: none;
+    color: #ffffff;
 }
 
-#imagenesTab .nav-link .badge {
-    background-color: rgba(255, 255, 255, 0.3);
+#imagenesTab .nav-link .badge,
+#videosTabs .nav-link .badge {
+    background-color: rgba(15, 23, 42, 0.25);
+    color: #ffffff;
 }
 
-#imagenesTab .nav-link.active .badge {
-    background-color: rgba(255, 255, 255, 0.9);
-    color: var(--st-primary);
+#imagenesTab .nav-link.active .badge,
+#videosTabs .nav-link.active .badge {
+    background-color: rgba(15, 23, 42, 0.35);
+    color: #ffffff;
 }
 
 /* ===== FORMULARIOS ===== */
@@ -4252,9 +4268,27 @@ thead.sticky-top {
     color: #6ea8fe;
 }
 
-/* ===== TABS DE IMÁGENES ===== */
-[data-bs-theme="dark"] #imagenesTab .nav-link:hover {
-    background-color: rgba(139, 159, 245, 0.15);
+/* ===== TABS DE IMÁGENES / VIDEOS ===== */
+[data-bs-theme="dark"] #imagenesTab .nav-link:hover,
+[data-bs-theme="dark"] #videosTabs .nav-link:hover {
+    background-color: rgba(37, 99, 155, 0.25);
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] #imagenesTab .nav-link.active,
+[data-bs-theme="dark"] #videosTabs .nav-link.active {
+    /* Azul slate más sobrio (menos brillante que #2563eb / #60a5fa) */
+    background: #1e4a6e;
+    background-image: none;
+    color: #ffffff;
+}
+
+[data-bs-theme="dark"] #imagenesTab .nav-link .badge,
+[data-bs-theme="dark"] #videosTabs .nav-link .badge,
+[data-bs-theme="dark"] #imagenesTab .nav-link.active .badge,
+[data-bs-theme="dark"] #videosTabs .nav-link.active .badge {
+    background-color: rgba(15, 23, 42, 0.45);
+    color: #ffffff;
 }
 
 /* ===== FORMULARIOS ===== */
