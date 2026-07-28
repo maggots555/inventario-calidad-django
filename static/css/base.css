@@ -326,6 +326,56 @@
     background-color: #334155;
 }
 
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Bootstrap .table-warning pinta fondo crema. En dark mode base.css fuerza
+ * texto claro en las celdas → crema + texto claro = ilegible (lista productos
+ * inventario con stock bajo, panel cotizaciones, etc.).
+ * Aquí usamos tinte ámbar sobre slate + texto legible (sólido, sin degradado).
+ */
+[data-bs-theme="dark"] .table-warning > * {
+    --bs-table-bg: rgba(180, 83, 9, 0.18);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(180, 83, 9, 0.28);
+    --bs-table-hover-color: #e2e8f0;
+    --bs-table-border-color: rgba(180, 83, 9, 0.35);
+    background-color: rgba(180, 83, 9, 0.18);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .table-warning:hover > * {
+    background-color: rgba(180, 83, 9, 0.28);
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .table-warning a {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .table-warning .text-muted,
+[data-bs-theme="dark"] .table-warning small {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .table-danger > * {
+    --bs-table-bg: rgba(185, 28, 28, 0.18);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(185, 28, 28, 0.28);
+    background-color: rgba(185, 28, 28, 0.18);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .table-success > * {
+    --bs-table-bg: rgba(4, 120, 87, 0.18);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(4, 120, 87, 0.28);
+    background-color: rgba(4, 120, 87, 0.18);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
 /* Dropdowns */
 [data-bs-theme="dark"] .dropdown-menu {
     background-color: #1e293b;

@@ -3136,6 +3136,34 @@ input[readonly].form-control:focus {
     border-left-color: #f87171 !important;
 }
 
+/*
+ * Filas inventario: objeto único / no disponible.
+ * En claro usan fondos lavanda/rojo claro; en oscuro deben ser tintes sobrios.
+ */
+[data-bs-theme="dark"] .tabla-producto-unico {
+    background-color: rgba(30, 74, 110, 0.25) !important;
+    border-left-color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .tabla-producto-unico > * {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .tabla-producto-no-disponible {
+    background-color: rgba(185, 28, 28, 0.18) !important;
+    border-left-color: #f87171;
+    animation: none;
+}
+
+[data-bs-theme="dark"] .tabla-producto-no-disponible > * {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .tabla-producto-no-disponible td::before {
+    background: none;
+    animation: none;
+}
+
 /* Separador de items del timeline */
 [data-bs-theme="dark"] div[style*="border-bottom: 1px solid #e9ecef"] {
     border-bottom-color: #334155 !important;
