@@ -36,12 +36,22 @@
     /* Amarillo claro para fondos */
     --warning-dark: #d97706;
     /* Amarillo oscuro para texto */
-    --info-color: #06b6d4;
-    /* Cian moderno */
-    --info-light: #f0fdfa;
-    /* Cian claro para fondos */
-    --info-dark: #0891b2;
-    /* Cian oscuro para texto */
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Antes usábamos un cian muy claro (#06b6d4 / Bootstrap #0dcaf0).
+     * Con texto blanco en badges (.bg-info) casi no se leía.
+     * Ahora usamos un teal más oscuro (#0e7490) con buen contraste.
+     * --bs-info / --bs-info-rgb hacen que TODAS las clases Bootstrap
+     * (.bg-info, .text-info, .btn-info, .border-info, etc.) usen este tono.
+     */
+    --info-color: #0e7490;
+    /* Teal legible (reemplaza el cian claro) */
+    --info-light: #ecfeff;
+    /* Fondo suave para cards/alerts info */
+    --info-dark: #155e75;
+    /* Teal más oscuro para texto/hover */
+    --bs-info: #0e7490;
+    --bs-info-rgb: 14, 116, 144;
 
     /* Colores Neutros */
     --white: #ffffff;
@@ -189,9 +199,16 @@
     --warning-color: #fbbf24;
     --warning-light: #451a03;
     --warning-dark: #fde68a;
-    --info-color: #22d3ee;
-    --info-light: #083344;
-    --info-dark: #67e8f9;
+    /*
+     * Info en oscuro: cian brillante (#22d3ee) también fallaba en badges
+     * (texto blanco sobre fondo muy claro). Usamos sky más profundo para
+     * fondos Bootstrap (.bg-info) y un sky suave para acentos/texto.
+     */
+    --info-color: #38bdf8;
+    --info-light: #0c4a6e;
+    --info-dark: #7dd3fc;
+    --bs-info: #0284c7;
+    --bs-info-rgb: 2, 132, 199;
 
     /* Colores Neutros - invertidos */
     --white: #1a1a2e;
@@ -528,6 +545,17 @@
 }
 
 /* Badges */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Refuerzo explícito del badge info en modo claro (además de --bs-info).
+ * Así texto blanco sobre teal oscuro siempre se lee bien.
+ */
+.badge.bg-info,
+.badge.text-bg-info {
+    background-color: #0e7490 !important;
+    color: #ffffff !important;
+}
+
 [data-bs-theme="dark"] .badge.bg-dark {
     background-color: #e2e8f0 !important;
     color: #0f172a !important;
@@ -552,6 +580,16 @@
 
 [data-bs-theme="dark"] .badge.bg-danger {
     background-color: #dc2626 !important;
+}
+
+/*
+ * Badge info en oscuro: mismo tono que --bs-info (sky profundo).
+ * Antes faltaba este override y quedaba el cian Bootstrap ilegible.
+ */
+[data-bs-theme="dark"] .badge.bg-info,
+[data-bs-theme="dark"] .badge.text-bg-info {
+    background-color: #0284c7 !important;
+    color: #f8fafc !important;
 }
 
 /* Section headers con gradientes inline - override para dark mode */
@@ -2591,10 +2629,9 @@ footer::after {
     }
 }
 
-/* Destacar el rol del usuario con color cyan */
+/* Destacar el rol del usuario con el color info del tema (legible en claro/oscuro) */
 .user-role strong {
-    color: #06b6d4;
-    /* Color cyan/turquesa que resalta */
+    color: var(--info-color);
     font-weight: 600;
     letter-spacing: 0.3px;
 }
