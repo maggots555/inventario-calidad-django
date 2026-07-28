@@ -9,78 +9,17 @@ Para cada producto muestra el stock actual disponible en cada ubicación.
 
 {% block title %}Distribución Multi-Sucursal - Almacén{% endblock %}
 
+{% comment %}
+  CSS externo: tintes suaves de stock + dark mode.
+  Ver static/css/dashboard_distribucion_sucursales.css
+{% endcomment %}
 {% block extra_css %}
-<style>
-    /* Estilos para la tabla de distribución */
-    .table-distribucion {
-        font-size: 0.875rem;
-    }
-    
-    .table-distribucion thead th {
-        position: sticky;
-        top: 0;
-        background-color: #f8f9fa;
-        z-index: 10;
-        border-bottom: 2px solid #dee2e6;
-    }
-    
-    .sucursal-col {
-        min-width: 150px;
-        text-align: center;
-    }
-    
-    .stock-cell {
-        padding: 0.5rem 0.75rem;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 1rem;
-        display: inline-block;
-        min-width: 50px;
-        text-align: center;
-    }
-    
-    /* Colores según nivel de stock */
-    .stock-cero {
-        background-color: #ff6b6b;
-        color: white;
-    }
-    
-    .stock-bajo {
-        background-color: #ffd93d;
-        color: #333;
-    }
-    
-    .stock-normal {
-        background-color: #6bcf7f;
-        color: white;
-    }
-    
-    /* Hover en filas */
-    .table-distribucion tbody tr:hover {
-        background-color: #f1f3f5;
-    }
-    
-    /* Scroll horizontal para pantallas pequeñas */
-    .table-responsive-custom {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    /* Tooltip personalizado */
-    .tooltip-movimiento {
-        cursor: help;
-    }
-    
-    /* Badge de totales */
-    .badge-total {
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
-    }
-</style>
-{% endblock %}
+<link rel="stylesheet" href="{% static 'css/dashboard_distribucion_sucursales.css' %}">
+{% endblock extra_css %}
 
 {% block almacen_content %}
-<div class="container-fluid py-4">
+{# Wrapper .distribucion-page: acota selectores CSS a esta pantalla #}
+<div class="container-fluid py-4 distribucion-page">
     <!-- Encabezado -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -242,7 +181,7 @@ Para cada producto muestra el stock actual disponible en cada ubicación.
             <div class="row g-2">
                 {% for nombre_suc, total in stock_por_sucursal.items %}
                 <div class="col-6 col-md-4 col-lg-3">
-                    <div class="p-2 bg-light rounded">
+                    <div class="resumen-ubicacion-chip">
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="small text-muted">{{ nombre_suc }}</span>
                             <span class="badge bg-primary">{{ total }}</span>
@@ -317,7 +256,8 @@ Para cada producto muestra el stock actual disponible en cada ubicación.
                             
                             <!-- Categoría -->
                             <td class="text-start">
-                                <span class="badge bg-secondary bg-opacity-25 text-dark">
+                                {# .badge-categoria: sin text-dark (rompe contraste en dark mode) #}
+                                <span class="badge badge-categoria">
                                     {{ producto.categoria }}
                                 </span>
                             </td>
@@ -348,9 +288,9 @@ Para cada producto muestra el stock actual disponible en cada ubicación.
                             </td>
                             {% endfor %}
                             
-                            <!-- Total General -->
+                            <!-- Total General: clases propias suaves (no bg-danger/warning/success sólidos) -->
                             <td class="text-center">
-                                <span class="badge badge-total {% if producto.total_general == 0 %}bg-danger{% elif producto.total_general <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                <span class="badge badge-total {% if producto.total_general == 0 %}stock-total-cero{% elif producto.total_general <= 10 %}stock-total-bajo{% else %}stock-total-normal{% endif %}">
                                     {{ producto.total_general }}
                                 </span>
                             </td>
