@@ -335,12 +335,23 @@
     color: #4b5563; 
 }
 
-/* Badge especial RHITSO con animación */
+/* Badge especial RHITSO
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes: linear-gradient amarillo→rojo (#f59e0b → #ef4444).
+ * Ahora: naranja/ámbar sólido sobrio (mismo criterio que btn-warning).
+ */
 .badge-rhitso {
-    background: linear-gradient(135deg, #f59e0b, #ef4444);
-    color: white;
+    background: #b45309;
+    background-image: none;
+    color: #ffffff;
     font-weight: 700;
     animation: pulse-rhitso 2s infinite;
+}
+
+[data-bs-theme="dark"] .badge-rhitso {
+    background: #b45309;
+    background-image: none;
+    color: #ffffff;
 }
 
 @keyframes pulse-rhitso {
@@ -380,22 +391,25 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
-/* Verde: 0-2 días (Actualización reciente) */
+/* Verde: 0-2 días (Actualización reciente) — sólido, sin degradado */
 .badge-dias-sin-actualizacion.bg-success {
-    background: linear-gradient(135deg, #10b981, #059669) !important;
-    color: white;
+    background: #047857 !important;
+    background-image: none !important;
+    color: #ffffff;
 }
 
-/* Amarillo: 3-5 días (Requiere atención) */
+/* Amarillo: 3-5 días (Requiere atención) — sólido, sin degradado */
 .badge-dias-sin-actualizacion.bg-warning {
-    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
-    color: white;
+    background: #b45309 !important;
+    background-image: none !important;
+    color: #ffffff;
 }
 
-/* Rojo: 6+ días (Urgente) */
+/* Rojo: 6+ días (Urgente) — sólido, sin degradado */
 .badge-dias-sin-actualizacion.bg-danger {
-    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
-    color: white;
+    background: #b91c1c !important;
+    background-image: none !important;
+    color: #ffffff;
     animation: pulse-urgent 2s ease-in-out infinite;
 }
 
@@ -4317,16 +4331,27 @@ thead.sticky-top {
 }
 
 /* ===== BADGES DE DÍAS SIN ACTUALIZACIÓN ===== */
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes usaban linear-gradient (brillo arriba → oscuro abajo).
+ * Ahora mismos tonos sólidos que btn-success / btn-warning / danger.
+ */
 [data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-success {
-    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    background: #047857 !important;
+    background-image: none !important;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-warning {
-    background: linear-gradient(135deg, #eab308, #ca8a04) !important;
+    background: #b45309 !important;
+    background-image: none !important;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-danger {
-    background: linear-gradient(135deg, #f87171, #ef4444) !important;
+    background: #b91c1c !important;
+    background-image: none !important;
+    color: #ffffff;
 }
 
 /* ===== ÓRDENES ESPECIALES ===== */

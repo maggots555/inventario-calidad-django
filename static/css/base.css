@@ -412,14 +412,18 @@
 }
 
 [data-bs-theme="dark"] .btn-warning {
-    background-color: #ca8a04;
-    border-color: #ca8a04;
-    color: #fef3c7;
+    /* Ámbar sobrio sólido (anula el gradiente del modo claro) */
+    background: #b45309;
+    background-image: none;
+    border-color: #b45309;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .btn-warning:hover {
-    background-color: #a16207;
-    border-color: #a16207;
+    background: #92400e;
+    background-image: none;
+    border-color: #92400e;
+    color: #ffffff;
 }
 
 [data-bs-theme="dark"] .btn-outline-danger {
@@ -1581,7 +1585,23 @@ footer::after {
 }
 
 .btn-warning {
-    background: linear-gradient(135deg, var(--warning-color), #d97706);
+    /*
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Antes: linear-gradient con --warning-color (en oscuro #fbbf24 = muy brillante).
+     * Ahora: ámbar sólido sobrio, mismo criterio que .btn-primary / .btn-success.
+     * Afecta botones como "Actualizar Reingreso/RHITSO" (detalle_orden).
+     */
+    background: #b45309;
+    background-image: none;
+    border-color: #b45309;
+    color: #ffffff;
+}
+
+.btn-warning:hover {
+    background: #92400e;
+    background-image: none;
+    border-color: #92400e;
+    color: #ffffff;
 }
 
 /* ===== TABLAS MODERNAS ===== */
