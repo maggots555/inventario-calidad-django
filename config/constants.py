@@ -334,6 +334,35 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('otro', 'Otro motivo'),
 ]
 
+# ---------------------------------------------------------------------------
+# Motivos de rechazo → correo al cliente (feedback / vigencia)
+# Fuente única para ST (detalle_orden) y Almacén (rechazo total).
+# ---------------------------------------------------------------------------
+# Correo con link de FeedbackCliente (encuesta de rechazo)
+MOTIVOS_RECHAZO_CON_FEEDBACK = frozenset({
+    'costo_alto',
+    'muchas_piezas',
+    'tiempo_largo',
+    'falta_justificacion',
+    'no_vale_pena',
+    'rechazo_sin_decision',
+    'no_especifica_motivo',
+    'no_autorizado_por_empresa',
+    'otro',
+})
+
+# Correo informativo de cotización vencida (sin token FeedbackCliente)
+MOTIVOS_RECHAZO_VIGENCIA_VENCIDA = frozenset({
+    'falta_de_respuesta',
+})
+
+# Motivos que NUNCA envían correo (ni feedback ni vigencia)
+MOTIVOS_RECHAZO_SIN_CORREO = frozenset({
+    'no_hay_partes',
+    'solo_venta_mostrador',
+    'no_apto',
+})
+
 # ============================================================================
 # ESTADOS DE SEGUIMIENTO DE PIEZAS
 # Actualizado: Noviembre 2025 - Agregados estados para piezas problemáticas

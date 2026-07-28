@@ -46,6 +46,33 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     </a>
     {% endif %}
 
+    {% if solicitud.estado == 'totalmente_rechazada' and solicitud.orden_servicio_id and admite_motivo_rechazo_st %}
+    <div class="border {% if mostrar_modal_motivo_rechazo_st %}border-danger{% else %}border-secondary{% endif %} rounded p-2 bg-body-secondary">
+        {% if mostrar_modal_motivo_rechazo_st %}
+        <p class="small mb-2 text-danger fw-semibold">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Falta el motivo de rechazo de Servicio Técnico
+        </p>
+        {% else %}
+        <p class="small mb-2 text-muted">
+            <i class="bi bi-check-circle me-1"></i>
+            {% if motivo_rechazo_st_etiqueta %}
+            Registrado: <strong>{{ motivo_rechazo_st_etiqueta }}</strong>
+            {% else %}
+            Motivo ST ya registrado (puedes actualizarlo)
+            {% endif %}
+        </p>
+        {% endif %}
+        <button type="button"
+                class="btn {% if mostrar_modal_motivo_rechazo_st %}btn-danger{% else %}btn-outline-secondary{% endif %} w-100"
+                data-bs-toggle="modal" data-bs-target="#registrarMotivoRechazoStModal"
+                id="btnAbrirMotivoRechazoStAcciones">
+            <i class="bi bi-clipboard-x me-2"></i>
+            {% if mostrar_modal_motivo_rechazo_st %}Registrar motivo ST{% else %}Ver / editar motivo ST{% endif %}
+        </button>
+    </div>
+    {% endif %}
+
     {% if solicitud.puede_vincular_orden %}
     <button type="button" class="btn btn-success w-100"
             data-solicitud-pk="{{ solicitud.pk }}"

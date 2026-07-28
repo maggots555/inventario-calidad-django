@@ -4147,6 +4147,43 @@ def detalle_solicitud_cotizacion(request, pk):
         # El usuario puede no tener perfil de empleado o sucursal asignada — es válido
         pass
 
+    from .utils.cotizacion_items_cliente import (
+        solicitud_puede_descargar_pdf_final,
+        solicitud_tiene_items_cotizables,
+    )
+    from config.constants import (
+        MOTIVO_RECHAZO_COTIZACION,
+        MOTIVOS_RECHAZO_CON_FEEDBACK,
+        MOTIVOS_RECHAZO_VIGENCIA_VENCIDA,
+    )
+    from .utils.sincronizar_rechazo_cotizacion_st import (
+        label_motivo_rechazo,
+        orden_admite_cotizacion_st,
+        solicitud_requiere_motivo_rechazo_st,
+    )
+    import json as _json_motivos
+
+    mostrar_modal_motivo_rechazo_st = solicitud_requiere_motivo_rechazo_st(solicitud)
+    admite_motivo_rechazo_st = orden_admite_cotizacion_st(solicitud.orden_servicio)
+
+    # Valores ya guardados en Cotizacion ST (para precargar "Ver / editar")
+    motivo_rechazo_st_actual = ''
+    detalle_rechazo_st_actual = ''
+    motivo_rechazo_st_etiqueta = ''
+    if solicitud.orden_servicio_id and admite_motivo_rechazo_st:
+        from servicio_tecnico.models import Cotizacion
+
+        try:
+            cotizacion_st_rechazo = Cotizacion.objects.get(
+                orden_id=solicitud.orden_servicio_id,
+            )
+            motivo_rechazo_st_actual = cotizacion_st_rechazo.motivo_rechazo or ''
+            detalle_rechazo_st_actual = cotizacion_st_rechazo.detalle_rechazo or ''
+            if motivo_rechazo_st_actual:
+                motivo_rechazo_st_etiqueta = label_motivo_rechazo(motivo_rechazo_st_actual)
+        except Cotizacion.DoesNotExist:
+            pass
+
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
@@ -4173,12 +4210,19 @@ def detalle_solicitud_cotizacion(request, pk):
         'costeo_reac_config_json': _serializar_costeo_reacondicionado_config(),
         # Opciones del dropdown "Agregar Servicio Adicional" (precios desde constants.py)
         'servicios_adicionales_opciones': _opciones_servicios_adicionales(),
+        # Modal motivo catálogo ST
+        'mostrar_modal_motivo_rechazo_st': mostrar_modal_motivo_rechazo_st,
+        'admite_motivo_rechazo_st': admite_motivo_rechazo_st,
+        'motivos_rechazo_cotizacion': MOTIVO_RECHAZO_COTIZACION,
+        'email_cliente_rechazo': email_cliente_modal,
+        'motivos_rechazo_con_feedback_json': _json_motivos.dumps(
+            sorted(MOTIVOS_RECHAZO_CON_FEEDBACK | MOTIVOS_RECHAZO_VIGENCIA_VENCIDA)
+        ),
+        'motivo_rechazo_st_actual': motivo_rechazo_st_actual,
+        'detalle_rechazo_st_actual': detalle_rechazo_st_actual,
+        'motivo_rechazo_st_etiqueta': motivo_rechazo_st_etiqueta,
     }
 
-    from .utils.cotizacion_items_cliente import (
-        solicitud_puede_descargar_pdf_final,
-        solicitud_tiene_items_cotizables,
-    )
     context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
     context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
 
@@ -4953,6 +4997,13 @@ def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
                         request,
                         f'Línea #{linea.numero_linea} rechazada por el cliente.'
                     )
+                    solicitud.refresh_from_db()
+                    if solicitud.estado == 'totalmente_rechazada':
+                        messages.info(
+                            request,
+                            'La cotización quedó totalmente rechazada. '
+                            'Registra el motivo de catálogo de Servicio Técnico.',
+                        )
                 else:
                     messages.error(request, 'No se pudo rechazar la línea.')
         else:
@@ -5011,30 +5062,130 @@ def aprobar_todas_lineas(request, pk):
 def rechazar_todas_lineas(request, pk):
     """
     Rechazar todas las líneas pendientes de una solicitud.
-    
+
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Atajo para cuando el cliente rechaza toda la cotización.
+    Atajo para marcar todas las líneas pendientes como rechazadas
+    (texto libre por línea, igual que rechazar una sola).
+
+    Cuando el estado pase a ``totalmente_rechazada``, al volver al detalle
+    se abrirá el modal de motivo de catálogo ST (si aún no está registrado).
     """
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
-    
+
     if request.method == 'POST':
         motivo = request.POST.get('motivo', 'Rechazado por el cliente')
         lineas_pendientes = solicitud.lineas.filter(estado_cliente='pendiente')
         rechazadas = 0
-        
+
         for linea in lineas_pendientes:
             if linea.rechazar(motivo=motivo):
                 rechazadas += 1
-        
+
         if rechazadas > 0:
             messages.warning(
                 request,
-                f'Se rechazaron {rechazadas} línea(s) de la cotización.'
+                f'Se rechazaron {rechazadas} línea(s) de la cotización.',
             )
+            solicitud.refresh_from_db()
+            if solicitud.estado == 'totalmente_rechazada':
+                messages.info(
+                    request,
+                    'La cotización quedó totalmente rechazada. '
+                    'Registra el motivo de catálogo de Servicio Técnico.',
+                )
         else:
             messages.info(request, 'No había líneas pendientes por rechazar.')
-    
+
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
+def registrar_motivo_rechazo_st(request, pk):
+    """
+    Registra motivo/detalle de catálogo ST tras un rechazo total.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Se llama desde el modal que aparece solo cuando la solicitud está
+    en ``totalmente_rechazada`` y aún falta `Cotizacion.motivo_rechazo`.
+
+    No vuelve a rechazar líneas: solo escribe la cabecera ST y, si el
+    checkbox lo pide, encola el correo de feedback.
+    """
+    from almacen.utils.sincronizar_rechazo_cotizacion_st import (
+        motivo_rechazo_es_valido,
+        procesar_feedback_rechazo_desde_almacen,
+        sincronizar_cabecera_rechazo_st,
+        label_motivo_rechazo,
+    )
+
+    solicitud = get_object_or_404(
+        SolicitudCotizacion.objects.select_related(
+            'orden_servicio',
+            'orden_servicio__detalle_equipo',
+        ),
+        pk=pk,
+    )
+
+    if request.method != 'POST':
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    if solicitud.estado != 'totalmente_rechazada':
+        messages.error(
+            request,
+            'Solo puedes registrar el motivo de catálogo ST cuando la '
+            'solicitud está totalmente rechazada.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    motivo_clave = (request.POST.get('motivo_rechazo') or '').strip()
+    detalle_rechazo = (request.POST.get('detalle_rechazo') or '').strip()
+
+    if not motivo_rechazo_es_valido(motivo_clave):
+        messages.error(
+            request,
+            'Debes seleccionar un motivo de rechazo del catálogo.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # Si ya había motivo, igual permitimos actualizar (reabrir modal manual).
+    empleado_actual = getattr(request.user, 'empleado', None)
+    cotizacion = sincronizar_cabecera_rechazo_st(
+        solicitud,
+        motivo_clave=motivo_clave,
+        detalle_rechazo=detalle_rechazo,
+        empleado=empleado_actual,
+    )
+    if cotizacion is None:
+        messages.warning(
+            request,
+            'No se pudo guardar el motivo en ST (sin orden válida o es venta mostrador).',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    label = label_motivo_rechazo(motivo_clave)
+    messages.success(
+        request,
+        f'Motivo de rechazo registrado en ST: {label}.',
+    )
+
+    enviar_feedback = request.POST.get('enviar_feedback') in (
+        'on', '1', 'true', 'True',
+    )
+    resultado_fb = procesar_feedback_rechazo_desde_almacen(
+        solicitud,
+        motivo_clave,
+        enviar_feedback=enviar_feedback,
+        empleado=empleado_actual,
+        usuario_id=request.user.pk if request.user.is_authenticated else None,
+    )
+    if enviar_feedback and resultado_fb.get('enviado'):
+        messages.success(request, f"📧 {resultado_fb['mensaje']}")
+    elif enviar_feedback and resultado_fb.get('mensaje'):
+        messages.warning(request, resultado_fb['mensaje'])
+
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
 

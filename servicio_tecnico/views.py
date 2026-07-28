@@ -1575,22 +1575,18 @@ def detalle_orden(request, orden_id):
                     )
 
                     # ── SISTEMA DE FEEDBACK DE RECHAZO ──────────────────────────
-                    # Motivos que requieren correo con link de feedback:
-                    MOTIVOS_CON_FEEDBACK = {
-                        'costo_alto', 'muchas_piezas', 'tiempo_largo',
-                        'falta_justificacion', 'no_vale_pena', 'rechazo_sin_decision',
-                        'no_especifica_motivo', 'no_autorizado_por_empresa', 'otro',
-                    }
-                    # Motivos que envían correo informativo (sin link de feedback):
-                    MOTIVOS_VIGENCIA_VENCIDA = {'falta_de_respuesta'}
-                    # Motivos que NO envían correo: no_hay_partes, solo_venta_mostrador, no_apto
+                    # Sets centralizados en config.constants (paridad Almacén/ST)
+                    from config.constants import (
+                        MOTIVOS_RECHAZO_CON_FEEDBACK,
+                        MOTIVOS_RECHAZO_VIGENCIA_VENCIDA,
+                    )
 
                     email_cliente_actual = (
                         orden.detalle_equipo.email_cliente
                         if orden.detalle_equipo else None
                     )
 
-                    if motivo_clave in MOTIVOS_CON_FEEDBACK and email_cliente_actual:
+                    if motivo_clave in MOTIVOS_RECHAZO_CON_FEEDBACK and email_cliente_actual:
                         # Crear token de feedback usando django.core.signing
                         from django.core.signing import TimestampSigner
                         from .models import FeedbackCliente
@@ -1613,7 +1609,7 @@ def detalle_orden(request, orden_id):
                         request.session['feedback_pendiente_id'] = feedback_obj.pk
                         request.session['feedback_pendiente_email'] = email_cliente_actual
 
-                    elif motivo_clave in MOTIVOS_VIGENCIA_VENCIDA and email_cliente_actual:
+                    elif motivo_clave in MOTIVOS_RECHAZO_VIGENCIA_VENCIDA and email_cliente_actual:
                         # Marcar en sesión que se debe enviar correo de vigencia vencida
                         request.session['vigencia_vencida_orden_id'] = orden.pk
                         request.session['vigencia_vencida_email'] = email_cliente_actual

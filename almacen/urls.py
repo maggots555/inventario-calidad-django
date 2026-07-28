@@ -123,6 +123,11 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/responder/', views.responder_linea_cotizacion, name='responder_linea_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/aprobar-todas/', views.aprobar_todas_lineas, name='aprobar_todas_lineas'),
     path('solicitudes-cotizacion/<int:pk>/rechazar-todas/', views.rechazar_todas_lineas, name='rechazar_todas_lineas'),
+    path(
+        'solicitudes-cotizacion/<int:pk>/registrar-motivo-rechazo-st/',
+        views.registrar_motivo_rechazo_st,
+        name='registrar_motivo_rechazo_st',
+    ),
     
     # Servicios adicionales (Venta Mostrador en cotizaciones)
     path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/agregar/', views.agregar_servicio_adicional, name='agregar_servicio_adicional'),

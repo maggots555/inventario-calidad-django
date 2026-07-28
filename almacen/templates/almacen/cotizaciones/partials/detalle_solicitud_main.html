@@ -36,6 +36,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
         <i class="bi bi-info-circle me-2"></i>
         <strong>Cotización finalizada.</strong>
         El cliente rechazó todas las piezas y servicios. No es posible reenviar la cotización.
+        {% if mostrar_modal_motivo_rechazo_st %}
+        <span class="d-block small mt-1">
+            Usa <strong>Acciones → Registrar motivo ST</strong> para el catálogo de Servicio Técnico.
+        </span>
+        {% endif %}
     </div>
     {% elif solicitud.estado == 'completada' %}
     <div class="alert alert-success border mt-3 mb-0" role="status">
@@ -757,6 +762,12 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
     {% elif solicitud.estado == 'parcialmente_aprobada' and tiene_items_cotizables %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
+    </button>
+    {% elif solicitud.estado == 'totalmente_rechazada' and solicitud.orden_servicio_id and admite_motivo_rechazo_st %}
+    <button type="button"
+            class="btn {% if mostrar_modal_motivo_rechazo_st %}btn-danger{% else %}btn-outline-secondary{% endif %} btn-dock-primary"
+            data-bs-toggle="modal" data-bs-target="#registrarMotivoRechazoStModal">
+        <i class="bi bi-clipboard-x me-1"></i>Motivo ST
     </button>
     {% else %}
     <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="btn btn-outline-secondary btn-dock-primary">

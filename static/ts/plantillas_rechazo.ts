@@ -1,13 +1,13 @@
 /**
  * Sistema de Plantillas Automáticas para Comentarios de Rechazo
- * 
- * Este módulo carga automáticamente plantillas estructuradas cuando
- * el usuario selecciona un motivo de rechazo en el formulario de cotización.
- * 
- * Beneficios:
- * - Estandarización de comentarios para mejor análisis de text mining
- * - Facilita el registro para técnicos (solo editan campos específicos)
- * - Mejora precisión del modelo ML de predicción de rechazos
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Cuando eliges un motivo de rechazo (select #id_motivo_rechazo), se precarga
+ * una plantilla estructurada en #id_detalle_rechazo. Sirve en ST (detalle_orden)
+ * y en Almacén (modal #rechazarTodasModal).
+ *
+ * También habilita/deshabilita el checkbox de correo de feedback en Almacén
+ * según el motivo seleccionado.
  */
 
 // Plantillas estructuradas por motivo de rechazo
@@ -75,7 +75,17 @@ const PLANTILLAS_RECHAZO: Record<string, string> = {
     'rechazo_sin_decision': `[RAZÓN PRINCIPAL]: Cliente retira equipo sin tomar decisión
 [DETALLE]: Se presenta al centro de servicio y retira sin [aceptar / rechazar] formalmente
 [CONTEXTO]: Menciona que [evaluará opciones / consultará / esperará mejor momento]
-[ALTERNATIVA]: [Buscará segunda opinión / Evaluará presupuesto / Comparará alternativas]`
+[ALTERNATIVA]: [Buscará segunda opinión / Evaluará presupuesto / Comparará alternativas]`,
+
+    'no_autorizado_por_empresa': `[RAZÓN PRINCIPAL]: Empresa no autoriza la reparación
+[DETALLE]: El cliente informa que [su empresa / el área de compras] no aprueba el gasto
+[CONTEXTO]: [Política interna / Presupuesto cerrado / Requiere otra cotización]
+[ALTERNATIVA]: [Esperará autorización / Evaluará compra de equipo / Cancelará servicio]`,
+
+    'otro': `[RAZÓN PRINCIPAL]: Otro motivo
+[DETALLE]: [DESCRIBE_EL_MOTIVO]
+[CONTEXTO]: [CONTEXTO_ADICIONAL]
+[ALTERNATIVA]: [ALTERNATIVA_DEL_CLIENTE]`,
 };
 
 // Diccionario de nombres legibles de motivos
@@ -92,8 +102,90 @@ const NOMBRES_MOTIVOS: Record<string, string> = {
     'solo_venta_mostrador': 'Solo venta mostrador',
     'falta_de_respuesta': 'Falta de respuesta del cliente',
     'no_especifica_motivo': 'No especifica motivo',
-    'rechazo_sin_decision': 'Rechazo sin decisión clara'
+    'rechazo_sin_decision': 'Rechazo sin decisión clara',
+    'no_autorizado_por_empresa': 'No autorizado por empresa',
+    'otro': 'Otro motivo',
 };
+
+/**
+ * Lee del modal de Almacén la lista JSON de motivos que permiten correo.
+ * Si no existe el atributo, usa el set por defecto (paridad con constants.py).
+ */
+function obtenerMotivosConCorreo(): Set<string> {
+    const modal = document.getElementById('registrarMotivoRechazoStModal');
+    const raw = modal?.getAttribute('data-motivos-feedback');
+    if (raw) {
+        try {
+            const parsed: unknown = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return new Set(parsed.filter((x): x is string => typeof x === 'string'));
+            }
+        } catch {
+            console.warn('⚠️ No se pudo parsear data-motivos-feedback');
+        }
+    }
+    return new Set([
+        'costo_alto',
+        'muchas_piezas',
+        'tiempo_largo',
+        'falta_justificacion',
+        'no_vale_pena',
+        'rechazo_sin_decision',
+        'no_especifica_motivo',
+        'no_autorizado_por_empresa',
+        'otro',
+        'falta_de_respuesta',
+    ]);
+}
+
+/**
+ * Habilita o deshabilita el checkbox de feedback según el motivo.
+ */
+function actualizarCheckboxFeedback(motivoSeleccionado: string): void {
+    const checkbox = document.getElementById('enviar_feedback_rechazo') as HTMLInputElement | null;
+    const ayuda = document.getElementById('ayudaFeedbackRechazo');
+    if (!checkbox) {
+        return;
+    }
+
+    const modal = document.getElementById('registrarMotivoRechazoStModal');
+    const yaRegistrado = modal?.getAttribute('data-motivo-ya-registrado') === '1';
+    const motivosConCorreo = obtenerMotivosConCorreo();
+    const permiteCorreo =
+        motivoSeleccionado !== '' && motivosConCorreo.has(motivoSeleccionado);
+
+    if (permiteCorreo) {
+        checkbox.disabled = false;
+        // Solo marcar por defecto en el primer registro (no al ver/editar)
+        if (!yaRegistrado) {
+            checkbox.checked = true;
+        }
+        if (ayuda && !yaRegistrado) {
+            ayuda.textContent =
+                'Si está marcado y el motivo lo permite, se encola el correo al cliente (mismo flujo que en ST).';
+        }
+    } else {
+        checkbox.disabled = true;
+        checkbox.checked = false;
+        if (ayuda) {
+            ayuda.textContent =
+                motivoSeleccionado === ''
+                    ? 'Selecciona un motivo para habilitar el envío de correo.'
+                    : 'Este motivo no envía correo de feedback al cliente.';
+        }
+    }
+}
+
+/**
+ * True si el texto de detalle aún parece plantilla cruda (con placeholders [CAMPO]).
+ */
+function detalleParecePlantillaSinEditar(valor: string): boolean {
+    const trim = valor.trim();
+    if (!trim.startsWith('[RAZÓN PRINCIPAL]:')) {
+        return false;
+    }
+    return /\[[A-ZÁÉÍÓÚÑ_]+\]/.test(trim);
+}
 
 /**
  * Inicializa el sistema de plantillas automáticas
@@ -101,43 +193,49 @@ const NOMBRES_MOTIVOS: Record<string, string> = {
 function inicializarPlantillasRechazo(): void {
     const selectMotivo = document.getElementById('id_motivo_rechazo') as HTMLSelectElement | null;
     const textareaDetalle = document.getElementById('id_detalle_rechazo') as HTMLTextAreaElement | null;
-    
+
     if (!selectMotivo || !textareaDetalle) {
-        console.warn('⚠️ Elementos de formulario de rechazo no encontrados');
+        // En páginas sin formulario de rechazo (ej. listas) es normal
         return;
     }
-    
+
+    // Form que contiene el select (ST o modal Almacén), no el primer form del DOM
+    const formContenedor = selectMotivo.closest('form');
+    const modal = document.getElementById('registrarMotivoRechazoStModal');
+    const yaRegistrado = modal?.getAttribute('data-motivo-ya-registrado') === '1';
+
     // Evento: cuando cambia el motivo de rechazo
     selectMotivo.addEventListener('change', (event: Event) => {
         const target = event.target as HTMLSelectElement;
         const motivoSeleccionado = target.value;
-        
+
+        actualizarCheckboxFeedback(motivoSeleccionado);
+
         if (!motivoSeleccionado || motivoSeleccionado === '') {
-            // Si no hay motivo seleccionado, limpiar textarea
-            textareaDetalle.value = '';
-            textareaDetalle.placeholder = 'Selecciona un motivo de rechazo y se cargará automáticamente una plantilla.';
+            // No borrar un detalle ya guardado en ST al limpiar el select
+            if (!yaRegistrado) {
+                textareaDetalle.value = '';
+            }
+            textareaDetalle.placeholder =
+                'Selecciona un motivo de rechazo y se cargará automáticamente una plantilla.';
             return;
         }
-        
-        // Obtener plantilla correspondiente
+
         const plantilla = PLANTILLAS_RECHAZO[motivoSeleccionado];
-        
+
         if (plantilla) {
-            // Solo cargar plantilla si el campo está vacío o tiene la plantilla anterior
             const valorActual = textareaDetalle.value.trim();
-            const esPlantillaAnterior = valorActual.startsWith('[RAZÓN PRINCIPAL]:');
-            
-            if (valorActual === '' || esPlantillaAnterior) {
+            // EXPLICACIÓN: si ya hay detalle guardado (o texto editado), no lo pisamos
+            // al cambiar de motivo. Solo reemplazamos vacío o plantilla sin editar.
+            const puedeReemplazar =
+                valorActual === '' || detalleParecePlantillaSinEditar(valorActual);
+
+            if (puedeReemplazar) {
                 textareaDetalle.value = plantilla;
-                
-                // Mostrar notificación visual
                 mostrarNotificacionPlantilla(motivoSeleccionado);
-                
-                // Auto-focus en el textarea para empezar a editar
                 textareaDetalle.focus();
-                
-                // Seleccionar el primer campo editable [MONTO], [AÑOS], etc.
-                const primerCampo = plantilla.match(/\[([A-Z_]+)\]/);
+
+                const primerCampo = plantilla.match(/\[([A-ZÁÉÍÓÚÑ_]+)\]/);
                 if (primerCampo) {
                     const inicio = plantilla.indexOf(primerCampo[0]);
                     textareaDetalle.setSelectionRange(inicio, inicio + primerCampo[0].length);
@@ -147,9 +245,36 @@ function inicializarPlantillasRechazo(): void {
             console.warn(`⚠️ No hay plantilla definida para el motivo: ${motivoSeleccionado}`);
         }
     });
-    
-    // Agregar ayuda contextual
+
     agregarAyudaContextual(textareaDetalle);
+    // Estado inicial del checkbox según el motivo ya seleccionado (si hay)
+    actualizarCheckboxFeedback(selectMotivo.value);
+
+    if (formContenedor) {
+        formContenedor.addEventListener('submit', (event: Event) => {
+            if (!debeValidarPlantillaEnSubmit(formContenedor)) {
+                return;
+            }
+            if (!validarPlantillaEditada(textareaDetalle)) {
+                event.preventDefault();
+            }
+        });
+    }
+}
+
+/**
+ * True si el submit actual es un rechazo (ST con radio, o form de Almacén).
+ */
+function debeValidarPlantillaEnSubmit(form: HTMLFormElement): boolean {
+    // Almacén: modal de motivo ST tras rechazo total
+    if (form.id === 'formRegistrarMotivoRechazoSt') {
+        return true;
+    }
+    // ST: solo si eligió la acción rechazar
+    const accionRadio = form.querySelector(
+        'input[name="accion"]:checked'
+    ) as HTMLInputElement | null;
+    return Boolean(accionRadio && accionRadio.value === 'rechazar');
 }
 
 /**
@@ -157,8 +282,7 @@ function inicializarPlantillasRechazo(): void {
  */
 function mostrarNotificacionPlantilla(motivo: string): void {
     const nombreMotivo = NOMBRES_MOTIVOS[motivo] || motivo;
-    
-    // Crear elemento de notificación
+
     const notificacion = document.createElement('div');
     notificacion.className = 'alert alert-info alert-dismissible fade show mt-2';
     notificacion.style.fontSize = '0.9rem';
@@ -168,13 +292,11 @@ function mostrarNotificacionPlantilla(motivo: string): void {
         <small>Edita los campos entre <code>[ ]</code> con los datos específicos del caso.</small>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
-    // Insertar después del textarea
+
     const textareaDetalle = document.getElementById('id_detalle_rechazo');
     if (textareaDetalle && textareaDetalle.parentElement) {
         textareaDetalle.parentElement.insertBefore(notificacion, textareaDetalle.nextSibling);
-        
-        // Auto-cerrar después de 5 segundos
+
         setTimeout(() => {
             notificacion.classList.remove('show');
             setTimeout(() => notificacion.remove(), 300);
@@ -183,11 +305,14 @@ function mostrarNotificacionPlantilla(motivo: string): void {
 }
 
 /**
- * Agrega ayuda contextual al textarea
+ * Agrega ayuda contextual al textarea (solo una vez)
  */
 function agregarAyudaContextual(textarea: HTMLTextAreaElement): void {
+    if (textarea.parentElement?.querySelector('.ayuda-plantilla-rechazo')) {
+        return;
+    }
     const helpText = document.createElement('div');
-    helpText.className = 'form-text mt-2';
+    helpText.className = 'form-text mt-2 ayuda-plantilla-rechazo';
     helpText.innerHTML = `
         <i class="bi bi-lightbulb"></i> <strong>Cómo usar las plantillas:</strong><br>
         1️⃣ Selecciona el motivo de rechazo arriba<br>
@@ -195,7 +320,7 @@ function agregarAyudaContextual(textarea: HTMLTextAreaElement): void {
         3️⃣ Edita los campos entre <code>[ ]</code> con información específica<br>
         4️⃣ Mantén la estructura para mejor análisis de datos
     `;
-    
+
     if (textarea.parentElement) {
         textarea.parentElement.appendChild(helpText);
     }
@@ -206,42 +331,26 @@ function agregarAyudaContextual(textarea: HTMLTextAreaElement): void {
  */
 function validarPlantillaEditada(textarea: HTMLTextAreaElement): boolean {
     const valor = textarea.value;
-    
-    // Buscar campos sin editar (aún con [ ])
-    const camposNoEditados = valor.match(/\[([A-Z_]+)\]/g);
-    
+    const camposNoEditados = valor.match(/\[[A-ZÁÉÍÓÚÑ_]+\]/g);
+
     if (camposNoEditados && camposNoEditados.length > 0) {
         const confirmacion = confirm(
             `⚠️ Aún hay ${camposNoEditados.length} campo(s) sin completar:\n\n` +
-            camposNoEditados.join(', ') + '\n\n' +
-            '¿Deseas continuar de todos modos?'
+                camposNoEditados.join(', ') +
+                '\n\n' +
+                '¿Deseas continuar de todos modos?'
         );
         return confirmacion;
     }
-    
+
     return true;
 }
 
 /**
- * Inicializar cuando el DOM esté listo
+ * Inicializar cuando el DOM esté listo.
+ * La auto-apertura del modal de Almacén vive en un script inline del template
+ * (más fiable que el JS cacheado); aquí solo inicializamos plantillas.
  */
 document.addEventListener('DOMContentLoaded', () => {
     inicializarPlantillasRechazo();
-    
-    // Agregar validación al formulario antes de enviar
-    const form = document.querySelector('form') as HTMLFormElement | null;
-    const textareaDetalle = document.getElementById('id_detalle_rechazo') as HTMLTextAreaElement | null;
-    
-    if (form && textareaDetalle) {
-        form.addEventListener('submit', (event: Event) => {
-            const accionRadio = document.querySelector('input[name="accion"]:checked') as HTMLInputElement | null;
-            
-            // Solo validar si se está rechazando
-            if (accionRadio && accionRadio.value === 'rechazar') {
-                if (!validarPlantillaEditada(textareaDetalle)) {
-                    event.preventDefault();
-                }
-            }
-        });
-    }
 });

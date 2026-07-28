@@ -86,7 +86,7 @@ Muestra toda la información y acciones según el estado
     </div>
 </div>
 
-<!-- Modal: Rechazar todas las líneas -->
+<!-- Modal: Rechazar todas las líneas (texto libre por pieza; el catálogo ST va aparte) -->
 <div class="modal fade" id="rechazarTodasModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -106,6 +106,10 @@ Muestra toda la información y acciones según el estado
                         <label class="form-label">Motivo del rechazo <span class="text-danger">*</span></label>
                         <textarea name="motivo" class="form-control" rows="3" 
                                   placeholder="Indica por qué el cliente rechazó la cotización..." required></textarea>
+                        <div class="form-text">
+                            Este texto se guarda en cada línea. Si la solicitud queda
+                            <em>totalmente rechazada</em>, después podrás registrar el motivo de catálogo de ST.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -118,6 +122,114 @@ Muestra toda la información y acciones según el estado
         </div>
     </div>
 </div>
+
+{% if solicitud.estado == 'totalmente_rechazada' and solicitud.orden_servicio_id and admite_motivo_rechazo_st %}
+{# Modal catálogo ST: registrar o ver/editar lo ya guardado (no aplica a FL-) #}
+<div class="modal fade" id="registrarMotivoRechazoStModal" tabindex="-1"
+     {% if mostrar_modal_motivo_rechazo_st %}data-auto-abrir="1"{% endif %}
+     {% if motivo_rechazo_st_actual %}data-motivo-ya-registrado="1"{% endif %}
+     data-motivos-feedback='{{ motivos_rechazo_con_feedback_json|escape }}'>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post"
+                  action="{% url 'almacen:registrar_motivo_rechazo_st' solicitud.pk %}"
+                  id="formRegistrarMotivoRechazoSt">
+                {% csrf_token %}
+
+                <div class="modal-header {% if motivo_rechazo_st_actual %}bg-secondary{% else %}bg-danger{% endif %} text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-clipboard-x me-2"></i>
+                        {% if motivo_rechazo_st_actual %}
+                        Motivo de rechazo registrado (ST)
+                        {% else %}
+                        Motivo de rechazo (Servicio Técnico)
+                        {% endif %}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% if motivo_rechazo_st_actual %}
+                    <div class="alert alert-success py-2 small mb-3" role="status">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Ya registrado:
+                        <strong>{{ motivo_rechazo_st_etiqueta|default:motivo_rechazo_st_actual }}</strong>.
+                        Puedes revisar o actualizar el detalle abajo.
+                    </div>
+                    {% else %}
+                    <p class="mb-3">
+                        La cotización quedó <strong>totalmente rechazada</strong>.
+                        Registra el motivo de catálogo y el detalle (igual que en ST)
+                        para dashboards, ML y feedback al cliente.
+                    </p>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="id_motivo_rechazo" class="form-label">
+                            Motivo del rechazo <span class="text-danger">*</span>
+                        </label>
+                        <select name="motivo_rechazo" id="id_motivo_rechazo"
+                                class="form-select form-control" required>
+                            <option value="">— Selecciona un motivo —</option>
+                            {% for clave, etiqueta in motivos_rechazo_cotizacion %}
+                            <option value="{{ clave }}"
+                                {% if clave == motivo_rechazo_st_actual %}selected{% endif %}>
+                                {{ etiqueta }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_detalle_rechazo" class="form-label">
+                            Detalle del rechazo
+                        </label>
+                        <textarea name="detalle_rechazo" id="id_detalle_rechazo"
+                                  class="form-control" rows="6"
+                                  placeholder="Selecciona un motivo y se cargará una plantilla. Edita los campos entre [ ] con los datos del caso.">{% if detalle_rechazo_st_actual %}{{ detalle_rechazo_st_actual }}{% endif %}</textarea>
+                    </div>
+
+                    {% if email_cliente_rechazo %}
+                    <div class="form-check border rounded p-3 bg-body-secondary" id="bloqueEnviarFeedbackRechazo">
+                        <input class="form-check-input" type="checkbox" value="on"
+                               name="enviar_feedback" id="enviar_feedback_rechazo"
+                               {% if not motivo_rechazo_st_actual %}checked{% endif %}>
+                        <label class="form-check-label" for="enviar_feedback_rechazo">
+                            {% if motivo_rechazo_st_actual %}
+                            Reenviar correo de feedback de rechazo a
+                            {% else %}
+                            Enviar correo de feedback de rechazo a
+                            {% endif %}
+                            <code>{{ email_cliente_rechazo }}</code>
+                        </label>
+                        <div class="form-text" id="ayudaFeedbackRechazo">
+                            {% if motivo_rechazo_st_actual %}
+                            Déjalo desmarcado si solo estás revisando o editando el motivo.
+                            {% else %}
+                            Si está marcado y el motivo lo permite, se encola el correo al cliente.
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-secondary mb-0 py-2 small">
+                        <i class="bi bi-envelope-x me-1"></i>
+                        No hay email del cliente: se guardará el motivo, pero no se podrá enviar feedback.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        {% if motivo_rechazo_st_actual %}Cerrar{% else %}Más tarde{% endif %}
+                    </button>
+                    <button type="submit" class="btn {% if motivo_rechazo_st_actual %}btn-primary{% else %}btn-danger{% endif %}">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {% if motivo_rechazo_st_actual %}Actualizar motivo en ST{% else %}Guardar motivo en ST{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Modal: Cancelar solicitud -->
 <div class="modal fade" id="cancelarModal" tabindex="-1">
@@ -1480,8 +1592,36 @@ window.COTIZACION_REACONDICIONADO_CONFIG = {
 
 {% block extra_js %}
 <script src="{% static 'js/detalle_solicitud.js' %}"></script>
+{# Plantillas de rechazo ST: precarga detalle al elegir motivo en el modal de catálogo #}
+<script src="{% static 'js/plantillas_rechazo.js' %}"></script>
 {% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}
 <script src="{% static 'js/cotizacion_reacondicionado_modal.js' %}"></script>
 <script src="{% static 'js/cotizacion_cliente_modal.js' %}"></script>
+{% endif %}
+{% if mostrar_modal_motivo_rechazo_st %}
+{#
+  EXPLICACIÓN: auto-apertura inline (igual que feedback en detalle_orden).
+  No depende del JS compilado ni del Service Worker; Bootstrap ya está cargado
+  porque este bloque va DESPUÉS de bootstrap.bundle en base.html.
+#}
+<script>
+(function () {
+    function abrirMotivoRechazoSt() {
+        var modalEl = document.getElementById('registrarMotivoRechazoStModal');
+        if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            return;
+        }
+        var instancia = bootstrap.Modal.getOrCreateInstance(modalEl);
+        instancia.show();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(abrirMotivoRechazoSt, 150);
+        });
+    } else {
+        setTimeout(abrirMotivoRechazoSt, 150);
+    }
+})();
+</script>
 {% endif %}
 {% endblock extra_js %}
