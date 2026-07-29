@@ -329,6 +329,15 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
             textarea.classList.add('border-success');
             setTimeout(() => textarea.classList.remove('border-success'), 2000);
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // El botón "Detectar Piezas" del modal de envío guardaba un snapshot
+            // del diagnóstico al cargar la página. Tras aceptar el texto de la IA
+            // actualizamos ese data-attribute para que el detector use el texto nuevo
+            // sin necesidad de recargar.
+            const btnDetectarPiezas = document.querySelector('#btnDetectarPiezas');
+            if (btnDetectarPiezas) {
+                btnDetectarPiezas.setAttribute('data-diagnostico', textoPropuesto);
+            }
             evaluarEstadoBoton();
             modal.hide();
         })();

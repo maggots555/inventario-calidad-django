@@ -185,7 +185,11 @@ COMPONENTES_DIAGNOSTICO_ORDEN = [
     {'componente_db': 'Teclado',              'label_pdf': 'TECLADO/PALMREST',       'orden': 4},
     {'componente_db': 'Cargador',             'label_pdf': 'ELIMINADOR(CARGADOR)',   'orden': 5},
     {'componente_db': 'Batería',              'label_pdf': 'BATERIA',                'orden': 6},
-    {'componente_db': 'DC-IN',                'label_pdf': 'DC-IN',                  'orden': 7},
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # componente_db debe coincidir con la clave de ALIAS_COMPONENTES en
+    # diagnostico_modal.ts (ej. "DC-IN Cable") para que "Detectar Piezas"
+    # marque la fila predefinida y no cree un componente dinámico duplicado.
+    {'componente_db': 'DC-IN Cable',          'label_pdf': 'DC-IN CABLE',            'orden': 7},
     {'componente_db': 'Botón',                'label_pdf': 'BOTÓN',                  'orden': 8},
     {'componente_db': 'WiFi / Bluetooth',     'label_pdf': 'ANTENAS',                'orden': 9},
     {'componente_db': 'Touchpad',             'label_pdf': 'TOUCH PAD',              'orden': 10},

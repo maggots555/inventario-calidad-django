@@ -73,14 +73,20 @@ const ALIAS_COMPONENTES = {
         'PILA CMOS', 'CMOS', 'BIOS BATTERY', 'COIN CELL', 'PILA BIOS',
         'PILA', 'CMOS BATTERY',
     ],
-    'DC-IN cable': [
-        'DC-IN', 'DCIN', 'DC IN', 'DC-IN CABLE', 'JACK DC', 'JACK DE CARGA',
-        'POWER JACK', 'CONECTOR DE CARGA', 'PUERTO DE CARGA',
-        'CHARGING PORT',
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // La clave debe coincidir con componente_db del checklist del modal
+    // (COMPONENTES_DIAGNOSTICO_ORDEN en config/constants.py). Si no coincide,
+    // "Aplicar" crea una fila dinámica en vez de marcar la predefinida.
+    'DC-IN Cable': [
+        'DC-IN CABLE', 'DC-IN', 'DCIN', 'DC IN', 'DC-IN JACK', 'DCIN CABLE',
+        'JACK DC', 'JACK DE CARGA', 'POWER JACK', 'DC JACK', 'DC POWER JACK',
+        'CONECTOR DE CARGA', 'PUERTO DE CARGA', 'CHARGING PORT', 'POWER PORT',
+        'CONECTOR DC', 'PUERTO DC', 'DC CONNECTOR', 'CABLE DC-IN', 'CABLE DCIN',
     ],
-    'Button Power': [
+    'Botón': [
         'BOTON', 'BOTÓN', 'BUTTON', 'POWER BUTTON', 'BUTTON POWER',
-        'BOTON DE ENCENDIDO', 'BOTÓN DE ENCENDIDO', 'SWITCH',
+        'BOTON DE ENCENDIDO', 'BOTÓN DE ENCENDIDO', 'BOTON POWER', 'BOTÓN POWER',
+        'SWITCH', 'POWER SWITCH', 'BOTON ENCENDIDO', 'BOTÓN ENCENDIDO',
     ],
     'WiFi / Bluetooth': [
         'WIFI', 'WI-FI', 'BLUETOOTH', 'WIRELESS',
@@ -321,6 +327,8 @@ const FRASES_NECESARIAS = [
 ];
 /** Frases que indican piezas OPCIONALES / SECUNDARIAS (es_necesaria = false) */
 const FRASES_OPCIONALES = [
+    'COTIZAR PIEZAS SECUNDARIAS',
+    'COTIZAR PIEZAS OPCIONALES',
     'PIEZAS OPCIONALES Y/O SECUNDARIAS',
     'PIEZAS OPCIONALES Y SECUNDARIAS',
     'PIEZAS OPCIONALES',
@@ -465,9 +473,100 @@ function extraerSeccionesCategoricas(texto) {
 }
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Lista plana de todos los aliases (ordenados del más largo al más corto).
+ * Sirve para saber si un fragmento "empieza" con un nombre de pieza conocido
+ * (ej: LCD, CARGADOR) frente a una especificación suelta (TN, AG, 15.6HDF).
+ */
+function obtenerAliasesOrdenados() {
+    const todos = [];
+    for (const aliases of Object.values(ALIAS_COMPONENTES)) {
+        for (const alias of aliases) {
+            todos.push(alias.toUpperCase());
+        }
+    }
+    // Más largos primero para preferir "SSD M.2" sobre "SSD"
+    todos.sort((a, b) => b.length - a.length);
+    return todos;
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * ¿Este fragmento nombra un componente al inicio?
+ * Ej: "LCD 15.6" → sí; "15.6HDF" → no; "BOE 96M67" → no.
+ */
+function fragmentoEmpiezaConAlias(fragmento) {
+    const upper = fragmento.trim().toUpperCase();
+    if (!upper)
+        return false;
+    for (const alias of obtenerAliasesOrdenados()) {
+        if (upper === alias)
+            return true;
+        if (upper.startsWith(alias + ' ') || upper.startsWith(alias + ':') || upper.startsWith(alias + ',')) {
+            return true;
+        }
+    }
+    return false;
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Tras partir por comas, specs del LCD quedan sueltas:
+ *   "LCD" | "15.6HDF" | "TN" | "AG" | "BOE 96M67"
+ * Esta función las vuelve a pegar al componente anterior.
+ */
+function esFragmentoSpecSuelta(fragmento) {
+    const t = fragmento.trim();
+    if (!t)
+        return false;
+    // Si ya nombra un componente, es una pieza nueva, no una spec
+    if (fragmentoEmpiezaConAlias(t))
+        return false;
+    const upper = t.toUpperCase();
+    // Specs típicas: tamaño de pantalla, panel TN/IPS, fabricante + DPN, watts
+    if (/^\d+(\.\d+)?(HDF?|FHD|UHD|QHD|HD)?$/i.test(upper.replace(/\s+/g, '')))
+        return true;
+    if (/^\d{1,3}W(H)?$/i.test(upper))
+        return true;
+    if (/^\d+(\.\d+)?TB$/i.test(upper))
+        return true;
+    // Tokens cortos tipo TN, AG, IPS, BOE, AUO, INX
+    if (/^[A-Z0-9.]{1,6}$/i.test(upper) && upper.length <= 6)
+        return true;
+    // "BOE 96M67" / "AUO B156HAN" — fabricante + código, sin alias de componente
+    if (/^[A-Z]{2,4}\s+[A-Z0-9]{4,15}$/i.test(upper))
+        return true;
+    // Fragmento corto con puntos/números (specs técnicas)
+    if (t.length <= 20 && /[\d.]/.test(t) && !/\s{2,}/.test(t))
+        return true;
+    return false;
+}
+/**
+ * Pega specs sueltas al fragmento de pieza anterior.
+ * ["LCD", "15.6HDF", "TN", "AG", "BOE 96M67"] → ["LCD 15.6HDF TN AG BOE 96M67"]
+ */
+function reconstruirFragmentosConSpecs(fragmentos) {
+    const resultado = [];
+    for (const frag of fragmentos) {
+        const limpio = frag.trim();
+        if (!limpio)
+            continue;
+        if (resultado.length > 0 && esFragmentoSpecSuelta(limpio)) {
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // La última pieza abierta absorbe esta spec (separada por espacio).
+            resultado[resultado.length - 1] = `${resultado[resultado.length - 1]} ${limpio}`;
+        }
+        else {
+            resultado.push(limpio);
+        }
+    }
+    return resultado;
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
  * Esta función toma el texto de la sección de piezas y lo divide en
  * fragmentos individuales. Los técnicos separan las piezas con comas,
  * puntos, punto y coma, o la conjunción "Y".
+ *
+ * Después, reúne especificaciones que quedaron partidas por comas
+ * (muy común en pantallas: LCD,15.6HDF,TN,AG,BOE 96M67).
  *
  * Ejemplo: "BATERIA 56W: CP6DF, PILA CMOS: W6NPD"
  * Se divide en: ["BATERIA 56W: CP6DF", "PILA CMOS: W6NPD"]
@@ -476,16 +575,24 @@ function dividirEnFragmentos(texto) {
     // Dividir por comas, puntos y coma, o punto seguido de espacio
     // También dividir por " Y " cuando es conjunción entre piezas
     // pero NO cuando forma parte del nombre (ej: "LIMPIEZA Y MANTENIMIENTO")
-    const fragmentos = texto
+    const fragmentosCrudos = texto
         .split(/[,;]|\.\s|\.-/)
         .flatMap((frag) => {
-        // Sub-dividir por " Y " solo si ambos lados parecen tener un código
-        // Es decir, si " Y " separa dos piezas independientes
+        // Sub-dividir por " Y " solo si ambos lados parecen piezas distintas
+        // (alias de componente O un código al final)
         const partes = frag.split(/\s+Y\s+/i);
         if (partes.length > 1) {
-            // Verificar si al menos 2 partes tienen algo que parece un código
-            const partesConCodigo = partes.filter((p) => /[A-Z0-9]{3,}/.test(p.trim().toUpperCase()));
-            if (partesConCodigo.length >= 2) {
+            const partesPieza = partes.filter((p) => {
+                const t = p.trim();
+                if (!t)
+                    return false;
+                if (fragmentoEmpiezaConAlias(t))
+                    return true;
+                // Tiene algo que parece código alfanumérico (4+ chars con mezcla)
+                return /[A-Za-z]+\d+[A-Za-z0-9]*|\d+[A-Za-z]+[A-Za-z0-9]*/.test(t)
+                    || /\b[A-Za-z]{5,7}\b/.test(t);
+            });
+            if (partesPieza.length >= 2) {
                 return partes;
             }
         }
@@ -493,130 +600,173 @@ function dividirEnFragmentos(texto) {
     })
         .map((f) => f.trim())
         .filter((f) => f.length > 0);
-    return fragmentos;
+    // Repegar specs tipo "15.6HDF","TN","AG" al LCD/componente anterior
+    return reconstruirFragmentosConSpecs(fragmentosCrudos);
 }
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Esta función toma un fragmento individual (ej: "BATERIA 56W: CP6DF")
- * y extrae la descripción de la pieza y el número de parte.
+ * Wattages (45W, 42WH), capacidades (1TB) y tamaños de pantalla (15.6HDF)
+ * NO son números de parte. Hay que descartarlos para no confundirlos con el DPN.
+ */
+function esCapacidadOTamaño(token) {
+    const t = token.toUpperCase().replace(/^\.+|\.+$/g, '');
+    if (/^\d{1,3}W$/.test(t))
+        return true;
+    if (/^\d{1,3}WH$/.test(t))
+        return true;
+    if (/^\d+(\.\d+)?TB$/.test(t))
+        return true;
+    if (/^\d+(\.\d+)?(GB|MB)$/.test(t))
+        return true;
+    if (/^\d+(\.\d+)?(HDF?|FHD|UHD|QHD|HD)$/.test(t))
+        return true;
+    if (/^\d+\.\d+$/.test(t))
+        return true; // 15.6 suelto
+    return false;
+}
+/** Palabras que nunca son DPN (formato mixto o solo-letras). */
+const PALABRAS_NUNCA_DPN = [
+    'DELL', 'CORE', 'INTEL', 'NVIDIA', 'QUADRO', 'LENOVO',
+    'ASUS', 'ACER', 'EPSA', 'BIOS', 'HDMI', 'USB3', 'USB2',
+    'CHICO', 'GRANDE', 'CABLE', 'PILA', 'PLUG', 'WIFI',
+    'PARA', 'ESTA', 'ESTE', 'COMO', 'TIENE', 'TIPO', 'SOLO',
+    'NUEVO', 'NUEVA', 'ROTO', 'ROTA', 'TODO', 'TODA', 'AREA',
+    'PART', 'WITH', 'FROM', 'THAT', 'THIS', 'EACH', 'WILL',
+    'DISPLAY', 'ASSEMBLY', 'COVER', 'TOUCH', 'PANEL',
+    'EQUIPO', 'FALLA', 'VIDEO', 'DAÑO', 'REEMPLAZO',
+    'SUGERIDO', 'SUGERIDA', 'PRIORITARIO', 'NECESARIO',
+    'SUSTITUIR', 'COTIZAR', 'VERIFICA', 'PRESENTA',
+    'ARRIBA', 'ABAJO', 'AFECTA', 'REQUIERE', 'INGRESA',
+    'ENCIENDE', 'FUNCIONA', 'EJECUTAN', 'ARROJANDO',
+    'PRUEBAS', 'VALIDAR', 'DEBIDO', 'ENCUENTRA', 'DENTRO',
+    'SISTEMA', 'MARCA', 'TEST', 'REVISION', 'CORRE',
+    'ESPAÑOL', 'ADICIONAL', 'GARANTIA', 'NVME', 'SATA',
+    'BLACK', 'WHITE', 'SCREEN', 'MEMORY', 'BOTTOM', 'SWITCH',
+    'BUTTON', 'BOARD', 'MOTHER', 'BATTERY',
+];
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Un DPN "mixto" tiene letras Y números (ej: 96M67, 0XPJWG, CP6DF).
+ * Un DPN Dell "solo letras" tiene 5–7 letras (ej: FDRHM, KXTTW).
+ */
+function esCandidatoDpnMixto(token) {
+    if (!/^[A-Za-z0-9]{4,15}$/.test(token))
+        return false;
+    if (!/\d/.test(token) || !/[A-Za-z]/.test(token))
+        return false;
+    if (esCapacidadOTamaño(token))
+        return false;
+    if (PALABRAS_NUNCA_DPN.includes(token.toUpperCase()))
+        return false;
+    return true;
+}
+function esCandidatoDpnSoloLetras(token) {
+    if (!/^[A-Za-z]{5,7}$/.test(token))
+        return false;
+    if (PALABRAS_NUNCA_DPN.includes(token.toUpperCase()))
+        return false;
+    return true;
+}
+/**
+ * Busca el mejor DPN en un fragmento: prefiere el ÚLTIMO candidato válido
+ * (los técnicos suelen poner el código al final: "CARGADOR 45W … KXTTW").
+ */
+function elegirMejorDpnEnFragmento(texto, permiteSoloLetras) {
+    // FORMATO con ":": "COMPONENTE: CODIGO" — si el código es válido, usarlo
+    if (texto.includes(':')) {
+        const partes = texto.split(':');
+        const posibleCodigo = partes[partes.length - 1].trim().split(/\s+/)[0].trim();
+        if (esCandidatoDpnMixto(posibleCodigo) ||
+            (permiteSoloLetras && esCandidatoDpnSoloLetras(posibleCodigo))) {
+            return {
+                descripcion: partes.slice(0, -1).join(':').trim(),
+                numeroParte: posibleCodigo.toUpperCase(),
+            };
+        }
+    }
+    // Tokens alfanuméricos (incluye 15.6HDF como un token si no partimos el punto…
+    // Usamos dos pasadas: tokens con punto y tokens simples)
+    const tokenRegex = /\b([A-Za-z0-9]+(?:\.[A-Za-z0-9]+)?)\b/g;
+    const candidatos = [];
+    let m;
+    while ((m = tokenRegex.exec(texto)) !== null) {
+        const token = m[1];
+        const tokenSinPuntoFinal = token.replace(/\.$/, '');
+        // Capacidades/tamaños con punto (15.6HDF) → ignorar
+        if (esCapacidadOTamaño(tokenSinPuntoFinal))
+            continue;
+        if (esCandidatoDpnMixto(tokenSinPuntoFinal)) {
+            candidatos.push({ token: tokenSinPuntoFinal, index: m.index });
+            continue;
+        }
+        if (permiteSoloLetras && esCandidatoDpnSoloLetras(tokenSinPuntoFinal)) {
+            candidatos.push({ token: tokenSinPuntoFinal, index: m.index });
+        }
+    }
+    if (candidatos.length === 0)
+        return null;
+    // ÚLTIMO candidato = DPN más probable
+    const elegido = candidatos[candidatos.length - 1];
+    const descripcion = texto.substring(0, elegido.index).trim();
+    if (!descripcion)
+        return null;
+    return {
+        descripcion,
+        numeroParte: elegido.token.toUpperCase(),
+    };
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función toma un fragmento individual (ej: "BATERIA 56W: CP6DF"
+ * o "CARGADOR 45W PLUG CHICO KXTTW") y extrae la descripción y el DPN.
  *
- * Maneja dos formatos:
- * 1. Con dos puntos: "BATERIA 56W: CP6DF" → pieza: "BATERIA 56W", parte: "CP6DF"
- * 2. Sin dos puntos: "TOP COVER 4Y37V" → pieza: "TOP COVER", parte: "4Y37V"
- *
- * Para el formato sin dos puntos, busca al final del texto un patrón
- * que parezca un código alfanumérico (como 4Y37V, X5CF4, 1M3M4).
+ * Mejoras clave:
+ * 1. Ignora wattages/capacidades (45W, 42WH, 1TB, 15.6HDF)
+ * 2. Prefiere el ÚLTIMO código válido (no el primero)
+ * 3. Acepta DPN Dell solo-letras de 5–7 chars (KXTTW, FDRHM) si hay alias
+ * 4. Si hay alias de componente pero no DPN (SSD 1TB NVME), igual emite la pieza
  */
 function extraerParteDeFragmento(fragmento, es_necesaria = true) {
     const textoLimpio = fragmento.trim();
-    // Ignorar fragmentos muy cortos o que no tienen sentido
+    // Ignorar fragmentos muy cortos
     if (textoLimpio.length < 3)
         return null;
-    // Ignorar fragmentos que son solo texto genérico sin códigos
-    // (ej: "INSTALACION DE S.O. SUGERIDO" sin número de parte)
-    let descripcion = '';
-    let numeroParte = '';
-    // FORMATO 1: Con dos puntos → "COMPONENTE: CÓDIGO"
-    if (textoLimpio.includes(':')) {
-        const partes = textoLimpio.split(':');
-        // Tomar la última parte como código (puede haber ":" en la descripción)
-        const posibleCodigo = partes[partes.length - 1].trim();
-        // Verificar que el código parece un número de parte válido
-        // (alfanumérico, generalmente 3-10 caracteres, sin espacios largos)
-        const codigoLimpio = posibleCodigo.split(/\s+/)[0].trim();
-        if (/^[A-Za-z0-9]{3,15}$/.test(codigoLimpio)) {
-            descripcion = partes.slice(0, -1).join(':').trim();
-            numeroParte = codigoLimpio.toUpperCase();
-        }
+    const tieneAlias = fragmentoEmpiezaConAlias(textoLimpio);
+    const dpnElegido = elegirMejorDpnEnFragmento(textoLimpio, tieneAlias);
+    if (dpnElegido) {
+        let descripcion = dpnElegido.descripcion.replace(/[\-\.]+$/, '').trim();
+        if (!descripcion)
+            return null;
+        const matchComponente = buscarComponenteDb(descripcion);
+        return {
+            textoOriginal: textoLimpio,
+            descripcionPieza: descripcion,
+            numeroParte: dpnElegido.numeroParte,
+            componenteDb: matchComponente.nombre,
+            confianza: matchComponente.confianza,
+            es_necesaria: es_necesaria,
+        };
     }
-    // FORMATO 2: Sin dos puntos → "COMPONENTE CÓDIGO" (código al final)
-    if (!numeroParte) {
-        // Buscar un código alfanumérico al final del texto
-        // Los códigos suelen ser 4-7 caracteres alfanuméricos con al menos un dígito y una letra
-        const match = textoLimpio.match(/\s+([A-Za-z0-9]{4,10})\.?\s*$/);
-        if (match) {
-            const posibleCodigo = match[1];
-            // Verificar que tiene mezcla de letras y números (no es una palabra normal)
-            const tieneDigitos = /\d/.test(posibleCodigo);
-            const tieneLetras = /[A-Za-z]/.test(posibleCodigo);
-            // Un código de parte típicamente tiene letras Y números mezclados
-            // Excluir palabras comunes que podrían confundirse
-            const palabrasExcluidas = [
-                'DELL', 'CORE', 'INTEL', 'NVIDIA', 'QUADRO',
-                'CHICO', 'GRANDE', 'CABLE', 'PILA', 'PLUG',
-                'PARA', 'ESTA', 'ESTE', 'COMO', 'TIENE',
-                'NUEVO', 'NUEVA', 'ROTO', 'ROTA', 'DAÑADO',
-                'SUGERIDO', 'SUGERIDA', 'PRIORITARIO', 'NECESARIO',
-                'REEMPLAZO', 'SUSTITUIR', 'COTIZAR'
-            ];
-            if (tieneDigitos && tieneLetras &&
-                !palabrasExcluidas.includes(posibleCodigo.toUpperCase())) {
-                descripcion = textoLimpio.substring(0, match.index || 0).trim();
-                numeroParte = posibleCodigo.toUpperCase();
+    // Sin DPN válido: si el fragmento nombra un componente conocido
+    // (ej: "SSD 1TB NVME"), emitir pieza con numeroParte vacío.
+    if (tieneAlias) {
+        const palabras = textoLimpio.split(/\s+/).filter(Boolean);
+        // Evitar prosa larga: solo fragmentos cortos de sección de piezas
+        if (palabras.length <= 8) {
+            const matchComponente = buscarComponenteDb(textoLimpio);
+            if (matchComponente.nombre) {
+                return {
+                    textoOriginal: textoLimpio,
+                    descripcionPieza: textoLimpio,
+                    numeroParte: '',
+                    componenteDb: matchComponente.nombre,
+                    confianza: matchComponente.confianza,
+                    es_necesaria: es_necesaria,
+                };
             }
         }
     }
-    // FORMATO 3: Código en cualquier posición del fragmento
-    // EXPLICACIÓN PARA PRINCIPIANTES:
-    // A veces los técnicos escriben texto DESPUÉS del número de parte, como:
-    //   "PALMREST ASSEMBLY 2DPKM EN ESPAÑOL CON LUZ"
-    // donde "2DPKM" está en medio, no al final. Este formato busca cualquier
-    // token alfanumérico (4-15 chars con letras Y números mezclados) en cualquier
-    // posición del fragmento. Usa la misma lista de exclusiones para evitar
-    // falsos positivos como "DDR4", "i7", etc.
-    if (!numeroParte) {
-        // Buscar TODOS los tokens alfanuméricos en el texto
-        const tokenRegex = /\b([A-Za-z0-9]{4,15})\b/g;
-        let tokenMatch;
-        // Lista extendida de exclusiones para el formato 3 (más agresivo)
-        // ya que busca en cualquier posición, necesitamos ser más estrictos
-        const palabrasExcluidasF3 = [
-            'DELL', 'CORE', 'INTEL', 'NVIDIA', 'QUADRO', 'LENOVO',
-            'ASUS', 'ACER', 'EPSA', 'BIOS', 'HDMI', 'USB3', 'USB2',
-            'CHICO', 'GRANDE', 'CABLE', 'PILA', 'PLUG', 'WIFI',
-            'PARA', 'ESTA', 'ESTE', 'COMO', 'TIENE', 'TIPO', 'SOLO',
-            'NUEVO', 'NUEVA', 'ROTO', 'ROTA', 'TODO', 'TODA', 'AREA',
-            'PART', 'WITH', 'FROM', 'THAT', 'THIS', 'EACH', 'WILL',
-            'DISPLAY', 'ASSEMBLY', 'COVER', 'TOUCH', 'PANEL',
-            'EQUIPO', 'FALLA', 'VIDEO', 'DAÑO', 'REEMPLAZO',
-            'SUGERIDO', 'SUGERIDA', 'PRIORITARIO', 'NECESARIO',
-            'SUSTITUIR', 'COTIZAR', 'VERIFICA', 'PRESENTA',
-            'ARRIBA', 'ABAJO', 'AFECTA', 'REQUIERE', 'INGRESA',
-            'ENCIENDE', 'FUNCIONA', 'EJECUTAN', 'ARROJANDO',
-            'PRUEBAS', 'VALIDAR', 'DEBIDO', 'ENCUENTRA', 'DENTRO',
-            'SISTEMA', 'MARCA', 'TEST', 'REVISION', 'CORRE',
-            'ESPAÑOL', 'ADICIONAL', 'GARANTIA',
-        ];
-        while ((tokenMatch = tokenRegex.exec(textoLimpio)) !== null) {
-            const posibleCodigo = tokenMatch[1];
-            const tieneDigitos = /\d/.test(posibleCodigo);
-            const tieneLetras = /[A-Za-z]/.test(posibleCodigo);
-            if (tieneDigitos && tieneLetras &&
-                !palabrasExcluidasF3.includes(posibleCodigo.toUpperCase())) {
-                // Encontramos un código válido — la descripción es todo lo que
-                // está ANTES de este token en el fragmento
-                const posInicio = tokenMatch.index;
-                descripcion = textoLimpio.substring(0, posInicio).trim();
-                numeroParte = posibleCodigo.toUpperCase();
-                break; // Tomar el primero válido
-            }
-        }
-    }
-    // Si no se encontró un número de parte válido, saltar este fragmento
-    if (!numeroParte || !descripcion)
-        return null;
-    // Limpiar descripción de caracteres sobrantes
-    descripcion = descripcion.replace(/[\-\.]+$/, '').trim();
-    // Intentar emparejar con un componente de la base de datos
-    const matchComponente = buscarComponenteDb(descripcion);
-    return {
-        textoOriginal: textoLimpio,
-        descripcionPieza: descripcion,
-        numeroParte: numeroParte,
-        componenteDb: matchComponente.nombre,
-        confianza: matchComponente.confianza,
-        es_necesaria: es_necesaria
-    };
+    return null;
 }
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
@@ -684,12 +834,13 @@ function extraerPiezasDiagnostico(textoDiagnostico) {
             const pieza = extraerParteDeFragmento(fragmento, seccion.es_necesaria);
             if (pieza) {
                 // EXPLICACIÓN PARA PRINCIPIANTES:
-                // Evitar duplicados: si ya tenemos una pieza con el mismo número de parte,
-                // no la agregamos otra vez. Pero solo comparamos si el DPN no está vacío,
-                // porque las piezas sin DPN (servicios) se manejan aparte en el Paso 3.
+                // Evitar duplicados por mismo DPN, o por mismo componente sin DPN
+                // (ej: "SSD 1TB NVME" no debe aparecer dos veces).
                 const yaExiste = pieza.numeroParte
                     ? piezas.some(p => p.numeroParte === pieza.numeroParte)
-                    : false;
+                    : piezas.some(p => p.componenteDb !== null &&
+                        p.componenteDb === pieza.componenteDb &&
+                        !p.numeroParte);
                 if (!yaExiste) {
                     piezas.push(pieza);
                 }
@@ -1915,8 +2066,20 @@ function initDiagnosticoModal() {
     // Event listener para el botón "Detectar Piezas"
     if (btnDetectarPiezas) {
         btnDetectarPiezas.addEventListener('click', () => {
-            // Obtener el texto del diagnóstico desde el data-attribute
-            const textoDiagnostico = btnDetectarPiezas.getAttribute('data-diagnostico') || '';
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Preferimos el texto ACTUAL del textarea #id_diagnostico_sic
+            // (por si el técnico pulió el diagnóstico con IA o lo editó
+            // sin recargar la página). Solo si está vacío usamos el
+            // data-diagnostico del botón (snapshot al cargar la página).
+            const textareaDiag = document.querySelector('#id_diagnostico_sic');
+            const textoVivo = ((textareaDiag === null || textareaDiag === void 0 ? void 0 : textareaDiag.value) || '').trim();
+            const textoSnapshot = (btnDetectarPiezas.getAttribute('data-diagnostico') || '').trim();
+            const textoDiagnostico = textoVivo || textoSnapshot;
+            // Si usamos el texto vivo, sincronizamos el data-attribute
+            // para que quede consistente en el DOM.
+            if (textoVivo) {
+                btnDetectarPiezas.setAttribute('data-diagnostico', textoVivo);
+            }
             if (!textoDiagnostico.trim()) {
                 if (panelPiezasDetectadas && contenedorPiezas) {
                     contenedorPiezas.innerHTML = `
