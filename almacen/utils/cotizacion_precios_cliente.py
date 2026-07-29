@@ -4,9 +4,11 @@ Persistencia de precios al cliente para cotizaciones de Almacén.
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 El costo de proveedor (costo_unitario) ya se guarda al cotizar.
-El precio al cliente (con margen de profit) solo existía en el PDF.
-Este módulo calcula esos precios con la misma fórmula del PDF y los
-guarda en la base de datos cuando el cliente aprueba las líneas.
+El precio al cliente (con margen de profit) se calcula con la misma fórmula
+del PDF y se congela en BD en la **primera respuesta** del cliente
+(aprobar o rechazar una pieza/servicio), vía fecha_precios_cliente.
+
+Así podemos analizar después qué se cotizó aunque el cliente haya rechazado.
 """
 
 from __future__ import annotations
@@ -153,7 +155,8 @@ def persistir_precios_cliente_solicitud(solicitud) -> bool:
     Guarda en BD los precios al cliente calculados para toda la solicitud.
 
     Solo se ejecuta la primera vez (fecha_precios_cliente vacía) para no
-    modificar precios ya acordados con el cliente.
+    modificar precios ya acordados/mostrados al cliente. Se llama tanto al
+    aprobar como al rechazar la primera pieza o servicio.
 
     Returns:
         bool: True si se persistieron precios, False si ya estaban bloqueados o sin ítems.

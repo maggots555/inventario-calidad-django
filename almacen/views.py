@@ -4492,7 +4492,8 @@ def api_enviar_cotizacion_cliente(request, pk):
             # Avanzar el estado usando el método del modelo
             solicitud.enviar_a_cliente()
 
-        # Snapshot del perfil de profit (los precios se calculan al aprobar líneas)
+        # Snapshot del perfil de profit (los precios se congelan en la primera
+        # respuesta del cliente: aprobar o rechazar)
         if not solicitud.fecha_precios_cliente:
             solicitud.tipo_servicio_cliente = tipo_servicio
             solicitud.incluir_descuento_diagnostico_cliente = incluir_descuento

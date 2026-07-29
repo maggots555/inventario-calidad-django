@@ -3056,7 +3056,7 @@ class SolicitudCotizacion(models.Model):
         help_text='Modelo del equipo del cliente (texto libre)'
     )
 
-    # ========== PRECIOS AL CLIENTE (snapshot envío + totales al aprobar) ==========
+    # ========== PRECIOS AL CLIENTE (snapshot envío + totales al responder) ==========
     TIPO_SERVICIO_CLIENTE_CHOICES = [
         ('mostrador', 'Mostrador'),
         ('estandar', 'Estándar'),
@@ -3082,7 +3082,10 @@ class SolicitudCotizacion(models.Model):
         null=True,
         blank=True,
         verbose_name='Fecha precios cliente',
-        help_text='Cuándo se calcularon y guardaron los precios al cliente (al aprobar)'
+        help_text=(
+            'Cuándo se calcularon y guardaron los precios al cliente '
+            '(primera aprobación o rechazo de línea/servicio)'
+        ),
     )
     precio_total_sin_iva_cliente = models.DecimalField(
         max_digits=12,
@@ -3493,8 +3496,9 @@ class SolicitudCotizacion(models.Model):
         """
         Calcula y guarda los precios al cliente en líneas y cabecera.
 
-        Se invoca al aprobar la primera línea. Delega en el módulo de utilidades
-        que replica la fórmula del PDF de cotización.
+        Se invoca en la primera respuesta del cliente (aprobar o rechazar
+        una pieza/servicio). Delega en el módulo de utilidades que replica
+        la fórmula del PDF de cotización. Es idempotente vía fecha_precios_cliente.
         """
         from almacen.utils.cotizacion_precios_cliente import persistir_precios_cliente_solicitud
         return persistir_precios_cliente_solicitud(self)
@@ -4382,7 +4386,10 @@ class LineaCotizacion(models.Model):
         null=True,
         blank=True,
         verbose_name='Precio unitario al cliente (sin IVA)',
-        help_text='Precio cotizado al cliente por unidad, calculado al aprobar la línea'
+        help_text=(
+            'Precio cotizado al cliente por unidad; se congela en la primera '
+            'aprobación o rechazo de la solicitud'
+        ),
     )
     subtotal_cliente_sin_iva = models.DecimalField(
         max_digits=12,
@@ -4390,7 +4397,10 @@ class LineaCotizacion(models.Model):
         null=True,
         blank=True,
         verbose_name='Subtotal cliente sin IVA',
-        help_text='cantidad × precio_unitario_cliente, guardado al aprobar'
+        help_text=(
+            'cantidad × precio_unitario_cliente, guardado al congelar precios '
+            '(primera respuesta del cliente)'
+        ),
     )
     
     # ========== ESTADO DEL CLIENTE ==========
@@ -4804,7 +4814,7 @@ class LineaCotizacion(models.Model):
         Efectos:
         - Cambia estado_cliente a 'aprobada'
         - En líneas reacondicionadas, aplica forma de pago y precio acordado
-        - Calcula y persiste precios al cliente (primera aprobación de la solicitud)
+        - Calcula y persiste precios al cliente (primera respuesta de la solicitud)
         - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=True)
         - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
         
@@ -4857,33 +4867,45 @@ class LineaCotizacion(models.Model):
     def rechazar(self, motivo=''):
         """
         Marca la línea como rechazada por el cliente.
-        
+
         Efectos:
         - Cambia estado_cliente a 'rechazada'
+        - Congela precios al cliente si aún no estaban (misma fórmula del PDF)
         - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=False)
         - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
-        
+
         Args:
             motivo: Razón del rechazo
-        
+
         Returns:
             bool: True si se rechazó exitosamente
         """
         if not self.puede_rechazar():
             return False
-        
+
         self.estado_cliente = 'rechazada'
         self.fecha_respuesta = timezone.now()
         if motivo:
             self.motivo_rechazo = motivo
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Igual que al aprobar: la primera respuesta congela los precios cotizados
+        # (líneas + totales de cabecera) para análisis posteriores, aunque el
+        # cliente haya rechazado. Hay que guardar el estado 'rechazada' ANTES
+        # de persistir, porque después hacemos refresh_from_db().
+        if not self.solicitud.fecha_precios_cliente:
+            self.save()
+            self.solicitud.persistir_precios_cliente()
+            self.refresh_from_db()
+
         self.save()
-        
+
         # Actualizar estado de la solicitud
         self.solicitud.actualizar_estado_segun_lineas()
-        
+
         # Actualizar estado general de Cotizacion en ST
         self._actualizar_cotizacion_st_estado()
-        
+
         return True
     
     # ========== MÉTODOS DE VISUALIZACIÓN ==========
@@ -5742,52 +5764,64 @@ class LineaServicioAdicional(models.Model):
     def aprobar(self):
         """
         Marca el servicio como aprobado por el cliente.
-        
+
         Efectos:
         - Cambia estado_cliente a 'aprobada'
+        - Congela precios de piezas si aún no estaban (primera respuesta)
         - Actualiza estado general de la solicitud (piezas + servicios)
-        
+
         Returns:
             bool: True si se aprobó exitosamente
         """
         if not self.puede_aprobar():
             return False
-        
+
         self.estado_cliente = 'aprobada'
         self.fecha_respuesta = timezone.now()
         self.save()
-        
+
+        # EXPLICACIÓN: si el cliente responde primero un servicio, igual
+        # congelamos precios de las piezas cotizadas (si hay costo).
+        if not self.solicitud.fecha_precios_cliente:
+            self.solicitud.persistir_precios_cliente()
+
         # Actualizar estado general de la solicitud
         self.solicitud.actualizar_estado_segun_lineas()
-        
+
         return True
-    
+
     def rechazar(self, motivo=''):
         """
         Marca el servicio como rechazado por el cliente.
-        
+
         Efectos:
         - Cambia estado_cliente a 'rechazada'
+        - Congela precios de piezas si aún no estaban (primera respuesta)
         - Actualiza estado general de la solicitud (piezas + servicios)
-        
+
         Args:
             motivo: Razón del rechazo
-        
+
         Returns:
             bool: True si se rechazó exitosamente
         """
         if not self.puede_rechazar():
             return False
-        
+
         self.estado_cliente = 'rechazada'
         self.fecha_respuesta = timezone.now()
         if motivo:
             self.motivo_rechazo = motivo
         self.save()
-        
+
+        # EXPLICACIÓN: mismo candado que en piezas — útil si el rechazo
+        # total cierra por servicios antes de tocar las líneas.
+        if not self.solicitud.fecha_precios_cliente:
+            self.solicitud.persistir_precios_cliente()
+
         # Actualizar estado general de la solicitud
         self.solicitud.actualizar_estado_segun_lineas()
-        
+
         return True
     
     # ========== MÉTODOS DE VISUALIZACIÓN ==========
