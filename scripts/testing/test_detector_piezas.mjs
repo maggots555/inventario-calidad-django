@@ -19,7 +19,7 @@
 
 'use strict';
 
-// --- Aliases mínimos necesarios para el caso de prueba ---
+// --- Aliases mínimos necesarios para los casos de prueba ---
 const ALIAS_COMPONENTES = {
   Motherboard: ['MOBO', 'MOTHERBOARD', 'TARJETA MADRE', 'BOARD', 'PLACA'],
   Pantalla: ['PANTALLA', 'LCD', 'DISPLAY', 'SCREEN', 'PANEL'],
@@ -27,10 +27,30 @@ const ALIAS_COMPONENTES = {
   'SSD M.2': ['SSD M.2', 'SSD M2', 'NVME', 'NVME SSD', 'M.2'],
   Cargador: ['CARGADOR', 'ELIMINADOR', 'ADAPTADOR', 'AC ADAPTER', 'CHARGER'],
   Batería: ['BATERIA', 'BATERÍA', 'BATTERY'],
+  'Sistema Operativo': [
+    'S.O.', 'SISTEMA OPERATIVO', 'WINDOWS',
+    'INSTALACION DE S.O', 'INSTALACIÓN DE S.O',
+    'INSTALACION S.O', 'INSTALACION SO',
+    'INSTALACION DE WINDOWS', 'INSTALACIÓN DE WINDOWS',
+    'INSTALACION DE SISTEMA', 'INSTALACIÓN DE SISTEMA',
+    'REINSTALACION', 'REINSTALACIÓN',
+    'FORMATEO', 'FORMATEO DE DISCO', 'FORMATEO DE SISTEMA',
+  ],
   'Limpieza y mantenimiento': ['LIMPIEZA', 'MANTENIMIENTO', 'LIMPIEZA Y MANTENIMIENTO'],
+  'Instalación de piezas': [
+    'INSTALACION DE PIEZAS', 'INSTALACIÓN DE PIEZAS',
+    'INSTALACION DE PARTES', 'INSTALACIÓN DE PARTES',
+    'INSTALACION DE COMPONENTES', 'INSTALACIÓN DE COMPONENTES',
+    'COSTO DE INSTALACION', 'SERVICIO DE INSTALACION',
+    'MANO DE OBRA', 'LABOR',
+  ],
 };
 
-const COMPONENTES_SIN_DPN = ['Limpieza y mantenimiento'];
+const COMPONENTES_SIN_DPN = [
+  'Sistema Operativo',
+  'Limpieza y mantenimiento',
+  'Instalación de piezas',
+];
 
 const FRASES_NECESARIAS = ['COTIZAR PIEZAS PRIORITARIAS', 'PIEZAS NECESARIAS'];
 const FRASES_OPCIONALES = [
@@ -184,12 +204,28 @@ function elegirMejorDpnEnFragmento(texto, permiteSoloLetras) {
   return { descripcion, numeroParte: elegido.token.toUpperCase() };
 }
 
+function aliasApareceEnTexto(textoUpper, alias) {
+  const aliasUpper = alias.toUpperCase();
+  if (!aliasUpper) return { encontrado: false, posicion: -1 };
+  if (/\s/.test(aliasUpper) || aliasUpper.includes('.')) {
+    const pos = textoUpper.indexOf(aliasUpper);
+    return { encontrado: pos !== -1, posicion: pos };
+  }
+  const escapado = aliasUpper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(^|[^A-Z0-9ÁÉÍÓÚÜÑ])${escapado}(?=[^A-Z0-9ÁÉÍÓÚÜÑ]|$)`, 'i');
+  const match = re.exec(textoUpper);
+  if (!match) return { encontrado: false, posicion: -1 };
+  const posicion = match.index + (match[1] ? match[1].length : 0);
+  return { encontrado: true, posicion };
+}
+
 function buscarComponenteDb(descripcion) {
   const descUpper = descripcion.toUpperCase();
   let mejorMatch = null;
   for (const [componenteDb, aliases] of Object.entries(ALIAS_COMPONENTES)) {
     for (const alias of aliases) {
-      if (descUpper.includes(alias)) {
+      const { encontrado } = aliasApareceEnTexto(descUpper, alias);
+      if (encontrado) {
         if (!mejorMatch || alias.length > mejorMatch.longitud) {
           mejorMatch = { nombre: componenteDb, longitud: alias.length };
         }
@@ -296,16 +332,20 @@ function detectarServiciosSinDPN(textoDiagnostico, piezasYaDetectadas) {
   for (const componenteDb of COMPONENTES_SIN_DPN) {
     if (ya.has(componenteDb)) continue;
     const aliases = ALIAS_COMPONENTES[componenteDb] || [];
+    let mejorAlias = null;
     for (const alias of aliases) {
-      if (textoUpper.includes(alias)) {
-        out.push({
-          descripcionPieza: componenteDb,
-          numeroParte: '',
-          componenteDb,
-          es_necesaria: true,
-        });
-        break;
+      const { encontrado } = aliasApareceEnTexto(textoUpper, alias);
+      if (encontrado && (!mejorAlias || alias.length > mejorAlias.length)) {
+        mejorAlias = alias;
       }
+    }
+    if (mejorAlias) {
+      out.push({
+        descripcionPieza: componenteDb,
+        numeroParte: '',
+        componenteDb,
+        es_necesaria: true,
+      });
     }
   }
   return out;
@@ -333,7 +373,7 @@ function extraerPiezasDiagnostico(textoDiagnostico) {
   return piezas;
 }
 
-// --- Caso real del usuario ---
+// --- Caso real del usuario (CARGADOR + LCD) ---
 const TEXTO = (
   'COTIZAR PIEZAS PRIORITARIAS: BATERIA 42WH FDRHM, CARGADOR 45W PLUG CHICO KXTTW Y MANTENIMIENTO. ' +
   'COTIZAR PIEZAS SECUNDARIAS: LCD,15.6HDF,TN,AG,BOE 96M67 Y SSD 1TB NVME.'
@@ -341,36 +381,38 @@ const TEXTO = (
 
 const piezas = extraerPiezasDiagnostico(TEXTO);
 
-function assert(cond, msg) {
+function assert(cond, msg, contexto) {
   if (!cond) {
     console.error('FAIL:', msg);
-    console.error('Piezas detectadas:', JSON.stringify(piezas, null, 2));
+    if (contexto !== undefined) {
+      console.error('Contexto:', JSON.stringify(contexto, null, 2));
+    }
     process.exit(1);
   }
 }
 
 const bat = piezas.find((p) => p.componenteDb === 'Batería');
-assert(bat, 'Debe detectar Batería');
-assert(bat.numeroParte === 'FDRHM', `Batería DPN debe ser FDRHM, fue ${bat.numeroParte}`);
-assert(bat.es_necesaria === true, 'Batería debe ser necesaria');
+assert(bat, 'Debe detectar Batería', piezas);
+assert(bat.numeroParte === 'FDRHM', `Batería DPN debe ser FDRHM, fue ${bat.numeroParte}`, piezas);
+assert(bat.es_necesaria === true, 'Batería debe ser necesaria', piezas);
 
 const carg = piezas.find((p) => p.componenteDb === 'Cargador');
-assert(carg, 'Debe detectar Cargador');
-assert(carg.numeroParte === 'KXTTW', `Cargador DPN debe ser KXTTW, fue ${carg.numeroParte}`);
+assert(carg, 'Debe detectar Cargador', piezas);
+assert(carg.numeroParte === 'KXTTW', `Cargador DPN debe ser KXTTW, fue ${carg.numeroParte}`, piezas);
 
 const pant = piezas.find((p) => p.componenteDb === 'Pantalla');
-assert(pant, 'Debe detectar Pantalla (LCD)');
-assert(pant.numeroParte === '96M67', `Pantalla DPN debe ser 96M67, fue ${pant.numeroParte}`);
-assert(pant.es_necesaria === false, 'Pantalla debe ser secundaria/opcional');
+assert(pant, 'Debe detectar Pantalla (LCD)', piezas);
+assert(pant.numeroParte === '96M67', `Pantalla DPN debe ser 96M67, fue ${pant.numeroParte}`, piezas);
+assert(pant.es_necesaria === false, 'Pantalla debe ser secundaria/opcional', piezas);
 
 const ssd = piezas.find(
   (p) => p.componenteDb === 'SSD M.2' || p.componenteDb === 'Disco Duro / SSD'
 );
-assert(ssd, 'Debe detectar SSD (sin inventar DPN falso)');
-assert(!ssd.numeroParte || !['1TB', 'NVME'].includes(ssd.numeroParte), 'SSD no debe usar 1TB/NVME como DPN');
+assert(ssd, 'Debe detectar SSD (sin inventar DPN falso)', piezas);
+assert(!ssd.numeroParte || !['1TB', 'NVME'].includes(ssd.numeroParte), 'SSD no debe usar 1TB/NVME como DPN', piezas);
 
 const mant = piezas.find((p) => p.componenteDb === 'Limpieza y mantenimiento');
-assert(mant, 'Debe detectar Mantenimiento');
+assert(mant, 'Debe detectar Mantenimiento', piezas);
 
 console.log('OK — detector piezas (caso CARGADOR + LCD)');
 console.log(
@@ -381,3 +423,46 @@ console.log(
     )
     .join('\n')
 );
+
+// --- Regresión: Sistema Operativo vs Instalación de piezas ---
+function soloComponentes(texto) {
+  return extraerPiezasDiagnostico(texto).map((p) => p.componenteDb);
+}
+
+const so1 = soloComponentes('SE RECOMIENDA REINSTALACION DEL EQUIPO.');
+assert(
+  so1.includes('Sistema Operativo'),
+  'REINSTALACION debe detectar Sistema Operativo',
+  so1
+);
+assert(
+  !so1.includes('Instalación de piezas'),
+  'REINSTALACION NO debe detectar Instalación de piezas',
+  so1
+);
+
+const piezasSolo = soloComponentes('COTIZAR: INSTALACION DE PIEZAS Y MANO DE OBRA.');
+assert(
+  piezasSolo.includes('Instalación de piezas'),
+  'INSTALACION DE PIEZAS debe detectar Instalación de piezas',
+  piezasSolo
+);
+assert(
+  !piezasSolo.includes('Sistema Operativo'),
+  'INSTALACION DE PIEZAS NO debe detectar Sistema Operativo',
+  piezasSolo
+);
+
+const so2 = soloComponentes('COTIZAR INSTALACION DE WINDOWS Y RESPALDO.');
+assert(
+  so2.includes('Sistema Operativo'),
+  'INSTALACION DE WINDOWS debe detectar Sistema Operativo',
+  so2
+);
+assert(
+  !so2.includes('Instalación de piezas'),
+  'INSTALACION DE WINDOWS NO debe detectar Instalación de piezas',
+  so2
+);
+
+console.log('OK — Sistema Operativo vs Instalación de piezas (sin confusión)');

@@ -104,10 +104,20 @@ const ALIAS_COMPONENTES = {
     'Mouse': [
         'MOUSE', 'RATON', 'RATÓN', 'RATON USB', 'RATÓN USB', 'USB MOUSE',
     ],
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // "Sistema Operativo" = reinstalación/formateo del SO (NO mano de obra de piezas).
+    // Evitamos aliases demasiado cortos (OS, FORMATO) que generan falsos positivos.
     'Sistema Operativo': [
-        'S.O.', 'SISTEMA OPERATIVO', 'WINDOWS', 'INSTALACION DE S.O',
-        'INSTALACION S.O', 'INSTALACION SO', 'REINSTALACION', 'REINSTALACIÓN',
-        'FORMATEO', 'FORMATO', 'INSTALACION DE SISTEMA', 'INSTALACIÓN DE SISTEMA', 'OS',
+        'S.O.', 'SISTEMA OPERATIVO', 'WINDOWS',
+        'INSTALACION DE S.O', 'INSTALACIÓN DE S.O',
+        'INSTALACION S.O', 'INSTALACIÓN S.O',
+        'INSTALACION SO', 'INSTALACIÓN SO',
+        'INSTALACION DE WINDOWS', 'INSTALACIÓN DE WINDOWS',
+        'INSTALACION DE SISTEMA', 'INSTALACIÓN DE SISTEMA',
+        'REINSTALACION', 'REINSTALACIÓN',
+        'REINSTALACION DE S.O', 'REINSTALACIÓN DE S.O',
+        'REINSTALACION DE WINDOWS', 'REINSTALACIÓN DE WINDOWS',
+        'FORMATEO', 'FORMATEO DE DISCO', 'FORMATEO DE SISTEMA',
     ],
     'Bisagras': [
         'BISAGRA', 'BISAGRAS', 'HINGE', 'HINGES', 'CHARNELA', 'CHARNELAS',
@@ -240,9 +250,16 @@ const ALIAS_COMPONENTES = {
         'LIMPIEZA', 'MANTENIMIENTO', 'LIMPIEZA Y MANTENIMIENTO',
         'SERVICIO DE LIMPIEZA', 'CLEANING', 'MAINTENANCE',
     ],
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Solo frases de mano de obra / montaje. NO usar "INSTALACION" suelto:
+    // esa palabra aparece dentro de "REINSTALACION" y confundiría con el SO.
     'Instalación de piezas': [
         'INSTALACION DE PIEZAS', 'INSTALACIÓN DE PIEZAS',
-        'INSTALACION', 'INSTALACIÓN', 'LABOR', 'MANO DE OBRA',
+        'INSTALACION DE PARTES', 'INSTALACIÓN DE PARTES',
+        'INSTALACION DE COMPONENTES', 'INSTALACIÓN DE COMPONENTES',
+        'COSTO DE INSTALACION', 'COSTO DE INSTALACIÓN',
+        'SERVICIO DE INSTALACION', 'SERVICIO DE INSTALACIÓN',
+        'MANO DE OBRA', 'LABOR',
     ],
     'Reparación a nivel componente': [
         'REPARACION A NIVEL COMPONENTE', 'REPARACIÓN A NIVEL COMPONENTE',
@@ -282,6 +299,7 @@ const ALIAS_COMPONENTES = {
  * sin necesidad de que tengan un número de parte asociado.
  */
 const COMPONENTES_SIN_DPN = [
+    'Sistema Operativo',
     'Limpieza y mantenimiento',
     'Instalación de piezas',
     'Reparación a nivel componente',
@@ -770,12 +788,51 @@ function extraerParteDeFragmento(fragmento, es_necesaria = true) {
 }
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
+ * ¿El alias aparece de verdad en el texto, sin “engancharse” a otra palabra?
+ *
+ * Ejemplo del bug que evitamos:
+ *   texto = "REINSTALACION"
+ *   alias = "INSTALACION"
+ *   Con includes() → sí (falso positivo: Instalación de piezas).
+ *   Con límites de palabra → no (correcto).
+ *
+ * - Si el alias tiene espacios o puntos (ej: "INSTALACION DE PIEZAS", "S.O."),
+ *   usamos includes: esas frases ya son específicas.
+ * - Si es una sola palabra (ej: "WINDOWS", "LABOR"), exigimos que no tenga
+ *   letras/números pegados antes ni después.
+ */
+function aliasApareceEnTexto(textoUpper, alias) {
+    const aliasUpper = alias.toUpperCase();
+    if (!aliasUpper) {
+        return { encontrado: false, posicion: -1 };
+    }
+    // Frases multi-palabra o con punto: búsqueda literal
+    if (/\s/.test(aliasUpper) || aliasUpper.includes('.')) {
+        const pos = textoUpper.indexOf(aliasUpper);
+        return { encontrado: pos !== -1, posicion: pos };
+    }
+    // Alias de una sola palabra: límites (no dentro de otra palabra)
+    const escapado = aliasUpper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(^|[^A-Z0-9ÁÉÍÓÚÜÑ])${escapado}(?=[^A-Z0-9ÁÉÍÓÚÜÑ]|$)`, 'i');
+    const match = re.exec(textoUpper);
+    if (!match) {
+        return { encontrado: false, posicion: -1 };
+    }
+    // La posición real del alias (después del posible carácter de límite)
+    const posicion = match.index + (match[1] ? match[1].length : 0);
+    return { encontrado: true, posicion };
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
  * Esta función busca en el mapa de aliases cuál componente de la base de datos
  * corresponde a la descripción que escribió el técnico.
  *
  * Por ejemplo, si el técnico escribió "MOBO CORE i7 6820HQ", esta función
  * busca la palabra "MOBO" en todos los aliases y encuentra que corresponde
  * al componente "Motherboard".
+ *
+ * Prioriza el alias más largo (más específico) para separar bien
+ * "Instalación de piezas" vs "Sistema Operativo".
  */
 function buscarComponenteDb(descripcion) {
     const descUpper = descripcion.toUpperCase();
@@ -790,8 +847,8 @@ function buscarComponenteDb(descripcion) {
     let mejorMatch = null;
     for (const [componenteDb, aliases] of Object.entries(ALIAS_COMPONENTES)) {
         for (const alias of aliases) {
-            // Verificar si el alias aparece en la descripción
-            if (descUpper.includes(alias)) {
+            const { encontrado } = aliasApareceEnTexto(descUpper, alias);
+            if (encontrado) {
                 const confianza = alias.length >= 4 ? 'alta' : 'media';
                 if (!mejorMatch || alias.length > mejorMatch.longitud) {
                     mejorMatch = { nombre: componenteDb, confianza, longitud: alias.length };
@@ -880,16 +937,16 @@ function detectarServiciosSinDPN(textoDiagnostico, piezasYaDetectadas) {
         const aliases = ALIAS_COMPONENTES[componenteDb];
         if (!aliases)
             continue;
-        // Buscar si algún alias aparece en el texto completo
+        // Buscar si algún alias aparece en el texto completo (con límites de palabra)
         // Priorizar el alias más largo (más específico)
         let mejorAlias = null;
         let mejorPosicion = -1;
         for (const alias of aliases) {
-            const pos = textoUpper.indexOf(alias);
-            if (pos !== -1) {
+            const { encontrado, posicion } = aliasApareceEnTexto(textoUpper, alias);
+            if (encontrado) {
                 if (!mejorAlias || alias.length > mejorAlias.length) {
                     mejorAlias = alias;
-                    mejorPosicion = pos;
+                    mejorPosicion = posicion;
                 }
             }
         }
