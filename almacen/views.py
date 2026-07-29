@@ -4157,14 +4157,23 @@ def detalle_solicitud_cotizacion(request, pk):
         MOTIVOS_RECHAZO_VIGENCIA_VENCIDA,
     )
     from .utils.sincronizar_rechazo_cotizacion_st import (
+        admite_motivo_rechazo_almacen,
+        armar_detalle_rechazo_desde_items,
         label_motivo_rechazo,
         orden_admite_cotizacion_st,
+        solicitud_requiere_motivo_rechazo_almacen,
         solicitud_requiere_motivo_rechazo_st,
     )
     import json as _json_motivos
 
     mostrar_modal_motivo_rechazo_st = solicitud_requiere_motivo_rechazo_st(solicitud)
     admite_motivo_rechazo_st = orden_admite_cotizacion_st(solicitud.orden_servicio)
+
+    # Flujo paralelo: rechazo total SIN orden ST → tipificar en SolicitudCotizacion
+    mostrar_modal_motivo_rechazo_almacen = solicitud_requiere_motivo_rechazo_almacen(
+        solicitud,
+    )
+    admite_motivo_rechazo_almacen_flag = admite_motivo_rechazo_almacen(solicitud)
 
     # Valores ya guardados en Cotizacion ST (para precargar "Ver / editar")
     motivo_rechazo_st_actual = ''
@@ -4183,6 +4192,25 @@ def detalle_solicitud_cotizacion(request, pk):
                 motivo_rechazo_st_etiqueta = label_motivo_rechazo(motivo_rechazo_st_actual)
         except Cotizacion.DoesNotExist:
             pass
+
+    # Cabecera Almacén: motivo guardado o prefill desde piezas/servicios
+    motivo_rechazo_solicitud_actual = ''
+    detalle_rechazo_solicitud_actual = ''
+    motivo_rechazo_solicitud_etiqueta = ''
+    if admite_motivo_rechazo_almacen_flag:
+        motivo_rechazo_solicitud_actual = solicitud.motivo_rechazo or ''
+        if motivo_rechazo_solicitud_actual:
+            motivo_rechazo_solicitud_etiqueta = label_motivo_rechazo(
+                motivo_rechazo_solicitud_actual,
+            )
+        # EXPLICACIÓN: si aún no hay detalle guardado, armamos resumen de ítems
+        detalle_guardado = (solicitud.detalle_rechazo or '').strip()
+        if detalle_guardado:
+            detalle_rechazo_solicitud_actual = detalle_guardado
+        else:
+            detalle_rechazo_solicitud_actual = armar_detalle_rechazo_desde_items(
+                solicitud,
+            )
 
     context = {
         'solicitud': solicitud,
@@ -4221,6 +4249,12 @@ def detalle_solicitud_cotizacion(request, pk):
         'motivo_rechazo_st_actual': motivo_rechazo_st_actual,
         'detalle_rechazo_st_actual': detalle_rechazo_st_actual,
         'motivo_rechazo_st_etiqueta': motivo_rechazo_st_etiqueta,
+        # Modal motivo cabecera Almacén (sin orden / FL-)
+        'mostrar_modal_motivo_rechazo_almacen': mostrar_modal_motivo_rechazo_almacen,
+        'admite_motivo_rechazo_almacen': admite_motivo_rechazo_almacen_flag,
+        'motivo_rechazo_solicitud_actual': motivo_rechazo_solicitud_actual,
+        'detalle_rechazo_solicitud_actual': detalle_rechazo_solicitud_actual,
+        'motivo_rechazo_solicitud_etiqueta': motivo_rechazo_solicitud_etiqueta,
     }
 
     context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
@@ -4999,10 +5033,12 @@ def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
                     )
                     solicitud.refresh_from_db()
                     if solicitud.estado == 'totalmente_rechazada':
+                        from almacen.utils.sincronizar_rechazo_cotizacion_st import (
+                            mensaje_flash_tras_rechazo_total,
+                        )
                         messages.info(
                             request,
-                            'La cotización quedó totalmente rechazada. '
-                            'Registra el motivo de catálogo de Servicio Técnico.',
+                            mensaje_flash_tras_rechazo_total(solicitud),
                         )
                 else:
                     messages.error(request, 'No se pudo rechazar la línea.')
@@ -5089,10 +5125,12 @@ def rechazar_todas_lineas(request, pk):
             )
             solicitud.refresh_from_db()
             if solicitud.estado == 'totalmente_rechazada':
+                from almacen.utils.sincronizar_rechazo_cotizacion_st import (
+                    mensaje_flash_tras_rechazo_total,
+                )
                 messages.info(
                     request,
-                    'La cotización quedó totalmente rechazada. '
-                    'Registra el motivo de catálogo de Servicio Técnico.',
+                    mensaje_flash_tras_rechazo_total(solicitud),
                 )
         else:
             messages.info(request, 'No había líneas pendientes por rechazar.')
@@ -5186,6 +5224,88 @@ def registrar_motivo_rechazo_st(request, pk):
     elif enviar_feedback and resultado_fb.get('mensaje'):
         messages.warning(request, resultado_fb['mensaje'])
 
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
+def registrar_motivo_rechazo_solicitud(request, pk):
+    """
+    Registra motivo/detalle de rechazo en la cabecera de Almacén (sin orden ST).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando la cotización queda ``totalmente_rechazada`` sin orden vinculada
+    (o con orden FL- venta_mostrador), tipificamos en SolicitudCotizacion
+    con el mismo catálogo que ST, pero:
+    - No se crea OrdenServicio
+    - No se crea Cotizacion ST
+    - No se envía FeedbackCliente (exige orden)
+
+    Args:
+        request: POST con motivo_rechazo y detalle_rechazo.
+        pk: PK de SolicitudCotizacion.
+
+    Efectos secundarios:
+        Actualiza motivo_rechazo / detalle_rechazo de la solicitud.
+    """
+    from almacen.utils.sincronizar_rechazo_cotizacion_st import (
+        admite_motivo_rechazo_almacen,
+        guardar_motivo_rechazo_solicitud,
+        label_motivo_rechazo,
+        motivo_rechazo_es_valido,
+    )
+
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+
+    if request.method != 'POST':
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    if solicitud.estado != 'totalmente_rechazada':
+        messages.error(
+            request,
+            'Solo puedes registrar el motivo cuando la solicitud '
+            'está totalmente rechazada.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # EXPLICACIÓN: si hay camino ST, este endpoint no aplica
+    if not admite_motivo_rechazo_almacen(solicitud):
+        messages.error(
+            request,
+            'Esta cotización tiene orden de Servicio Técnico: '
+            'usa el registro de motivo ST.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    motivo_clave = (request.POST.get('motivo_rechazo') or '').strip()
+    detalle_rechazo = (request.POST.get('detalle_rechazo') or '').strip()
+
+    if not motivo_rechazo_es_valido(motivo_clave):
+        messages.error(
+            request,
+            'Debes seleccionar un motivo de rechazo del catálogo.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    try:
+        guardar_motivo_rechazo_solicitud(
+            solicitud,
+            motivo_clave=motivo_clave,
+            detalle=detalle_rechazo,
+        )
+    except ValueError:
+        messages.error(
+            request,
+            'Debes seleccionar un motivo de rechazo del catálogo.',
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    label = label_motivo_rechazo(motivo_clave)
+    messages.success(
+        request,
+        f'Motivo de rechazo registrado en la cotización: {label}.',
+    )
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
 

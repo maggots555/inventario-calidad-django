@@ -73,6 +73,34 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     </div>
     {% endif %}
 
+    {% if solicitud.estado == 'totalmente_rechazada' and admite_motivo_rechazo_almacen %}
+    {# Tipificación en cabecera Almacén (sin orden ST / FL-) — sin feedback #}
+    <div class="border {% if mostrar_modal_motivo_rechazo_almacen %}border-danger{% else %}border-secondary{% endif %} rounded p-2 bg-body-secondary">
+        {% if mostrar_modal_motivo_rechazo_almacen %}
+        <p class="small mb-2 text-danger fw-semibold">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Falta tipificar el motivo de rechazo
+        </p>
+        {% else %}
+        <p class="small mb-2 text-muted">
+            <i class="bi bi-check-circle me-1"></i>
+            {% if motivo_rechazo_solicitud_etiqueta %}
+            Registrado: <strong>{{ motivo_rechazo_solicitud_etiqueta }}</strong>
+            {% else %}
+            Motivo ya registrado (puedes actualizarlo)
+            {% endif %}
+        </p>
+        {% endif %}
+        <button type="button"
+                class="btn {% if mostrar_modal_motivo_rechazo_almacen %}btn-danger{% else %}btn-outline-secondary{% endif %} w-100"
+                data-bs-toggle="modal" data-bs-target="#registrarMotivoRechazoSolicitudModal"
+                id="btnAbrirMotivoRechazoSolicitudAcciones">
+            <i class="bi bi-clipboard-x me-2"></i>
+            {% if mostrar_modal_motivo_rechazo_almacen %}Registrar motivo rechazo{% else %}Ver / editar motivo rechazo{% endif %}
+        </button>
+    </div>
+    {% endif %}
+
     {% if solicitud.puede_vincular_orden %}
     <button type="button" class="btn btn-success w-100"
             data-solicitud-pk="{{ solicitud.pk }}"

@@ -128,6 +128,11 @@ urlpatterns = [
         views.registrar_motivo_rechazo_st,
         name='registrar_motivo_rechazo_st',
     ),
+    path(
+        'solicitudes-cotizacion/<int:pk>/registrar-motivo-rechazo/',
+        views.registrar_motivo_rechazo_solicitud,
+        name='registrar_motivo_rechazo_solicitud',
+    ),
     
     # Servicios adicionales (Venta Mostrador en cotizaciones)
     path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/agregar/', views.agregar_servicio_adicional, name='agregar_servicio_adicional'),

@@ -121,6 +121,132 @@ def solicitud_requiere_motivo_rechazo_st(solicitud: 'SolicitudCotizacion') -> bo
     return not bool((cotizacion.motivo_rechazo or '').strip())
 
 
+# Máximo de caracteres del detalle precargado desde piezas/servicios
+_MAX_DETALLE_RECHAZO_ITEMS = 2000
+
+
+def admite_motivo_rechazo_almacen(solicitud: 'SolicitudCotizacion') -> bool:
+    """
+    True si el rechazo total se tipifica en la cabecera de Almacén (no en ST).
+
+    Aplica cuando no hay orden, o la orden es venta_mostrador (FL-):
+    no se crea Cotizacion ST ni FeedbackCliente.
+    """
+    if solicitud.estado != 'totalmente_rechazada':
+        return False
+    # EXPLICACIÓN: si hay camino ST válido, el modal de ST manda; aquí no.
+    return not orden_admite_cotizacion_st(solicitud.orden_servicio)
+
+
+def solicitud_requiere_motivo_rechazo_almacen(
+    solicitud: 'SolicitudCotizacion',
+) -> bool:
+    """
+    True si falta tipificar el rechazo en SolicitudCotizacion (sin orden ST).
+
+    Condiciones:
+    - estado = totalmente_rechazada
+    - no admite flujo Cotizacion ST (sin orden o FL-)
+    - motivo_rechazo de la solicitud aún vacío
+    """
+    if not admite_motivo_rechazo_almacen(solicitud):
+        return False
+    return not bool((solicitud.motivo_rechazo or '').strip())
+
+
+def armar_detalle_rechazo_desde_items(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Concatena motivos de líneas y servicios rechazados para precargar el detalle.
+
+    Formato por renglón:
+        Pieza: HDD — costo alto
+        Servicio: Limpieza — no autorizado
+
+    Salta ítems sin motivo; recorta a ``_MAX_DETALLE_RECHAZO_ITEMS`` caracteres.
+
+    Args:
+        solicitud: Solicitud de cotización de Almacén.
+
+    Returns:
+        Texto multilínea listo para el textarea (puede ser vacío).
+    """
+    partes: list[str] = []
+
+    # EXPLICACIÓN: solo líneas ya rechazadas; el motivo por línea es texto libre
+    lineas_rechazadas = solicitud.lineas.filter(estado_cliente='rechazada')
+    for linea in lineas_rechazadas:
+        motivo = (linea.motivo_rechazo or '').strip()
+        if not motivo:
+            continue
+        nombre = (linea.descripcion_pieza or '').strip() or f'Línea #{linea.numero_linea}'
+        partes.append(f'Pieza: {nombre} — {motivo}')
+
+    # Servicios adicionales rechazados (mismo patrón)
+    servicios_rechazados = solicitud.servicios_adicionales.filter(
+        estado_cliente='rechazada',
+    )
+    for servicio in servicios_rechazados:
+        motivo = (servicio.motivo_rechazo or '').strip()
+        if not motivo:
+            continue
+        nombre = servicio.get_tipo_servicio_display()
+        partes.append(f'Servicio: {nombre} — {motivo}')
+
+    texto = '\n'.join(partes)
+    if len(texto) > _MAX_DETALLE_RECHAZO_ITEMS:
+        return texto[: _MAX_DETALLE_RECHAZO_ITEMS - 1] + '…'
+    return texto
+
+
+def guardar_motivo_rechazo_solicitud(
+    solicitud: 'SolicitudCotizacion',
+    motivo_clave: str,
+    detalle: str = '',
+) -> 'SolicitudCotizacion':
+    """
+    Guarda motivo/detalle de catálogo en la cabecera de Almacén (sin tocar ST).
+
+    Args:
+        solicitud: Solicitud totalmente rechazada sin camino ST.
+        motivo_clave: Clave de MOTIVO_RECHAZO_COTIZACION.
+        detalle: Texto libre / plantilla / resumen de ítems.
+
+    Returns:
+        La misma solicitud refrescada tras el save.
+
+    Raises:
+        ValueError: si el motivo no está en el catálogo.
+    """
+    if not motivo_rechazo_es_valido(motivo_clave):
+        raise ValueError(f'Motivo de rechazo inválido: {motivo_clave!r}')
+
+    # EXPLICACIÓN: solo campos de cabecera Almacén; no crea orden ni Cotizacion
+    solicitud.motivo_rechazo = motivo_clave
+    solicitud.detalle_rechazo = detalle or ''
+    solicitud.save(update_fields=['motivo_rechazo', 'detalle_rechazo'])
+    solicitud.refresh_from_db()
+
+    logger.info(
+        '[RECHAZO_ALM] Solicitud %s motivo=%s (sin Cotizacion ST)',
+        solicitud.numero_solicitud,
+        motivo_clave,
+    )
+    return solicitud
+
+
+def mensaje_flash_tras_rechazo_total(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Texto del messages.info tras quedar ``totalmente_rechazada``.
+
+    Con orden ST válida → pide motivo en catálogo ST.
+    Sin orden / FL- → pide tipificar en Acciones (cabecera Almacén).
+    """
+    base = 'La cotización quedó totalmente rechazada. '
+    if orden_admite_cotizacion_st(solicitud.orden_servicio):
+        return base + 'Registra el motivo de catálogo de Servicio Técnico.'
+    return base + 'Registra el motivo de rechazo en Acciones.'
+
+
 def sincronizar_cabecera_rechazo_st(
     solicitud: 'SolicitudCotizacion',
     motivo_clave: str,

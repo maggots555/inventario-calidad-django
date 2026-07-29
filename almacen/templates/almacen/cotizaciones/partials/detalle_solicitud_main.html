@@ -40,6 +40,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
         <span class="d-block small mt-1">
             Usa <strong>Acciones → Registrar motivo ST</strong> para el catálogo de Servicio Técnico.
         </span>
+        {% elif mostrar_modal_motivo_rechazo_almacen %}
+        <span class="d-block small mt-1">
+            Usa <strong>Acciones → Registrar motivo rechazo</strong> para tipificar el rechazo
+            (sin orden de Servicio Técnico).
+        </span>
         {% endif %}
     </div>
     {% elif solicitud.estado == 'completada' %}
@@ -768,6 +773,12 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             class="btn {% if mostrar_modal_motivo_rechazo_st %}btn-danger{% else %}btn-outline-secondary{% endif %} btn-dock-primary"
             data-bs-toggle="modal" data-bs-target="#registrarMotivoRechazoStModal">
         <i class="bi bi-clipboard-x me-1"></i>Motivo ST
+    </button>
+    {% elif solicitud.estado == 'totalmente_rechazada' and admite_motivo_rechazo_almacen %}
+    <button type="button"
+            class="btn {% if mostrar_modal_motivo_rechazo_almacen %}btn-danger{% else %}btn-outline-secondary{% endif %} btn-dock-primary"
+            data-bs-toggle="modal" data-bs-target="#registrarMotivoRechazoSolicitudModal">
+        <i class="bi bi-clipboard-x me-1"></i>Motivo rechazo
     </button>
     {% else %}
     <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="btn btn-outline-secondary btn-dock-primary">

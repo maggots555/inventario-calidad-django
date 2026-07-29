@@ -60,6 +60,8 @@ from config.constants import (
     TIPO_SERVICIO_ADICIONAL_CHOICES,
     PRECIOS_SERVICIOS_ADICIONALES,
     MAPEO_SERVICIO_A_VENTA_MOSTRADOR,
+    # Motivo de rechazo de cabecera (mismo catálogo que ST, sin orden vinculada)
+    MOTIVO_RECHAZO_COTIZACION,
 )
 
 import logging
@@ -2967,6 +2969,30 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Observaciones del Cliente',
         help_text='Comentarios o feedback del cliente'
     )
+
+    # ========== RECHAZO TOTAL SIN ORDEN ST ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Cuando la cotización se rechaza por completo SIN orden vinculada (modo
+    # sin_orden_activa / VM), tipificamos el motivo aquí — mismo catálogo que
+    # Cotizacion.motivo_rechazo en ST, pero sin crear orden ni Cotizacion ST.
+    motivo_rechazo = models.CharField(
+        max_length=30,
+        choices=MOTIVO_RECHAZO_COTIZACION,
+        blank=True,
+        verbose_name='Motivo de rechazo (cabecera)',
+        help_text=(
+            'Motivo de catálogo cuando la solicitud queda totalmente rechazada '
+            'sin orden de Servicio Técnico vinculada'
+        ),
+    )
+    detalle_rechazo = models.TextField(
+        blank=True,
+        verbose_name='Detalle del rechazo (cabecera)',
+        help_text=(
+            'Detalle / plantilla del rechazo a nivel solicitud. '
+            'Se puede precargar con los comentarios de piezas y servicios.'
+        ),
+    )
     
     # ========== MODO SIN ORDEN ACTIVA ==========
     sin_orden_activa = models.BooleanField(
@@ -4132,15 +4158,20 @@ class SolicitudCotizacion(models.Model):
     
     def puede_vincular_orden(self):
         """
-        Verifica si se puede vincular una orden de servicio.
-        
+        Verifica si se puede vincular o crear una orden de servicio.
+
         Condiciones:
         - Debe estar en modo sin_orden_activa
-        - No debe estar completada ni cancelada
+        - No debe estar completada, cancelada ni totalmente rechazada
+          (un rechazo total ya no debe ofrecer Crear/Vincular orden)
         """
         return (
             self.sin_orden_activa
-            and self.estado not in ['completada', 'cancelada']
+            and self.estado not in [
+                'completada',
+                'cancelada',
+                'totalmente_rechazada',
+            ]
         )
     
     def vincular_orden(self, orden_servicio):

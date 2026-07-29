@@ -231,6 +231,91 @@ Muestra toda la información y acciones según el estado
 </div>
 {% endif %}
 
+{% if solicitud.estado == 'totalmente_rechazada' and admite_motivo_rechazo_almacen %}
+{# Modal cabecera Almacén: tipificar rechazo sin orden ST (sin checkbox feedback) #}
+<div class="modal fade" id="registrarMotivoRechazoSolicitudModal" tabindex="-1"
+     {% if mostrar_modal_motivo_rechazo_almacen %}data-auto-abrir="1"{% endif %}
+     {% if motivo_rechazo_solicitud_actual %}data-motivo-ya-registrado="1"{% endif %}>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post"
+                  action="{% url 'almacen:registrar_motivo_rechazo_solicitud' solicitud.pk %}"
+                  id="formRegistrarMotivoRechazoSolicitud">
+                {% csrf_token %}
+
+                <div class="modal-header {% if motivo_rechazo_solicitud_actual %}bg-secondary{% else %}bg-danger{% endif %} text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-clipboard-x me-2"></i>
+                        {% if motivo_rechazo_solicitud_actual %}
+                        Motivo de rechazo registrado
+                        {% else %}
+                        Motivo de rechazo
+                        {% endif %}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% if motivo_rechazo_solicitud_actual %}
+                    <div class="alert alert-success py-2 small mb-3" role="status">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Ya registrado:
+                        <strong>{{ motivo_rechazo_solicitud_etiqueta|default:motivo_rechazo_solicitud_actual }}</strong>.
+                        Puedes revisar o actualizar el detalle abajo.
+                    </div>
+                    {% else %}
+                    <p class="mb-3">
+                        La cotización quedó <strong>totalmente rechazada</strong>
+                        (sin orden de Servicio Técnico vinculada).
+                        Tipifica el motivo de catálogo; el detalle se precarga
+                        con los comentarios de piezas y servicios rechazados.
+                    </p>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="id_motivo_rechazo_solicitud" class="form-label">
+                            Motivo del rechazo <span class="text-danger">*</span>
+                        </label>
+                        <select name="motivo_rechazo" id="id_motivo_rechazo_solicitud"
+                                class="form-select form-control" required>
+                            <option value="">— Selecciona un motivo —</option>
+                            {% for clave, etiqueta in motivos_rechazo_cotizacion %}
+                            <option value="{{ clave }}"
+                                {% if clave == motivo_rechazo_solicitud_actual %}selected{% endif %}>
+                                {{ etiqueta }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_detalle_rechazo_solicitud" class="form-label">
+                            Detalle del rechazo
+                        </label>
+                        <textarea name="detalle_rechazo" id="id_detalle_rechazo_solicitud"
+                                  class="form-control" rows="6"
+                                  placeholder="Comentarios de piezas/servicios o plantilla al elegir motivo.">{% if detalle_rechazo_solicitud_actual %}{{ detalle_rechazo_solicitud_actual }}{% endif %}</textarea>
+                        <div class="form-text">
+                            Si aún no guardabas detalle, aquí verás el resumen de
+                            motivos por pieza/servicio. Puedes editarlo o reemplazarlo
+                            con la plantilla al cambiar el motivo.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        {% if motivo_rechazo_solicitud_actual %}Cerrar{% else %}Más tarde{% endif %}
+                    </button>
+                    <button type="submit" class="btn {% if motivo_rechazo_solicitud_actual %}btn-primary{% else %}btn-danger{% endif %}">
+                        <i class="bi bi-check-lg me-1"></i>
+                        {% if motivo_rechazo_solicitud_actual %}Actualizar motivo{% else %}Guardar motivo{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Modal: Cancelar solicitud -->
 <div class="modal fade" id="cancelarModal" tabindex="-1">
     <div class="modal-dialog">
@@ -1620,6 +1705,26 @@ window.COTIZACION_REACONDICIONADO_CONFIG = {
         });
     } else {
         setTimeout(abrirMotivoRechazoSt, 150);
+    }
+})();
+</script>
+{% elif mostrar_modal_motivo_rechazo_almacen %}
+<script>
+(function () {
+    function abrirMotivoRechazoSolicitud() {
+        var modalEl = document.getElementById('registrarMotivoRechazoSolicitudModal');
+        if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            return;
+        }
+        var instancia = bootstrap.Modal.getOrCreateInstance(modalEl);
+        instancia.show();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(abrirMotivoRechazoSolicitud, 150);
+        });
+    } else {
+        setTimeout(abrirMotivoRechazoSolicitud, 150);
     }
 })();
 </script>

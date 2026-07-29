@@ -3,12 +3,13 @@
  * Sistema de Plantillas Automáticas para Comentarios de Rechazo
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Cuando eliges un motivo de rechazo (select #id_motivo_rechazo), se precarga
- * una plantilla estructurada en #id_detalle_rechazo. Sirve en ST (detalle_orden)
- * y en Almacén (modal #rechazarTodasModal).
+ * Cuando eliges un motivo de rechazo (select), se precarga una plantilla
+ * estructurada en el textarea de detalle. Sirve en:
+ * - ST (detalle_orden): #id_motivo_rechazo / #id_detalle_rechazo
+ * - Almacén con orden ST: mismos IDs en #registrarMotivoRechazoStModal
+ * - Almacén sin orden: #id_motivo_rechazo_solicitud / #id_detalle_rechazo_solicitud
  *
- * También habilita/deshabilita el checkbox de correo de feedback en Almacén
- * según el motivo seleccionado.
+ * También habilita/deshabilita el checkbox de correo de feedback (solo modal ST).
  */
 // Plantillas estructuradas por motivo de rechazo
 const PLANTILLAS_RECHAZO = {
@@ -168,29 +169,26 @@ function detalleParecePlantillaSinEditar(valor) {
     return /\[[A-ZÁÉÍÓÚÑ_]+\]/.test(trim);
 }
 /**
- * Inicializa el sistema de plantillas automáticas
+ * Engancha plantillas a un par select/textarea concretos.
+ *
+ * EXPLICACIÓN: en Almacén pueden coexistir el modal ST y el de solicitud
+ * (IDs distintos). Cada par se inicializa por separado.
  */
-function inicializarPlantillasRechazo() {
-    const selectMotivo = document.getElementById('id_motivo_rechazo');
-    const textareaDetalle = document.getElementById('id_detalle_rechazo');
+function inicializarPlantillasParaCampos(opciones) {
+    const selectMotivo = document.getElementById(opciones.selectId);
+    const textareaDetalle = document.getElementById(opciones.textareaId);
     if (!selectMotivo || !textareaDetalle) {
-        // En páginas sin formulario de rechazo (ej. listas) es normal
         return;
     }
-    // Form que contiene el select (ST o modal Almacén), no el primer form del DOM
     const formContenedor = selectMotivo.closest('form');
-    const modal = document.getElementById('registrarMotivoRechazoStModal');
-    const yaRegistrado = (modal === null || modal === void 0 ? void 0 : modal.getAttribute('data-motivo-ya-registrado')) === '1';
-    // Evento: cuando cambia el motivo de rechazo
     selectMotivo.addEventListener('change', (event) => {
         const target = event.target;
         const motivoSeleccionado = target.value;
-        actualizarCheckboxFeedback(motivoSeleccionado);
+        if (opciones.conFeedback) {
+            actualizarCheckboxFeedback(motivoSeleccionado);
+        }
         if (!motivoSeleccionado || motivoSeleccionado === '') {
-            // No borrar un detalle ya guardado en ST al limpiar el select
-            if (!yaRegistrado) {
-                textareaDetalle.value = '';
-            }
+            // EXPLICACIÓN: no borramos prefill de piezas/servicios al limpiar el select
             textareaDetalle.placeholder =
                 'Selecciona un motivo de rechazo y se cargará automáticamente una plantilla.';
             return;
@@ -198,12 +196,12 @@ function inicializarPlantillasRechazo() {
         const plantilla = PLANTILLAS_RECHAZO[motivoSeleccionado];
         if (plantilla) {
             const valorActual = textareaDetalle.value.trim();
-            // EXPLICACIÓN: si ya hay detalle guardado (o texto editado), no lo pisamos
-            // al cambiar de motivo. Solo reemplazamos vacío o plantilla sin editar.
+            // EXPLICACIÓN: no pisamos detalle guardado, prefill de ítems ni texto editado.
+            // Solo reemplazamos vacío o plantilla cruda sin editar.
             const puedeReemplazar = valorActual === '' || detalleParecePlantillaSinEditar(valorActual);
             if (puedeReemplazar) {
                 textareaDetalle.value = plantilla;
-                mostrarNotificacionPlantilla(motivoSeleccionado);
+                mostrarNotificacionPlantilla(motivoSeleccionado, textareaDetalle);
                 textareaDetalle.focus();
                 const primerCampo = plantilla.match(/\[([A-ZÁÉÍÓÚÑ_]+)\]/);
                 if (primerCampo) {
@@ -217,8 +215,9 @@ function inicializarPlantillasRechazo() {
         }
     });
     agregarAyudaContextual(textareaDetalle);
-    // Estado inicial del checkbox según el motivo ya seleccionado (si hay)
-    actualizarCheckboxFeedback(selectMotivo.value);
+    if (opciones.conFeedback) {
+        actualizarCheckboxFeedback(selectMotivo.value);
+    }
     if (formContenedor) {
         formContenedor.addEventListener('submit', (event) => {
             if (!debeValidarPlantillaEnSubmit(formContenedor)) {
@@ -231,11 +230,28 @@ function inicializarPlantillasRechazo() {
     }
 }
 /**
- * True si el submit actual es un rechazo (ST con radio, o form de Almacén).
+ * Inicializa el sistema de plantillas automáticas (ST + Almacén sin orden).
+ */
+function inicializarPlantillasRechazo() {
+    // Modal / form ST (detalle_orden o Almacén con orden)
+    inicializarPlantillasParaCampos({
+        selectId: 'id_motivo_rechazo',
+        textareaId: 'id_detalle_rechazo',
+        conFeedback: true,
+    });
+    // Modal Almacén sin orden / FL- (IDs propios para no chocar)
+    inicializarPlantillasParaCampos({
+        selectId: 'id_motivo_rechazo_solicitud',
+        textareaId: 'id_detalle_rechazo_solicitud',
+        conFeedback: false,
+    });
+}
+/**
+ * True si el submit actual es un rechazo (ST con radio, o forms de Almacén).
  */
 function debeValidarPlantillaEnSubmit(form) {
-    // Almacén: modal de motivo ST tras rechazo total
-    if (form.id === 'formRegistrarMotivoRechazoSt') {
+    if (form.id === 'formRegistrarMotivoRechazoSt' ||
+        form.id === 'formRegistrarMotivoRechazoSolicitud') {
         return true;
     }
     // ST: solo si eligió la acción rechazar
@@ -245,7 +261,7 @@ function debeValidarPlantillaEnSubmit(form) {
 /**
  * Muestra notificación temporal indicando que se cargó la plantilla
  */
-function mostrarNotificacionPlantilla(motivo) {
+function mostrarNotificacionPlantilla(motivo, textareaDetalle) {
     const nombreMotivo = NOMBRES_MOTIVOS[motivo] || motivo;
     const notificacion = document.createElement('div');
     notificacion.className = 'alert alert-info alert-dismissible fade show mt-2';
@@ -256,8 +272,7 @@ function mostrarNotificacionPlantilla(motivo) {
         <small>Edita los campos entre <code>[ ]</code> con los datos específicos del caso.</small>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    const textareaDetalle = document.getElementById('id_detalle_rechazo');
-    if (textareaDetalle && textareaDetalle.parentElement) {
+    if (textareaDetalle.parentElement) {
         textareaDetalle.parentElement.insertBefore(notificacion, textareaDetalle.nextSibling);
         setTimeout(() => {
             notificacion.classList.remove('show');
