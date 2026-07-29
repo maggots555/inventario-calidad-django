@@ -988,9 +988,10 @@ function initDiagnosticoModal() {
     const inputComponentesJSON = document.getElementById('inputComponentesJSON');
     const btnRefrescarPreview = document.getElementById('btnRefrescarPreviewDiag');
     const iframePreview = document.getElementById('iframePreviewDiagnostico');
-    // Interruptor: plantilla estándar vs reparación a nivel componente
-    const togglePlantillaNivelComponente = document.getElementById('togglePlantillaNivelComponente');
-    const avisoPlantillaNivelComponente = document.getElementById('avisoPlantillaNivelComponente');
+    // Radios: plantilla estándar | nivel componente | validación
+    const radiosTipoPlantilla = document.querySelectorAll('input[name="tipo_plantilla"]');
+    const avisoPlantillaCorreo = document.getElementById('avisoPlantillaCorreo');
+    const avisoPlantillaCorreoTexto = document.getElementById('avisoPlantillaCorreoTexto');
     // Checkboxes
     const checkboxSelectAllImgs = document.getElementById('seleccionarTodasImagenesDiag');
     // Botón y dropdown para agregar componentes adicionales
@@ -1007,28 +1008,55 @@ function initDiagnosticoModal() {
     if (!form)
         return;
     // ====================================================================
-    // 0. Interruptor de plantilla (reparación a nivel componente)
+    // 0. Selector de plantilla del correo (3 radios)
     // ====================================================================
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Muestra u oculta el aviso azul cuando el técnico activa el interruptor.
-     * No envía nada por sí solo: solo cambia el flag que viaja en el FormData.
+     * Lee el radio marcado y devuelve el valor que Celery entiende:
+     * 'estandar' | 'nivel_componente' | 'validacion'.
      */
-    function actualizarAvisoPlantillaNivelComponente() {
-        if (!avisoPlantillaNivelComponente || !togglePlantillaNivelComponente) {
+    function obtenerTipoPlantillaSeleccionada() {
+        for (const radio of Array.from(radiosTipoPlantilla)) {
+            if (radio.checked) {
+                return radio.value;
+            }
+        }
+        return 'estandar';
+    }
+    /**
+     * Etiqueta legible para el confirm y el aviso azul del modal.
+     */
+    function etiquetaTipoPlantilla(tipo) {
+        if (tipo === 'nivel_componente') {
+            return 'Reparación a nivel componente';
+        }
+        if (tipo === 'validacion') {
+            return 'Diagnóstico de validación';
+        }
+        return 'Estándar (diagnóstico normal)';
+    }
+    /**
+     * Muestra u oculta el aviso según la plantilla elegida.
+     * En "estándar" ocultamos el aviso para no distraer.
+     */
+    function actualizarAvisoPlantillaCorreo() {
+        if (!avisoPlantillaCorreo || !avisoPlantillaCorreoTexto) {
             return;
         }
-        if (togglePlantillaNivelComponente.checked) {
-            avisoPlantillaNivelComponente.classList.remove('d-none');
+        const tipo = obtenerTipoPlantillaSeleccionada();
+        if (tipo === 'estandar') {
+            avisoPlantillaCorreo.classList.add('d-none');
+            avisoPlantillaCorreoTexto.textContent = '';
+            return;
         }
-        else {
-            avisoPlantillaNivelComponente.classList.add('d-none');
-        }
+        avisoPlantillaCorreoTexto.innerHTML =
+            `Se enviará la plantilla de <strong>${etiquetaTipoPlantilla(tipo)}</strong>.`;
+        avisoPlantillaCorreo.classList.remove('d-none');
     }
-    if (togglePlantillaNivelComponente) {
-        togglePlantillaNivelComponente.addEventListener('change', actualizarAvisoPlantillaNivelComponente);
-        actualizarAvisoPlantillaNivelComponente();
-    }
+    radiosTipoPlantilla.forEach((radio) => {
+        radio.addEventListener('change', actualizarAvisoPlantillaCorreo);
+    });
+    actualizarAvisoPlantillaCorreo();
     // ====================================================================
     // 1. Actualización en tiempo real del asunto
     // ====================================================================
@@ -2305,12 +2333,9 @@ function initDiagnosticoModal() {
                     return;
             }
             // EXPLICACIÓN PARA PRINCIPIANTES:
-            // Si el interruptor está ON, avisamos en el confirm y mandamos el flag
-            // para que Celery use la plantilla de reparación a nivel componente.
-            const usaPlantillaNivelComponente = Boolean(togglePlantillaNivelComponente && togglePlantillaNivelComponente.checked);
-            const etiquetaPlantilla = usaPlantillaNivelComponente
-                ? 'Reparación a nivel componente'
-                : 'Estándar (diagnóstico normal)';
+            // El radio elegido manda tipo_plantilla a la vista → Celery elige el HTML.
+            const tipoPlantilla = obtenerTipoPlantillaSeleccionada();
+            const etiquetaPlantilla = etiquetaTipoPlantilla(tipoPlantilla);
             // Confirmación final
             const confirmMsg = `¿Enviar diagnóstico al cliente?\n\n` +
                 `📋 Folio: ${folio}\n` +
@@ -2325,13 +2350,10 @@ function initDiagnosticoModal() {
             // Agregar JSON de componentes
             const componentesJSON = JSON.stringify(construirComponentesJSON());
             formData.set('componentes', componentesJSON);
-            // Asegurar el flag aunque el checkbox no entre en FormData por algún motivo
-            if (usaPlantillaNivelComponente) {
-                formData.set('plantilla_nivel_componente', '1');
-            }
-            else {
-                formData.delete('plantilla_nivel_componente');
-            }
+            // Asegurar el valor del radio (whitelist la valida el backend)
+            formData.set('tipo_plantilla', tipoPlantilla);
+            // Compatibilidad: limpiar el flag viejo del switch booleano
+            formData.delete('plantilla_nivel_componente');
             // Mostrar estado de loading
             btnEnviar.disabled = true;
             const textoOriginal = btnEnviar.innerHTML;

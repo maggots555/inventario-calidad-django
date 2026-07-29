@@ -792,7 +792,7 @@ def enviar_diagnostico_cliente_task(
         email_empleado        : Email del empleado que envía
         nombre_empleado       : Nombre del empleado que envía
         usuario_id            : ID del usuario (para historial)
-        tipo_plantilla        : 'estandar' o 'nivel_componente' (elige el HTML del correo)
+        tipo_plantilla        : 'estandar', 'nivel_componente' o 'validacion' (elige el HTML del correo)
         db_alias              : Alias de BD del país activo (multi-tenant Celery)
     """
     import io
@@ -991,14 +991,72 @@ def enviar_diagnostico_cliente_task(
         }
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # tipo_plantilla llega desde el interruptor del modal.
-        # 'nivel_componente' usa la plantilla con FAQ + fotos del proceso RHITSO.
+        # tipo_plantilla llega desde los radios del modal.
+        # Cada valor apunta a un HTML distinto; el PDF siempre es el mismo.
+        TEMPLATES_DIAGNOSTICO = {
+            'estandar': 'servicio_tecnico/emails/diagnostico_cliente.html',
+            'nivel_componente': (
+                'servicio_tecnico/emails/diagnostico_cliente_nivel_componente.html'
+            ),
+            'validacion': (
+                'servicio_tecnico/emails/diagnostico_cliente_validacion.html'
+            ),
+        }
         usa_plantilla_nivel_componente = (tipo_plantilla == 'nivel_componente')
-        template_email = (
-            'servicio_tecnico/emails/diagnostico_cliente_nivel_componente.html'
-            if usa_plantilla_nivel_componente
-            else 'servicio_tecnico/emails/diagnostico_cliente.html'
+        template_email = TEMPLATES_DIAGNOSTICO.get(
+            tipo_plantilla,
+            TEMPLATES_DIAGNOSTICO['estandar'],
         )
+
+        # Plantilla de validación: necesita horario y datos de sucursal
+        # (mismo criterio que el correo de "equipo disponible").
+        if tipo_plantilla == 'validacion':
+            sucursal = orden.sucursal
+            horario_default = (
+                'Lunes a Viernes de 09:00 a 17:30 hrs horario corrido.'
+            )
+            horario_sucursal = (
+                (sucursal.horario_atencion or '').strip() if sucursal else ''
+            )
+            partes_ciudad = []
+            if sucursal:
+                if sucursal.ciudad:
+                    partes_ciudad.append(sucursal.ciudad)
+                if sucursal.estado_provincia:
+                    partes_ciudad.append(sucursal.estado_provincia)
+
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Drop Off tarda ~1 día en tener el equipo físicamente.
+            # No decimos "ya puede recolectar"; pedimos esperar el correo
+            # de "equipo disponible" (otra función del sistema).
+            nombre_suc_norm = (
+                (sucursal.nombre or '').lower().strip() if sucursal else ''
+            )
+            es_sucursal_drop_off = any(
+                clave in nombre_suc_norm
+                for clave in ('drop off', 'dropoff', 'drop-off')
+            )
+
+            # es_fuera_garantia controla la nota de almacenaje (cláusula 6).
+            # En Drop Off esa nota tampoco se muestra aquí (irá en equipo disponible).
+            context_email.update({
+                'horario_atencion': horario_sucursal or horario_default,
+                'sucursal_nombre': (
+                    sucursal.nombre if sucursal else 'Centro de servicio'
+                ),
+                'sucursal_direccion': (
+                    (sucursal.direccion or '').strip() if sucursal else ''
+                ),
+                'sucursal_ciudad_estado': ', '.join(partes_ciudad),
+                'sucursal_telefono': (
+                    (sucursal.telefono or '').strip() if sucursal else ''
+                ),
+                'es_fuera_garantia': bool(orden.es_fuera_garantia),
+                'es_sucursal_drop_off': es_sucursal_drop_off,
+                'nombre_cliente': (
+                    (detalle.nombre_cliente or 'cliente').strip() or 'cliente'
+                ),
+            })
 
         html_content = render_to_string(template_email, context_email)
 
@@ -1185,12 +1243,18 @@ def enviar_diagnostico_cliente_task(
                 except User.DoesNotExist:
                     pass
 
+            etiquetas_plantilla = {
+                'nivel_componente': 'Reparación a nivel componente',
+                'validacion': 'Diagnóstico de validación',
+                'estandar': 'Estándar',
+            }
+            etiqueta_plantilla = etiquetas_plantilla.get(tipo_plantilla, 'Estándar')
+
             comentario = (
                 f"📧 Diagnóstico enviado al cliente (background) ({email_cliente})\n"
                 f"📋 Folio: {folio}\n"
                 f"📄 PDF adjunto: {resultado_pdf['archivo']}\n"
-                f"✉️ Plantilla: "
-                f"{'Reparación a nivel componente' if tipo_plantilla == 'nivel_componente' else 'Estándar'}\n"
+                f"✉️ Plantilla: {etiqueta_plantilla}\n"
                 f"🔧 Componentes marcados (sugerencias Almacén): {componentes_marcados}\n"
                 f"📸 Imágenes adjuntas: {len(imagenes_comprimidas)}"
             )

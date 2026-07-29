@@ -824,15 +824,19 @@ def enviar_diagnostico_cliente(request, orden_id):
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # El interruptor del modal manda plantilla_nivel_componente=1.
-        # Si viene activo, Celery usa la plantilla explicativa de reparación
-        # a nivel componente; si no, la plantilla estándar de diagnóstico.
-        plantilla_flag = request.POST.get('plantilla_nivel_componente', '').strip()
-        tipo_plantilla = (
-            'nivel_componente'
-            if plantilla_flag in ('1', 'true', 'on', 'nivel_componente')
-            else 'estandar'
-        )
+        # El modal manda tipo_plantilla con uno de tres valores.
+        # También aceptamos el flag viejo plantilla_nivel_componente=1 por
+        # compatibilidad (por si queda algún cliente/cache antiguo).
+        # Cualquier valor fuera de la whitelist cae a 'estandar' (seguro).
+        TIPOS_PLANTILLA_VALIDOS = {'estandar', 'nivel_componente', 'validacion'}
+        tipo_plantilla = request.POST.get('tipo_plantilla', '').strip()
+        if tipo_plantilla not in TIPOS_PLANTILLA_VALIDOS:
+            # Fallback al interruptor booleano anterior
+            plantilla_flag = request.POST.get('plantilla_nivel_componente', '').strip()
+            if plantilla_flag in ('1', 'true', 'on', 'nivel_componente'):
+                tipo_plantilla = 'nivel_componente'
+            else:
+                tipo_plantilla = 'estandar'
         
         email_empleado = ''
         nombre_empleado = ''

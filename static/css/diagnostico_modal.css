@@ -182,22 +182,25 @@
     color: #e2e8f0;
 }
 
-/* Interruptor plantilla reparación a nivel componente.
+/* Selector de plantilla del correo (3 radios mutuamente excluyentes).
    EXPLICACIÓN PARA PRINCIPIANTES:
-   El marco (.diag-toggle-plantilla) NO lleva form-check; el switch va dentro.
-   Así el padding del borde envuelve bien el botón y no se sale a la izquierda. */
+   El marco (.diag-toggle-plantilla) agrupa las opciones; cada radio es un
+   form-check de Bootstrap. Solo puede haber una plantilla activa a la vez. */
 .diag-toggle-plantilla {
     background-color: var(--gray-50, #f8fafc);
     border-color: var(--border-color, #e2e8f0) !important;
 }
 
 .diag-toggle-plantilla .form-check {
-    padding-left: 2.5em;
     min-height: 1.5rem;
 }
 
 .diag-toggle-plantilla .form-check .form-check-input {
-    margin-left: -2.5em;
+    margin-top: 0.35em;
+}
+
+.diag-toggle-plantilla .form-check-label {
+    cursor: pointer;
 }
 
 [data-bs-theme="dark"] .diag-toggle-plantilla {
@@ -210,7 +213,7 @@
     color: #94a3b8 !important;
 }
 
-[data-bs-theme="dark"] #avisoPlantillaNivelComponente {
+[data-bs-theme="dark"] #avisoPlantillaCorreo {
     background-color: rgba(13, 115, 119, 0.2);
     border-color: #0d7377;
     color: #e2e8f0;
