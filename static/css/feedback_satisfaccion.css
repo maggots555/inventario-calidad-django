@@ -21,13 +21,14 @@
   --fs-ease:          all 0.2s ease;
 }
 
-/* === Layout principal === */
+/* === Layout principal ===
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   El fondo usa el mismo degradado azul oscuro del portal de seguimiento
+   cliente (.st-body), para que ambas páginas se sientan de la misma familia. */
 .fs-body {
   min-height: 100vh;
   min-height: 100dvh;
-  background: #1f6391;
-  background-size: 300% 300%;
-  animation: fsGradientShift 10s ease infinite;
+  background: linear-gradient(150deg, #0a1628 0%, #0e2a45 25%, #0c3556 50%, #0a2f3d 75%, #071e2b 100%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   padding: env(safe-area-inset-top, 1rem) 1rem env(safe-area-inset-bottom, 1rem);
   display: flex;
@@ -35,12 +36,6 @@
   align-items: center;
   justify-content: flex-start;
   position: relative;
-}
-
-@keyframes fsGradientShift {
-  0%   { background-position: 0%   50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0%   50%; }
 }
 
 /* === Canvas de partículas (fondo interactivo) === */
@@ -76,9 +71,12 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* === Header de la card === */
+/* === Header de la card ===
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Copiamos el estilo del header de seguimiento cliente (.st-card-header):
+   degradado azul oscuro, líneas geométricas cyan y destello inferior. */
 .fs-card-header {
-  background: #1f6391;
+  background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
   padding: 2rem 1.75rem 1.5rem;
   text-align: center;
   color: white;
@@ -86,46 +84,71 @@
   overflow: hidden;
 }
 
-.fs-card-header::before,
+/* Líneas diagonales geométricas — efecto tech (igual que seguimiento) */
+.fs-card-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    linear-gradient(135deg, transparent 40%, rgba(56, 189, 248, 0.06) 40%, rgba(56, 189, 248, 0.06) 41%, transparent 41%),
+    linear-gradient(135deg, transparent 55%, rgba(56, 189, 248, 0.04) 55%, rgba(56, 189, 248, 0.04) 56%, transparent 56%),
+    linear-gradient(135deg, transparent 70%, rgba(56, 189, 248, 0.03) 70%, rgba(56, 189, 248, 0.03) 71%, transparent 71%);
+  pointer-events: none;
+  border-radius: 0;
+}
+
+/* Destello horizontal sutil en la parte inferior */
 .fs-card-header::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
+  bottom: 0; left: 10%; right: 10%;
+  height: 1px;
+  width: auto;
+  top: auto;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent);
+  border-radius: 0;
 }
-.fs-card-header::before { width: 220px; height: 220px; top: -60%; right: -10%; }
-.fs-card-header::after  { width: 140px; height: 140px; bottom: -40%; left: 10%; }
 
 .fs-header-logo {
-  height: 40px;
+  height: 42px;
   margin-bottom: 0.75rem;
-  filter: brightness(0) invert(1);
+  /* logo_sic_white.svg ya es blanco: no hace falta filter invert */
   position: relative;
   z-index: 1;
 }
 
 .fs-header-title {
-  font-size: 1.45rem;
+  font-size: 1.5rem;
   font-weight: 800;
   margin: 0;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
   position: relative;
   z-index: 1;
 }
 
 .fs-header-subtitle {
-  font-size: 0.9rem;
-  opacity: 0.85;
-  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  opacity: 0.75;
+  margin: 0.5rem 0 0;
   position: relative;
   z-index: 1;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.08);
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* === Info del equipo === */
+/* === Info del equipo ===
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Antes usaba tonos púrpura/lavanda. Ahora usa azul SIC (#1f6391)
+   para que coincida con el header de la card y el tema de la página. */
 .fs-equipo-info {
-  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  background: linear-gradient(135deg, #eff6fb 0%, #e2eef6 100%);
   padding: 1rem 1.75rem;
-  border-bottom: 1px solid rgba(109, 40, 217, 0.1);
+  border-bottom: 1px solid rgba(31, 99, 145, 0.12);
   display: flex;
   align-items: center;
   gap: 0.85rem;
@@ -137,7 +160,7 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #7c3aed;
+  color: var(--fs-primary);
   font-weight: 700;
   margin-bottom: 2px;
 }
@@ -145,7 +168,7 @@
 .fs-equipo-nombre {
   font-size: 0.95rem;
   font-weight: 800;
-  color: #1e1b4b;
+  color: #0f172a;
   margin: 0;
   line-height: 1.2;
 }
@@ -390,7 +413,8 @@
 .feedback-textarea:focus {
   outline: none;
   border-color: var(--fs-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.13);
+  /* Sombra de foco en azul SIC (antes era azul-violeta Tailwind) */
+  box-shadow: 0 0 0 3px rgba(31, 99, 145, 0.18);
 }
 
 /* === Botón submit === */
@@ -406,10 +430,10 @@
   cursor: pointer;
   transition: var(--fs-spring);
   letter-spacing: 0.3px;
-  box-shadow: 0 5px 18px rgba(102, 126, 234, 0.42);
+  box-shadow: 0 5px 18px rgba(31, 99, 145, 0.42);
   margin-top: 0.25rem;
 }
-.fs-submit-btn:hover   { transform: translateY(-2px); box-shadow: 0 9px 28px rgba(102,126,234,0.52); }
+.fs-submit-btn:hover   { transform: translateY(-2px); box-shadow: 0 9px 28px rgba(31, 99, 145, 0.52); }
 .fs-submit-btn:active  { transform: translateY(0); }
 .fs-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none !important; }
 
@@ -422,14 +446,16 @@
 }
 .fs-error-msg.visible { display: block; }
 
-/* === Badge de vigencia === */
+/* === Badge de vigencia ===
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Antes era violeta; ahora usa el azul primary semitransparente. */
 .fs-vigencia-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(109, 40, 217, 0.08);
-  color: #6d28d9;
-  border: 1px solid rgba(109, 40, 217, 0.18);
+  background: rgba(31, 99, 145, 0.08);
+  color: var(--fs-primary);
+  border: 1px solid rgba(31, 99, 145, 0.18);
   border-radius: 20px;
   padding: 0.3rem 0.85rem;
   font-size: 0.75rem;
@@ -473,7 +499,7 @@
   font-size: 1.45rem;
   font-weight: 800;
   margin: 0 0 0.75rem;
-  color: #1e1b4b;
+  color: #0f172a;
 }
 .fs-estado-msg   { color: #6b7280; margin-bottom: 1.75rem; line-height: 1.55; font-size: 0.95rem; }
 
@@ -486,10 +512,10 @@
   border-radius: 50px;
   font-weight: 700;
   font-size: 0.9rem;
-  box-shadow: 0 4px 14px rgba(102,126,234,0.4);
+  box-shadow: 0 4px 14px rgba(31, 99, 145, 0.4);
   transition: var(--fs-spring);
 }
-.fs-estado-btn:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(102,126,234,0.5); }
+.fs-estado-btn:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(31, 99, 145, 0.5); }
 
 /* === Confetti (estado gracias) === */
 .fs-confetti-wrapper {
@@ -551,9 +577,9 @@
   --fs-star-inactive: #475569;
 }
 
-/* El fondo animado se suaviza en dark (ya es oscuro, se darkifica un poco más) */
+/* Fondo dark: mismo degradado base (la página ya es oscura por defecto) */
 [data-bs-theme="dark"] .fs-body {
-  background: linear-gradient(135deg, #1e1b4b 0%, #3b0764 50%, #4a044e 100%);
+  background: linear-gradient(150deg, #071018 0%, #0a1628 25%, #0c2740 50%, #082032 75%, #050e16 100%);
 }
 
 /* Card principal - glassmorphism oscuro */
@@ -562,14 +588,14 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Info del equipo - gradiente claro → oscuro */
+/* Info del equipo en dark — tonos slate/azul, no púrpura */
 [data-bs-theme="dark"] .fs-equipo-info {
-  background: linear-gradient(135deg, #2d1b69 0%, #1e1b4b 100%);
-  border-color: rgba(139, 92, 246, 0.15);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: rgba(96, 165, 250, 0.15);
 }
 
 [data-bs-theme="dark"] .fs-equipo-folio {
-  color: #a78bfa;
+  color: #60a5fa;
 }
 
 [data-bs-theme="dark"] .fs-equipo-nombre {
@@ -659,10 +685,10 @@
   color: #64748b;
 }
 
-/* Badge de vigencia */
+/* Badge de vigencia en dark — azul claro del sistema */
 [data-bs-theme="dark"] .fs-vigencia-badge {
-  background: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
 }
 
 /* Progress bar */
@@ -697,16 +723,25 @@
   box-shadow: 0 6px 20px rgba(66, 133, 244, 0.55);
 }
 
-/* Botón secundario (visitar web) cuando ya hay botón Google */
+/* Botón secundario (visitar web) — azul SIC, no púrpura */
 .fs-estado-btn--secondary {
   background: transparent;
-  color: #7c3aed !important;
-  border: 1.5px solid #7c3aed;
+  color: var(--fs-primary) !important;
+  border: 1.5px solid var(--fs-primary);
   box-shadow: none;
   font-size: 0.85rem;
   padding: 0.55rem 1.25rem;
 }
 .fs-estado-btn--secondary:hover {
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(31, 99, 145, 0.08);
   box-shadow: none;
+}
+
+/* Enlace del footer hacia sic.com.mx */
+.fs-footer-link {
+  color: var(--fs-primary);
+  text-decoration: none;
+}
+.fs-footer-link:hover {
+  text-decoration: underline;
 }
