@@ -1020,7 +1020,9 @@ body {
     /* Late más rápido */
 }
 
-/* ===== CURSOR TRAIL (Estela) ===== */
+/* ===== CURSOR TRAIL (Estela) =====
+   Las partículas las reutiliza el pool en cursor_personalizado.ts
+   (no se crean/destruyen en cada frame). Transition ~ TRAIL_FADE_MS. */
 .cursor-trail {
     position: fixed;
     width: 6px;
@@ -1033,7 +1035,7 @@ body {
     /* Justo debajo del cursor principal */
     transform: translate(-50%, -50%);
     /* Centrado */
-    transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
     box-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
 }
 

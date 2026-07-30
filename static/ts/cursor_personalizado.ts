@@ -227,9 +227,31 @@ let motorCursorListo = false;
 /** Variante activa para colorear la estela. */
 let varianteTrailActual: Exclude<CursorId, 'system'> = 'tech';
 
-/** Intervalo mínimo entre partículas de estela (ms). */
+/**
+ * Estela — pool + frecuencia equilibrada (suave sin saturar el DOM).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes se creaba y borraba un <div> en cada partícula (~30 ms).
+ * Ahora reutilizamos N divs fijos (pool).
+ * 60 ms se sentía “a saltos”; ~42 ms es un punto medio: más suave
+ * que 60, y sigue costando menos que spawnear/destruir nodos.
+ * Si el pool está ocupado, se salta esa partícula.
+ */
+const TRAIL_POOL_SIZE = 16;
+/** Antes 30 (denso) → 60 (raro) → 42 (suave + razonable). */
+const TRAIL_INTERVAL_MS = 42;
+/** Duración del fade; debe coincidir con transition CSS (~0.4s). */
+const TRAIL_FADE_MS = 400;
+
+interface TrailParticle {
+    el: HTMLElement;
+    busy: boolean;
+    hideTimer: ReturnType<typeof setTimeout> | null;
+}
+
+let trailPool: TrailParticle[] = [];
+let trailPoolListo = false;
 let lastTrailTime = 0;
-const TRAIL_INTERVAL_MS = 30;
 
 /**
  * API pública en window para Mi Perfil y depuración.
@@ -335,29 +357,100 @@ function desactivarCursorPersonalizado(motivo: string): void {
         cursor.classList.remove('hover-active');
     }
 
+    // Ocultar partículas del pool para que no queden puntos flotando
+    ocultarPoolTrail();
+
     console.log(`Cursor personalizado deshabilitado (${motivo}) — fallback al cursor del sistema`);
 }
 
 /**
- * Crea una partícula de estela en (x, y) con color según la variante.
+ * Crea una sola vez los divs reutilizables de la estela.
+ * Efectos secundarios: añade TRAIL_POOL_SIZE nodos a document.body.
+ */
+function asegurarPoolTrail(): void {
+    if (trailPoolListo) {
+        return;
+    }
+    trailPoolListo = true;
+
+    for (let i = 0; i < TRAIL_POOL_SIZE; i++) {
+        const el = document.createElement('div');
+        // Empiezan ocultos; al spawnear se muestran y se reciclan
+        el.className = 'cursor-trail';
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(el);
+        trailPool.push({ el, busy: false, hideTimer: null });
+    }
+}
+
+/**
+ * Esconde todas las partículas del pool (p. ej. al pasar a cursor sistema).
+ */
+function ocultarPoolTrail(): void {
+    for (const slot of trailPool) {
+        if (slot.hideTimer !== null) {
+            clearTimeout(slot.hideTimer);
+            slot.hideTimer = null;
+        }
+        slot.busy = false;
+        slot.el.style.display = 'none';
+        slot.el.style.opacity = '0';
+    }
+}
+
+/**
+ * Muestra una partícula de estela en (x, y) reusando el pool.
+ *
+ * Args:
+ *   x, y — coordenadas del mouse (clientX/clientY)
+ *
+ * Efectos secundarios: reutiliza un div del pool; no crea nodos nuevos.
+ * Si todos están ocupados, no hace nada (mejor que saturar el DOM).
  */
 function crearParticulaTrail(x: number, y: number): void {
-    const particle = document.createElement('div');
-    // Clase base + modificador por variante (colores en base.css)
-    particle.className = `cursor-trail cursor-trail--${varianteTrailActual}`;
-    particle.style.left = `${x}px`;
-    particle.style.top = `${y}px`;
-    document.body.appendChild(particle);
+    asegurarPoolTrail();
 
-    // Permitir que el navegador pinte el estado inicial antes de animar
-    setTimeout(() => {
-        particle.style.transform = 'translate(-50%, -50%) scale(0)';
-        particle.style.opacity = '0';
-    }, 10);
+    // Buscar el primer slot libre
+    const slot = trailPool.find((p) => !p.busy);
+    if (!slot) {
+        return;
+    }
 
-    setTimeout(() => {
-        particle.remove();
-    }, 510);
+    slot.busy = true;
+    if (slot.hideTimer !== null) {
+        clearTimeout(slot.hideTimer);
+        slot.hideTimer = null;
+    }
+
+    const el = slot.el;
+
+    // Paso 1: reset visual SIN transición (snap a visible en la nueva posición)
+    el.style.transition = 'none';
+    el.className = `cursor-trail cursor-trail--${varianteTrailActual}`;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%, -50%) scale(1)';
+    el.style.display = '';
+
+    // Forzar reflow para que el navegador “vea” el estado inicial
+    // antes de animar el fade (si no, a veces salta directo a opacity 0)
+    void el.offsetWidth;
+
+    // Paso 2: reactivar transición CSS y animar desaparición
+    el.style.transition = '';
+    requestAnimationFrame(() => {
+        el.style.transform = 'translate(-50%, -50%) scale(0)';
+        el.style.opacity = '0';
+    });
+
+    // Paso 3: al terminar el fade, liberar el slot (no se borra el div)
+    slot.hideTimer = setTimeout(() => {
+        el.style.display = 'none';
+        slot.busy = false;
+        slot.hideTimer = null;
+    }, TRAIL_FADE_MS);
 }
 
 /**
@@ -383,6 +476,9 @@ function asegurarMotorCursor(cursor: HTMLElement): void {
     }
     motorCursorListo = true;
 
+    // Pool listo desde el primer uso del motor (12 divs fijos, no se recrean)
+    asegurarPoolTrail();
+
     // EXPLICACIÓN: requestAnimationFrame evita jank al mover el SVG
     document.addEventListener('mousemove', (e: MouseEvent) => {
         // Si el usuario eligió "sistema", el div está oculto; no crear estela
@@ -393,6 +489,7 @@ function asegurarMotorCursor(cursor: HTMLElement): void {
         requestAnimationFrame(() => {
             cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
 
+            // Menos frecuencia = menos trabajo (TRAIL_INTERVAL_MS ≈ 60)
             const now = Date.now();
             if (now - lastTrailTime > TRAIL_INTERVAL_MS) {
                 crearParticulaTrail(e.clientX, e.clientY);
