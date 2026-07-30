@@ -1148,35 +1148,46 @@ form:has(#btnSubirImagenes:disabled) textarea {
     cursor: not-allowed;
 }
 
-/* ===== ÓRDENES FUERA DE GARANTÍA CON DIAGNÓSTICO (rosa) ===== */
+/* ===== ÓRDENES FUERA DE GARANTÍA CON DIAGNÓSTICO (rosa sobrio, modo claro) ===== */
 /* EXPLICACIÓN PARA PRINCIPIANTES:
    - En lista_ordenes.html solo se asigna esta clase si orden.es_fuera_garantia
      Y tipo_servicio == 'diagnostico'. Las de garantía quedan con el estilo normal.
+   - En modo claro usamos fondo casi blanco + barra izquierda (más profesional que un rosa lleno).
    - El nombre CSS "orden-oow" se conserva por historial; el criterio es garantía + tipo.
 */
 .orden-oow {
-    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
-    border-color: #d86f92;
-    box-shadow: 0 3px 12px rgba(167, 73, 151, 0.815);
+    background: #fdf8fa;
+    border-color: #e8d0d9;
+    border-left: 4px solid #d4849a;
+    box-shadow: 0 1px 4px rgba(148, 80, 110, 0.08);
 }
 
 .orden-oow:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(233, 30, 99, 0.25);
-    border-color: #c55582;
+    background: #fbf3f6;
+    border-color: #dcb0c0;
+    border-left-color: #c26b85;
+    box-shadow: 0 6px 18px rgba(148, 80, 110, 0.12);
 }
 
-/* ===== ÓRDENES FUERA DE GARANTÍA VENTA MOSTRADOR (rosa más fuerte) ===== */
+/* ===== ÓRDENES FUERA DE GARANTÍA VENTA MOSTRADOR (rosa un poco más marcado) ===== */
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   - Un tono más visible que diagnóstico, para distinguir FL/venta mostrador de un vistazo.
+   - Fondo un poco más rosa + barra izquierda más gruesa y saturada.
+*/
 .orden-fl {
-    background: linear-gradient(135deg, #f48fb1 0%, #eba6bd8e 100%);
-    border-color: #c75f89;
-    box-shadow: 0 3px 12px rgba(167, 73, 151, 0.815);
+    background: #f7e6ed;
+    border-color: #d49aaf;
+    border-left: 5px solid #b8325c;
+    box-shadow: 0 2px 6px rgba(148, 80, 110, 0.14);
 }
 
 .orden-fl:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 30px rgba(194, 24, 91, 0.35);
-    border-color: #880e4f;
+    background: #f3dde7;
+    border-color: #c8809a;
+    border-left-color: #9a284c;
+    box-shadow: 0 6px 18px rgba(148, 80, 110, 0.18);
 }
 
 /* ===== CUADRO INFORMATIVO: EQUIPOS "NO ENCIENDE" POR TÉCNICO ===== */
@@ -4341,16 +4352,18 @@ thead.sticky-top {
     color: #ffffff;
 }
 
-/* ===== ÓRDENES POR TIPO DE SERVICIO (dark) ===== */
+/* ===== ÓRDENES POR TIPO DE SERVICIO (dark) — se deja el tint suave que ya gustaba ===== */
 [data-bs-theme="dark"] .orden-oow {
     background: linear-gradient(135deg, rgba(252, 228, 236, 0.15) 0%, rgba(248, 187, 217, 0.15) 100%);
     border-color: rgba(216, 111, 146, 0.5);
+    border-left-color: #d4849a;
     box-shadow: 0 3px 12px rgba(167, 73, 151, 0.3);
 }
 
 [data-bs-theme="dark"] .orden-fl {
-    background: linear-gradient(135deg, rgba(244, 143, 177, 0.15) 0%, rgba(235, 166, 189, 0.15) 100%);
-    border-color: rgba(199, 95, 137, 0.5);
+    background: linear-gradient(135deg, rgba(244, 143, 177, 0.22) 0%, rgba(235, 166, 189, 0.22) 100%);
+    border-color: rgba(199, 95, 137, 0.65);
+    border-left: 5px solid #c45f7e;
 }
 
 /* ===== CUADROS INFORMATIVOS ===== */
@@ -5555,13 +5568,15 @@ thead.sticky-top {
 }
 
 .orden-oow:hover {
-    border-color: #c2185b;
-    box-shadow: 0 10px 28px rgba(136, 14, 79, 0.18);
+    border-color: #dcb0c0;
+    border-left-color: #c26b85;
+    box-shadow: 0 8px 22px rgba(148, 80, 110, 0.12);
 }
 
 .orden-fl:hover {
-    border-color: #c75f89;
-    box-shadow: 0 10px 28px rgba(199, 95, 137, 0.20);
+    border-color: #c8809a;
+    border-left-color: #9a284c;
+    box-shadow: 0 8px 22px rgba(148, 80, 110, 0.18);
 }
 
 /* Accesibilidad: sin animaciones si el usuario prefiere reducir movimiento */
