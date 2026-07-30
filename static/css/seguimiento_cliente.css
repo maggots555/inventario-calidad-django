@@ -1190,9 +1190,17 @@
   color: #e2e8f0;
 }
 
-[data-bs-theme="dark"] .st-equipo-serial,
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   S/N y la falla van sobre el bloque oscuro del equipo (#0c2340).
+   #94a3b8 era demasiado apagado; aclaramos para leer la falla reportada sin esfuerzo. */
+[data-bs-theme="dark"] .st-equipo-serial {
+  color: #cbd5e1;
+}
+
 [data-bs-theme="dark"] .st-equipo-falla {
-  color: #94a3b8;
+  color: #e2e8f0;
+  background: rgba(96, 165, 250, 0.12);
+  border-left-color: #60a5fa;
 }
 
 /* Timeline */
@@ -1236,16 +1244,20 @@
   color: #e2e8f0;
 }
 
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   En dark mode el fondo del nodo es casi negro (#0c2340 / #0f172a).
+   Los grises antiguos (#64748b, #475569) se “perdían” y fallaban contraste WCAG.
+   Usamos tonos más claros de la paleta del proyecto para que fecha y “Hace…” se lean bien. */
 [data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content .st-timeline-nombre {
-  color: #7dd3fc;
+  color: #bae6fd;
 }
 
 [data-bs-theme="dark"] .st-timeline-fecha {
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 [data-bs-theme="dark"] .st-timeline-hace {
-  color: #475569;
+  color: #94a3b8;
 }
 
 /* Banners contextuales */
@@ -1358,14 +1370,25 @@
   border-color: #60a5fa;
   box-shadow: 0 4px 16px rgba(96, 165, 250, 0.2), 0 0 0 2px rgba(96, 165, 250, 0.1);
 }
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   El fondo del footer en dark es casi negro (#0c1a2e / #0f172a).
+   Los grises #475569 / #334155 y el azul de marca #1f6391 se “perdían”.
+   Aclaramos texto secundario y acentos (misma lógica de contraste que el timeline). */
 [data-bs-theme="dark"] .st-footer-brand-line {
-  color: #475569;
+  color: #cbd5e1;
+}
+[data-bs-theme="dark"] .st-footer-brand {
+  color: #bae6fd;
 }
 [data-bs-theme="dark"] .st-footer-sep {
-  color: #334155;
+  color: #94a3b8;
+}
+[data-bs-theme="dark"] .st-footer-website {
+  color: #7dd3fc;
+  opacity: 0.95;
 }
 [data-bs-theme="dark"] .st-footer-refresh {
-  color: #334155;
+  color: #94a3b8;
 }
 
 /* Galería */
