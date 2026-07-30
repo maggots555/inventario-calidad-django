@@ -173,6 +173,36 @@ const CURSOR_VARIANTES = {
   </g>
 </svg>`.trim(),
     },
+    ganso: {
+        id: 'ganso',
+        nombre: 'Ganso',
+        descripcion: 'Ganso blanco con pico naranja (hotspot).',
+        accent: '#f97316',
+        svgMarkup: `
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="dropShadowGansoRuntime" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowGansoRuntime)">
+    <ellipse cx="18" cy="21" rx="10" ry="7.5" fill="#f8fafc" stroke="#64748b" stroke-width="1.1"/>
+    <path d="M12 20 C15 17 20 17 24 20 C20 22 15 22 12 20 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="0.7"/>
+    <path d="M12 16 C10 12 8 8 7 5 C9 4.5 11 6 12 9 C13 12 14 15 15 17 Z" fill="#f8fafc" stroke="#64748b" stroke-width="1.1" stroke-linejoin="round"/>
+    <circle cx="7.5" cy="5.5" r="3.4" fill="#f8fafc" stroke="#64748b" stroke-width="1.1"/>
+    <circle cx="6.4" cy="5" r="0.85" fill="#1e293b"/>
+    <circle cx="6.15" cy="4.75" r="0.28" fill="#ffffff"/>
+    <path d="M4.5 5.8 L1.5 4.2 L4.3 3.4 Z" fill="#f97316" stroke="#c2410c" stroke-width="0.7" stroke-linejoin="round"/>
+    <path d="M14 28 L12.5 30.5 M14 28 L14.5 30.5 M14 28 L15.5 30.2" stroke="#f97316" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M20 28 L18.5 30.5 M20 28 L20.5 30.5 M20 28 L21.5 30.2" stroke="#f97316" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M26 18 C29 17 30 20 28 22 C27 20 27 19 26 18 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="0.7"/>
+    <circle class="cursor-core-dot" cx="18" cy="20" r="1.2" fill="#cbd5e1" opacity="0.95"/>
+  </g>
+</svg>`.trim(),
+    },
 };
 /** Opción “cursor del sistema” (sin SVG custom). */
 const CURSOR_SYSTEM_ITEM = {
@@ -188,6 +218,7 @@ const CURSOR_IDS_VALIDOS = [
     'banana',
     'hongo',
     'metallica',
+    'ganso',
     'system',
 ];
 /** Evita registrar mousemove/hover dos veces al cambiar de variante. */

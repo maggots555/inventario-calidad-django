@@ -1074,6 +1074,12 @@ body {
     box-shadow: 0 0 4px rgba(148, 163, 184, 0.35);
 }
 
+/* Estela Ganso (pico naranja) */
+.cursor-trail--ganso {
+    background-color: rgba(249, 115, 22, 0.55);
+    box-shadow: 0 0 4px rgba(249, 115, 22, 0.35);
+}
+
 /* ===== OCULTAR CURSOR PERSONALIZADO EN MÓVILES Y TABLETS ===== */
 /* Detectar dispositivos táctiles y pantallas pequeñas */
 @media (hover: none) and (pointer: coarse), (max-width: 1024px) {

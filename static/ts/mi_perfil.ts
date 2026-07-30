@@ -198,6 +198,7 @@ const CURSOR_NOMBRES: Record<CursorId, string> = {
     banana: 'Banana',
     hongo: 'Hongo Mario',
     metallica: 'Metallica M',
+    ganso: 'Ganso',
     system: 'Sistema',
 };
 
