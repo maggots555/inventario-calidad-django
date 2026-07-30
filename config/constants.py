@@ -809,10 +809,11 @@ INCLUSIONES_SERVICIO_ADICIONAL = {
 }
 
 # Aviso comercial cuando el documento (PDF/email) es solo de servicios.
-# El cálculo ya omite el descuento de diagnóstico; este texto lo explica al cliente.
+# El diagnóstico se cobra al ingresar el equipo y no forma parte de esta cotización.
 AVISO_DIAGNOSTICO_SOLO_SERVICIOS = (
-    'Este documento no incluye descuento de diagnóstico. '
-    'El descuento de diagnóstico aplica únicamente para el reemplazo de piezas.'
+    'Este documento no incluye el cargo de diagnóstico. '
+    'El diagnóstico se cobra por separado al ingresar el equipo; '
+    'la reparación se abona en su totalidad.'
 )
 
 # Países donde aplican inclusiones de paquetes y el aviso de diagnóstico.

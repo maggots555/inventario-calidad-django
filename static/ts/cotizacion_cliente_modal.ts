@@ -76,11 +76,11 @@ interface ServicioItem {
 /** Resultado de la calculadora de profit */
 interface ResultadoCalculo {
     subtotal_costo:         number;   // suma de costos internos de piezas
-    precio_piezas_sin_iva:  number;   // piezas con margen, sin diagnóstico
-    precio_sin_iva:         number;   // precio al cliente sin IVA (piezas + diagnóstico)
+    precio_piezas_sin_iva:  number;   // piezas con margen (total de reparación sin IVA)
+    precio_sin_iva:         number;   // precio al cliente sin IVA (= piezas con margen)
     precio_con_iva:         number;   // precio al cliente con IVA 16%
-    diagnostico:            number;   // costo del diagnóstico del perfil
-    precio_menos_diag_iva:  number;   // precio_con_iva - diagnostico*(1+0.16)
+    diagnostico:            number;   // siempre 0: el diagnóstico no entra en reparación
+    precio_menos_diag_iva:  number;   // legacy (= precio_con_iva; ya no hay descuento)
     costos_fijos_total:     number;   // suma de costos fijos internos (auditoría)
     porcentaje_profit:      number;   // ej. 0.36 para estándar
     mano_obra:              number;   // mano de obra interna (auditoría)
@@ -99,12 +99,13 @@ interface ResultadoCalculo {
  * Fórmula (espejo exacto del backend Python en pdf_cotizacion_cliente.py):
  *
  *   precio_piezas_sin_iva = costoPiezas / (1 - profit%)
- *   precio_sin_iva        = precio_piezas_sin_iva + diagnostico
+ *   precio_sin_iva        = precio_piezas_sin_iva   // sin sumar diagnóstico
  *   precio_con_iva        = precio_sin_iva * 1.16
- *   precio_menos_diag     = precio_con_iva - (diagnostico * 1.16)
  *
+ * El diagnóstico se cobra al ingresar el equipo y NO se diluye ni se
+ * descuenta en la cotización de reparación.
  * Los costos fijos y la mano de obra NO inflan el precio al cliente; solo
- * alimentan la ganancia bruta de control interno (bloque BRUTO del Excel).
+ * alimentan la ganancia bruta de control interno.
  *
  * @param tipo         - Perfil de servicio ('estandar', 'alta_gama', etc.)
  * @param costoTotal   - Suma de costos internos de piezas (sin servicios adicionales)
@@ -120,16 +121,13 @@ function calcularPrecioCliente(
 
     const profit      = cfg?.profit_target  ?? 0.36;
     const costosFijos = cfg?.costos_fijos   ?? [25, 160];
-    const diagnostico = cfg?.diagnostico    ?? 570;
 
     const costosFijosTotal = costosFijos.reduce((a: number, b: number) => a + b, 0);
 
-    // Regla Excel: margen SOLO sobre piezas; diagnóstico se suma después
+    // Margen SOLO sobre piezas; el diagnóstico ya no se suma al total de reparación
     const precioPiezasSinIva = profit < 1 ? costoTotal / (1 - profit) : costoTotal;
-    const precioSinIva = precioPiezasSinIva + diagnostico;
-
+    const precioSinIva = precioPiezasSinIva;
     const precioConIva = precioSinIva * 1.16;
-    const precioMenosDiagIva = precioConIva - (diagnostico * 1.16);
 
     // Métricas de control interno (no van al cliente)
     const totalCostosExcel = costoTotal + manoObra + costosFijosTotal;
@@ -143,8 +141,8 @@ function calcularPrecioCliente(
         precio_piezas_sin_iva: precioPiezasSinIva,
         precio_sin_iva:        precioSinIva,
         precio_con_iva:        precioConIva,
-        diagnostico:           diagnostico,
-        precio_menos_diag_iva: precioMenosDiagIva,
+        diagnostico:           0,
+        precio_menos_diag_iva: precioConIva,
         costos_fijos_total:    costosFijosTotal,
         porcentaje_profit:     profit,
         mano_obra:             manoObra,
@@ -207,8 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Referencias a elementos del DOM ---
     const tipoServicioInput  = document.querySelector<HTMLInputElement>('#tipoServicioInput');
     // manoObraOverride ya no existe como input — el campo es solo informativo.
-    // La mano de obra NO entra en el cálculo de profit; el diagnóstico ya va incluido
-    // en el perfil seleccionado. Por eso se pasa siempre 0 a calcularPrecioCliente().
+    // La mano de obra NO entra en el cálculo de profit. El diagnóstico se cobra
+    // al ingresar el equipo y tampoco entra en esta cotización de reparación.
     const calcBody           = document.querySelector<HTMLElement>('#calcBody');
     const btnPreviewPDF      = document.querySelector<HTMLButtonElement>('#btnPreviewPDF');
     const iframePreview      = document.querySelector<HTMLIFrameElement>('#iframePreviewPDF');
@@ -216,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewPlaceholder = document.querySelector<HTMLElement>('#previewPDFPlaceholder');
     const btnConfirmar       = document.querySelector<HTMLButtonElement>('#btnConfirmarEnvioCliente');
     const alertaDiv          = document.querySelector<HTMLElement>('#alertaEnvioModal');
-    const checkDescuento     = document.querySelector<HTMLInputElement>('#checkDescuentoDiagnostico');
     const emailClienteInput  = document.querySelector<HTMLInputElement>('#emailClienteInput');
     const emailClienteCard   = document.querySelector<HTMLElement>('#emailClienteCard');
     const emailEstadoLabel   = document.querySelector<HTMLElement>('#emailClienteEstadoLabel');
@@ -324,11 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --------------------------------------------------------
-    // EVENTO: Cambio en checkbox de descuento diagnóstico
-    // --------------------------------------------------------
-    checkDescuento?.addEventListener('change', actualizarCalculadora);
-
-    // --------------------------------------------------------
     // EVENTO: Botones de modo de agrupación (visual)
     // --------------------------------------------------------
     const agrupacionOptions = document.querySelectorAll<HTMLElement>('.agrupacion-option');
@@ -409,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const tipo = tipoServicioInput.value || 'estandar';
         // Mano de obra = 0: el campo es solo informativo, no entra en el cálculo.
-        // El diagnóstico ya se incluye automáticamente al seleccionar el perfil de profit.
+        // El diagnóstico tampoco entra: se cobra al ingresar el equipo.
         const manoObra = 0;
 
         const lineasActivas = config.lineas.filter(l => esItemCotizable(l.estado_cliente || 'pendiente'));
@@ -452,17 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Profit solo sobre piezas; diagnóstico del perfil se suma aparte
+        // Profit solo sobre piezas (sin diluir ni descontar diagnóstico)
         const res = calcularPrecioCliente(tipo, costoLineas, manoObra);
-
-        // Totales combinados: piezas (con profit) + servicios (precio fijo)
         const precioConIvaTotal = res.precio_con_iva + serviciosConIva;
-        const precioMenosDiagTotal = res.diagnostico > 0
-            ? precioConIvaTotal - (res.diagnostico * 1.16)
-            : precioConIvaTotal;
-
-        // Determinar si se muestra el descuento diagnóstico
-        const mostrarDescuento = checkDescuento?.checked ?? false;
 
         // Construir las filas de resultado en HTML
         calcBody.innerHTML = `
@@ -489,11 +473,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="etq">Profit aplicado (solo sobre costo de piezas)</span>
                 <span class="val">${fmtPct(res.porcentaje_profit)}</span>
             </div>
-            ${res.diagnostico > 0 ? `
-            <div class="calc-row">
-                <span class="etq">Diagnóstico técnico (cargo fijo, sin profit)</span>
-                <span class="val">${fmtPeso(res.diagnostico)}</span>
-            </div>` : ''}
             <div class="calc-row">
                 <span class="etq">Reparación y piezas (sin IVA, con margen)</span>
                 <span class="val">${fmtPeso(res.precio_piezas_sin_iva)}</span>
@@ -502,15 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="etq">TOTAL CON IVA (16%)</span>
                 <span class="val">${fmtPeso(precioConIvaTotal)}</span>
             </div>
-            ${mostrarDescuento && res.diagnostico > 0 ? `
-            <div class="calc-row descuento">
-                <span class="etq">- Diagnóstico ya pagado: ${fmtPeso(res.diagnostico)} + IVA</span>
-                <span class="val">- ${fmtPeso(res.diagnostico * 1.16)}</span>
-            </div>
-            <div class="calc-row total-pagar">
-                <span class="etq">TOTAL A PAGAR (menos diagnóstico)</span>
-                <span class="val">${fmtPeso(precioMenosDiagTotal)}</span>
-            </div>` : ''}
         `;
     }
 
@@ -560,14 +530,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const tipo      = tipoServicioInput.value || 'estandar';
-        const descuento = checkDescuento?.checked ? '1' : '0';
 
         // Construir la URL del preview con parámetros.
         // mano_de_obra_override=0: la mano de obra ya no entra en la cotización al cliente.
+        // El descuento de diagnóstico ya no existe (reparación se abona completa).
         const params = new URLSearchParams({
             tipo_servicio: tipo,
             mano_de_obra_override: '0',
-            incluir_descuento_diagnostico: descuento,
         });
 
         const url = `${config.urlPreview}?${params.toString()}`;
@@ -640,9 +609,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('modo_cotizacion', 'reparacion');
                 formData.append('tipo_servicio',         tipoServicioInput.value || 'estandar');
                 formData.append('mano_de_obra_override', '0');
-                if (checkDescuento?.checked) {
-                    formData.append('incluir_descuento_diagnostico', '1');
-                }
                 const radioAgrupacion = document.querySelector<HTMLInputElement>('input[name="modo_agrupacion"]:checked');
                 formData.append('modo_agrupacion', radioAgrupacion?.value ?? 'todo_junto');
             }

@@ -3076,7 +3076,10 @@ class SolicitudCotizacion(models.Model):
     incluir_descuento_diagnostico_cliente = models.BooleanField(
         default=True,
         verbose_name='Descontar diagnóstico (envío al cliente)',
-        help_text='Si el PDF enviado al cliente incluía descuento de diagnóstico'
+        help_text=(
+            'Legacy: ya no se descuenta el diagnóstico en cotizaciones nuevas. '
+            'Se conserva por historial; el código siempre guarda False al enviar.'
+        ),
     )
     fecha_precios_cliente = models.DateTimeField(
         null=True,
@@ -3109,7 +3112,10 @@ class SolicitudCotizacion(models.Model):
         null=True,
         blank=True,
         verbose_name='Total cliente menos diagnóstico',
-        help_text='Total con IVA restando diagnóstico ya pagado (si aplica)'
+        help_text=(
+            'Legacy: en cotizaciones nuevas queda vacío (None). '
+            'Antes guardaba el total con IVA restando el diagnóstico ya pagado.'
+        ),
     )
 
     # ========== COTIZACIÓN EQUIPO REACONDICIONADO ==========
@@ -5885,11 +5891,13 @@ class ConfiguracionProfitPerfil(models.Model):
         perfil         : Clave interna usada por el motor de profit y el PDF.
         profit_target  : Fracción de margen (ej. 0.36 = 36%).
         costos_fijos   : Montos internos separados por coma (ej. "25,160").
-        diagnostico    : Cargo de evaluación técnica (MXN sin IVA).
+        diagnostico    : Monto de referencia (auditoría). Ya no entra al precio
+                         de reparación; se cobra al ingresar el equipo.
 
     Efectos secundarios:
         Al guardar desde el panel, los cálculos nuevos (modal, PDF, Celery)
-        usan estos valores de inmediato. Las cotizaciones ya enviadas no
+        usan profit y costos fijos de inmediato. El campo diagnóstico no
+        altera el total de reparación. Las cotizaciones ya enviadas no
         se recalculan.
     """
 
@@ -5927,7 +5935,10 @@ class ConfiguracionProfitPerfil(models.Model):
         default=0,
         validators=[MinValueValidator(0)],
         verbose_name='Diagnóstico (MXN sin IVA)',
-        help_text='Cargo de evaluación técnica incluido en el precio al cliente.',
+        help_text=(
+            'Referencia / auditoría. Ya NO se incluye ni se diluye en la '
+            'cotización de reparación; el diagnóstico se cobra al ingresar el equipo.'
+        ),
     )
     actualizado_por = models.ForeignKey(
         User,

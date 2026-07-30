@@ -63,7 +63,7 @@ class ParametrosCotizadorGetterTest(TestCase):
         """
         Si el panel guarda profit 50% en estándar, el cálculo lo refleja.
 
-        EXPLICACIÓN: costo 1000 con profit 0.50 → piezas = 2000; + diag 0 = 2000.
+        EXPLICACIÓN: costo 1000 con profit 0.50 → piezas = 2000 (sin diagnóstico).
         """
         asegurar_parametros_iniciales()
         guardar_profit_perfiles({
@@ -115,8 +115,51 @@ class ParametrosCotizadorGetterTest(TestCase):
             items=items,
             tipo_servicio='estandar',
         )
-        # 1000 / (1 - 0.50) + 0 = 2000
+        # 1000 / (1 - 0.50) = 2000 (el diagnóstico del panel no suma)
         self.assertAlmostEqual(calc['precio_sin_iva'], 2000.0, places=2)
+
+    def test_diagnostico_bd_no_infla_precio_reparacion(self):
+        """
+        Guardar diagnóstico alto en el panel NO debe subir el total de reparación.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El campo sigue en BD por auditoría, pero el motor de cotización ya no
+        lo suma ni lo diluye. Con profit 36%, 1000 de costo → 1562.50 siempre.
+        """
+        asegurar_parametros_iniciales()
+        cfg_base = obtener_profit_config()
+        perfiles = {}
+        for clave, datos in cfg_base.items():
+            costos = datos['costos_fijos']
+            if isinstance(costos, list):
+                costos_str = ','.join(str(c) for c in costos)
+            else:
+                costos_str = str(costos)
+            perfiles[clave] = {
+                'profit_target': Decimal(str(datos['profit_target'])),
+                'costos_fijos': costos_str,
+                'diagnostico': Decimal('9999') if clave == 'estandar' else Decimal(
+                    str(datos['diagnostico'])
+                ),
+            }
+        guardar_profit_perfiles(perfiles)
+
+        cfg = obtener_profit_config()
+        self.assertEqual(cfg['estandar']['diagnostico'], 9999.0)
+
+        calc = calcular_precios_items_cotizacion(
+            items=[{
+                'descripcion': 'Pieza',
+                'cantidad': 1,
+                'costo_unitario': 1000.0,
+                'es_servicio': False,
+            }],
+            tipo_servicio='estandar',
+        )
+        # Solo margen 36%: 1000 / 0.64 = 1562.50 (sin los 9999 de diagnóstico)
+        self.assertAlmostEqual(calc['precio_sin_iva'], 1562.50, places=2)
+        self.assertEqual(calc['diagnostico'], 0)
+        self.assertIsNone(calc['precio_menos_diagnostico'])
 
     def test_override_bd_cambia_costeo_reacondicionado(self):
         """Cambiar margen REAC en BD altera el subtotal."""

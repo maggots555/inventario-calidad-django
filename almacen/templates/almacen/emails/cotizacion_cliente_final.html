@@ -194,7 +194,7 @@
             font-weight: 700;
             font-size: 16px;
         }
-        /* Fila total a pagar (con descuento diagnóstico) */
+        /* Fila total a pagar (legacy; ya no se usa en reparación) */
         .total-row.final {
             background-color: #1d4e8f;
         }
@@ -217,7 +217,7 @@
         .pdf-notice strong {
             color: #e65100;
         }
-        /* Aviso México: cotización solo servicios (sin descuento diagnóstico) */
+        /* Aviso México: cotización solo servicios (diagnóstico cobrado aparte) */
         .aviso-solo-servicios {
             background-color: #FDECEC;
             border: 1px solid #C00000;
@@ -533,27 +533,11 @@
             <div class="totales-header">Resumen de Cotización</div>
             <div class="totales-body">
 
-                <!-- Total con IVA — siempre visible y destacado -->
+                <!-- Total con IVA — siempre visible y destacado (reparación completa) -->
                 <div class="total-row destacado">
                     <span class="etiqueta">TOTAL CON IVA (16%)</span>
                     <span class="monto">${{ calculo.precio_con_iva|floatformat:2 }} MXN</span>
                 </div>
-
-                <!-- Total a pagar con descuento diagnóstico — solo si aplica -->
-                {% if incluir_descuento and calculo.precio_menos_diagnostico %}
-                <div class="total-row" style="background-color: #f5f5f5;">
-                    <span class="etiqueta" style="color: #666; font-size: 13px;">
-                        Descuento diagnóstico incluido (diagnóstico ya pagado)
-                    </span>
-                    <span class="monto" style="color: #666; font-size: 13px;">
-                        - ${{ calculo.diagnostico|floatformat:2 }} + IVA
-                    </span>
-                </div>
-                <div class="total-row final">
-                    <span class="etiqueta">TOTAL A PAGAR (aplicando descuento diagnóstico)</span>
-                    <span class="monto">${{ calculo.precio_menos_diagnostico|floatformat:2 }} MXN</span>
-                </div>
-                {% endif %}
             </div>
         </div>
 

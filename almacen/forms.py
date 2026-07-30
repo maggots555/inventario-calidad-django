@@ -2661,7 +2661,10 @@ class ParametrosProfitPerfilForm(forms.Form):
         decimal_places=2,
         min_value=0,
         label='Diagnóstico (MXN sin IVA)',
-        help_text='Cargo de evaluación técnica incluido en el precio al cliente.',
+        help_text=(
+            'Referencia / auditoría. Ya NO se incluye ni se diluye en la '
+            'cotización de reparación; el diagnóstico se cobra al ingresar el equipo.'
+        ),
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
             'step': '0.01',

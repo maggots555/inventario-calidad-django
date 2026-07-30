@@ -1013,32 +1013,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="form-text" style="font-size: 0.75rem;">
                                 Valor registrado en la cotización de Servicio Técnico.
                                 Úsalo como referencia para elegir el perfil de profit correcto.
-                                El diagnóstico ya está incluido en cada perfil.
+                                El diagnóstico se cobra al ingresar el equipo y no se incluye en esta cotización.
                             </div>
                         </div>
 
-                        <!-- --- 3. DESCUENTO DIAGNÓSTICO --- -->
-                        {% if solicitud.orden_servicio %}
-                        <div class="mb-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox"
-                                       id="checkDescuentoDiagnostico" name="incluir_descuento_diagnostico"
-                                       value="1" checked>
-                                <label class="form-check-label fw-semibold" for="checkDescuentoDiagnostico"
-                                       style="font-size: 0.87rem;">
-                                    <i class="bi bi-tag-fill me-1 text-success"></i>
-                                    Descontar costo de diagnóstico del total
-                                </label>
-                            </div>
-                            <div class="form-text ms-4" style="font-size: 0.75rem;">
-                                El cliente ya pagó el diagnóstico. Se mostrará el total a pagar restando ese costo.
-                            </div>
-                        </div>
-                        {% else %}
-                        <input type="hidden" name="incluir_descuento_diagnostico" value="0">
-                        {% endif %}
-
-                        <!-- --- 4. CALCULADORA DE PROFIT (resultado dinámico) --- -->
+                        <!-- --- 3. CALCULADORA DE PROFIT (resultado dinámico) --- -->
                         <div id="calcResultadoContainer" class="mb-4">
                             <div class="calc-resultado-panel">
                                 <div class="calc-resultado-header">

@@ -113,15 +113,13 @@ def calcular_precios_cliente_solicitud(solicitud) -> Dict[str, Any]:
     """
     items = construir_items_desde_solicitud(solicitud)
     tipo_servicio = obtener_tipo_servicio_solicitud(solicitud)
-    incluir_descuento = bool(
-        getattr(solicitud, 'incluir_descuento_diagnostico_cliente', True)
-    )
     mano_obra = _obtener_mano_obra_solicitud(solicitud)
 
+    # Sin descuento ni dilución de diagnóstico: reparación completa
     calculo = calcular_precios_items_cotizacion(
         items=items,
         tipo_servicio=tipo_servicio,
-        incluir_descuento_diagnostico=incluir_descuento,
+        incluir_descuento_diagnostico=False,
         mano_de_obra_override=mano_obra,
     )
 
@@ -142,11 +140,8 @@ def calcular_precios_cliente_solicitud(solicitud) -> Dict[str, Any]:
         'precios_por_linea': precios_por_linea,
         'precio_total_sin_iva_cliente': Decimal(str(calculo.get('precio_sin_iva', 0))),
         'precio_total_con_iva_cliente': Decimal(str(calculo.get('precio_con_iva', 0))),
-        'precio_total_menos_diagnostico_cliente': (
-            Decimal(str(calculo['precio_menos_diagnostico']))
-            if calculo.get('precio_menos_diagnostico') is not None
-            else None
-        ),
+        # Campo histórico: ya no se calcula total menos diagnóstico
+        'precio_total_menos_diagnostico_cliente': None,
     }
 
 

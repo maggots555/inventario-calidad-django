@@ -493,7 +493,7 @@ def enviar_cotizacion_cliente_task(
     tipo_servicio,
     items,
     titulo_propuesta='',
-    incluir_descuento_diagnostico=True,
+    incluir_descuento_diagnostico=False,
     mano_de_obra_override=None,
     mensaje_personalizado='',
     asunto_correo='',
@@ -522,7 +522,7 @@ def enviar_cotizacion_cliente_task(
         tipo_servicio                : Clave del perfil ('estandar', 'express', etc.)
         items                        : Lista de dicts con los ítems del PDF (ya serializada).
         titulo_propuesta             : Título de la propuesta (vacío = usar nombre del perfil).
-        incluir_descuento_diagnostico: Si True, muestra el precio con deducción de diagnóstico.
+        incluir_descuento_diagnostico: Legacy; siempre se fuerza a False (sin descuento).
         mano_de_obra_override        : Costo de mano de obra (informativo, se ignora en cálculo).
         mensaje_personalizado        : Texto adicional para el cuerpo del email.
         asunto_correo                : Asunto personalizado. Si está vacío se genera automáticamente.
@@ -595,7 +595,7 @@ def enviar_cotizacion_cliente_task(
                 tipo_servicio=tipo_servicio,
                 items=items,
                 titulo_propuesta=titulo_propuesta,
-                incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+                incluir_descuento_diagnostico=False,
                 mano_de_obra_override=mano_de_obra_override,
                 pais_config=_pais,
             )
@@ -677,7 +677,7 @@ def enviar_cotizacion_cliente_task(
             calculo_resumen = calcular_precio_cliente(
                 costo_piezas=total_piezas_costo,
                 tipo_servicio=tipo_servicio,
-                incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+                incluir_descuento_diagnostico=False,
                 servicios_con_iva=servicios_con_iva,
             )
             info_equipo_reac = None
@@ -713,9 +713,7 @@ def enviar_cotizacion_cliente_task(
             asunto_fallback=asunto_base,
         )
 
-        # Avisos MX: solo-servicios (descuento diagnóstico) y mención Solución Plata
-        # EXPLICACIÓN: en modo piezas_vs_servicios, el envío de solo servicios
-        # también entra aquí porque items no trae piezas.
+        # Avisos MX: solo-servicios (diagnóstico cobrado aparte) y mención Solución Plata
         hay_piezas_email = any(not item.get('es_servicio') for item in (items or []))
         hay_servicios_email = any(item.get('es_servicio') for item in (items or []))
         es_solo_servicios = (not hay_piezas_email) and hay_servicios_email and not es_reacondicionado
@@ -742,7 +740,7 @@ def enviar_cotizacion_cliente_task(
             'pais_nombre':           _pais.get('nombre', ''),
             'whatsapp_empleado':     whatsapp_empleado,
             'nombre_usuario':        nombre_usuario,
-            'incluir_descuento':     incluir_descuento_diagnostico,
+            'incluir_descuento':     False,
             'es_reacondicionado':    es_reacondicionado,
             'costeo_reac':           costeo_reac or {},
             'info_equipo_reac':      info_equipo_reac or {},

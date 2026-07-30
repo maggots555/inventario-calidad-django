@@ -164,6 +164,9 @@ class CotizacionTotalesFinalTest(SimpleTestCase):
         calculo = calcular_totales_items_finales(items, diagnostico=570)
         self.assertEqual(calculo['precio_sin_iva'], 2200.0)
         self.assertEqual(calculo['precio_con_iva'], round(1200 * 1.16 + 1160, 2))
+        # El diagnóstico legacy ya no resta del total de reparación
+        self.assertIsNone(calculo.get('precio_menos_diagnostico'))
+        self.assertEqual(calculo['diagnostico'], 0)
 
 
 class CotizacionPdfFinalReacondicionadoTest(SimpleTestCase):

@@ -13,7 +13,7 @@ Estructura del PDF generado:
 3. Datos del cliente (nombre, RFC, email, teléfono, centro de servicio)
 4. Datos del equipo (marca, modelo, tipo, service tag)
 5. Tabla de productos/servicios (con precios ya con margen aplicado, sin IVA)
-6. Sección Cotización (totales: sin IVA, con IVA, descuento diagnóstico si aplica)
+6. Sección Cotización (totales: sin IVA y con IVA; el diagnóstico ya no entra en reparación)
 7. Página adicional: Términos y condiciones legales + QR equipos reacondicionados
 
 Uso básico:
@@ -195,19 +195,21 @@ def _calcular_matematica_profit(
     mano_obra: float = 0.0,
 ) -> Dict[str, float]:
     """
-    Núcleo matemático alineado con el libro de Excel operativo.
+    Núcleo matemático de precio al cliente para cotización de reparación.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
     El margen (profit_target) SOLO se aplica sobre el costo de piezas físicas.
-    El diagnóstico se suma después, sin margen.
+    El diagnóstico YA NO se suma ni se diluye en las piezas: se cobra aparte
+    al ingresar el equipo. El parámetro ``diagnostico`` se conserva por
+    compatibilidad de firma, pero no afecta el precio de reparación.
     Los costos fijos y la mano de obra NO inflan el precio al cliente; solo
     reducen la ganancia bruta real en el bloque de control interno.
 
     Args:
         suma_costos_brutos : Σ(costo_unitario × cantidad) de piezas.
         profit_target      : Margen esperado (ej. 0.36 = 36%).
-        diagnostico        : Cargo plano por revisión técnica (MXN sin IVA).
+        diagnostico        : Ignorado en el precio (legacy; cobro aparte al ingreso).
         costos_fijos       : Gastos operativos internos del perfil (MXN sin IVA).
         mano_obra          : Mano de obra interna (solo auditoría, no precio cliente).
 
@@ -216,7 +218,8 @@ def _calcular_matematica_profit(
     """
     costos_brutos = _a_decimal(suma_costos_brutos)
     target = _a_decimal(profit_target)
-    diag = _a_decimal(diagnostico)
+    # EXPLICACIÓN: se lee para no romper firmas/callers, pero NO entra al precio.
+    _ = _a_decimal(diagnostico)
     mo = _a_decimal(mano_obra)
     suma_fijos = sum((_a_decimal(c) for c in costos_fijos), Decimal('0'))
 
@@ -225,17 +228,17 @@ def _calcular_matematica_profit(
     if factor <= 0:
         factor = Decimal('1')
 
-    # Regla Excel: margen solo sobre piezas
+    # Margen solo sobre piezas; el total de reparación es exactamente ese monto
     precio_piezas_sin_iva = costos_brutos / factor if costos_brutos > 0 else Decimal('0')
-    precio_final_sin_iva = precio_piezas_sin_iva + diag
+    precio_final_sin_iva = precio_piezas_sin_iva
 
-    # Factor para repartir diagnóstico entre líneas proporcionalmente al costo
+    # Factor para repartir el total CON MARGEN entre líneas (proporcional al costo)
     if costos_brutos > 0:
         factor_redistrib = precio_final_sin_iva / costos_brutos
     else:
         factor_redistrib = Decimal('0')
 
-    # Bloque BRUTO del Excel — solo control interno
+    # Bloque BRUTO — solo control interno (no se cobra al cliente)
     total_costos_excel = costos_brutos + mo + suma_fijos
     ganancia_bruta_dinero = precio_piezas_sin_iva - total_costos_excel
     ganancia_bruta_pct = (
@@ -337,16 +340,18 @@ def _redistribuir_precios_items(
 def calcular_precio_cliente(
     costo_piezas: float,
     tipo_servicio: str = 'estandar',
-    incluir_descuento_diagnostico: bool = True,
+    incluir_descuento_diagnostico: bool = False,
     servicios_con_iva: float = 0,
     mano_de_obra_override: float = 0,
 ) -> Dict[str, Any]:
     """
-    Calcula los precios al cliente según la matriz de profit de SIC (reglas Excel).
+    Calcula los precios al cliente según la matriz de profit de SIC.
 
     EXPLICACIÓN:
     El margen se aplica ÚNICAMENTE sobre el costo de piezas físicas.
-    El diagnóstico se suma después sin margen.
+    El diagnóstico NO se incluye en la cotización de reparación (se cobra
+    al ingresar el equipo). El parámetro ``incluir_descuento_diagnostico``
+    se conserva por compatibilidad pero siempre se ignora.
     Los costos fijos y la mano de obra NO inflan el precio; solo alimentan
     las métricas de ganancia bruta para control interno.
 
@@ -356,7 +361,7 @@ def calcular_precio_cliente(
     Args:
         costo_piezas                  : Costo interno total de piezas (lista o número).
         tipo_servicio                 : Clave del tipo ('mostrador', 'estandar', etc.)
-        incluir_descuento_diagnostico : Si True, calcula el precio con deducción.
+        incluir_descuento_diagnostico : Legacy; ya no aplica descuento de diagnóstico.
         servicios_con_iva             : Suma de servicios adicionales (IVA incluido).
         mano_de_obra_override         : Mano de obra interna (solo auditoría).
 
@@ -379,7 +384,7 @@ def calcular_precio_cliente(
     servicios_sin_iva = servicios_con_iva / IVA_FACTOR if servicios_con_iva > 0 else 0.0
     mano_obra = float(mano_de_obra_override or 0)
 
-    # PDF/cotización solo con servicios adicionales: sin profit, fijos ni diagnóstico
+    # PDF/cotización solo con servicios adicionales: sin profit ni fijos
     if costo_total == 0 and servicios_con_iva > 0:
         return {
             'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
@@ -397,10 +402,11 @@ def calcular_precio_cliente(
             'profit_target': perfil['profit_target'],
         }
 
+    # EXPLICACIÓN: diagnostico=0 en la matemática → no diluye ni suma al total
     matematica = _calcular_matematica_profit(
         suma_costos_brutos=costo_total,
         profit_target=perfil['profit_target'],
-        diagnostico=perfil['diagnostico'],
+        diagnostico=0,
         costos_fijos=perfil['costos_fijos'],
         mano_obra=mano_obra,
     )
@@ -411,10 +417,8 @@ def calcular_precio_cliente(
     precio_sin_iva = precio_sin_iva_piezas + servicios_sin_iva
     precio_con_iva = precio_con_iva_piezas + servicios_con_iva
 
-    precio_menos_diagnostico_iva = None
-    if incluir_descuento_diagnostico and perfil['diagnostico'] > 0:
-        diagnostico_con_iva = perfil['diagnostico'] * IVA_FACTOR
-        precio_menos_diagnostico_iva = precio_con_iva - diagnostico_con_iva
+    # Legacy: el descuento de diagnóstico ya no existe en reparación
+    _ = incluir_descuento_diagnostico
 
     return {
         'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
@@ -422,14 +426,11 @@ def calcular_precio_cliente(
         'total_costos_excel': matematica['total_costos_excel'],
         'precio_piezas_sin_iva': matematica['precio_piezas_sin_iva'],
         'precio_fijos_sin_iva': matematica['suma_costos_fijos'],
-        'diagnostico': perfil['diagnostico'],
+        # 0 = el cargo de diagnóstico no forma parte de esta cotización
+        'diagnostico': 0.0,
         'precio_sin_iva': round(precio_sin_iva, 2),
         'precio_con_iva': round(precio_con_iva, 2),
-        'precio_menos_diagnostico': (
-            round(precio_menos_diagnostico_iva, 2)
-            if precio_menos_diagnostico_iva is not None
-            else None
-        ),
+        'precio_menos_diagnostico': None,
         'ganancia_bruta_dinero': matematica['ganancia_bruta_dinero'],
         'ganancia_bruta_porcentaje': matematica['ganancia_bruta_porcentaje'],
         'factor_ganancia': matematica['factor_ganancia'],
@@ -442,9 +443,9 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     Calcula el precio unitario al cliente para UN solo ítem (aproximación).
 
     EXPLICACIÓN:
-    Aplica solo el factor de margen sobre el costo unitario, SIN redistribución
-    del diagnóstico entre líneas. Para cotizaciones completas usar siempre
-    calcular_precios_items_cotizacion(), que absorbe el diagnóstico en el breakdown.
+    Aplica solo el factor de margen sobre el costo unitario. El diagnóstico
+    ya no se redistribuye entre líneas. Para cotizaciones completas usar
+    siempre calcular_precios_items_cotizacion().
 
     Args:
         costo_unitario  : Costo interno de la pieza/servicio.
@@ -463,24 +464,24 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
 def calcular_precios_items_cotizacion(
     items: List[Dict],
     tipo_servicio: str,
-    incluir_descuento_diagnostico: bool = True,
+    incluir_descuento_diagnostico: bool = False,
     mano_de_obra_override: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Calcula precios al cliente por ítem y totales (misma lógica Excel que el PDF).
+    Calcula precios al cliente por ítem y totales (misma lógica que el PDF).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función centraliza el cálculo de profit usado por el PDF y por la
     persistencia de precios al aprobar líneas en Almacén.
 
-    El margen solo aplica sobre piezas; el diagnóstico se reparte proporcionalmente
-    entre líneas vía factor_redistribución. Costos fijos y mano de obra son
-    métricas internas que no inflan el precio al cliente.
+    El margen solo aplica sobre piezas. El diagnóstico NO se reparte entre
+    líneas ni se resta del total: se cobra aparte al ingresar el equipo.
+    Costos fijos y mano de obra son métricas internas que no inflan el precio.
 
     Args:
         items                         : Lista de dicts con costo_unitario, cantidad, es_servicio, etc.
         tipo_servicio                 : Perfil de profit (mostrador, estandar, etc.).
-        incluir_descuento_diagnostico : Si aplica deducción de diagnóstico en totales.
+        incluir_descuento_diagnostico : Legacy; ya no aplica (siempre sin descuento).
         mano_de_obra_override         : Mano de obra sin IVA (solo auditoría interna).
 
     Returns:
@@ -492,6 +493,8 @@ def calcular_precios_items_cotizacion(
         tipo_servicio = 'estandar'
     perfil = profit_cfg[tipo_servicio]
     mano_obra = float(mano_de_obra_override or 0)
+    # Legacy: el parámetro se ignora (ya no hay descuento de diagnóstico)
+    _ = incluir_descuento_diagnostico
 
     items_piezas = [i for i in items if not i.get('es_servicio')]
     items_servicios = [i for i in items if i.get('es_servicio')]
@@ -521,10 +524,11 @@ def calcular_precios_items_cotizacion(
                 '_cantidad': cantidad,
             })
 
+        # diagnostico=0: no diluir cargo de evaluación en las piezas
         matematica = _calcular_matematica_profit(
             suma_costos_brutos=suma_costos_brutos,
             profit_target=perfil['profit_target'],
-            diagnostico=perfil['diagnostico'],
+            diagnostico=0,
             costos_fijos=perfil['costos_fijos'],
             mano_obra=mano_obra,
         )
@@ -537,16 +541,8 @@ def calcular_precios_items_cotizacion(
                 factor_redistrib=matematica['factor_redistrib'],
             )
 
-        if not items_calculados_map and precio_sin_iva_piezas > 0:
-            items_calculados_map[-1] = {
-                'descripcion': 'Servicio de reparación',
-                'cantidad': 1,
-                'precio_unitario_cliente': round(precio_sin_iva_piezas, 2),
-                'subtotal_cliente': round(precio_sin_iva_piezas, 2),
-                'tiempo_entrega_estimado': None,
-                'es_necesaria': True,
-            }
-
+        # Sin piezas no inventamos línea "Servicio de reparación" por diagnóstico:
+        # ese cargo ya no pertenece a la cotización de reparación.
         precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
 
     suma_servicios_con_iva = 0.0
@@ -575,21 +571,10 @@ def calcular_precios_items_cotizacion(
     for idx in range(len(items)):
         if idx in items_calculados_map:
             items_calculados.append(items_calculados_map[idx])
-    if -1 in items_calculados_map:
-        items_calculados.append(items_calculados_map[-1])
 
     precio_sin_iva = precio_sin_iva_piezas + suma_servicios_sin_iva
     precio_con_iva = precio_con_iva_piezas + suma_servicios_con_iva
     iva = precio_con_iva - precio_sin_iva
-
-    precio_menos_diagnostico = None
-    if (
-        not solo_servicios
-        and incluir_descuento_diagnostico
-        and perfil['diagnostico'] > 0
-    ):
-        diagnostico_con_iva = perfil['diagnostico'] * IVA_FACTOR
-        precio_menos_diagnostico = precio_con_iva - diagnostico_con_iva
 
     return {
         'items_calculados': items_calculados,
@@ -599,19 +584,17 @@ def calcular_precios_items_cotizacion(
         'total_costos_excel': matematica.get('total_costos_excel', 0.0),
         'ganancia_bruta_dinero': matematica.get('ganancia_bruta_dinero', 0.0),
         'ganancia_bruta_porcentaje': matematica.get('ganancia_bruta_porcentaje', 0.0),
-        'diagnostico': 0 if solo_servicios else perfil['diagnostico'],
+        'diagnostico': 0,
         'precio_sin_iva': round(precio_sin_iva, 2),
         'iva': round(iva, 2),
         'precio_con_iva': round(precio_con_iva, 2),
-        'precio_menos_diagnostico': (
-            round(precio_menos_diagnostico, 2) if precio_menos_diagnostico else None
-        ),
+        'precio_menos_diagnostico': None,
     }
 
 
 def calcular_totales_items_finales(
     items: List[Dict],
-    incluir_descuento_diagnostico: bool = True,
+    incluir_descuento_diagnostico: bool = False,
     diagnostico: float = 0,
 ) -> Dict[str, Any]:
     """
@@ -620,21 +603,24 @@ def calcular_totales_items_finales(
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
     El PDF final no recalcula margen: usa los precios guardados al aprobar
-    cada línea. Solo suma subtotales y aplica IVA / descuento diagnóstico.
+    cada línea. Solo suma subtotales y aplica IVA. Ya no resta diagnóstico.
 
     Args:
         items                         : Ítems con precio_unitario_cliente y subtotal_cliente.
-        incluir_descuento_diagnostico : Si muestra total menos diagnóstico.
-        diagnostico                   : Cargo de diagnóstico del perfil (MXN sin IVA).
+        incluir_descuento_diagnostico : Legacy; se ignora.
+        diagnostico                   : Legacy; se ignora (cargo aparte al ingreso).
 
     Returns:
         Dict compatible con el generador PDF (items_calculados, totales, etc.).
     """
+    # Parámetros legacy conservados por firma; no afectan el total
+    _ = incluir_descuento_diagnostico
+    _ = diagnostico
+
     items_calculados: List[Dict] = []
     suma_piezas_sin_iva = 0.0
     suma_servicios_sin_iva = 0.0
     suma_servicios_con_iva = 0.0
-    hay_piezas = False
 
     for item in items:
         item_limpio = {k: v for k, v in item.items() if not k.startswith('_')}
@@ -652,7 +638,6 @@ def calcular_totales_items_finales(
             costo_con_iva = float(item.get('costo_unitario', 0) or 0)
             suma_servicios_con_iva += costo_con_iva * int(item.get('cantidad', 1) or 1)
         else:
-            hay_piezas = True
             suma_piezas_sin_iva += subtotal
 
     precio_sin_iva_piezas = suma_piezas_sin_iva
@@ -660,14 +645,6 @@ def calcular_totales_items_finales(
     precio_sin_iva = precio_sin_iva_piezas + suma_servicios_sin_iva
     precio_con_iva = precio_con_iva_piezas + suma_servicios_con_iva
     iva = precio_con_iva - precio_sin_iva
-
-    precio_menos_diagnostico = None
-    if (
-        hay_piezas
-        and incluir_descuento_diagnostico
-        and diagnostico > 0
-    ):
-        precio_menos_diagnostico = precio_con_iva - (diagnostico * IVA_FACTOR)
 
     return {
         'items_calculados': items_calculados,
@@ -677,13 +654,11 @@ def calcular_totales_items_finales(
         'total_costos_excel': 0.0,
         'ganancia_bruta_dinero': 0.0,
         'ganancia_bruta_porcentaje': 0.0,
-        'diagnostico': diagnostico if hay_piezas else 0,
+        'diagnostico': 0,
         'precio_sin_iva': round(precio_sin_iva, 2),
         'iva': round(iva, 2),
         'precio_con_iva': round(precio_con_iva, 2),
-        'precio_menos_diagnostico': (
-            round(precio_menos_diagnostico, 2) if precio_menos_diagnostico is not None else None
-        ),
+        'precio_menos_diagnostico': None,
     }
 
 
@@ -719,7 +694,7 @@ class PDFCotizacionCliente:
         tipo_servicio: str,
         items: List[Dict],
         titulo_propuesta: str = '',
-        incluir_descuento_diagnostico: bool = True,
+        incluir_descuento_diagnostico: bool = False,
         mano_de_obra_override: Optional[float] = None,
         pais_config: Optional[Dict] = None,
         modo_final: bool = False,
@@ -732,7 +707,7 @@ class PDFCotizacionCliente:
             tipo_servicio               : 'mostrador', 'estandar', 'express', 'alta_gama', 'server'.
             items                       : Lista de dicts con los ítems a incluir en el PDF.
             titulo_propuesta            : Título personalizado (usa nombre del perfil si está vacío).
-            incluir_descuento_diagnostico: Si True y hay diagnóstico, muestra precio con deducción.
+            incluir_descuento_diagnostico: Legacy; ya no se muestra descuento de diagnóstico.
             mano_de_obra_override       : Si el usuario editó la mano de obra en el modal (float).
             pais_config                 : Dict con info del país activo (empresa, ciudad, etc.).
             modo_final                  : Si True, usa precios persistidos sin recalcular profit.
@@ -742,7 +717,9 @@ class PDFCotizacionCliente:
         _cfg_init = _profit_config_vigente()
         self.tipo_servicio = tipo_servicio if tipo_servicio in _cfg_init else 'estandar'
         self.items = items
-        self.incluir_descuento_diagnostico = incluir_descuento_diagnostico
+        # Siempre False: el diagnóstico se cobra al ingreso, no se descuenta en reparación
+        self.incluir_descuento_diagnostico = False
+        _ = incluir_descuento_diagnostico
         self.mano_de_obra_override = mano_de_obra_override
         self.pais_config = pais_config or {}
         self.modo_final = modo_final
@@ -982,18 +959,16 @@ class PDFCotizacionCliente:
         En modo_final suma precios guardados en BD; en modo normal aplica profit Excel.
         """
         if self.modo_final:
-            # En modo final solo necesitamos el monto de diagnóstico del perfil
-            profit_cfg = _profit_config_vigente()
-            perfil = profit_cfg.get(self.tipo_servicio, profit_cfg['estandar'])
+            # Precios ya congelados en BD; solo sumar (sin descuento de diagnóstico)
             return calcular_totales_items_finales(
                 items=self.items,
-                incluir_descuento_diagnostico=self.incluir_descuento_diagnostico,
-                diagnostico=perfil['diagnostico'],
+                incluir_descuento_diagnostico=False,
+                diagnostico=0,
             )
         return calcular_precios_items_cotizacion(
             items=self.items,
             tipo_servicio=self.tipo_servicio,
-            incluir_descuento_diagnostico=self.incluir_descuento_diagnostico,
+            incluir_descuento_diagnostico=False,
             mano_de_obra_override=self.mano_de_obra_override,
         )
 
@@ -1531,39 +1506,15 @@ class PDFCotizacionCliente:
         fila_idx += 1
         estilos_totales.append(('BACKGROUND', (0, idx_total_iva), (-1, idx_total_iva), COLOR_NAVY))
 
-        # Fila opcional: descuento diagnóstico
-        if calculo.get('precio_menos_diagnostico') is not None:
-            # Calcular el descuento como la diferencia exacta entre los dos totales.
-            # Esto evita cualquier discrepancia por redondeo vs. diagnostico * 1.16.
-            descuento_display = calculo['precio_con_iva'] - calculo['precio_menos_diagnostico']
-            filas_totales.append([
-                Paragraph(
-                    'Descuento diagnóstico incluido (diagnóstico ya pagado):',
-                    ParagraphStyle('DescDiag', fontName='Helvetica', fontSize=8,
-                                   textColor=colors.HexColor('#555555'), alignment=TA_LEFT)
-                ),
-                Paragraph(
-                    f"- ${descuento_display:,.2f}",
-                    ParagraphStyle('DescDiagMonto', fontName='Helvetica', fontSize=8,
-                                   textColor=colors.HexColor('#555555'), alignment=TA_RIGHT)
-                ),
-            ])
-            estilos_totales.append(('BACKGROUND', (0, fila_idx), (-1, fila_idx), COLOR_GRIS_ALT))
-            fila_idx += 1
-
-            # Fila final: Total a pagar (con descuento), fondo navy
-            filas_totales.append([
-                Paragraph('TOTAL A PAGAR (aplicando descuento diagnóstico):', estilo_destacado_etq),
-                Paragraph(f"${calculo['precio_menos_diagnostico']:,.2f}", estilo_destacado),
-            ])
-            estilos_totales.append(('BACKGROUND', (0, fila_idx), (-1, fila_idx), COLOR_NAVY))
-            fila_idx += 1
+        # EXPLICACIÓN: ya no se muestran filas de "descuento diagnóstico" ni
+        # "TOTAL A PAGAR (aplicando descuento…)". El diagnóstico se cobra al
+        # ingresar el equipo; aquí el cliente paga la reparación completa.
 
         tabla_totales = Table(filas_totales, colWidths=col_widths_totales)
         tabla_totales.setStyle(TableStyle(estilos_totales))
         elementos.append(tabla_totales)
 
-        # Aviso México: documentos solo-servicios no incluyen descuento de diagnóstico
+        # Aviso México: documentos solo-servicios no incluyen cargo de diagnóstico
         # (cubre también el PDF de "Servicios" del modo piezas_vs_servicios)
         elementos += self._construir_aviso_diagnostico_solo_servicios()
 
@@ -1598,8 +1549,9 @@ class PDFCotizacionCliente:
         Bloque de aviso cuando el PDF es solo servicios (México).
 
         EXPLICACIÓN PARA PRINCIPIANTES:
-        El cálculo ya pone diagnóstico en 0 si no hay piezas. Aquí solo
-        explicamos esa regla al cliente para que no espere el descuento.
+        El diagnóstico se cobra al ingresar el equipo y no forma parte de
+        esta cotización. Aquí lo aclaramos cuando el documento solo trae
+        servicios adicionales (sin piezas).
 
         Returns:
             Lista de flowables ReportLab (puede ser vacía).

@@ -4391,7 +4391,8 @@ def api_enviar_cotizacion_cliente(request, pk):
         email_cliente  = request.POST.get('email_cliente', '').strip()
         modo_agrupacion = request.POST.get('modo_agrupacion', 'todo_junto')
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
-        incluir_descuento = request.POST.get('incluir_descuento_diagnostico') == '1'
+        # El descuento de diagnóstico ya no aplica: reparación se abona completa.
+        incluir_descuento = False
 
         # Asunto personalizado del correo.
         # Si el usuario lo dejó vacío o con el prefijo por defecto sin texto adicional,
@@ -4496,7 +4497,8 @@ def api_enviar_cotizacion_cliente(request, pk):
         # respuesta del cliente: aprobar o rechazar)
         if not solicitud.fecha_precios_cliente:
             solicitud.tipo_servicio_cliente = tipo_servicio
-            solicitud.incluir_descuento_diagnostico_cliente = incluir_descuento
+            # Siempre False: ya no se descuenta diagnóstico en reparación
+            solicitud.incluir_descuento_diagnostico_cliente = False
             solicitud.save(update_fields=[
                 'tipo_servicio_cliente',
                 'incluir_descuento_diagnostico_cliente',
@@ -4601,7 +4603,6 @@ def preview_pdf_cotizacion(request, pk):
         request: HttpRequest GET con parámetros:
                  - tipo_servicio: str
                  - modo_agrupacion: str
-                 - incluir_descuento: '1'/'0'
                  - grupo_idx: int (0=primero, 1=segundo — para modo separado)
         pk     : ID de la SolicitudCotizacion.
 
@@ -4627,7 +4628,6 @@ def preview_pdf_cotizacion(request, pk):
         tipo_servicio     = request.GET.get('tipo_servicio', 'estandar')
         modo_cotizacion   = request.GET.get('modo_cotizacion', 'reparacion')
         modo_agrupacion   = request.GET.get('modo_agrupacion', 'todo_junto')
-        incluir_descuento = request.GET.get('incluir_descuento_diagnostico', '0') == '1'
         grupo_idx         = int(request.GET.get('grupo_idx', 0))
 
         _pais = get_pais_actual()
@@ -4710,7 +4710,7 @@ def preview_pdf_cotizacion(request, pk):
             tipo_servicio=tipo_servicio,
             items=grupo['items'],
             titulo_propuesta=grupo['titulo'],
-            incluir_descuento_diagnostico=incluir_descuento,
+            incluir_descuento_diagnostico=False,
             pais_config=_pais,
         )
 
@@ -4821,15 +4821,12 @@ def descargar_pdf_cotizacion_final(request, pk):
             )
 
         tipo_servicio = obtener_tipo_servicio_solicitud(solicitud)
-        incluir_descuento = bool(
-            getattr(solicitud, 'incluir_descuento_diagnostico_cliente', True)
-        )
 
         generador = PDFCotizacionCliente(
             solicitud=solicitud,
             tipo_servicio=tipo_servicio,
             items=items,
-            incluir_descuento_diagnostico=incluir_descuento,
+            incluir_descuento_diagnostico=False,
             pais_config=_pais,
             modo_final=True,
         )
