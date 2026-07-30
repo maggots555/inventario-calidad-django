@@ -28,7 +28,10 @@
 </head>
 <body class="st-body"{% if estado != 'invalido' %} data-eventos-url="{% url 'eventos_seguimiento_cliente' token=token %}"{% if url_diagnostico_pdf %} data-diagnostico-pdf-url="{{ url_diagnostico_pdf }}"{% endif %}{% endif %}>
 
-<canvas id="particles-canvas"></canvas>
+{# Fondo de puntos: spotlight al hover + cascada tenue automática #}
+<div class="st-fondo-puntos" aria-hidden="true">
+  <span class="st-fondo-cascada"></span>
+</div>
 
 {% if estado != 'invalido' and ai_enabled %}
 {% comment %}
@@ -815,52 +818,6 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   </div>
 </div>
 
-{# === Partículas flotantes (reutiliza el mismo script del feedback) === #}
-<script>
-(function () {
-  var c = document.getElementById('particles-canvas');
-  if (!c) return;
-  var ctx = c.getContext('2d');
-  var particles = [];
-  var count = 30;
-
-  function resize() {
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
-  for (var i = 0; i < count; i++) {
-    particles.push({
-      x: Math.random() * c.width,
-      y: Math.random() * c.height,
-      r: Math.random() * 2 + 1,
-      dx: (Math.random() - 0.5) * 0.4,
-      dy: (Math.random() - 0.5) * 0.4,
-      o: Math.random() * 0.3 + 0.1,
-    });
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, c.width, c.height);
-    for (var i = 0; i < particles.length; i++) {
-      var p = particles[i];
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,' + p.o + ')';
-      ctx.fill();
-      p.x += p.dx;
-      p.y += p.dy;
-      if (p.x < 0 || p.x > c.width) p.dx = -p.dx;
-      if (p.y < 0 || p.y > c.height) p.dy = -p.dy;
-    }
-    requestAnimationFrame(draw);
-  }
-  draw();
-})();
-</script>
-
 {# === Confetti para estado "entregado" === #}
 {% if estado == 'entregado' %}
 <script>
@@ -938,6 +895,7 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
 {# === Toggle de modo oscuro (persistente vía localStorage) === #}
 <script src="{% static 'js/dark_mode.js' %}"></script>
+<script src="{% static 'js/seguimiento_fondo_spotlight.js' %}"></script>
 
 {% if estado != 'invalido' %}
 <!-- PWA: registro del Service Worker con scope acotado a esta URL de seguimiento -->

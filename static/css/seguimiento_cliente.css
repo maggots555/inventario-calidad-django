@@ -36,13 +36,8 @@
 .st-body {
   min-height: 100vh;
   min-height: 100dvh;
-  /* Gradiente base profundo con angulo dramatico */
-  background:
-    /* Grid sutil de puntos — efecto tech */
-    radial-gradient(circle at center, rgba(255,255,255,0.04) 1px, transparent 1px),
-    /* Gradiente principal */
-    linear-gradient(150deg, #0a1628 0%, #0e2a45 25%, #0c3556 50%, #0a2f3d 75%, #071e2b 100%);
-  background-size: 24px 24px, 100% 100%;
+  /* Solo el degradado base; la grilla de puntos vive en .st-fondo-puntos */
+  background: linear-gradient(150deg, #0a1628 0%, #0e2a45 25%, #0c3556 50%, #0a2f3d 75%, #071e2b 100%);
   font-family: var(--st-font);
   padding: env(safe-area-inset-top, 1rem) 1rem env(safe-area-inset-bottom, 1rem);
   display: flex;
@@ -55,13 +50,163 @@
   border-top: 2px solid rgba(56, 189, 248, 0.3);
 }
 
-/* === Partículas flotantes (fondo) === */
-#particles-canvas {
+/* === Fondo de puntos + spotlight al hover
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   - Capa base: puntos grises tenues en toda la pantalla.
+   - ::before: glow cyan suave bajo el cursor (paleta SIC: --st-primary-light).
+   - ::after: mismos puntos en sky/cyan, revelados solo cerca del mouse
+     con una máscara radial (mask-image). El TS mueve --st-spot-x/y.
+   En modo claro el fondo es azul medio: subimos brillo/opacidad para que no se pierda.
+   pointer-events: none → no bloquea clics en la card ni el chat. */
+.st-fondo-puntos {
+  /* Centro del spotlight (el TS actualiza estos valores al mover el puntero) */
+  --st-spot-x: 50%;
+  --st-spot-y: 50%;
   position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
+  /* Puntos base un poco más claros: se notan sobre el azul medio del tema light */
+  background-image: radial-gradient(
+    circle,
+    rgba(186, 230, 253, 0.28) 1px,
+    transparent 1.5px
+  );
+  background-size: 24px 24px;
+}
+
+/* Halo cyan más presente en modo claro (el azul del fondo “come” colores suaves) */
+.st-fondo-puntos::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle 240px at var(--st-spot-x) var(--st-spot-y),
+    rgba(56, 189, 248, 0.22),
+    rgba(125, 211, 252, 0.08) 40%,
+    transparent 75%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+/* Puntos iluminados: casi blancos/cyan claro = mejor contraste en light */
+.st-fondo-puntos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    rgba(224, 242, 254, 0.95) 1.2px,
+    transparent 1.7px
+  );
+  background-size: 24px 24px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  /* Máscara más amplia y con caída gradual = efecto menos “duro” */
+  -webkit-mask-image: radial-gradient(
+    circle 220px at var(--st-spot-x) var(--st-spot-y),
+    #000 0%,
+    #000 18%,
+    rgba(0, 0, 0, 0.55) 42%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    circle 220px at var(--st-spot-x) var(--st-spot-y),
+    #000 0%,
+    #000 18%,
+    rgba(0, 0, 0, 0.55) 42%,
+    transparent 78%
+  );
+}
+
+/* data-activo lo pone el TS mientras hay puntero sobre la ventana */
+.st-fondo-puntos[data-activo="1"]::before,
+.st-fondo-puntos[data-activo="1"]::after {
+  opacity: 1;
+}
+
+/* === Cascada automática (muy tenue)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Es una franja horizontal de puntos cyan que baja sola por la pantalla.
+   Usa mask-image + mask-position animado: solo se ven los puntos dentro
+   de esa franja. Así el fondo “respira” sin depender del mouse.
+   opacity baja → no compite con el spotlight del cursor. */
+.st-fondo-cascada {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    rgba(224, 242, 254, 0.9) 1.15px,
+    transparent 1.7px
+  );
+  background-size: 24px 24px;
+  opacity: 0.72;
+  /* EXPLICACIÓN PARA PRINCIPIANTES:
+     La máscara tiene una rampa LARGA de transparente → visible → transparente.
+     Así los puntos no “saltan”: se van encendiendo y apagando poco a poco
+     mientras la franja baja. */
+  /* opacity base: el keyframe la anima (fade in/out del ciclo) */
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 10%,
+    rgba(0, 0, 0, 0.12) 18%,
+    rgba(0, 0, 0, 0.35) 28%,
+    rgba(0, 0, 0, 0.7) 38%,
+    #000 48%,
+    #000 52%,
+    rgba(0, 0, 0, 0.7) 62%,
+    rgba(0, 0, 0, 0.35) 72%,
+    rgba(0, 0, 0, 0.12) 82%,
+    rgba(0, 0, 0, 0.04) 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.04) 10%,
+    rgba(0, 0, 0, 0.12) 18%,
+    rgba(0, 0, 0, 0.35) 28%,
+    rgba(0, 0, 0, 0.7) 38%,
+    #000 48%,
+    #000 52%,
+    rgba(0, 0, 0, 0.7) 62%,
+    rgba(0, 0, 0, 0.35) 72%,
+    rgba(0, 0, 0, 0.12) 82%,
+    rgba(0, 0, 0, 0.04) 90%,
+    transparent 100%
+  );
+  -webkit-mask-size: 100% 280%;
+  mask-size: 100% 280%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  /* Cada ciclo dura 10s (franja completa de arriba a abajo) */
+  animation: stCascadaPuntos 10s ease-in-out infinite;
+}
+
+/* La franja baja con fade al entrar/salir del ciclo (evita el “corte” al reiniciar) */
+@keyframes stCascadaPuntos {
+  0% {
+    -webkit-mask-position: 0 -55%;
+    mask-position: 0 -55%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.72;
+  }
+  88% {
+    opacity: 0.72;
+  }
+  100% {
+    -webkit-mask-position: 0 130%;
+    mask-position: 0 130%;
+    opacity: 0;
+  }
 }
 
 /* === Card principal (glassmorphism tech) === */
@@ -1180,6 +1325,17 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* Sin spotlight interactivo ni cascada: solo grilla tenue fija */
+  .st-fondo-puntos::before,
+  .st-fondo-puntos::after,
+  .st-fondo-puntos[data-activo="1"]::before,
+  .st-fondo-puntos[data-activo="1"]::after {
+    opacity: 0 !important;
+  }
+  .st-fondo-cascada {
+    animation: none !important;
+    opacity: 0 !important;
+  }
 }
 
 /* ============================================================
@@ -1190,14 +1346,66 @@
   --st-glow-primary: 0 0 20px rgba(96, 165, 250, 0.25), 0 0 60px rgba(96, 165, 250, 0.08);
 }
 
-/* Fondo degradado oscuro con grid pattern */
+/* Fondo degradado oscuro (la grilla de puntos está en .st-fondo-puntos) */
 [data-bs-theme="dark"] .st-body {
-  background:
-    radial-gradient(circle at center, rgba(96, 165, 250, 0.03) 1px, transparent 1px),
-    linear-gradient(150deg, #020617 0%, #0a1628 25%, #0c1e33 50%, #071520 75%, #020617 100%);
-  background-size: 24px 24px, 100% 100%;
+  background: linear-gradient(150deg, #020617 0%, #0a1628 25%, #0c1e33 50%, #071520 75%, #020617 100%);
   color: #e2e8f0;
   border-top-color: rgba(96, 165, 250, 0.3);
+}
+
+[data-bs-theme="dark"] .st-fondo-puntos {
+  background-image: radial-gradient(
+    circle,
+    rgba(148, 163, 184, 0.18) 1px,
+    transparent 1.5px
+  );
+}
+
+/* En dark: puntos iluminados un poco más brillantes (siguen en cyan) */
+[data-bs-theme="dark"] .st-fondo-puntos::before {
+  background: radial-gradient(
+    circle 240px at var(--st-spot-x) var(--st-spot-y),
+    rgba(96, 165, 250, 0.12),
+    rgba(56, 189, 248, 0.04) 45%,
+    transparent 75%
+  );
+}
+
+[data-bs-theme="dark"] .st-fondo-puntos::after {
+  background-image: radial-gradient(
+    circle,
+    rgba(125, 211, 252, 0.85) 1.1px,
+    transparent 1.6px
+  );
+}
+
+/* Cascada en dark: mismos fades suaves, pico un poco más bajo */
+[data-bs-theme="dark"] .st-fondo-cascada {
+  background-image: radial-gradient(
+    circle,
+    rgba(186, 230, 253, 0.85) 1.15px,
+    transparent 1.7px
+  );
+  animation-name: stCascadaPuntosDark;
+}
+
+@keyframes stCascadaPuntosDark {
+  0% {
+    -webkit-mask-position: 0 -55%;
+    mask-position: 0 -55%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.58;
+  }
+  88% {
+    opacity: 0.58;
+  }
+  100% {
+    -webkit-mask-position: 0 130%;
+    mask-position: 0 130%;
+    opacity: 0;
+  }
 }
 
 /* Card principal - glassmorphism oscuro */
