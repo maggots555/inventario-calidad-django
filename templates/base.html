@@ -662,17 +662,17 @@
                 </div>
             </div>
 
-            <!-- Indicadores decorativos -->
-            <div class="footer-indicators">
-                <span class="footer-dot"></span>
-                <span class="footer-dot"></span>
-                <span class="footer-dot"></span>
+            {# EXPLICACIÓN: separador decorativo (línea + pip). aria-hidden evita que lectores de pantalla lo anuncien como controles. #}
+            <div class="footer-divider" aria-hidden="true">
+                <span class="footer-divider-line"></span>
+                <span class="footer-divider-pip"></span>
+                <span class="footer-divider-line"></span>
             </div>
 
             <!-- Copyright y Bottom -->
             <div class="footer-bottom">
                 <p class="footer-copyright">
-                    © {% now "Y" %} Sistema Integral de Gestión • Todos los derechos reservados
+                    © {% now "Y" %} • Gestión inteligente, servicio impecable.
                 </p>
                 <p class="footer-made-with">
                     Hecho con <span class="footer-heart">❤️</span> usando <span class="footer-tech">Python • Django •

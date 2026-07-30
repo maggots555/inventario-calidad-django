@@ -2119,30 +2119,36 @@ footer::after {
     font-weight: 500;
 }
 
-/* Indicadores decorativos */
-.footer-indicators {
-    text-align: center;
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes había tres puntos (.footer-dot) que parecían paginación de carrusel.
+ * Ahora usamos una línea + un pip central: decora, no sugiere “hay más páginas”.
+ * Sin :hover interactivo ni cursor pointer.
+ */
+.footer-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
     margin: 1.4rem 0 1.05rem;
+    pointer-events: none;
 }
 
-.footer-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    display: inline-block;
-    margin: 0 0.3rem;
-    transition: all 0.3s ease;
+.footer-divider-line {
+    display: block;
+    width: 2.75rem;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.22);
 }
 
-.footer-dot:nth-child(2) {
-    background: rgba(52, 152, 219, 0.8);
-    transform: scale(1.2);
-}
-
-.footer-dot:hover {
-    background: #3498db;
-    transform: scale(1.3);
+.footer-divider-pip {
+    display: block;
+    width: 7px;
+    height: 7px;
+    background: rgba(52, 152, 219, 0.85);
+    transform: rotate(45deg);
+    border-radius: 1px;
+    flex-shrink: 0;
 }
 
 /* Copyright y Bottom */
@@ -2154,7 +2160,9 @@ footer::after {
 
 .footer-copyright {
     font-size: 0.85rem;
-    color: #95a5a6;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #b0bec5;
     margin-bottom: 0.5rem;
 }
 
