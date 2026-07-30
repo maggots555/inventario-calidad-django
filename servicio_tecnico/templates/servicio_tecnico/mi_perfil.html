@@ -490,8 +490,8 @@
                 </div>
 
                 <p class="pcard-cursor-hint" id="cursor-pref-hint">
-                    Elige cómo se ve el puntero en escritorio. Se guarda solo en este navegador
-                    (igual que el tema claro/oscuro).
+                    Elige cómo se ve el puntero cuando hay mouse o trackpad.
+                    Se guarda solo en este navegador (igual que el tema claro/oscuro).
                 </p>
 
                 <button id="btn-personalizar-cursor"
@@ -591,12 +591,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                {# Aviso si el dispositivo no soporta custom (táctil / ≤1024) #}
+                {# Aviso si el dispositivo no tiene mouse/trackpad #}
                 <div id="cursor-compat-alert" class="cursor-compat-alert" role="status" hidden>
                     <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                    En este dispositivo el cursor personalizado está desactivado
-                    (táctil o pantalla estrecha). Tu elección se guardará y se verá
-                    en una PC de escritorio con mouse.
+                    En este dispositivo no hay mouse o trackpad, así que el cursor
+                    personalizado está desactivado (tipico en telefono o tablet).
+                    Tu elección se guardará y se verá en cualquier PC o laptop con mouse.
                 </div>
 
                 <p class="cursor-modal-intro">

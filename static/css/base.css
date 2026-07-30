@@ -1080,9 +1080,11 @@ body {
     box-shadow: 0 0 4px rgba(249, 115, 22, 0.35);
 }
 
-/* ===== OCULTAR CURSOR PERSONALIZADO EN MÓVILES Y TABLETS ===== */
-/* Detectar dispositivos táctiles y pantallas pequeñas */
-@media (hover: none) and (pointer: coarse), (max-width: 1024px) {
+/* ===== OCULTAR CURSOR PERSONALIZADO EN TELEFONOS / TABLETS =====
+   Solo dispositivos con puntero primario grueso y sin hover (dedo).
+   NO usar max-width: el zoom o una ventana estrecha en PC no debe
+   apagar el custom si hay mouse/trackpad. */
+@media (hover: none) and (pointer: coarse) {
     /* Ocultar cursor personalizado completamente */
     .tech-cursor {
         display: none !important;

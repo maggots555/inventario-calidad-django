@@ -244,15 +244,36 @@ let trailPool = [];
 let trailPoolListo = false;
 let lastTrailTime = 0;
 /**
- * Detecta táctil / híbrido / pantallas chicas.
- * Mismo criterio que el cursor original (evita bug “sin cursor”).
+ * ¿Hay mouse/trackpad real? (incluye laptop con pantalla táctil).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes se apagaba el custom si había touch O si el ancho era ≤1024.
+ * Eso fallaba al hacer zoom (innerWidth baja) y en laptops táctiles.
+ * Ahora solo miramos si existe un puntero fino con hover (mouse/trackpad).
+ * Teléfonos/tablets solo-dedo → false. Desktop/laptop con mouse → true.
  */
-function esDispositivoTactilOHibrido() {
-    return ('ontouchstart' in window ||
-        navigator.maxTouchPoints > 0 ||
-        window.matchMedia('(hover: none)').matches ||
-        window.matchMedia('(pointer: coarse)').matches ||
-        window.innerWidth <= 1024);
+function puedeUsarCursorPersonalizado() {
+    return (window.matchMedia('(any-pointer: fine)').matches &&
+        window.matchMedia('(any-hover: hover)').matches);
+}
+/**
+ * Escucha cambios de media query (conectar/desconectar mouse) una sola vez.
+ * Efectos: vuelve a llamar aplicarCursorPreferido() sin re-guardar preferencia.
+ */
+let listenerCapacidadCursorListo = false;
+function asegurarListenerCapacidadCursor() {
+    if (listenerCapacidadCursorListo) {
+        return;
+    }
+    listenerCapacidadCursorListo = true;
+    const onCambioCapacidad = () => {
+        // Releer preferencia y activar/desactivar según el hardware actual
+        aplicarCursorPreferido();
+    };
+    // EXPLICACIÓN: 'change' se dispara si el usuario enchufa un mouse a una tablet
+    // o si el SO reporta otro tipo de puntero.
+    window.matchMedia('(any-pointer: fine)').addEventListener('change', onCambioCapacidad);
+    window.matchMedia('(any-hover: hover)').addEventListener('change', onCambioCapacidad);
 }
 /**
  * Valida y normaliza un id leído de localStorage.
@@ -475,9 +496,9 @@ function aplicarCursorPreferido(idOpcional) {
         setCursorPreferido(idOpcional);
     }
     const preferido = getCursorPreferido();
-    // Dispositivos táctiles: nunca custom (preferencia sí se guarda para escritorio)
-    if (esDispositivoTactilOHibrido()) {
-        desactivarCursorPersonalizado('dispositivo táctil o híbrido');
+    // Sin mouse/trackpad (teléfono/tablet solo-dedo): cursor del sistema
+    if (!puedeUsarCursorPersonalizado()) {
+        desactivarCursorPersonalizado('sin puntero fino (telefono/tablet)');
         return;
     }
     if (preferido === 'system') {
@@ -504,10 +525,11 @@ window.SigmaCursor = {
     getPreferido: getCursorPreferido,
     aplicar: aplicarCursorPreferido,
     catalogo: obtenerCatalogoPublico(),
-    esDispositivoCompatible: () => !esDispositivoTactilOHibrido(),
+    esDispositivoCompatible: () => puedeUsarCursorPersonalizado(),
     obtenerSvgPreview: obtenerSvgPreview,
 };
 document.addEventListener('DOMContentLoaded', () => {
+    asegurarListenerCapacidadCursor();
     aplicarCursorPreferido();
 });
 //# sourceMappingURL=cursor_personalizado.js.map
