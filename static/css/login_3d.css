@@ -28,10 +28,11 @@ body.login-3d-page {
     height: 100vh;
     overflow: hidden;
     font-family: 'Sora', 'Inter', system-ui, -apple-system, sans-serif;
-    background: radial-gradient(circle at center, var(--bg-gradient-2), var(--bg-gradient-1));
+    /* Mismo degradado oscuro que encuesta / seguimiento (la malla se lee mejor) */
+    background: linear-gradient(150deg, #0a1628 0%, #0e2a45 25%, #0c3556 50%, #0a2f3d 75%, #071e2b 100%);
 }
 
-/* --- Fondo de Partículas (Canvas) --- */
+/* --- Fondo de malla (Canvas) --- */
 #particles-canvas {
     position: absolute;
     top: 0;
@@ -39,6 +40,7 @@ body.login-3d-page {
     width: 100%;
     height: 100%;
     z-index: 0;
+    pointer-events: none;
 }
 
 /* ============================================================
@@ -159,34 +161,61 @@ body.login-3d-page {
     z-index: 1;
 }
 
-/* Borde animado (pseudo gradiente rotante) */
+/* Borde con destello (sheen) — solo el contorno, sin cuadrado giratorio
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   La máscara deja ver solo un anillo fino (borde). El gradiente se mueve
+   con background-position → el brillo “viaja” por el borde al hacer hover. */
 .login-card-3d::after {
     content: '';
     position: absolute;
-    inset: -1px;
-    border-radius: 25px;
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg,
-        rgba(31, 99, 145, 0.6) 60deg,
-        rgba(16, 119, 187, 0.8) 120deg,
-        rgba(6, 182, 212, 0.6) 180deg,
-        transparent 240deg,
-        transparent 360deg
+    inset: -2px;
+    border-radius: 26px;
+    padding: 2.5px;
+    background: linear-gradient(
+        120deg,
+        transparent 12%,
+        rgba(31, 99, 145, 0.55) 28%,
+        rgba(186, 230, 253, 1) 46%,
+        rgba(56, 189, 248, 1) 50%,
+        rgba(125, 211, 252, 1) 54%,
+        rgba(31, 99, 145, 0.55) 72%,
+        transparent 88%
     );
+    background-size: 250% 250%;
+    /* Anillo: se ve el padding (borde) y se oculta el centro */
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
     z-index: -1;
-    animation: border-rotate 6s linear infinite;
+    pointer-events: none;
     opacity: 0;
     transition: opacity 0.4s ease;
+    animation: border-sheen 3.5s ease-in-out infinite;
 }
 
 .login-card-3d:hover::after {
     opacity: 1;
 }
 
-@keyframes border-rotate {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+/* Glow cyan más intenso al pasar el mouse */
+.login-card-3d:hover {
+    box-shadow:
+        var(--glass-shadow),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+        0 0 18px rgba(125, 211, 252, 0.45),
+        0 0 40px rgba(56, 189, 248, 0.4),
+        0 0 72px rgba(31, 99, 145, 0.35);
+}
+
+@keyframes border-sheen {
+    0%   { background-position: 100% 0%; }
+    50%  { background-position: 0% 100%; }
+    100% { background-position: 100% 0%; }
 }
 
 /* Contenido interno con profundidad */
