@@ -1937,31 +1937,35 @@ footer::after {
 /* Logo y Branding */
 .footer-brand {
     display: flex;
-    align-items: center;
-    /* Centrar verticalmente el logo y el texto */
-    gap: 0rem;
-    padding: 2rem 0;
-    /* Espacio arriba y abajo para que no se vea apretado */
-    padding-left: 0rem;
+    /*
+     * EXPLICACIÓN: align-items flex-start = el título arranca a la misma altura
+     * que la parte superior del logo (no queda “a media altura” del bloque).
+     */
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0;
 }
 
 /*
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * En desktop el logo SIGMA quedaba muy cerca de «Acceso Rápido».
- * Con margin-left negativo lo empujamos un poco a la izquierda (aprovecha
- * el gutter de Bootstrap) y con padding-right abrimos aire hacia la derecha.
- * Solo aplica desde tablet/desktop; en móvil el footer se apila centrado.
+ * En desktop empujamos SOLO la posición del bloque marca hacia la izquierda
+ * (hacia el borde del container). No cambia el tamaño del logo ni el texto;
+ * solo abre aire entre la marca y «Acceso Rápido».
  */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
     .footer-brand {
         margin-left: -7.25rem;
-        padding-right: 1.75rem;
     }
 }
 
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El logo combo (ícono + “SIGMA”) es horizontal. Un cuadrado 140×140 lo hacía
+ * demasiado alto y desalineaba las columnas. Mejor ancho fijo y alto automático.
+ */
 .footer-logo {
-    width: 220px;
-    height: 220px;
+    width: 168px;
+    height: auto;
     background: linear-gradient(135deg, #3498db, #2980b9);
     border-radius: 8px;
     display: flex;
@@ -1991,8 +1995,9 @@ footer::after {
 }
 
 .footer-logo-svg .sigma-logo-img {
-    width: 100%;
-    height: 100%;
+    width: 168px;
+    height: auto;
+    display: block;
     object-fit: contain;
     filter: drop-shadow(0 2px 8px rgba(70, 165, 229, 0.4));
     transition: filter 0.3s ease, transform 0.3s ease;
@@ -2003,10 +2008,16 @@ footer::after {
     transform: scale(1.05);
 }
 
+.footer-brand-text {
+    /* EXPLICACIÓN: min-width 0 permite que el texto se ajuste dentro del flex sin empujar la columna. */
+    min-width: 0;
+    padding-top: 0.35rem;
+}
+
 .footer-brand-text h5 {
     font-size: 0.95rem;
     font-weight: 700;
-    margin-bottom: 0.175rem;
+    margin-bottom: 0.35rem;
     color: #ffffff;
 }
 
@@ -2014,6 +2025,7 @@ footer::after {
     font-size: 0.75rem;
     color: #bdc3c7;
     margin-bottom: 0;
+    line-height: 1.45;
 }
 
 /* Enlaces de Acceso Rápido */
@@ -2057,7 +2069,7 @@ footer::after {
     width: 20px;
 }
 
-/* Desarrollador */
+/* Desarrollador: centrado dentro de su columna (sin empujar al borde derecho) */
 .footer-developer {
     text-align: center;
 }
@@ -2216,9 +2228,12 @@ footer::after {
         align-items: center;
         text-align: center;
         margin-bottom: 2rem;
-        /* EXPLICACIÓN: anular el empujón desktop para que en móvil quede centrado */
+        /* EXPLICACIÓN: en móvil no empujamos a la izquierda; queda centrado. */
         margin-left: 0;
-        padding-right: 0;
+    }
+
+    .footer-brand-text {
+        padding-top: 0;
     }
 
     .footer-section {
@@ -2231,6 +2246,7 @@ footer::after {
     }
 
     .footer-developer {
+        text-align: center;
         margin-bottom: 2rem;
     }
 }

@@ -582,9 +582,16 @@
     <!-- Footer Moderno -->
     <footer class="modern-footer">
         <div class="container">
-            <div class="row">
-                <!-- Columna 1: Logo y Branding -->
-                <div class="col-md-5 mb-4">
+            <!--
+              EXPLICACIÓN PARA PRINCIPIANTES:
+              - align-items-start: Acceso Rápido y Desarrollado por arrancan arriba.
+              - align-self-center en la marca: el logo baja al centro vertical de la fila
+                (a la altura media de la lista), no queda pegado al tope.
+              - Proporciones 5/4/3 según el contenido de cada columna.
+            -->
+            <div class="row g-4 align-items-start">
+                <!-- Columna 1: Logo y Branding (centrada en vertical respecto a Acceso Rápido) -->
+                <div class="col-md-5 mb-4 mb-md-0 align-self-center">
                     <div class="footer-brand">
                         <div class="footer-logo footer-logo-svg">
                             <img src="{% static 'images/logos/logo_sigma_combo.svg' %}" alt="Sigma Logo"
@@ -603,7 +610,7 @@
                 </div>
 
                 <!-- Columna 2: Acceso Rápido -->
-                <div class="col-md-4 mb-4">
+                <div class="col-md-4 mb-4 mb-md-0">
                     <div class="footer-section">
                         <h6>Acceso Rápido</h6>
                         <ul class="footer-links">
@@ -647,7 +654,7 @@
                 </div>
 
                 <!-- Columna 3: Desarrollador -->
-                <div class="col-md-3 mb-4">
+                <div class="col-md-3 mb-4 mb-md-0">
                     <div class="footer-section footer-developer">
                         <h6>Desarrollado por</h6>
                         <div class="developer-avatar">
