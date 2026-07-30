@@ -133,6 +133,9 @@ class SelectorCursorMiPerfilTest(TestCase):
         self.assertIn('data-cursor-id="tech"', content)
         self.assertIn('data-cursor-id="classic"', content)
         self.assertIn('data-cursor-id="minimal"', content)
+        self.assertIn('data-cursor-id="banana"', content)
+        self.assertIn('data-cursor-id="hongo"', content)
+        self.assertIn('data-cursor-id="metallica"', content)
         self.assertIn('data-cursor-id="system"', content)
 
     def test_perfil_directorio_no_incluye_selector_cursor(self):

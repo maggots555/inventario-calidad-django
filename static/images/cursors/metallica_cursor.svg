@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Metallica-style angular M (must read as M, not W); left peak = hotspot -->
+  <defs>
+    <filter id="dropShadowMetallica" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.5"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="metalGradM" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="0.45" stop-color="#94a3b8"/>
+      <stop offset="1" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#dropShadowMetallica)">
+    <!--
+      Classic block M silhouette:
+        left pillar | center V down | right pillar
+      Tip of left pillar at (3,2) for hotspot.
+    -->
+    <path
+      d="M3 2
+         L3 29
+         L9 29
+         L9 14
+         L16 26
+         L23 14
+         L23 29
+         L29 29
+         L29 2
+         L22 2
+         L22 12
+         L16 4
+         L10 12
+         L10 2
+         Z"
+      fill="url(#metalGradM)"
+      stroke="#0f172a"
+      stroke-width="1.15"
+      stroke-linejoin="round"/>
+    <!-- Thin inner bevel -->
+    <path
+      d="M5.5 4.5 L5.5 26.5 M26.5 4.5 L26.5 26.5 M11.5 12 L16 20 L20.5 12"
+      stroke="#e2e8f0"
+      stroke-width="0.7"
+      stroke-linecap="round"
+      opacity="0.45"
+      fill="none"/>
+    <circle class="cursor-core-dot" cx="16" cy="10" r="1.25" fill="#ef4444" opacity="0.95"/>
+  </g>
+</svg>

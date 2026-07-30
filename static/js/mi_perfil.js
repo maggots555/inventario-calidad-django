@@ -165,6 +165,9 @@ const CURSOR_NOMBRES = {
     tech: 'Tech Cyan',
     classic: 'Classic Gold',
     minimal: 'Minimal',
+    banana: 'Banana',
+    hongo: 'Hongo Mario',
+    metallica: 'Metallica M',
     system: 'Sistema',
 };
 /**

@@ -90,6 +90,89 @@ const CURSOR_VARIANTES = {
   </g>
 </svg>`.trim(),
     },
+    banana: {
+        id: 'banana',
+        nombre: 'Banana',
+        descripcion: 'Crescent amarillo con tallo (easter egg).',
+        accent: '#f4c430',
+        svgMarkup: `
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="dropShadowBananaRuntime" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowBananaRuntime)">
+    <path d="M4 3 C10 2 18 8 24 16 C27 20 29 25 30 29 C26 26 22 22 17 17 C12 11 7 6 4 3 Z" fill="#f4c430" stroke="#b8860b" stroke-width="1.15" stroke-linejoin="round"/>
+    <path d="M7 6 C12 7 17 12 21 17 C24 21 26 24 28 27 C25 24 22 21 18 17 C14 12 10 8 7 6 Z" fill="#e6b422" opacity="0.55"/>
+    <path d="M3 2.2 L5.2 4" stroke="#5c3a1e" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="29.2" cy="28.5" r="1.35" fill="#5c3a1e"/>
+    <path d="M9 6.5 C13 8 17 12 21 17" stroke="#fff6c2" stroke-width="1.6" stroke-linecap="round" opacity="0.75" fill="none"/>
+    <circle class="cursor-core-dot" cx="15" cy="13" r="1.25" fill="#fff8dc" opacity="0.95"/>
+  </g>
+</svg>`.trim(),
+    },
+    hongo: {
+        id: 'hongo',
+        nombre: 'Hongo Mario',
+        descripcion: 'Super hongo rojo con carita.',
+        accent: '#e52521',
+        svgMarkup: `
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="dropShadowHongoRuntime" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowHongoRuntime)">
+    <ellipse cx="16" cy="12" rx="13" ry="10" fill="#e52521" stroke="#9a1613" stroke-width="1.1"/>
+    <ellipse cx="16" cy="16" rx="13" ry="3.2" fill="#c41e1a" stroke="#9a1613" stroke-width="0.8"/>
+    <circle cx="9" cy="9" r="2.6" fill="#ffffff"/>
+    <circle cx="17" cy="6.5" r="3" fill="#ffffff"/>
+    <circle cx="24" cy="10.5" r="2.1" fill="#ffffff"/>
+    <path d="M11 16 H21 V25.5 C21 28 18.8 29.5 16 29.5 C13.2 29.5 11 28 11 25.5 Z" fill="#f5d7a1" stroke="#c4a36a" stroke-width="1.1" stroke-linejoin="round"/>
+    <ellipse cx="13.5" cy="22" rx="1.15" ry="1.7" fill="#1e293b"/>
+    <ellipse cx="18.5" cy="22" rx="1.15" ry="1.7" fill="#1e293b"/>
+    <circle cx="13.8" cy="21.4" r="0.35" fill="#ffffff"/>
+    <circle cx="18.8" cy="21.4" r="0.35" fill="#ffffff"/>
+    <path d="M14 25.2 Q16 26.4 18 25.2" stroke="#1e293b" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <circle class="cursor-core-dot" cx="16" cy="8" r="1.4" fill="#ffffff" opacity="0.95"/>
+  </g>
+</svg>`.trim(),
+    },
+    metallica: {
+        id: 'metallica',
+        nombre: 'Metallica M',
+        descripcion: 'M angular metalica plateada.',
+        accent: '#94a3b8',
+        svgMarkup: `
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="dropShadowMetallicaRuntime" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="metalGradMRuntime" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="0.45" stop-color="#94a3b8"/>
+      <stop offset="1" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#dropShadowMetallicaRuntime)">
+    <path d="M3 2 L3 29 L9 29 L9 14 L16 26 L23 14 L23 29 L29 29 L29 2 L22 2 L22 12 L16 4 L10 12 L10 2 Z" fill="url(#metalGradMRuntime)" stroke="#0f172a" stroke-width="1.15" stroke-linejoin="round"/>
+    <path d="M5.5 4.5 L5.5 26.5 M26.5 4.5 L26.5 26.5 M11.5 12 L16 20 L20.5 12" stroke="#e2e8f0" stroke-width="0.7" stroke-linecap="round" opacity="0.45" fill="none"/>
+    <circle class="cursor-core-dot" cx="16" cy="10" r="1.25" fill="#ef4444" opacity="0.95"/>
+  </g>
+</svg>`.trim(),
+    },
 };
 /** Opción “cursor del sistema” (sin SVG custom). */
 const CURSOR_SYSTEM_ITEM = {
@@ -98,7 +181,15 @@ const CURSOR_SYSTEM_ITEM = {
     descripcion: 'Cursor normal del sistema operativo.',
     accent: '#64748b',
 };
-const CURSOR_IDS_VALIDOS = ['tech', 'classic', 'minimal', 'system'];
+const CURSOR_IDS_VALIDOS = [
+    'tech',
+    'classic',
+    'minimal',
+    'banana',
+    'hongo',
+    'metallica',
+    'system',
+];
 /** Evita registrar mousemove/hover dos veces al cambiar de variante. */
 let motorCursorListo = false;
 /** Variante activa para colorear la estela. */
@@ -154,27 +245,14 @@ function setCursorPreferido(id) {
  * Lista pública para el modal (sin markup SVG pesado en el listado).
  */
 function obtenerCatalogoPublico() {
-    return [
-        {
-            id: CURSOR_VARIANTES.tech.id,
-            nombre: CURSOR_VARIANTES.tech.nombre,
-            descripcion: CURSOR_VARIANTES.tech.descripcion,
-            accent: CURSOR_VARIANTES.tech.accent,
-        },
-        {
-            id: CURSOR_VARIANTES.classic.id,
-            nombre: CURSOR_VARIANTES.classic.nombre,
-            descripcion: CURSOR_VARIANTES.classic.descripcion,
-            accent: CURSOR_VARIANTES.classic.accent,
-        },
-        {
-            id: CURSOR_VARIANTES.minimal.id,
-            nombre: CURSOR_VARIANTES.minimal.nombre,
-            descripcion: CURSOR_VARIANTES.minimal.descripcion,
-            accent: CURSOR_VARIANTES.minimal.accent,
-        },
-        CURSOR_SYSTEM_ITEM,
-    ];
+    // EXPLICACIÓN: Object.values evita olvidar una variante nueva en el modal
+    const variantes = Object.values(CURSOR_VARIANTES).map((v) => ({
+        id: v.id,
+        nombre: v.nombre,
+        descripcion: v.descripcion,
+        accent: v.accent,
+    }));
+    return [...variantes, CURSOR_SYSTEM_ITEM];
 }
 /**
  * SVG de preview estático para las cards del modal (misma forma, más chico).

@@ -1054,6 +1054,24 @@ body {
     box-shadow: 0 0 4px rgba(203, 213, 225, 0.25);
 }
 
+/* Estela Banana */
+.cursor-trail--banana {
+    background-color: rgba(244, 196, 48, 0.6);
+    box-shadow: 0 0 4px rgba(244, 196, 48, 0.4);
+}
+
+/* Estela Hongo Mario */
+.cursor-trail--hongo {
+    background-color: rgba(229, 37, 33, 0.55);
+    box-shadow: 0 0 4px rgba(229, 37, 33, 0.35);
+}
+
+/* Estela Metallica M */
+.cursor-trail--metallica {
+    background-color: rgba(148, 163, 184, 0.55);
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.35);
+}
+
 /* ===== OCULTAR CURSOR PERSONALIZADO EN MÓVILES Y TABLETS ===== */
 /* Detectar dispositivos táctiles y pantallas pequeñas */
 @media (hover: none) and (pointer: coarse), (max-width: 1024px) {

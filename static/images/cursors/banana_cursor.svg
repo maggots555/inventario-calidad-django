@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Banana cursor: curved crescent, stem tip at top-left = hotspot -->
+  <defs>
+    <filter id="dropShadowBanana" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowBanana)">
+    <!-- Outer banana crescent (readable at 32px) -->
+    <path
+      d="M4 3
+         C10 2 18 8 24 16
+         C27 20 29 25 30 29
+         C26 26 22 22 17 17
+         C12 11 7 6 4 3 Z"
+      fill="#f4c430"
+      stroke="#b8860b"
+      stroke-width="1.15"
+      stroke-linejoin="round"/>
+    <!-- Inner cut to thicken crescent look -->
+    <path
+      d="M7 6
+         C12 7 17 12 21 17
+         C24 21 26 24 28 27
+         C25 24 22 21 18 17
+         C14 12 10 8 7 6 Z"
+      fill="#e6b422"
+      opacity="0.55"/>
+    <!-- Stem (hotspot tip) -->
+    <path d="M3 2.2 L5.2 4" stroke="#5c3a1e" stroke-width="2.2" stroke-linecap="round"/>
+    <!-- Tip at bottom -->
+    <circle cx="29.2" cy="28.5" r="1.35" fill="#5c3a1e"/>
+    <!-- Gloss -->
+    <path
+      d="M9 6.5 C13 8 17 12 21 17"
+      stroke="#fff6c2"
+      stroke-width="1.6"
+      stroke-linecap="round"
+      opacity="0.75"
+      fill="none"/>
+    <circle class="cursor-core-dot" cx="15" cy="13" r="1.25" fill="#fff8dc" opacity="0.95"/>
+  </g>
+</svg>

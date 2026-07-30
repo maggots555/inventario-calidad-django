@@ -1379,6 +1379,7 @@
 
 @media (min-width: 768px) {
     .cursor-options-grid {
+        /* 7 opciones: 4 columnas se ve bien en modal grande */
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }

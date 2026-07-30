@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Mushroom cursor (Mario-style): top of cap near hotspot -->
+  <defs>
+    <filter id="dropShadowHongo" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.45"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowHongo)">
+    <!-- Red cap -->
+    <ellipse cx="16" cy="12" rx="13" ry="10" fill="#e52521" stroke="#9a1613" stroke-width="1.1"/>
+    <!-- Flat underside of cap -->
+    <ellipse cx="16" cy="16" rx="13" ry="3.2" fill="#c41e1a" stroke="#9a1613" stroke-width="0.8"/>
+    <!-- White spots -->
+    <circle cx="9" cy="9" r="2.6" fill="#ffffff"/>
+    <circle cx="17" cy="6.5" r="3" fill="#ffffff"/>
+    <circle cx="24" cy="10.5" r="2.1" fill="#ffffff"/>
+    <!-- Stem / face -->
+    <path
+      d="M11 16 H21 V25.5 C21 28 18.8 29.5 16 29.5 C13.2 29.5 11 28 11 25.5 Z"
+      fill="#f5d7a1"
+      stroke="#c4a36a"
+      stroke-width="1.1"
+      stroke-linejoin="round"/>
+    <!-- Eyes -->
+    <ellipse cx="13.5" cy="22" rx="1.15" ry="1.7" fill="#1e293b"/>
+    <ellipse cx="18.5" cy="22" rx="1.15" ry="1.7" fill="#1e293b"/>
+    <circle cx="13.8" cy="21.4" r="0.35" fill="#ffffff"/>
+    <circle cx="18.8" cy="21.4" r="0.35" fill="#ffffff"/>
+    <!-- Smile -->
+    <path d="M14 25.2 Q16 26.4 18 25.2" stroke="#1e293b" stroke-width="0.8" stroke-linecap="round" fill="none"/>
+    <circle class="cursor-core-dot" cx="16" cy="8" r="1.4" fill="#ffffff" opacity="0.95"/>
+  </g>
+</svg>
