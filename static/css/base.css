@@ -1026,7 +1026,7 @@ body {
     width: 6px;
     height: 6px;
     background-color: rgba(6, 182, 212, 0.5);
-    /* Cyan con transparencia */
+    /* Cyan con transparencia — default / tech */
     border-radius: 50%;
     pointer-events: none;
     z-index: 99998;
@@ -1035,6 +1035,23 @@ body {
     /* Centrado */
     transition: transform 0.5s ease-out, opacity 0.5s ease-out;
     box-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
+}
+
+/* Estela Classic Gold (data-cursor-variant / clase en JS) */
+.cursor-trail--classic {
+    background-color: rgba(212, 168, 67, 0.55);
+    box-shadow: 0 0 4px rgba(212, 168, 67, 0.35);
+}
+
+/* Estela Minimal (gris suave) */
+.cursor-trail--minimal {
+    background-color: rgba(148, 163, 184, 0.55);
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.3);
+}
+
+[data-bs-theme="dark"] .cursor-trail--minimal {
+    background-color: rgba(203, 213, 225, 0.45);
+    box-shadow: 0 0 4px rgba(203, 213, 225, 0.25);
 }
 
 /* ===== OCULTAR CURSOR PERSONALIZADO EN MÓVILES Y TABLETS ===== */

@@ -2,9 +2,14 @@
 /**
  * mi_perfil.ts
  * Carrusel de opiniones de clientes en "Mi Perfil" y "Directorio".
+ * + Selector de cursor personalizado (modal, solo vista propia).
  *
  * Enfoque: translateX en PÍXELES (no %) para evitar el bug de porcentaje
  * relativo al track en lugar de al wrapper.
+ *
+ * Cursor: usa window.SigmaCursor (cursor_personalizado.js en base.html).
+ * Guarda preferencia en localStorage clave 'sigma-cursor' (como el tema).
+ * Los tipos de SigmaCursor / CursorId viven en cursor_personalizado.ts (globales).
  */
 // ── Clase principal del carrusel ───────────────────────────────────────────
 class ReviewCarousel {
@@ -152,9 +157,106 @@ class ReviewCarousel {
         this._startAuto();
     }
 }
+/**
+ * Nombres legibles para el label “Preferencia actual”.
+ * CursorId es el type global definido en cursor_personalizado.ts.
+ */
+const CURSOR_NOMBRES = {
+    tech: 'Tech Cyan',
+    classic: 'Classic Gold',
+    minimal: 'Minimal',
+    system: 'Sistema',
+};
+/**
+ * Inicializa el modal de personalizar cursor en Mi Perfil.
+ *
+ * Objetivo: al elegir una card, guardar + aplicar vía window.SigmaCursor.
+ * Efectos: localStorage (dentro de SigmaCursor.aplicar) y UI selected/label.
+ */
+function inicializarSelectorCursorPerfil() {
+    const grid = document.getElementById('cursor-options-grid');
+    const modal = document.getElementById('modalPersonalizarCursor');
+    // Vista directorio u otras páginas sin modal → salir en silencio
+    if (!grid || !modal) {
+        return;
+    }
+    const api = window.SigmaCursor;
+    const labelActual = document.getElementById('cursor-pref-actual-label');
+    const alertaCompat = document.getElementById('cursor-compat-alert');
+    /**
+     * Marca la card seleccionada y actualiza el texto del label.
+     */
+    function refrescarUISeleccion(id) {
+        var _a;
+        // grid ya se validó arriba; tipado estricto no lo recuerda en closures
+        const gridEl = document.getElementById('cursor-options-grid');
+        if (!gridEl) {
+            return;
+        }
+        gridEl.querySelectorAll('.cursor-option-card').forEach((card) => {
+            const esSel = card.dataset['cursorId'] === id;
+            card.classList.toggle('is-selected', esSel);
+            card.setAttribute('aria-selected', esSel ? 'true' : 'false');
+        });
+        if (labelActual) {
+            labelActual.textContent = (_a = CURSOR_NOMBRES[id]) !== null && _a !== void 0 ? _a : id;
+        }
+    }
+    // Inyectar previews SVG en las cards (desde el catálogo de SigmaCursor)
+    if (api) {
+        grid.querySelectorAll('[data-preview-for]').forEach((preview) => {
+            const id = preview.dataset['previewFor'];
+            if (!id || id === 'system') {
+                return;
+            }
+            const svg = api.obtenerSvgPreview(id);
+            if (svg) {
+                preview.innerHTML = svg;
+            }
+        });
+    }
+    // Aviso si el dispositivo no soporta custom (táctil / ≤1024)
+    if (alertaCompat && api && !api.esDispositivoCompatible()) {
+        alertaCompat.hidden = false;
+    }
+    // Estado inicial según localStorage
+    const preferidoInicial = api ? api.getPreferido() : 'tech';
+    refrescarUISeleccion(preferidoInicial);
+    // Clic en cada opción
+    grid.querySelectorAll('.cursor-option-card').forEach((card) => {
+        card.addEventListener('click', () => {
+            const id = card.dataset['cursorId'];
+            if (!id) {
+                return;
+            }
+            // EXPLICACIÓN: aplicar() guarda en localStorage y cambia el SVG global
+            if (api) {
+                api.aplicar(id);
+            }
+            else {
+                try {
+                    localStorage.setItem('sigma-cursor', id);
+                }
+                catch {
+                    /* ignore */
+                }
+            }
+            refrescarUISeleccion(id);
+        });
+    });
+    // Al abrir el modal, sincronizar (p. ej. cambio en otra pestaña)
+    modal.addEventListener('show.bs.modal', () => {
+        const actual = api ? api.getPreferido() : preferidoInicial;
+        refrescarUISeleccion(actual);
+        if (alertaCompat && api) {
+            alertaCompat.hidden = api.esDispositivoCompatible();
+        }
+    });
+}
 // ── Inicialización ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.review-carousel-wrapper')
         .forEach((wrapper) => new ReviewCarousel(wrapper));
+    inicializarSelectorCursorPerfil();
 });
 //# sourceMappingURL=mi_perfil.js.map

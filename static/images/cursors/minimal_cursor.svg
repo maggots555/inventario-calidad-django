@@ -1,0 +1,20 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cursor Minimal: flecha limpia sin adornos tech -->
+  <defs>
+    <filter id="dropShadowMinimal" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowMinimal)">
+    <path d="M3 3 L11 27 L15 17 L25 13 L3 3 Z" fill="#334155" stroke="#94a3b8" stroke-width="1.25" stroke-linejoin="round"/>
+    <circle class="cursor-core-dot" cx="8" cy="10" r="1.2" fill="#94a3b8" opacity="0.9"/>
+  </g>
+</svg>

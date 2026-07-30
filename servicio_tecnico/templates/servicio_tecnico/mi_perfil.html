@@ -480,6 +480,32 @@
             {% endif %}
 
 
+            {# ── Personalizar cursor ─────────────────── #}
+            {% if not es_vista_directorio %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-cursor" style="color:var(--pcard-gold)"></i>
+                    Cursor personalizado
+                </div>
+
+                <p class="pcard-cursor-hint" id="cursor-pref-hint">
+                    Elige cómo se ve el puntero en escritorio. Se guarda solo en este navegador
+                    (igual que el tema claro/oscuro).
+                </p>
+
+                <button id="btn-personalizar-cursor"
+                        type="button"
+                        class="pcard-push-btn"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalPersonalizarCursor">
+                    <i class="bi bi-palette2" aria-hidden="true"></i>
+                    Personalizar cursor
+                </button>
+            </div>
+            {% endif %}
+
+
             {# ── Notificaciones Push ─────────────────── #}
             {% if not es_vista_directorio %}
             <div class="pcard-divider"></div>
@@ -550,6 +576,73 @@
         </div>{# /.pcard-card #}
     </div>{# /.perfil-wrapper #}
 </div>{# /.perfil-page #}
+
+{# ── Modal: elegir variante de cursor (solo vista propia) ── #}
+{% if not es_vista_directorio %}
+<div class="modal fade" id="modalPersonalizarCursor" tabindex="-1"
+     aria-labelledby="modalPersonalizarCursorLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content cursor-modal-content">
+            <div class="modal-header cursor-modal-header">
+                <h2 class="modal-title fs-5" id="modalPersonalizarCursorLabel">
+                    <i class="bi bi-cursor me-2" aria-hidden="true"></i>
+                    Personalizar cursor
+                </h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                {# Aviso si el dispositivo no soporta custom (táctil / ≤1024) #}
+                <div id="cursor-compat-alert" class="cursor-compat-alert" role="status" hidden>
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                    En este dispositivo el cursor personalizado está desactivado
+                    (táctil o pantalla estrecha). Tu elección se guardará y se verá
+                    en una PC de escritorio con mouse.
+                </div>
+
+                <p class="cursor-modal-intro">
+                    Toca una opción para aplicarla al instante. Preferencia actual:
+                    <strong id="cursor-pref-actual-label">—</strong>
+                </p>
+
+                {# Grid de opciones — las llena mi_perfil.ts desde window.SigmaCursor #}
+                <div id="cursor-options-grid" class="cursor-options-grid" role="listbox"
+                     aria-label="Variantes de cursor">
+                    {# Fallback HTML por si JS falla: las 4 opciones fijas #}
+                    <button type="button" class="cursor-option-card" data-cursor-id="tech"
+                            role="option" aria-selected="false">
+                        <span class="cursor-option-preview" data-preview-for="tech" aria-hidden="true"></span>
+                        <span class="cursor-option-name">Tech Cyan</span>
+                        <span class="cursor-option-desc">Cursor original SIGMA</span>
+                    </button>
+                    <button type="button" class="cursor-option-card" data-cursor-id="classic"
+                            role="option" aria-selected="false">
+                        <span class="cursor-option-preview" data-preview-for="classic" aria-hidden="true"></span>
+                        <span class="cursor-option-name">Classic Gold</span>
+                        <span class="cursor-option-desc">Acento dorado de marca</span>
+                    </button>
+                    <button type="button" class="cursor-option-card" data-cursor-id="minimal"
+                            role="option" aria-selected="false">
+                        <span class="cursor-option-preview" data-preview-for="minimal" aria-hidden="true"></span>
+                        <span class="cursor-option-name">Minimal</span>
+                        <span class="cursor-option-desc">Flecha limpia</span>
+                    </button>
+                    <button type="button" class="cursor-option-card" data-cursor-id="system"
+                            role="option" aria-selected="false">
+                        <span class="cursor-option-preview cursor-option-preview--system" aria-hidden="true">
+                            <i class="bi bi-mouse"></i>
+                        </span>
+                        <span class="cursor-option-name">Sistema</span>
+                        <span class="cursor-option-desc">Cursor del sistema operativo</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer cursor-modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
