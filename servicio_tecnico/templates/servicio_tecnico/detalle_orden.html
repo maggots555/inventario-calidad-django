@@ -477,6 +477,40 @@
                             </small>
                             {% endif %}
 
+                            {# ── Enviar Diagnóstico al Cliente (arriba de Guardar) ───────────────────── #}
+                            {# type="button": abre el modal; NO envía #formConfiguracion aunque esté dentro #}
+                            {% if orden.detalle_equipo.falla_principal and orden.detalle_equipo.diagnostico_sic %}
+                            <div class="d-grid mt-3">
+                                <button type="button"
+                                        class="btn btn-success btn-lg"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEnviarDiagnostico"
+                                        {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                                            disabled
+                                            title="⚠️ Configura un email válido del cliente antes de enviar"
+                                        {% else %}
+                                            title="Enviar diagnóstico al cliente con PDF adjunto"
+                                        {% endif %}>
+                                    <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
+                                </button>
+                                {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                                <small class="text-danger text-center mt-1">
+                                    <i class="bi bi-exclamation-triangle"></i> Email del cliente no configurado
+                                </small>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <div class="d-grid mt-3">
+                                <button type="button" class="btn btn-outline-secondary" disabled
+                                        title="Completa la falla principal y el diagnóstico SIC para habilitar">
+                                    <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
+                                </button>
+                                <small class="text-muted text-center mt-1">
+                                    <i class="bi bi-info-circle"></i> Completa "Falla principal" y "Diagnóstico SIC" para habilitar
+                                </small>
+                            </div>
+                            {% endif %}
+
                             {# ── Guardar Configuración ───────────────────────────────────────────────── #}
                             <div class="d-grid mt-3">
                                 <button type="submit" class="btn btn-primary">
@@ -610,39 +644,6 @@
                         </div>
                         
                     </form>
-                    
-                    <!-- BOTÓN: Enviar Diagnóstico al Cliente -->
-                    {% if orden.detalle_equipo.falla_principal and orden.detalle_equipo.diagnostico_sic %}
-                    <div class="d-grid mt-3">
-                        <button type="button" 
-                                class="btn btn-success btn-lg"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#modalEnviarDiagnostico"
-                                {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
-                                    disabled
-                                    title="⚠️ Configura un email válido del cliente antes de enviar"
-                                {% else %}
-                                    title="Enviar diagnóstico al cliente con PDF adjunto"
-                                {% endif %}>
-                            <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
-                        </button>
-                        {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
-                        <small class="text-danger text-center mt-1">
-                            <i class="bi bi-exclamation-triangle"></i> Email del cliente no configurado
-                        </small>
-                        {% endif %}
-                    </div>
-                    {% else %}
-                    <div class="d-grid mt-3">
-                        <button type="button" class="btn btn-outline-secondary" disabled
-                                title="Completa la falla principal y el diagnóstico SIC para habilitar">
-                            <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
-                        </button>
-                        <small class="text-muted text-center mt-1">
-                            <i class="bi bi-info-circle"></i> Completa "Falla principal" y "Diagnóstico SIC" para habilitar
-                        </small>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
