@@ -281,7 +281,10 @@
   list-style: none;
 }
 
-/* Línea vertical conectora */
+/* Línea vertical conectora
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Dos capas de fondo: (1) destello blanco semitransparente que se mueve,
+   (2) el gradiente verde→gris fijo. La animación baja el destello = “flujo”. */
 .st-timeline::before {
   content: '';
   position: absolute;
@@ -289,8 +292,20 @@
   top: 4px;
   bottom: 4px;
   width: 2px;
-  background: linear-gradient(180deg, var(--st-accent) 0%, #94a3b8 40%, #cbd5e1 100%);
+  background-image:
+    linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%),
+    linear-gradient(180deg, var(--st-accent) 0%, #94a3b8 40%, #cbd5e1 100%);
+  background-size: 100% 35%, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 0 -35%, 0 0;
   border-radius: 2px;
+  animation: stTimelineFlow 2.8s linear infinite;
+}
+
+/* Destello que recorre la línea de arriba hacia abajo */
+@keyframes stTimelineFlow {
+  from { background-position: 0 -35%, 0 0; }
+  to   { background-position: 0 135%, 0 0; }
 }
 
 .st-timeline-item {
@@ -335,7 +350,10 @@
   height: 100%;
 }
 
-/* Nodo actual — más grande con glow neon */
+/* Nodo actual — más grande con glow neon
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   El pulso combina: (1) anillo que se expande y se desvanece,
+   (2) brillo cyan, (3) scale ligero. Así el punto “respira” y se nota vivo. */
 .st-timeline-dot--current {
   width: 27px;
   height: 27px;
@@ -344,7 +362,10 @@
   background: var(--st-primary);
   border-color: var(--st-primary-light);
   animation: stDotPulseNeon 2s ease-in-out infinite;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4), 0 0 32px rgba(31, 99, 145, 0.2);
+  box-shadow:
+    0 0 0 0 rgba(56, 189, 248, 0.55),
+    0 0 12px rgba(56, 189, 248, 0.4),
+    0 0 32px rgba(31, 99, 145, 0.2);
 }
 
 .st-timeline-dot--current::after {
@@ -361,8 +382,20 @@
 }
 
 @keyframes stDotPulseNeon {
-  0%, 100% { box-shadow: 0 0 12px rgba(56, 189, 248, 0.4), 0 0 32px rgba(31, 99, 145, 0.2); }
-  50%      { box-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 0 48px rgba(31, 99, 145, 0.3); }
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 0 rgba(56, 189, 248, 0.55),
+      0 0 12px rgba(56, 189, 248, 0.4),
+      0 0 32px rgba(31, 99, 145, 0.2);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 10px rgba(56, 189, 248, 0),
+      0 0 20px rgba(56, 189, 248, 0.65),
+      0 0 48px rgba(31, 99, 145, 0.35);
+  }
 }
 
 @keyframes stDotPulse {
@@ -1203,9 +1236,15 @@
   border-left-color: #60a5fa;
 }
 
-/* Timeline */
+/* Timeline — misma lógica de flujo, destello cyan sobre gradiente dark */
 [data-bs-theme="dark"] .st-timeline::before {
-  background: linear-gradient(180deg, #059669 0%, #334155 40%, #1e293b 100%);
+  background-image:
+    linear-gradient(180deg, transparent 0%, rgba(125, 211, 252, 0.7) 50%, transparent 100%),
+    linear-gradient(180deg, #059669 0%, #334155 40%, #1e293b 100%);
+  background-size: 100% 35%, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: 0 -35%, 0 0;
+  animation: stTimelineFlow 2.8s linear infinite;
 }
 
 [data-bs-theme="dark"] .st-timeline-dot {
@@ -1220,11 +1259,10 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
-/* Restaurar azul para el nodo actual */
+/* Nodo actual: sin box-shadow fijo — stDotPulseNeon controla el glow */
 [data-bs-theme="dark"] .st-timeline-dot--current {
   background: #60a5fa;
   border-color: #93c5fd;
-  box-shadow: 0 0 12px rgba(96, 165, 250, 0.5), 0 0 32px rgba(96, 165, 250, 0.2);
 }
 
 [data-bs-theme="dark"] .st-timeline-content {
