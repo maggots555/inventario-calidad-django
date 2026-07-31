@@ -12,6 +12,11 @@
  *
  * Efectos: CSS vars + canvas; no toca BD ni red.
  * Accesibilidad: con prefers-reduced-motion no hay gravedad ni spotlight.
+ *
+ * Estabilidad móvil (Android):
+ * - try/catch en el init (un fallo no tumba la página).
+ * - Se pausa el requestAnimationFrame al hacer scroll o si la pestaña
+ *   está oculta, para no saturar la GPU.
  */
 const SPOT_ACTIVO = '1';
 const GRID = 24;
@@ -36,154 +41,203 @@ function esTemaOscuro() {
  * Inicializa spotlight CSS + malla canvas (gravedad + pulso).
  */
 function inicializarFondoSpotlight() {
-    const fondo = document.querySelector('.st-fondo-puntos');
-    if (!fondo) {
-        return;
-    }
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (reduceMotion.matches) {
-        return;
-    }
-    const mouse = {
-        x: null,
-        y: null,
-        radius: 220,
-        spotlightRadius: 200
-    };
-    const onPointerMove = (evento) => {
-        mouse.x = evento.clientX;
-        mouse.y = evento.clientY;
-        actualizarSpotlight(fondo, evento.clientX, evento.clientY);
-    };
-    const onPointerUp = (evento) => {
-        if (evento.pointerType === 'touch' || evento.pointerType === 'pen') {
+    try {
+        const fondo = document.querySelector('.st-fondo-puntos');
+        if (!fondo) {
+            return;
+        }
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (reduceMotion.matches) {
+            return;
+        }
+        const mouse = {
+            x: null,
+            y: null,
+            radius: 220,
+            spotlightRadius: 200
+        };
+        const onPointerMove = (evento) => {
+            mouse.x = evento.clientX;
+            mouse.y = evento.clientY;
+            actualizarSpotlight(fondo, evento.clientX, evento.clientY);
+        };
+        const onPointerUp = (evento) => {
+            if (evento.pointerType === 'touch' || evento.pointerType === 'pen') {
+                mouse.x = null;
+                mouse.y = null;
+                apagarSpotlight(fondo);
+            }
+        };
+        const onPointerLeave = () => {
             mouse.x = null;
             mouse.y = null;
             apagarSpotlight(fondo);
+        };
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+        window.addEventListener('pointerup', onPointerUp, { passive: true });
+        window.addEventListener('pointercancel', onPointerUp, { passive: true });
+        document.documentElement.addEventListener('mouseleave', onPointerLeave);
+        // ── Canvas: puntitos con gravedad (solo puntos, sin líneas) ──
+        const canvas = document.getElementById('st-fondo-canvas');
+        const ctx = canvas ? canvas.getContext('2d') : null;
+        if (!canvas || !ctx) {
+            return;
         }
-    };
-    const onPointerLeave = () => {
-        mouse.x = null;
-        mouse.y = null;
-        apagarSpotlight(fondo);
-    };
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUp, { passive: true });
-    window.addEventListener('pointercancel', onPointerUp, { passive: true });
-    document.documentElement.addEventListener('mouseleave', onPointerLeave);
-    // ── Canvas: puntitos con gravedad (solo puntos, sin líneas = mismo look) ──
-    const canvas = document.getElementById('st-fondo-canvas');
-    const ctx = canvas ? canvas.getContext('2d') : null;
-    if (!canvas || !ctx) {
-        return;
-    }
-    // EXPLICACIÓN PARA PRINCIPIANTES:
-    // Misma física del login, pero solo dibujamos círculos (la grilla de
-    // seguimiento no tenía líneas entre nodos).
-    let points = [];
-    const SPRING = 0.06;
-    const FRICTION = 0.82;
-    const PUSH_STRENGTH = 4.0;
-    const POINT_SIZE = 1.15;
-    const PULSE_SPEED = 0.0014;
-    const PULSE_SIZE = 0.4;
-    const PULSE_ALPHA = 0.18;
-    function initGrid() {
-        const w = canvas.width;
-        const h = canvas.height;
-        const cols = Math.ceil(w / GRID) + 1;
-        const rows = Math.ceil(h / GRID) + 1;
-        const offsetX = (w - (cols - 1) * GRID) / 2;
-        const offsetY = (h - (rows - 1) * GRID) / 2;
-        points = [];
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                const homeX = offsetX + col * GRID;
-                const homeY = offsetY + row * GRID;
-                points.push({
-                    homeX,
-                    homeY,
-                    x: homeX,
-                    y: homeY,
-                    vx: 0,
-                    vy: 0,
-                    col,
-                    row
-                });
+        let points = [];
+        let rafId = 0;
+        let animando = false;
+        let scrollPauseTimer = 0;
+        const SPRING = 0.06;
+        const FRICTION = 0.82;
+        const PUSH_STRENGTH = 4.0;
+        const POINT_SIZE = 1.15;
+        const PULSE_SPEED = 0.0014;
+        const PULSE_SIZE = 0.4;
+        const PULSE_ALPHA = 0.18;
+        function initGrid() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const cols = Math.ceil(w / GRID) + 1;
+            const rows = Math.ceil(h / GRID) + 1;
+            const offsetX = (w - (cols - 1) * GRID) / 2;
+            const offsetY = (h - (rows - 1) * GRID) / 2;
+            points = [];
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const homeX = offsetX + col * GRID;
+                    const homeY = offsetY + row * GRID;
+                    points.push({
+                        homeX,
+                        homeY,
+                        x: homeX,
+                        y: homeY,
+                        vx: 0,
+                        vy: 0,
+                        col,
+                        row
+                    });
+                }
             }
         }
-    }
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        initGrid();
-    }
-    function mouseGlow(p) {
-        if (mouse.x === null || mouse.y === null)
-            return 0;
-        const dx = p.x - mouse.x;
-        const dy = p.y - mouse.y;
-        const r = mouse.spotlightRadius;
-        const distSq = dx * dx + dy * dy;
-        if (distSq >= r * r)
-            return 0;
-        const falloff = 1 - Math.sqrt(distSq) / r;
-        return Math.min(1, Math.pow(falloff, 1.4) * 1.15);
-    }
-    function pulseFactor(p, timeMs) {
-        const phase = timeMs * PULSE_SPEED + p.col * 0.35 + p.row * 0.28;
-        return (Math.sin(phase) + 1) / 2;
-    }
-    function updatePoint(p) {
-        // Gravedad / empujón lejos del cursor
-        if (mouse.x !== null && mouse.y !== null) {
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            initGrid();
+        }
+        function mouseGlow(p) {
+            if (mouse.x === null || mouse.y === null)
+                return 0;
             const dx = p.x - mouse.x;
             const dy = p.y - mouse.y;
+            const r = mouse.spotlightRadius;
             const distSq = dx * dx + dy * dy;
-            const radiusSq = mouse.radius * mouse.radius;
-            if (distSq < radiusSq && distSq > 0.01) {
-                const dist = Math.sqrt(distSq);
-                const force = (1 - dist / mouse.radius) * PUSH_STRENGTH;
-                p.vx += (dx / dist) * force;
-                p.vy += (dy / dist) * force;
+            if (distSq >= r * r)
+                return 0;
+            const falloff = 1 - Math.sqrt(distSq) / r;
+            return Math.min(1, Math.pow(falloff, 1.4) * 1.15);
+        }
+        function pulseFactor(p, timeMs) {
+            const phase = timeMs * PULSE_SPEED + p.col * 0.35 + p.row * 0.28;
+            return (Math.sin(phase) + 1) / 2;
+        }
+        function updatePoint(p) {
+            // Gravedad / empujón lejos del cursor
+            if (mouse.x !== null && mouse.y !== null) {
+                const dx = p.x - mouse.x;
+                const dy = p.y - mouse.y;
+                const distSq = dx * dx + dy * dy;
+                const radiusSq = mouse.radius * mouse.radius;
+                if (distSq < radiusSq && distSq > 0.01) {
+                    const dist = Math.sqrt(distSq);
+                    const force = (1 - dist / mouse.radius) * PUSH_STRENGTH;
+                    p.vx += (dx / dist) * force;
+                    p.vy += (dy / dist) * force;
+                }
+            }
+            p.vx += (p.homeX - p.x) * SPRING;
+            p.vy += (p.homeY - p.y) * SPRING;
+            p.vx *= FRICTION;
+            p.vy *= FRICTION;
+            p.x += p.vx;
+            p.y += p.vy;
+        }
+        function drawPoints(timeMs) {
+            const dark = esTemaOscuro();
+            const baseRgb = dark ? '148, 163, 184' : '186, 230, 253';
+            const litRgb = dark ? '125, 211, 252' : '224, 242, 254';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                updatePoint(p);
+                const g = mouseGlow(p);
+                const pulse = pulseFactor(p, timeMs);
+                const size = POINT_SIZE + g * 1.4 + pulse * PULSE_SIZE;
+                const baseAlpha = dark ? 0.18 : 0.28;
+                const alpha = Math.min(1, baseAlpha + pulse * PULSE_ALPHA + g * 0.55);
+                ctx.fillStyle = g > 0.12
+                    ? `rgba(${litRgb}, ${alpha})`
+                    : `rgba(${baseRgb}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
-        p.vx += (p.homeX - p.x) * SPRING;
-        p.vy += (p.homeY - p.y) * SPRING;
-        p.vx *= FRICTION;
-        p.vy *= FRICTION;
-        p.x += p.vx;
-        p.y += p.vy;
-    }
-    function drawPoints(timeMs) {
-        const dark = esTemaOscuro();
-        // Colores alineados con el CSS original de la grilla
-        const baseRgb = dark ? '148, 163, 184' : '186, 230, 253';
-        const litRgb = dark ? '125, 211, 252' : '224, 242, 254';
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        for (let i = 0; i < points.length; i++) {
-            const p = points[i];
-            updatePoint(p);
-            const g = mouseGlow(p);
-            const pulse = pulseFactor(p, timeMs);
-            const size = POINT_SIZE + g * 1.4 + pulse * PULSE_SIZE;
-            const baseAlpha = dark ? 0.18 : 0.28;
-            const alpha = Math.min(1, baseAlpha + pulse * PULSE_ALPHA + g * 0.55);
-            ctx.fillStyle = g > 0.12
-                ? `rgba(${litRgb}, ${alpha})`
-                : `rgba(${baseRgb}, ${alpha})`;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-            ctx.fill();
+        /**
+         * EXPLICACIÓN PARA PRINCIPIANTES:
+         * Solo pedimos un frame si estamos “animando”. Así podemos pausar
+         * al scrollear o al ocultar la pestaña sin dejar un bucle infinito.
+         */
+        function animate(timeMs = 0) {
+            if (!animando) {
+                return;
+            }
+            drawPoints(timeMs);
+            rafId = requestAnimationFrame(animate);
         }
+        function iniciarAnimacion() {
+            if (animando) {
+                return;
+            }
+            animando = true;
+            rafId = requestAnimationFrame(animate);
+        }
+        function pausarAnimacion() {
+            animando = false;
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = 0;
+            }
+        }
+        // Al scrollear: pausar GPU; al dejar de scrollear (150 ms), reanudar
+        const onScroll = () => {
+            pausarAnimacion();
+            window.clearTimeout(scrollPauseTimer);
+            scrollPauseTimer = window.setTimeout(() => {
+                if (!document.hidden) {
+                    iniciarAnimacion();
+                }
+            }, 150);
+        };
+        const onVisibility = () => {
+            if (document.hidden) {
+                pausarAnimacion();
+            }
+            else {
+                iniciarAnimacion();
+            }
+        };
+        window.addEventListener('resize', resize);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        document.addEventListener('visibilitychange', onVisibility);
+        resize();
+        iniciarAnimacion();
     }
-    function animate(timeMs = 0) {
-        requestAnimationFrame(animate);
-        drawPoints(timeMs);
+    catch (error) {
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Si el canvas falla en un Android concreto, la página de seguimiento
+        // debe seguir usable (card, chat, etc.). Solo registramos el error.
+        console.warn('[Seguimiento fondo] No se pudo iniciar el canvas:', error);
     }
-    window.addEventListener('resize', resize);
-    resize();
-    animate();
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', inicializarFondoSpotlight);

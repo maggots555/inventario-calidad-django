@@ -4,9 +4,8 @@
    Abril 2026 — Sistema SIGMA
    ============================================================================= */
 
-/* === Google Fonts: Plus Jakarta Sans === */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
-
+/* === Google Fonts: se cargan en el HTML (preconnect + link).
+   No usar @import aquí: bloquea TODO este CSS hasta que Fonts responda. */
 /* === Variables de diseño === */
 :root {
   --st-primary:       #1f6391;
@@ -1442,13 +1441,30 @@
   pointer-events: none;
 }
 
-/* === Accesibilidad === */
+/* === Accesibilidad ===
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Antes acortábamos TODAS las animaciones a 0.01ms. En Android/iOS eso
+   a veces deja a .st-card (que arranca en opacity:0) invisible para siempre.
+   Ahora: apagamos animaciones de entrada y forzamos opacity:1. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Elementos que animan desde opacity:0 — visibles ya */
+  .st-card,
+  .st-timeline-item,
+  .st-banner,
+  .st-gracias-emoji,
+  .st-pieza-card,
+  .st-pieza-tl-step,
+  .st-chat-msg,
+  .st-chat-panel {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
   /* Sin spotlight, cascada ni gravedad: solo fondo plano */
   .st-fondo-puntos::before,
   .st-fondo-puntos[data-activo="1"]::before {
@@ -1460,6 +1476,181 @@
   }
   .st-fondo-canvas {
     display: none !important;
+  }
+}
+
+/* =====================================================================
+   MÓVIL / TOUCH — aliviar GPU (Android gama media-alta)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Muchos backdrop-filter anidados + overflow:hidden hacen que Chrome
+   Android “pierda” capas (contenido invisible). En pantallas ≤900px:
+   1) sin animaciones de entrada (opacity:0),
+   2) sin blur anidado (fondos rgba un poco más opacos).
+   En desktop el vidrio se mantiene.
+   ===================================================================== */
+@media (max-width: 900px) {
+  .st-card,
+  .st-timeline-item,
+  .st-banner,
+  .st-gracias-emoji,
+  .st-pieza-card,
+  .st-pieza-tl-step,
+  .st-diagnostico-card {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .st-card,
+  .st-card-header,
+  .st-equipo-info,
+  .st-estado-badge,
+  .st-timeline-content,
+  .st-banner--warning,
+  .st-banner--success,
+  .st-contacto,
+  .st-galeria,
+  .st-gracias,
+  .st-gracias-fecha,
+  .st-encuesta-box,
+  .st-vigencia,
+  .st-push-card,
+  .st-diagnostico-card,
+  .st-footer,
+  .st-footer-red,
+  .st-modal,
+  .st-modal-header,
+  .st-pieza-card,
+  .st-pieza-fechas,
+  .st-chat-panel,
+  .st-chat-panel-header,
+  .st-chat-msg--bot .st-chat-msg-bubble,
+  .st-chat-input-area,
+  .st-chat-input-wrapper,
+  .st-chat-chip,
+  .st-chat-bubble,
+  .st-dark-toggle {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Sin blur: un poco más opacos para que se lean igual de bien */
+  .st-card {
+    background: rgba(255, 255, 255, 0.92);
+  }
+  .st-card-header {
+    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
+  }
+  .st-equipo-info {
+    background: rgba(255, 255, 255, 0.85);
+  }
+  .st-estado-badge--activo {
+    background: rgba(248, 250, 252, 0.92);
+  }
+  .st-estado-badge--finalizado {
+    background: rgba(255, 251, 235, 0.92);
+  }
+  .st-estado-badge--entregado {
+    background: rgba(236, 253, 245, 0.92);
+  }
+  .st-timeline-content {
+    background: rgba(255, 255, 255, 0.88);
+  }
+  .st-timeline-item--current .st-timeline-content {
+    background: rgba(239, 246, 255, 0.95);
+  }
+  .st-banner--warning {
+    background: rgba(255, 251, 235, 0.92);
+  }
+  .st-banner--success {
+    background: rgba(236, 253, 245, 0.92);
+  }
+  .st-contacto,
+  .st-push-card,
+  .st-diagnostico-card,
+  .st-galeria,
+  .st-gracias {
+    background: rgba(255, 255, 255, 0.88);
+  }
+  .st-encuesta-box {
+    background: rgba(255, 251, 235, 0.9);
+  }
+  .st-footer {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  .st-modal {
+    background: rgba(255, 255, 255, 0.96);
+  }
+  .st-modal-header {
+    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
+  }
+  .st-pieza-card {
+    background: rgba(255, 255, 255, 0.92);
+  }
+  .st-chat-panel {
+    background: rgba(255, 255, 255, 0.96);
+  }
+  .st-chat-panel-header {
+    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
+  }
+  .st-chat-msg--bot .st-chat-msg-bubble {
+    background: rgba(241, 245, 249, 0.98);
+  }
+  .st-chat-input-area {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  .st-chat-input-wrapper {
+    background: rgba(248, 250, 252, 0.98);
+  }
+  .st-chat-bubble,
+  .st-dark-toggle {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  /* Cascada CSS también pesa en GPU móvil */
+  .st-fondo-cascada {
+    animation: none !important;
+    opacity: 0.35 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  [data-bs-theme="dark"] .st-card {
+    background: rgba(15, 23, 42, 0.92);
+  }
+  [data-bs-theme="dark"] .st-card-header {
+    background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
+  }
+  [data-bs-theme="dark"] .st-equipo-info,
+  [data-bs-theme="dark"] .st-contacto,
+  [data-bs-theme="dark"] .st-push-card,
+  [data-bs-theme="dark"] .st-diagnostico-card,
+  [data-bs-theme="dark"] .st-galeria,
+  [data-bs-theme="dark"] .st-gracias,
+  [data-bs-theme="dark"] .st-footer {
+    background: rgba(15, 23, 42, 0.88);
+  }
+  [data-bs-theme="dark"] .st-timeline-content {
+    background: rgba(15, 23, 42, 0.88);
+  }
+  [data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content {
+    background: rgba(12, 35, 64, 0.95);
+  }
+  [data-bs-theme="dark"] .st-modal,
+  [data-bs-theme="dark"] .st-chat-panel {
+    background: rgba(15, 23, 42, 0.96);
+  }
+  [data-bs-theme="dark"] .st-modal-header,
+  [data-bs-theme="dark"] .st-chat-panel-header {
+    background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
+  }
+  [data-bs-theme="dark"] .st-pieza-card,
+  [data-bs-theme="dark"] .st-chat-msg--bot .st-chat-msg-bubble {
+    background: rgba(30, 41, 59, 0.95);
+  }
+  [data-bs-theme="dark"] .st-chat-bubble,
+  [data-bs-theme="dark"] .st-dark-toggle {
+    background: rgba(30, 41, 59, 0.85);
   }
 }
 
