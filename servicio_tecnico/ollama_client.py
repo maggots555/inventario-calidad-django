@@ -1277,6 +1277,12 @@ def analizar_sentimiento_encuestas(
 
     ollama_base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
     timeout = getattr(settings, 'OLLAMA_TIMEOUT', 180)  # análisis necesita más tiempo
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Usamos el MISMO num_ctx que chat de seguimiento y pulir diagnóstico
+    # (CHAT_SEGUIMIENTO_NUM_CTX, default 8192). Sin esto Ollama usa ~2048 y,
+    # además, un tamaño distinto al de las otras features puede forzar
+    # unload/reload del modelo en RAM aunque el nombre sea el mismo.
+    num_ctx = getattr(settings, 'CHAT_SEGUIMIENTO_NUM_CTX', 8192)
 
     # Formatear todas las encuestas como texto legible para el prompt
     datos_encuestas = '\n\n'.join(
@@ -1302,6 +1308,8 @@ def analizar_sentimiento_encuestas(
             'temperature': 0.2,   # Muy bajo → análisis consistente y estructurado
             'top_p': 0.9,
             'num_predict': 600,   # Suficiente para el JSON de respuesta
+            # Misma ventana de contexto que chat/diagnóstico (evita unload en Ollama)
+            'num_ctx': num_ctx,
         },
         'format': 'json',  # Fuerza salida JSON nativa si el modelo lo soporta
     }

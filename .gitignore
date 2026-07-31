@@ -48,6 +48,7 @@ backup_BD/
 
 
 # IDEs
+.cursor/
 .vscode/
 .idea/
 *.swp
