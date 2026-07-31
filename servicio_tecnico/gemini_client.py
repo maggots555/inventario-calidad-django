@@ -460,52 +460,44 @@ def mejorar_diagnostico(
 
 
 # ===========================================================================
-# ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción (vía Gemini)
+# ANÁLISIS DE SENTIMIENTO IA — Satisfacción / rechazo (vía Gemini)
 # ===========================================================================
 
 def analizar_sentimiento_encuestas(
     encuestas: list[dict],
     modelo: str = GEMINI_MODEL_DEFAULT,
+    tipo: str = 'satisfaccion',
 ) -> dict:
     """
-    Analiza el sentimiento general del conjunto de encuestas de satisfacción
-    usando Google Gemini vía API REST.
+    Analiza el sentimiento del conjunto de encuestas/feedbacks con Google Gemini.
 
     Usa los mismos prompts y la misma estructura de respuesta que la versión
     Ollama (`ollama_client.analizar_sentimiento_encuestas`) para garantizar
-    resultados consistentes entre proveedores.
+    resultados consistentes entre proveedores. El parámetro `tipo` elige
+    satisfacción vs rechazo.
 
     Args:
-        encuestas: Lista de dicts con claves:
-                   calificacion_general, calificacion_atencion,
-                   calificacion_tiempo, nps, recomienda, comentario
+        encuestas: Lista de dicts (campos según tipo)
         modelo:    Nombre del modelo Gemini (default: gemini-3.6-flash)
+        tipo:      'satisfaccion' | 'rechazo'
 
     Returns:
-        dict con las claves:
-            success (bool)
-            analisis (dict): sentimiento_general, resumen_ejecutivo,
-                             temas_positivos, temas_negativos, recomendacion_ia
-            modelo_usado (str)
-            error (str) — solo si success=False
-            error_type (str) — solo si success=False; permite cascada en el
-                dispatcher (igual que mejorar_diagnostico / inspección):
-                Recuperables: rate_limit, server_error, timeout, network_error
-                Irrecuperables: hard_error, safety_block, config_error
+        dict con success, analisis, modelo_usado (o error + error_type)
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Funciona igual que la versión Ollama pero envía los datos a los servidores
-    de Google en lugar de un servidor local. Necesita GEMINI_API_KEY configurada.
-    El campo error_type le dice al dispatcher si debe probar el siguiente
-    modelo Gemini o saltar directo a Ollama.
+    Funciona igual que la versión Ollama pero envía los datos a Google.
+    Si finishReason=MAX_TOKENS, fallamos con hard_error (como en diagnóstico)
+    para que la cascada pueda caer a Ollama en lugar de cachear JSON truncado.
     """
     # Importamos los helpers de ollama_client para reutilizar prompts y parsers
     from .ollama_client import (
-        _PROMPT_SENTIMIENTO_SISTEMA,
-        _PROMPT_SENTIMIENTO_USUARIO,
         _formatear_encuesta,
+        _normalizar_tipo_sentimiento,
+        _obtener_prompts_sentimiento,
         _parsear_json_analisis,
     )
+
+    tipo_ok = _normalizar_tipo_sentimiento(tipo)
 
     if not encuestas:
         return {
@@ -534,21 +526,24 @@ def analizar_sentimiento_encuestas(
 
     timeout = getattr(settings, 'GEMINI_TIMEOUT', 120)
 
-    # ── Construir el prompt ──────────────────────────────────────────────────
+    # ── Construir el prompt según tipo ───────────────────────────────────────
+    prompt_sistema, prompt_usuario_tpl = _obtener_prompts_sentimiento(tipo_ok)
     datos_encuestas = '\n\n'.join(
-        _formatear_encuesta(enc, idx) for idx, enc in enumerate(encuestas)
+        _formatear_encuesta(enc, idx, tipo=tipo_ok)
+        for idx, enc in enumerate(encuestas)
     )
-    prompt_usuario = _PROMPT_SENTIMIENTO_USUARIO.format(
+    prompt_usuario = prompt_usuario_tpl.format(
         n=len(encuestas),
         datos_encuestas=datos_encuestas,
     )
 
     # ── Payload Gemini generateContent ──────────────────────────────────────
     # systemInstruction + contents (rol user) + responseMimeType=application/json
-    # thinking_level minimal: clasificación de sentimiento es throughput, no razonamiento profundo.
+    # thinking_level minimal: clasificación de sentimiento es throughput.
+    # max_output_tokens=2048: deja margen para JSON denso (p. ej. muchos rechazos).
     payload = {
         'systemInstruction': {
-            'parts': [{'text': _PROMPT_SENTIMIENTO_SISTEMA}],
+            'parts': [{'text': prompt_sistema}],
         },
         'contents': [
             {
@@ -558,7 +553,7 @@ def analizar_sentimiento_encuestas(
         ],
         'generationConfig': construir_generation_config(
             modelo,
-            max_output_tokens=1024,
+            max_output_tokens=2048,
             temperature=0.2,
             top_p=0.9,
             thinking_budget=0,
@@ -571,8 +566,8 @@ def analizar_sentimiento_encuestas(
     payload_bytes = json.dumps(payload).encode('utf-8')
 
     logger.info(
-        f'[AnalisisSentimiento][Gemini] Enviando {len(encuestas)} encuestas '
-        f'al modelo {modelo}'
+        f'[AnalisisSentimiento][Gemini] Enviando {len(encuestas)} ítems '
+        f'({tipo_ok}) al modelo {modelo}'
     )
 
     try:
@@ -610,6 +605,23 @@ def analizar_sentimiento_encuestas(
             }
 
         finish_reason = candidates[0].get('finishReason', 'STOP')
+        # EXPLICACIÓN PARA PRINCIPIANTES: igual que mejorar_diagnostico.
+        # MAX_TOKENS = respuesta cortada → JSON incompleto. Fallamos duro para
+        # que el dispatcher salte a Ollama en vez de cachear basura.
+        if finish_reason == 'MAX_TOKENS':
+            logger.warning(
+                f'[AnalisisSentimiento][Gemini] Respuesta TRUNCADA '
+                f'(MAX_TOKENS) | Modelo: {modelo} | tipo={tipo_ok}'
+            )
+            return {
+                'success': False,
+                'error': (
+                    'La respuesta de Gemini fue cortada por límite de tokens. '
+                    'Se intentará con otro proveedor si está disponible.'
+                ),
+                'error_type': 'hard_error',
+            }
+
         if finish_reason == 'SAFETY':
             return {
                 'success': False,

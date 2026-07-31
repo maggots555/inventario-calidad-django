@@ -1168,16 +1168,17 @@ def mejorar_diagnostico_dispatch(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  ANÁLISIS DE SENTIMIENTO — Encuestas de Satisfacción
+#  ANÁLISIS DE SENTIMIENTO — Satisfacción y rechazo (mismo pipeline)
 # ─────────────────────────────────────────────────────────────────────────────
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Un solo analizador sirve para dos dashboards. El parámetro `tipo` elige el
+# prompt y el formateo de cada ítem; la salida JSON (5 claves) es la misma.
 
-# Prompt del sistema para el análisis de sentimiento.
-# REGLAS:
-#   - Analizar ÚNICAMENTE los datos recibidos, sin inventar información
-#   - Devolver SIEMPRE un JSON válido con exactamente las 5 claves definidas
-#   - Español formal, orientado a reporte ejecutivo para gerencia
-#   - temas_positivos / temas_negativos: máximo 6 ítems cada uno, frases cortas
-_PROMPT_SENTIMIENTO_SISTEMA = """\
+TIPOS_SENTIMIENTO_VALIDOS = frozenset({'satisfaccion', 'rechazo'})
+
+# Alias histórico (satisfacción) — otros módulos pueden importarlo aún.
+_PROMPT_SENTIMIENTO_SISTEMA_SATISFACCION = """\
 Eres un analista de experiencia del cliente. Tu tarea es analizar el conjunto \
 de encuestas de satisfacción de un taller de servicio técnico y producir un \
 reporte ejecutivo en español.
@@ -1198,7 +1199,7 @@ INSTRUCCIONES ESTRICTAS:
 5. Usa terminología profesional de servicio al cliente y mejora continua.
 """
 
-_PROMPT_SENTIMIENTO_USUARIO = """\
+_PROMPT_SENTIMIENTO_USUARIO_SATISFACCION = """\
 Analiza las siguientes {n} encuestas de satisfacción de clientes:
 
 {datos_encuestas}
@@ -1207,19 +1208,105 @@ Genera el análisis de sentimiento siguiendo exactamente el formato JSON \
 especificado en las instrucciones del sistema.
 """
 
+_PROMPT_SENTIMIENTO_SISTEMA_RECHAZO = """\
+Eres un analista comercial de un taller de servicio técnico. Tu tarea es \
+analizar comentarios de clientes que rechazaron una cotización de reparación \
+y producir un reporte ejecutivo en español.
 
-def _formatear_encuesta(enc: dict, idx: int) -> str:
+INSTRUCCIONES ESTRICTAS:
+1. Analiza ÚNICAMENTE los datos proporcionados (motivo de rechazo + comentario).
+2. Devuelve EXCLUSIVAMENTE un objeto JSON válido, sin texto adicional, sin \
+   explicaciones, sin bloques de código markdown.
+3. El JSON debe tener exactamente estas 5 claves:
+   - "sentimiento_general": una de estas palabras exactas: \
+     "positivo", "negativo", "mixto", "neutral"
+   - "resumen_ejecutivo": párrafo de 2-4 oraciones para gerencia sobre por qué \
+     rechazan
+   - "temas_positivos": array de máximo 6 strings cortos (señales favorables \
+     residuales: lo que aún valoraron o dejaron abierto)
+   - "temas_negativos": array de máximo 6 strings cortos (fricciones y razones \
+     de rechazo)
+   - "recomendacion_ia": 1-2 oraciones con la acción comercial/operativa más \
+     importante
+4. Si el comentario está vacío, basa el análisis en el motivo de rechazo.
+5. Usa terminología profesional de ventas, postventa y mejora de conversión.
+"""
+
+_PROMPT_SENTIMIENTO_USUARIO_RECHAZO = """\
+Analiza los siguientes {n} feedbacks de rechazo de cotización:
+
+{datos_encuestas}
+
+Genera el análisis de sentimiento siguiendo exactamente el formato JSON \
+especificado en las instrucciones del sistema.
+"""
+
+# Compatibilidad hacia atrás (imports antiguos = satisfacción)
+_PROMPT_SENTIMIENTO_SISTEMA = _PROMPT_SENTIMIENTO_SISTEMA_SATISFACCION
+_PROMPT_SENTIMIENTO_USUARIO = _PROMPT_SENTIMIENTO_USUARIO_SATISFACCION
+
+
+def _normalizar_tipo_sentimiento(tipo: str) -> str:
     """
-    Convierte un dict de encuesta en texto legible para el prompt.
+    Devuelve 'satisfaccion' o 'rechazo'. Cualquier otro valor → satisfacción.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Evita que un typo en el frontend rompa el analizador; caemos al tipo
+    histórico por defecto.
+    """
+    tipo_limpio = (tipo or 'satisfaccion').strip().lower()
+    if tipo_limpio not in TIPOS_SENTIMIENTO_VALIDOS:
+        return 'satisfaccion'
+    return tipo_limpio
+
+
+def _obtener_prompts_sentimiento(tipo: str) -> tuple[str, str]:
+    """
+    Elige el par (system, user) según el tipo de encuesta.
+
+    Returns:
+        (prompt_sistema, prompt_usuario_template)
+    """
+    tipo_ok = _normalizar_tipo_sentimiento(tipo)
+    if tipo_ok == 'rechazo':
+        return (
+            _PROMPT_SENTIMIENTO_SISTEMA_RECHAZO,
+            _PROMPT_SENTIMIENTO_USUARIO_RECHAZO,
+        )
+    return (
+        _PROMPT_SENTIMIENTO_SISTEMA_SATISFACCION,
+        _PROMPT_SENTIMIENTO_USUARIO_SATISFACCION,
+    )
+
+
+def _formatear_encuesta(enc: dict, idx: int, tipo: str = 'satisfaccion') -> str:
+    """
+    Convierte un dict de encuesta/feedback en texto legible para el prompt.
+
+    Args:
+        enc:  Dict con campos según tipo (satisfacción: ratings/NPS; rechazo: motivo)
+        idx:  Índice 0-based para numerar en el prompt
+        tipo: 'satisfaccion' | 'rechazo'
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     En vez de mandar un JSON crudo al modelo, lo convertimos a texto natural
-    para que el modelo entienda mejor el contexto de cada encuesta.
+    para que el modelo entienda mejor el contexto de cada respuesta.
     """
-    recomienda_str = 'Sí' if enc.get('recomienda') else 'No'
-    comentario = enc.get('comentario', '').strip()
-    comentario_str = f'Comentario: "{comentario}"' if comentario else 'Sin comentario escrito.'
+    tipo_ok = _normalizar_tipo_sentimiento(tipo)
+    comentario = (enc.get('comentario') or '').strip()
+    comentario_str = (
+        f'Comentario: "{comentario}"' if comentario else 'Sin comentario escrito.'
+    )
 
+    if tipo_ok == 'rechazo':
+        motivo = (enc.get('motivo') or enc.get('motivo_rechazo') or 'N/D')
+        return (
+            f"Feedback de rechazo #{idx + 1}:\n"
+            f"  Motivo de rechazo (catálogo): {motivo}\n"
+            f"  {comentario_str}"
+        )
+
+    recomienda_str = 'Sí' if enc.get('recomienda') else 'No'
     return (
         f"Encuesta #{idx + 1}:\n"
         f"  Calificación general: {enc.get('calificacion_general', 'N/D')}/5 estrellas\n"
@@ -1234,31 +1321,26 @@ def _formatear_encuesta(enc: dict, idx: int) -> str:
 def analizar_sentimiento_encuestas(
     encuestas: list[dict],
     modelo: str = 'gemma4:e4b',
+    tipo: str = 'satisfaccion',
 ) -> dict:
     """
-    Analiza el sentimiento general del conjunto de encuestas de satisfacción
-    usando el modelo Ollama especificado.
+    Analiza el sentimiento del conjunto de encuestas/feedbacks con Ollama.
 
     Args:
-        encuestas: Lista de dicts, cada uno con las claves:
-                   calificacion_general, calificacion_atencion,
-                   calificacion_tiempo, nps, recomienda, comentario
-        modelo:    Nombre del modelo Ollama a usar (default: gemma4:e4b)
+        encuestas: Lista de dicts (campos según tipo)
+        modelo:    Nombre del modelo Ollama a usar
+        tipo:      'satisfaccion' | 'rechazo' — elige prompt y formateo
 
     Returns:
-        dict con las claves:
-            success (bool)
-            analisis (dict): sentimiento_general, resumen_ejecutivo,
-                             temas_positivos, temas_negativos, recomendacion_ia
-            modelo_usado (str)
-            error (str) — solo si success=False
+        dict con success, analisis, modelo_usado (o error)
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    1. Construimos un mensaje con todas las encuestas en formato legible
-    2. Se lo enviamos al modelo local (gemma4:e4b) vía HTTP
-    3. El modelo responde con un JSON que parseamos
-    4. Si el JSON viene malformado hacemos un fallback con texto plano
+    1. Elegimos el prompt según el tipo (satisfacción vs rechazo)
+    2. Formateamos cada ítem a texto legible
+    3. Llamamos a Ollama /api/chat y parseamos el JSON de respuesta
     """
+    tipo_ok = _normalizar_tipo_sentimiento(tipo)
+
     if not encuestas:
         return {
             'success': False,
@@ -1284,12 +1366,15 @@ def analizar_sentimiento_encuestas(
     # unload/reload del modelo en RAM aunque el nombre sea el mismo.
     num_ctx = getattr(settings, 'CHAT_SEGUIMIENTO_NUM_CTX', 8192)
 
+    prompt_sistema, prompt_usuario_tpl = _obtener_prompts_sentimiento(tipo_ok)
+
     # Formatear todas las encuestas como texto legible para el prompt
     datos_encuestas = '\n\n'.join(
-        _formatear_encuesta(enc, idx) for idx, enc in enumerate(encuestas)
+        _formatear_encuesta(enc, idx, tipo=tipo_ok)
+        for idx, enc in enumerate(encuestas)
     )
 
-    prompt_usuario = _PROMPT_SENTIMIENTO_USUARIO.format(
+    prompt_usuario = prompt_usuario_tpl.format(
         n=len(encuestas),
         datos_encuestas=datos_encuestas,
     )
@@ -1299,7 +1384,7 @@ def analizar_sentimiento_encuestas(
     payload = {
         'model': modelo,
         'messages': [
-            {'role': 'system', 'content': _PROMPT_SENTIMIENTO_SISTEMA},
+            {'role': 'system', 'content': prompt_sistema},
             {'role': 'user',   'content': prompt_usuario},
         ],
         'stream': False,
@@ -1318,7 +1403,7 @@ def analizar_sentimiento_encuestas(
     payload_bytes = json.dumps(payload).encode('utf-8')
 
     logger.info(
-        f'[AnalisisSentimiento] Enviando {len(encuestas)} encuestas a Ollama '
+        f'[AnalisisSentimiento] Enviando {len(encuestas)} ítems ({tipo_ok}) a Ollama '
         f'({modelo}) en {url}'
     )
 
@@ -1489,19 +1574,21 @@ def _validar_analisis(data: dict, claves_requeridas: set, sentimientos_validos: 
 def analizar_sentimiento_dispatch(
     encuestas: list[dict],
     modelo_override: str = '',
+    tipo: str = 'satisfaccion',
 ) -> dict:
     """
     Dispatcher con cascada Gemini → Ollama para análisis de sentimiento.
 
     Objetivo de negocio: mismo comportamiento que mejorar_diagnostico_dispatch
     y analizar_imagenes_ingreso_dispatch — probar modelos Gemini en orden y,
-    si fallan, caer a Ollama local.
+    si fallan, caer a Ollama local. Sirve para satisfacción y rechazo (`tipo`).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     El frontend puede mandar vacío (Automático), "[Gemini] …" u "[Ollama] …".
     - Vacío / Automático → recorre GEMINI_MODELS; si todos fallan → OLLAMA_MODEL.
     - Override Gemini → ese modelo primero + resto de GEMINI_MODELS → Ollama.
     - Override Ollama → solo ese modelo local (sin cascada Gemini).
+    - tipo='rechazo' usa el prompt de feedback de cotización; default satisfacción.
 
     Errores recuperables (probar siguiente Gemini):
       rate_limit, server_error, timeout, network_error
@@ -1512,6 +1599,7 @@ def analizar_sentimiento_dispatch(
         encuestas:       Lista de dicts de encuestas (mismo formato que
                          analizar_sentimiento_encuestas)
         modelo_override: Vacío = cascada automática. Con prefijo/nombre = override.
+        tipo:            'satisfaccion' | 'rechazo'
 
     Returns:
         dict con success, analisis, modelo_usado (o error)
@@ -1523,6 +1611,7 @@ def analizar_sentimiento_dispatch(
     # Si Gemini dice "rate limit" o "timeout", tiene sentido probar el siguiente.
     # Si la API key es inválida, no sirve seguir con más Gemini → vamos a Ollama.
     ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+    tipo_ok = _normalizar_tipo_sentimiento(tipo)
 
     # ── Limpiar prefijos visuales del selector ───────────────────────────────
     nombre_limpio = modelo_override.strip()
@@ -1553,11 +1642,12 @@ def analizar_sentimiento_dispatch(
             }
         logger.info(
             f'[AnalisisSentimiento][Dispatch] Ollama seleccionado explícitamente: '
-            f'{nombre_limpio}'
+            f'{nombre_limpio} | tipo={tipo_ok}'
         )
         return analizar_sentimiento_encuestas(
             encuestas=encuestas,
             modelo=nombre_limpio,
+            tipo=tipo_ok,
         )
 
     # ── Lista de modelos Gemini a intentar ───────────────────────────────────
@@ -1569,14 +1659,14 @@ def analizar_sentimiento_dispatch(
         modelos_a_intentar = [nombre_limpio] + restantes
         logger.info(
             f'[AnalisisSentimiento][Dispatch] Override Gemini: {nombre_limpio} '
-            f'(primero), fallback: {restantes or "ninguno"}'
+            f'(primero), fallback: {restantes or "ninguno"} | tipo={tipo_ok}'
         )
     else:
         # Modo automático (Analizar / selector Automático): orden de GEMINI_MODELS
         modelos_a_intentar = gemini_models_configurados
         logger.info(
             f'[AnalisisSentimiento][Dispatch] Modo automático — modelos Gemini: '
-            f'{modelos_a_intentar}'
+            f'{modelos_a_intentar} | tipo={tipo_ok}'
         )
 
     # ── Ciclo Gemini ─────────────────────────────────────────────────────────
@@ -1602,6 +1692,7 @@ def analizar_sentimiento_dispatch(
                 resultado = gemini_client.analizar_sentimiento_encuestas(
                     encuestas=encuestas,
                     modelo=modelo_gemini,
+                    tipo=tipo_ok,
                 )
             except Exception as e_exc:
                 # Excepción fuera del flujo normal → tratamos como recuperable
@@ -1660,12 +1751,13 @@ def analizar_sentimiento_dispatch(
         modelo_ollama = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
         logger.info(
             f'[AnalisisSentimiento][Dispatch] Fallback a Ollama '
-            f'({modelo_ollama})...'
+            f'({modelo_ollama}) | tipo={tipo_ok}...'
         )
         try:
             resultado_ollama = analizar_sentimiento_encuestas(
                 encuestas=encuestas,
                 modelo=modelo_ollama,
+                tipo=tipo_ok,
             )
             if resultado_ollama.get('success'):
                 return resultado_ollama

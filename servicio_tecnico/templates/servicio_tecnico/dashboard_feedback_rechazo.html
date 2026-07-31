@@ -5,6 +5,8 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/dashboard_feedback_rechazo.css' %}">
+{# Reutilizamos estilos de la tarjeta IA del dashboard de satisfacción #}
+<link rel="stylesheet" href="{% static 'css/dashboard_encuestas.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -242,6 +244,97 @@
     </div>
 </div>
 
+<!-- Análisis de Sentimiento IA — Por qué rechazan -->
+<div class="enc-ia-card mb-4" id="seccionAnalisisIA">
+
+    <div id="iaEstadoInicial">
+        <div class="ia-placeholder">
+            <div class="ia-placeholder-icono">
+                <i class="bi bi-stars"></i>
+            </div>
+            <div class="ia-placeholder-texto">
+                <h5 class="mb-1">Análisis IA — Por qué rechazan</h5>
+                <p class="text-muted mb-3">
+                    Deja que la IA analice los comentarios de rechazo y genere un
+                    resumen ejecutivo de las fricciones y señales comerciales.
+                </p>
+                <button class="btn btn-ia" id="btnAnalizarIA" type="button">
+                    <i class="bi bi-cpu me-2"></i>Analizar comentarios con IA
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="iaEstadoCargando" class="d-none">
+        <div class="ia-cargando">
+            <div class="ia-cargando-spinner">
+                <div class="spinner-border text-primary" role="status" style="width:2.5rem;height:2.5rem;"></div>
+            </div>
+            <div>
+                <div class="fw-semibold mb-1">Analizando con IA…</div>
+                <div class="text-muted small" id="iaProgreso">
+                    Procesando feedbacks. Esto puede tomar unos segundos.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="iaEstadoResultado" class="d-none">
+        <div class="ia-resultado-header">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="ia-titulo">
+                    <i class="bi bi-stars me-2"></i>Análisis IA — Por qué rechazan
+                </div>
+                <span id="iaBadgeSentimiento" class="badge ia-badge-sentimiento"></span>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span id="iaMetadatos" class="ia-metadatos"></span>
+                {% if ai_enabled and ai_models|length > 1 %}
+                <select id="iaModeloSelector" class="form-select form-select-sm ia-modelo-selector" title="Modelo para regenerar">
+                    <option value="">Automático — Gemini → Ollama (recomendado)</option>
+                    {% for modelo in ai_models %}
+                    <option value="{{ modelo }}">{{ modelo }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <button class="btn btn-ia-sm" id="btnRegenerarIA" type="button" title="Regenerar análisis">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Regenerar
+                </button>
+            </div>
+        </div>
+
+        <div class="ia-resumen-ejecutivo" id="iaResumenEjecutivo"></div>
+
+        <div class="ia-temas-grid">
+            <div class="ia-temas-columna ia-temas-positivos">
+                <div class="ia-temas-titulo">
+                    <i class="bi bi-hand-thumbs-up-fill me-1"></i>Señales favorables
+                </div>
+                <div class="ia-chips-grupo" id="iaTemasPositivos"></div>
+            </div>
+            <div class="ia-temas-columna ia-temas-negativos">
+                <div class="ia-temas-titulo">
+                    <i class="bi bi-hand-thumbs-down-fill me-1"></i>Razones de rechazo
+                </div>
+                <div class="ia-chips-grupo" id="iaTemasNegativos"></div>
+            </div>
+        </div>
+
+        <div class="ia-recomendacion" id="iaRecomendacion"></div>
+    </div>
+
+    <div id="iaEstadoError" class="d-none">
+        <div class="ia-error">
+            <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>
+            <span id="iaErrorMensaje">Error al conectar con el servicio de IA.</span>
+            <button class="btn btn-sm btn-outline-secondary ms-3" id="btnReintentarIA" type="button">
+                <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+            </button>
+        </div>
+    </div>
+
+</div>
+
 <!-- Comentarios recientes -->
 <div class="fbr-chart-card mb-4">
     <div class="chart-titulo">
@@ -262,8 +355,11 @@
      data-url-tendencia="{% url 'servicio_tecnico:api_feedback_rechazo_tendencia' %}"
      data-url-lista="{% url 'servicio_tecnico:api_feedback_rechazo_lista' %}"
      data-url-comentarios="{% url 'servicio_tecnico:api_feedback_rechazo_comentarios' %}"
+     data-url-analisis-ia="{% url 'servicio_tecnico:api_analisis_sentimiento_rechazo' %}"
      data-url-exportar="{% url 'servicio_tecnico:exportar_feedback_rechazo_excel' %}"
      data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
+     data-ai-enabled="{{ ai_enabled|yesno:'true,false' }}"
+     data-ai-models="{{ ai_models|join:'||' }}"
 ></div>
 {% endblock %}
 

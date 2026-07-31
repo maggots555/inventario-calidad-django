@@ -3538,19 +3538,22 @@ class BannerPromocional(models.Model):
 
 class AnalisisSentimientoEncuesta(models.Model):
     """
-    Cachea el resultado del análisis de sentimiento generado por IA (Ollama)
-    sobre el conjunto de encuestas de satisfacción respondidas.
+    Cachea el resultado del análisis de sentimiento generado por IA
+    (Gemini / Ollama) sobre un conjunto de respuestas de feedback.
 
-    Un registro representa UN análisis para UN conjunto de encuestas
-    (identificado por el hash SHA-256 de los datos). Si los datos cambian
-    (nueva encuesta respondida, filtros distintos) se genera un nuevo
-    registro en lugar de sobreescribir el anterior.
+    Sirve tanto para encuestas de satisfacción como para feedbacks de
+    rechazo de cotización. El discriminador es `tipo_encuesta`.
+
+    Un registro representa UN análisis para UN conjunto de ítems
+    (identificado por el hash SHA-256 de los datos + tipo). Si los datos
+    cambian se genera un nuevo registro en lugar de sobreescribir.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Imagina que la IA lee todas las encuestas y escribe un resumen. Este
-    modelo guarda ese resumen para no tener que pedírselo cada vez que
-    alguien abre el dashboard. Si llegan nuevas encuestas el hash cambia
-    y se pide un resumen nuevo.
+    Imagina que la IA lee todas las respuestas y escribe un resumen. Este
+    modelo guarda ese resumen para no pedírselo cada vez que alguien abre
+    el dashboard. Si llegan nuevas respuestas el hash cambia y se pide
+    un resumen nuevo. El campo tipo_encuesta evita mezclar caché de
+    satisfacción con la de rechazo.
     """
 
     SENTIMIENTO_CHOICES = [
@@ -3559,6 +3562,21 @@ class AnalisisSentimientoEncuesta(models.Model):
         ('mixto',    'Mixto'),
         ('neutral',  'Neutral'),
     ]
+
+    TIPO_ENCUESTA_CHOICES = [
+        ('satisfaccion', 'Satisfacción'),
+        ('rechazo', 'Rechazo de cotización'),
+    ]
+
+    # Discriminador: satisfacción vs rechazo (mismo schema JSON de resultado)
+    tipo_encuesta = models.CharField(
+        max_length=20,
+        choices=TIPO_ENCUESTA_CHOICES,
+        default='satisfaccion',
+        db_index=True,
+        verbose_name='Tipo de encuesta',
+        help_text='Separá la caché de satisfacción de la de rechazo.',
+    )
 
     # ── Resultado del análisis ──────────────────────────────────────────────
     sentimiento_general = models.CharField(
@@ -3585,7 +3603,7 @@ class AnalisisSentimientoEncuesta(models.Model):
         blank=True,
         default='',
         verbose_name='Recomendación IA',
-        help_text='Acción sugerida por la IA para mejorar la satisfacción.',
+        help_text='Acción sugerida por la IA (satisfacción o conversión).',
     )
 
     # ── Metadatos del conjunto analizado ───────────────────────────────────
@@ -3623,8 +3641,8 @@ class AnalisisSentimientoEncuesta(models.Model):
 
     def __str__(self) -> str:
         return (
-            f'Análisis {self.sentimiento_general.upper()} — '
-            f'{self.total_encuestas} encuestas — '
+            f'Análisis {self.tipo_encuesta}/{self.sentimiento_general.upper()} — '
+            f'{self.total_encuestas} ítems — '
             f'{self.fecha_analisis.strftime("%d/%m/%Y %H:%M") if self.fecha_analisis else "sin fecha"}'
         )
 

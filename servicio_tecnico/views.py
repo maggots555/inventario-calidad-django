@@ -235,6 +235,7 @@ from .views_encuestas import (  # noqa: F401
     exportar_encuestas_pdf,
 )
 from .views_feedback_rechazo_dash import (  # noqa: F401
+    api_analisis_sentimiento_rechazo,
     api_feedback_rechazo_comentarios,
     api_feedback_rechazo_kpis,
     api_feedback_rechazo_lista,

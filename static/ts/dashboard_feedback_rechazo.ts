@@ -61,6 +61,23 @@ interface FbrComentarioItem {
     fecha: string;
 }
 
+/** Respuesta del endpoint de análisis de sentimiento (rechazo). */
+interface FbrAnalisisIAData {
+    success: boolean;
+    error?: string;
+    desde_cache?: boolean;
+    sentimiento_general?: 'positivo' | 'negativo' | 'mixto' | 'neutral';
+    resumen_ejecutivo?: string;
+    temas_positivos?: string[];
+    temas_negativos?: string[];
+    recomendacion_ia?: string;
+    total_encuestas?: number;
+    modelo_usado?: string;
+    fecha_analisis?: string;
+    badge_color?: string;
+    icono?: string;
+}
+
 class DashboardFeedbackRechazo {
     private urls: { [key: string]: string } = {};
     private urlDetalle: string = '';
@@ -80,6 +97,7 @@ class DashboardFeedbackRechazo {
             tendencia: urlsEl.dataset.urlTendencia || '',
             lista: urlsEl.dataset.urlLista || '',
             comentarios: urlsEl.dataset.urlComentarios || '',
+            analisisIA: urlsEl.dataset.urlAnalisisIa || '',
             exportar: urlsEl.dataset.urlExportar || '',
         };
         this.urlDetalle = (urlsEl.dataset.urlDetalle || '').replace('/0/', '/{id}/');
@@ -119,6 +137,19 @@ class DashboardFeedbackRechazo {
             const params = this.obtenerFiltros();
             window.location.href = this.urls.exportar + '?' + params.toString();
         });
+
+        // ── Análisis de sentimiento IA (reutiliza pipeline de satisfacción) ──
+        document.getElementById('btnAnalizarIA')?.addEventListener('click', () => {
+            this.cargarAnalisisIA(false);
+        });
+        document.getElementById('btnRegenerarIA')?.addEventListener('click', () => {
+            const selectorEl = document.getElementById('iaModeloSelector') as HTMLSelectElement | null;
+            const modeloElegido = selectorEl ? selectorEl.value : '';
+            this.cargarAnalisisIA(true, modeloElegido);
+        });
+        document.getElementById('btnReintentarIA')?.addEventListener('click', () => {
+            this.cargarAnalisisIA(false);
+        });
     }
 
     private obtenerFiltros(): URLSearchParams {
@@ -135,6 +166,15 @@ class DashboardFeedbackRechazo {
             if (val) params.set(param, val);
         }
         return params;
+    }
+
+    /** Filtros como objeto JSON para el POST de análisis IA. */
+    private obtenerFiltrosJson(): Record<string, string> {
+        const out: Record<string, string> = {};
+        this.obtenerFiltros().forEach((valor, clave) => {
+            out[clave] = valor;
+        });
+        return out;
     }
 
     private limpiarFiltros(): void {
@@ -498,6 +538,184 @@ class DashboardFeedbackRechazo {
                 </div>`;
         }
         container.innerHTML = html;
+    }
+
+    // ── Análisis de Sentimiento IA ─────────────────────────────────────
+
+    /**
+     * Muestra uno de los 4 estados de la tarjeta IA.
+     */
+    private mostrarEstadoIA(estado: 'inicial' | 'cargando' | 'resultado' | 'error'): void {
+        const estados: Record<string, string> = {
+            inicial: 'iaEstadoInicial',
+            cargando: 'iaEstadoCargando',
+            resultado: 'iaEstadoResultado',
+            error: 'iaEstadoError',
+        };
+        for (const [key, id] of Object.entries(estados)) {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('d-none', key !== estado);
+        }
+    }
+
+    /**
+     * Llama al endpoint de análisis IA de rechazo (mismo pipeline que satisfacción).
+     * @param forzar - Si true, ignora caché
+     * @param modeloElegido - Vacío = cascada Automática Gemini → Ollama
+     */
+    cargarAnalisisIA(forzar: boolean = false, modeloElegido: string = ''): void {
+        if (!this.urls.analisisIA) return;
+
+        const progresoEl = document.getElementById('iaProgreso');
+        if (progresoEl) {
+            if (!modeloElegido) {
+                progresoEl.innerHTML = (
+                    'Procesando feedbacks con <strong>cascada automática</strong> ' +
+                    '(Gemini → Ollama). Esto puede tomar unos segundos.'
+                );
+            } else {
+                const nombreModelo = modeloElegido.replace(
+                    /^\[Ollama\]\s*|\[Gemini\]\s*/i,
+                    '',
+                );
+                const esGemini = modeloElegido.toLowerCase().includes('gemini');
+                const proveedor = esGemini ? 'Google Gemini' : 'IA local';
+                progresoEl.innerHTML = (
+                    `Procesando feedbacks con <strong>${this.escaparHtml(nombreModelo)}</strong> ` +
+                    `(${proveedor}). Esto puede tomar unos segundos.`
+                );
+            }
+        }
+
+        this.mostrarEstadoIA('cargando');
+
+        const body: Record<string, unknown> = {
+            ...this.obtenerFiltrosJson(),
+            forzar,
+        };
+        if (modeloElegido) {
+            body['modelo'] = modeloElegido;
+        }
+
+        fetch(this.urls.analisisIA, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.obtenerCsrfToken(),
+            },
+            body: JSON.stringify(body),
+        })
+            .then(r => r.json())
+            .then((data: FbrAnalisisIAData) => {
+                if (data.success) {
+                    this.renderizarAnalisisIA(data);
+                    this.mostrarEstadoIA('resultado');
+                } else {
+                    const errEl = document.getElementById('iaErrorMensaje');
+                    if (errEl) {
+                        errEl.textContent = data.error || 'Error al generar el análisis.';
+                    }
+                    this.mostrarEstadoIA('error');
+                }
+            })
+            .catch((err) => {
+                console.error('[AnalisisIA Rechazo] Error de red:', err);
+                const errEl = document.getElementById('iaErrorMensaje');
+                if (errEl) {
+                    errEl.textContent = (
+                        'No se pudo conectar con el servidor. '
+                        + 'Verifica que el servicio de IA esté activo.'
+                    );
+                }
+                this.mostrarEstadoIA('error');
+            });
+    }
+
+    private renderizarAnalisisIA(data: FbrAnalisisIAData): void {
+        const badge = document.getElementById('iaBadgeSentimiento');
+        if (badge) {
+            const sentimientoLabel: Record<string, string> = {
+                positivo: 'Positivo',
+                negativo: 'Negativo',
+                mixto: 'Mixto',
+                neutral: 'Neutral',
+            };
+            const icono = data.icono || 'bi-emoji-expressionless';
+            const sentimiento = data.sentimiento_general || 'neutral';
+            badge.innerHTML = (
+                `<i class="bi ${this.escaparHtml(icono)} me-1"></i>`
+                + `${sentimientoLabel[sentimiento] || 'Neutral'}`
+            );
+            badge.className = (
+                `badge ia-badge-sentimiento ia-sentimiento-${sentimiento}`
+            );
+        }
+
+        const resumen = document.getElementById('iaResumenEjecutivo');
+        if (resumen) resumen.textContent = data.resumen_ejecutivo || '';
+
+        const chipsPositivos = document.getElementById('iaTemasPositivos');
+        if (chipsPositivos) {
+            const temas = data.temas_positivos || [];
+            chipsPositivos.innerHTML = temas.length > 0
+                ? temas.map(
+                    t => `<span class="ia-chip ia-chip-positivo">${this.escaparHtml(t)}</span>`,
+                ).join('')
+                : '<span class="text-muted small fst-italic">Sin señales favorables destacadas</span>';
+        }
+
+        const chipsNegativos = document.getElementById('iaTemasNegativos');
+        if (chipsNegativos) {
+            const temas = data.temas_negativos || [];
+            chipsNegativos.innerHTML = temas.length > 0
+                ? temas.map(
+                    t => `<span class="ia-chip ia-chip-negativo">${this.escaparHtml(t)}</span>`,
+                ).join('')
+                : '<span class="text-muted small fst-italic">Sin razones de rechazo detectadas</span>';
+        }
+
+        const rec = document.getElementById('iaRecomendacion');
+        if (rec) {
+            if (data.recomendacion_ia) {
+                rec.innerHTML = (
+                    `<i class="bi bi-lightbulb-fill me-2 text-warning"></i>`
+                    + `${this.escaparHtml(data.recomendacion_ia)}`
+                );
+                rec.classList.remove('d-none');
+            } else {
+                rec.classList.add('d-none');
+            }
+        }
+
+        const metadatos = document.getElementById('iaMetadatos');
+        if (metadatos) {
+            const cacheLabel = data.desde_cache
+                ? '<span class="ia-cache-badge">caché</span>'
+                : '<span class="ia-cache-badge ia-cache-nuevo">nuevo</span>';
+            metadatos.innerHTML = (
+                `<i class="bi bi-cpu me-1"></i>${this.escaparHtml(data.modelo_usado || '')} `
+                + `· ${data.total_encuestas || 0} feedbacks `
+                + `· ${this.escaparHtml(data.fecha_analisis || '')} `
+                + cacheLabel
+            );
+        }
+    }
+
+    /**
+     * CSRF: en producción la cookie es sigma_csrftoken; en dev csrftoken.
+     */
+    private obtenerCsrfToken(): string {
+        const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
+        const cookies = document.cookie.split(';');
+        for (const name of cookieNames) {
+            for (const raw of cookies) {
+                const cookie = raw.trim();
+                if (cookie.startsWith(name + '=')) {
+                    return decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            }
+        }
+        return '';
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

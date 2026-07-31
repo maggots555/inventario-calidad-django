@@ -483,6 +483,8 @@ urlpatterns = [
          views.api_feedback_rechazo_lista, name='api_feedback_rechazo_lista'),
     path('feedback-rechazo/api/comentarios/',
          views.api_feedback_rechazo_comentarios, name='api_feedback_rechazo_comentarios'),
+    path('feedback-rechazo/api/analisis-ia/',
+         views.api_analisis_sentimiento_rechazo, name='api_analisis_sentimiento_rechazo'),
 
     # Exportación a Excel del dashboard de feedback de rechazo
     path('feedback-rechazo/dashboard/exportar-excel/',

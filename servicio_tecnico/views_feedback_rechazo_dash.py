@@ -79,6 +79,7 @@ def dashboard_feedback_rechazo(request):
     Vista principal del panel de feedback de rechazo.
     Renderiza el template; la data se carga vía AJAX.
     """
+    from django.conf import settings as django_settings
     from config.constants import MOTIVO_RECHAZO_COTIZACION
 
     empleados = Empleado.objects.filter(activo=True).order_by('nombre_completo')
@@ -88,6 +89,9 @@ def dashboard_feedback_rechazo(request):
         'empleados': empleados,
         'sucursales': sucursales,
         'motivos_rechazo': MOTIVO_RECHAZO_COTIZACION,
+        # Misma lista de modelos IA que el dashboard de satisfacción
+        'ai_enabled': getattr(django_settings, 'AI_ENABLED', False),
+        'ai_models': getattr(django_settings, 'AI_MODELS', []),
     })
 
 
@@ -498,3 +502,190 @@ def exportar_feedback_rechazo_excel(request):
     response['Content-Disposition'] = f'attachment; filename=Feedback_Rechazo_{fecha_str}.xlsx'
     wb.save(response)
     return response
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['POST'])
+def api_analisis_sentimiento_rechazo(request):
+    """
+    Endpoint AJAX: análisis de sentimiento IA sobre feedbacks de rechazo.
+
+    Objetivo de negocio: reutilizar el mismo pipeline que satisfacción
+    (cascada Gemini → Ollama + caché) con tipo='rechazo'.
+
+    Body JSON opcional:
+        fecha_desde, fecha_hasta, responsable_id, sucursal_id, motivo_rechazo,
+        forzar (bool), modelo (vacío = Automático)
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    1. Filtra feedbacks respondidos con los mismos filtros del dashboard
+    2. Arma un hash del conjunto (incluye tipo=rechazo)
+    3. Si hay caché y no forzar → devuelve el resumen guardado
+    4. Si no → llama al dispatcher con tipo rechazo → guarda → responde
+    """
+    import hashlib
+    import json as json_stdlib
+    from django.conf import settings as django_settings
+    from django.http import QueryDict
+    from config.constants import MOTIVO_RECHAZO_COTIZACION
+    from .models import AnalisisSentimientoEncuesta
+    from .ollama_client import analizar_sentimiento_dispatch
+
+    if not getattr(django_settings, 'AI_ENABLED', False):
+        return JsonResponse({
+            'success': False,
+            'error': 'La función de IA no está habilitada en este entorno.',
+        }, status=503)
+
+    try:
+        body = json_stdlib.loads(request.body or '{}')
+    except (json_stdlib.JSONDecodeError, ValueError):
+        body = {}
+
+    forzar = bool(body.get('forzar', False))
+    modelo_override = str(body.get('modelo', '')).strip()
+
+    # Inyectar filtros del body como GET para reutilizar _filtrar_feedback_rechazo
+    get_params = QueryDict(mutable=True)
+    for campo in (
+        'fecha_desde', 'fecha_hasta', 'responsable_id',
+        'sucursal_id', 'motivo_rechazo',
+    ):
+        valor = body.get(campo)
+        if valor:
+            get_params[campo] = str(valor)
+
+    request_filtrado = request
+    request_filtrado.GET = get_params  # noqa: override temporal
+
+    # Solo respondidos: el cliente ya contestó el formulario de rechazo
+    qs = _filtrar_feedback_rechazo(request_filtrado).filter(
+        utilizado=True,
+    ).order_by('fecha_respuesta')
+
+    feedbacks_qs = list(qs.values(
+        'motivo_rechazo_snapshot',
+        'comentario_cliente',
+    ))
+
+    if not feedbacks_qs:
+        return JsonResponse({
+            'success': False,
+            'error': (
+                'No hay feedbacks de rechazo respondidos para analizar '
+                'con los filtros actuales.'
+            ),
+        }, status=404)
+
+    # Etiquetas legibles del catálogo (el modelo ve "Costo muy elevado", no la clave)
+    motivos_dict = dict(MOTIVO_RECHAZO_COTIZACION)
+
+    items_para_hash = [
+        {
+            'motivo': fb.get('motivo_rechazo_snapshot') or '',
+            'comentario': (fb.get('comentario_cliente') or '').strip(),
+        }
+        for fb in feedbacks_qs
+    ]
+
+    # Hash incluye tipo para no mezclar con satisfacción
+    hash_payload = {'tipo': 'rechazo', 'items': items_para_hash}
+    hash_input = json_stdlib.dumps(hash_payload, sort_keys=True, ensure_ascii=False)
+    hash_encuestas = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+    if not forzar:
+        analisis_existente = (
+            AnalisisSentimientoEncuesta.objects
+            .filter(hash_encuestas=hash_encuestas, tipo_encuesta='rechazo')
+            .order_by('-fecha_analisis')
+            .first()
+        )
+        if analisis_existente:
+            return JsonResponse({
+                'success': True,
+                'desde_cache': True,
+                'sentimiento_general': analisis_existente.sentimiento_general,
+                'resumen_ejecutivo': analisis_existente.resumen_ejecutivo,
+                'temas_positivos': analisis_existente.temas_positivos,
+                'temas_negativos': analisis_existente.temas_negativos,
+                'recomendacion_ia': analisis_existente.recomendacion_ia,
+                'total_encuestas': analisis_existente.total_encuestas,
+                'modelo_usado': analisis_existente.modelo_usado,
+                'fecha_analisis': analisis_existente.fecha_analisis.strftime(
+                    '%d/%m/%Y a las %H:%M'
+                ),
+                'badge_color': analisis_existente.badge_color,
+                'icono': analisis_existente.icono,
+            })
+
+    # Payload para la IA: motivo legible + comentario
+    encuestas_para_ia = [
+        {
+            'motivo': motivos_dict.get(
+                item['motivo'],
+                item['motivo'] or 'Sin motivo',
+            ),
+            'comentario': item['comentario'],
+        }
+        for item in items_para_hash
+    ]
+
+    logger.info(
+        f'[api_analisis_sentimiento_rechazo] Dispatcher con '
+        f'{len(encuestas_para_ia)} feedbacks. Hash: {hash_encuestas[:12]}… '
+        f'forzar={forzar} modelo="{modelo_override or "(automático)"}"'
+    )
+
+    resultado_ia = analizar_sentimiento_dispatch(
+        encuestas=encuestas_para_ia,
+        modelo_override=modelo_override,
+        tipo='rechazo',
+    )
+
+    if not resultado_ia.get('success'):
+        return JsonResponse({
+            'success': False,
+            'error': resultado_ia.get(
+                'error',
+                'Error desconocido en el análisis de IA.',
+            ),
+        }, status=503)
+
+    analisis = resultado_ia['analisis']
+    filtros_aplicados = {
+        k: body.get(k)
+        for k in (
+            'fecha_desde', 'fecha_hasta', 'responsable_id',
+            'sucursal_id', 'motivo_rechazo',
+        )
+        if body.get(k)
+    }
+
+    registro = AnalisisSentimientoEncuesta.objects.create(
+        tipo_encuesta='rechazo',
+        sentimiento_general=analisis.get('sentimiento_general', 'neutral'),
+        resumen_ejecutivo=analisis.get('resumen_ejecutivo', ''),
+        temas_positivos=analisis.get('temas_positivos', []),
+        temas_negativos=analisis.get('temas_negativos', []),
+        recomendacion_ia=analisis.get('recomendacion_ia', ''),
+        total_encuestas=len(feedbacks_qs),
+        hash_encuestas=hash_encuestas,
+        filtros_aplicados=filtros_aplicados,
+        modelo_usado=resultado_ia.get('modelo_usado', modelo_override),
+    )
+
+    return JsonResponse({
+        'success': True,
+        'desde_cache': False,
+        'sentimiento_general': registro.sentimiento_general,
+        'resumen_ejecutivo': registro.resumen_ejecutivo,
+        'temas_positivos': registro.temas_positivos,
+        'temas_negativos': registro.temas_negativos,
+        'recomendacion_ia': registro.recomendacion_ia,
+        'total_encuestas': registro.total_encuestas,
+        'modelo_usado': registro.modelo_usado,
+        'fecha_analisis': registro.fecha_analisis.strftime('%d/%m/%Y a las %H:%M'),
+        'badge_color': registro.badge_color,
+        'icono': registro.icono,
+    })

@@ -877,11 +877,16 @@ def exportar_encuestas_pdf(request):
             )
         )
         if encuestas_para_hash:
-            hash_input = _json.dumps(encuestas_para_hash, sort_keys=True, ensure_ascii=False)
+            # Mismo payload que api_analisis_sentimiento_ia (incluye tipo)
+            hash_payload = {
+                'tipo': 'satisfaccion',
+                'items': encuestas_para_hash,
+            }
+            hash_input = _json.dumps(hash_payload, sort_keys=True, ensure_ascii=False)
             hash_encuestas = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
             analisis_ia = (
                 AnalisisSentimientoEncuesta.objects
-                .filter(hash_encuestas=hash_encuestas)
+                .filter(hash_encuestas=hash_encuestas, tipo_encuesta='satisfaccion')
                 .order_by('-fecha_analisis')
                 .first()
             )
@@ -1008,16 +1013,20 @@ def api_analisis_sentimiento_ia(request):
         }, status=404)
 
     # ── 3. Calcular hash SHA-256 del conjunto ───────────────────────────────
-    # Usamos una representación canónica (sorted keys) para que el hash sea
-    # consistente independientemente del orden de las claves en el dict.
-    hash_input = json_stdlib.dumps(encuestas_qs, sort_keys=True, ensure_ascii=False)
+    # Incluimos el tipo en el material hasheado para no colisionar con rechazo.
+    # Usamos representación canónica (sorted keys) para hash estable.
+    hash_payload = {
+        'tipo': 'satisfaccion',
+        'items': encuestas_qs,
+    }
+    hash_input = json_stdlib.dumps(hash_payload, sort_keys=True, ensure_ascii=False)
     hash_encuestas = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
 
     # ── 4. Buscar análisis cacheado ─────────────────────────────────────────
     if not forzar:
         analisis_existente = (
             AnalisisSentimientoEncuesta.objects
-            .filter(hash_encuestas=hash_encuestas)
+            .filter(hash_encuestas=hash_encuestas, tipo_encuesta='satisfaccion')
             .order_by('-fecha_analisis')
             .first()
         )
@@ -1066,6 +1075,7 @@ def api_analisis_sentimiento_ia(request):
     resultado_ia = analizar_sentimiento_dispatch(
         encuestas=encuestas_para_ia,
         modelo_override=modelo_override,
+        tipo='satisfaccion',
     )
 
     if not resultado_ia.get('success'):
@@ -1084,6 +1094,7 @@ def api_analisis_sentimiento_ia(request):
     }
 
     registro = AnalisisSentimientoEncuesta.objects.create(
+        tipo_encuesta='satisfaccion',
         sentimiento_general = analisis.get('sentimiento_general', 'neutral'),
         resumen_ejecutivo   = analisis.get('resumen_ejecutivo', ''),
         temas_positivos     = analisis.get('temas_positivos', []),
