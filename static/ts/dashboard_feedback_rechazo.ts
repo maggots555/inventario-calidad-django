@@ -99,6 +99,7 @@ class DashboardFeedbackRechazo {
             comentarios: urlsEl.dataset.urlComentarios || '',
             analisisIA: urlsEl.dataset.urlAnalisisIa || '',
             exportar: urlsEl.dataset.urlExportar || '',
+            exportarPdf: urlsEl.dataset.urlExportarPdf || '',
         };
         this.urlDetalle = (urlsEl.dataset.urlDetalle || '').replace('/0/', '/{id}/');
 
@@ -136,6 +137,23 @@ class DashboardFeedbackRechazo {
             e.preventDefault();
             const params = this.obtenerFiltros();
             window.location.href = this.urls.exportar + '?' + params.toString();
+        });
+
+        // Export PDF — Reporte Ejecutivo con los mismos filtros activos
+        // EXPLICACIÓN PARA PRINCIPIANTES: el servidor genera gráficos (~3-6 s);
+        // mostramos spinner y restauramos el botón tras 6 s (espejo de encuestas).
+        document.getElementById('btnExportarPDF')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = this.obtenerFiltros();
+            const btn = e.currentTarget as HTMLAnchorElement;
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Generando PDF...';
+            btn.classList.add('disabled');
+            window.location.href = this.urls.exportarPdf + '?' + params.toString();
+            setTimeout(() => {
+                btn.innerHTML = textoOriginal;
+                btn.classList.remove('disabled');
+            }, 6000);
         });
 
         // ── Análisis de sentimiento IA (reutiliza pipeline de satisfacción) ──

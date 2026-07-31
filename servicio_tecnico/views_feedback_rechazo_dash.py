@@ -6,11 +6,12 @@ urls.py sigue usando views.<nombre> porque views.py reexporta estos símbolos.
 
 import logging
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -501,6 +502,295 @@ def exportar_feedback_rechazo_excel(request):
     fecha_str = now.strftime('%Y%m%d')
     response['Content-Disposition'] = f'attachment; filename=Feedback_Rechazo_{fecha_str}.xlsx'
     wb.save(response)
+    return response
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
+def exportar_feedback_rechazo_pdf(request):
+    """
+    Genera y descarga el Reporte Ejecutivo PDF del Panel de Feedback de Rechazo.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Misma idea que exportar_encuestas_pdf: la vista arma KPIs, motivos,
+    tendencia, ranking y comentarios; luego busca el análisis IA ya
+    guardado (caché, tipo_encuesta='rechazo') y lo anexa si existe.
+    No vuelve a llamar a Gemini/Ollama.
+
+    Comentarios:
+      - Con filtros activos → todos los respondidos con texto
+      - Sin filtros → últimos 10 (paridad con satisfacción)
+
+    Args:
+        request: GET con los mismos filtros del dashboard
+            (fecha_desde, fecha_hasta, responsable_id, sucursal_id, motivo_rechazo)
+
+    Efectos secundarios:
+        Ninguno en BD. Devuelve HttpResponse PDF o redirect con messages.
+    """
+    from django.db.models.functions import TruncWeek
+    from config.constants import MOTIVO_RECHAZO_COTIZACION
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    from .pdf_feedback_rechazo import generar_pdf_reporte_rechazo
+
+    pais = get_pais_actual()
+    now = timezone.now()
+    motivos_dict = dict(MOTIVO_RECHAZO_COTIZACION)
+
+    # ---- 1. Queryset + detección de filtros ----
+    qs = _filtrar_feedback_rechazo(request)
+
+    fecha_desde = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta = request.GET.get('fecha_hasta', '').strip()
+    responsable_id = request.GET.get('responsable_id', '').strip()
+    sucursal_id = request.GET.get('sucursal_id', '').strip()
+    motivo_rechazo = request.GET.get('motivo_rechazo', '').strip()
+    hay_filtros = any([
+        fecha_desde, fecha_hasta, responsable_id, sucursal_id, motivo_rechazo,
+    ])
+
+    # ---- 2. KPIs (espejo de api_feedback_rechazo_kpis) ----
+    total_enviados = qs.filter(correo_enviado=True).count()
+    total_respondidos = qs.filter(utilizado=True).count()
+    total_pendientes = qs.filter(
+        utilizado=False, correo_enviado=True, fecha_expiracion__gte=now,
+    ).count()
+    total_expirados = qs.filter(
+        utilizado=False, fecha_expiracion__lt=now,
+    ).count()
+    tasa_respuesta = round(
+        (total_respondidos / total_enviados * 100) if total_enviados > 0 else 0,
+        1,
+    )
+
+    motivo_top = (
+        qs.filter(correo_enviado=True)
+        .values('motivo_rechazo_snapshot')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+        .first()
+    )
+    motivo_label = ''
+    motivo_porcentaje = 0
+    if motivo_top and total_enviados > 0:
+        motivo_label = motivos_dict.get(
+            motivo_top['motivo_rechazo_snapshot'],
+            motivo_top['motivo_rechazo_snapshot'],
+        )
+        motivo_porcentaje = round(
+            motivo_top['total'] / total_enviados * 100, 1,
+        )
+
+    kpis = {
+        'total_enviados': total_enviados,
+        'total_respondidos': total_respondidos,
+        'total_pendientes': total_pendientes,
+        'total_expirados': total_expirados,
+        'tasa_respuesta': tasa_respuesta,
+        'motivo_mas_frecuente': motivo_label,
+        'motivo_mas_frecuente_porcentaje': motivo_porcentaje,
+    }
+
+    # ---- 3. Motivos (espejo de api_feedback_rechazo_por_motivo) ----
+    qs_enviados = qs.filter(correo_enviado=True)
+    datos_motivos = (
+        qs_enviados.values('motivo_rechazo_snapshot')
+        .annotate(
+            total=Count('id'),
+            respondidos=Count('id', filter=Q(utilizado=True)),
+        )
+        .order_by('-total')
+    )
+    motivos = []
+    for row in datos_motivos:
+        clave = row['motivo_rechazo_snapshot']
+        motivos.append({
+            'motivo': clave,
+            'label': motivos_dict.get(clave, clave or 'Sin motivo'),
+            'total': row['total'],
+            'respondidos': row['respondidos'],
+        })
+
+    # ---- 4. Tendencia semanal ----
+    datos_tendencia = (
+        qs_enviados.annotate(semana=TruncWeek('fecha_creacion'))
+        .values('semana')
+        .annotate(
+            total_enviados_s=Count('id'),
+            total_respondidos_s=Count('id', filter=Q(utilizado=True)),
+        )
+        .order_by('semana')
+    )
+    labels_tend = []
+    enviados_tend = []
+    respondidos_tend = []
+    tasas_tend = []
+    for row in datos_tendencia:
+        labels_tend.append(
+            fecha_local_pais(row['semana'], pais).strftime('%d/%m/%Y')
+        )
+        enviados_tend.append(row['total_enviados_s'])
+        respondidos_tend.append(row['total_respondidos_s'])
+        tasas_tend.append(round(
+            (row['total_respondidos_s'] / row['total_enviados_s'] * 100)
+            if row['total_enviados_s'] > 0 else 0,
+            1,
+        ))
+    tendencia = {
+        'labels': labels_tend,
+        'datasets': {
+            'total_enviados': enviados_tend,
+            'total_respondidos': respondidos_tend,
+            'tasa_respuesta': tasas_tend,
+        },
+    }
+
+    # ---- 5. Ranking por responsable ----
+    datos_resp = (
+        qs_enviados.values(
+            'orden__responsable_seguimiento__id',
+            'orden__responsable_seguimiento__nombre_completo',
+        )
+        .annotate(
+            total_enviados_r=Count('id'),
+            total_respondidos_r=Count('id', filter=Q(utilizado=True)),
+        )
+        .order_by('-total_enviados_r')
+    )
+    responsables = []
+    for row in datos_resp:
+        nombre = (
+            row['orden__responsable_seguimiento__nombre_completo']
+            or '(Sin responsable)'
+        )
+        t_env = row['total_enviados_r']
+        t_resp = row['total_respondidos_r']
+        responsables.append({
+            'id': row['orden__responsable_seguimiento__id'],
+            'nombre': nombre,
+            'total_enviados': t_env,
+            'total_respondidos': t_resp,
+            'tasa_respuesta': round(
+                (t_resp / t_env * 100) if t_env > 0 else 0, 1,
+            ),
+        })
+
+    # ---- 6. Comentarios (con filtros → todos; sin → últimos 10) ----
+    comentarios_qs = (
+        qs.filter(utilizado=True)
+        .exclude(comentario_cliente='')
+        .order_by('-fecha_respuesta')
+    )
+    if not hay_filtros:
+        comentarios_qs = comentarios_qs[:10]
+
+    comentarios = []
+    for fb in comentarios_qs:
+        detalle = getattr(fb.orden, 'detalle_equipo', None)
+        comentarios.append({
+            'orden_numero': (
+                detalle.orden_cliente
+                if detalle and detalle.orden_cliente
+                else fb.orden.numero_orden_interno
+            ),
+            'orden_id': fb.orden.id,
+            'responsable': (
+                str(fb.orden.responsable_seguimiento)
+                if fb.orden.responsable_seguimiento else ''
+            ),
+            'motivo_rechazo': motivos_dict.get(
+                fb.motivo_rechazo_snapshot,
+                fb.motivo_rechazo_snapshot or 'Sin motivo',
+            ),
+            'comentario': fb.comentario_cliente,
+            'fecha': (
+                fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y')
+                if fb.fecha_respuesta else ''
+            ),
+        })
+
+    # ---- 7. Período legible ----
+    partes_periodo = []
+    if fecha_desde:
+        partes_periodo.append(f'Desde: {fecha_desde}')
+    if fecha_hasta:
+        partes_periodo.append(f'Hasta: {fecha_hasta}')
+    if responsable_id:
+        partes_periodo.append('Responsable filtrado')
+    if sucursal_id:
+        partes_periodo.append('Sucursal filtrada')
+    if motivo_rechazo:
+        partes_periodo.append(
+            f'Motivo: {motivos_dict.get(motivo_rechazo, motivo_rechazo)}'
+        )
+    periodo = ' | '.join(partes_periodo) if partes_periodo else 'Todos los registros'
+
+    # ---- 8. Análisis IA cacheado (mismo hash que api_analisis_sentimiento_rechazo) ----
+    analisis_ia = None
+    try:
+        import hashlib
+        import json as _json
+        from .models import AnalisisSentimientoEncuesta
+
+        respondidos_qs = qs.filter(utilizado=True).order_by('fecha_respuesta')
+        feedbacks_para_hash = list(respondidos_qs.values(
+            'motivo_rechazo_snapshot',
+            'comentario_cliente',
+        ))
+        if feedbacks_para_hash:
+            items_para_hash = [
+                {
+                    'motivo': fb.get('motivo_rechazo_snapshot') or '',
+                    'comentario': (fb.get('comentario_cliente') or '').strip(),
+                }
+                for fb in feedbacks_para_hash
+            ]
+            hash_payload = {'tipo': 'rechazo', 'items': items_para_hash}
+            hash_input = _json.dumps(
+                hash_payload, sort_keys=True, ensure_ascii=False,
+            )
+            hash_encuestas = hashlib.sha256(
+                hash_input.encode('utf-8')
+            ).hexdigest()
+            analisis_ia = (
+                AnalisisSentimientoEncuesta.objects
+                .filter(hash_encuestas=hash_encuestas, tipo_encuesta='rechazo')
+                .order_by('-fecha_analisis')
+                .first()
+            )
+    except Exception as _e:
+        logger.warning(f'No se pudo recuperar análisis IA para el PDF: {_e}')
+
+    # ---- 9. Generar PDF ----
+    datos_pdf = {
+        'kpis': kpis,
+        'motivos': motivos,
+        'tendencia': tendencia,
+        'responsables': responsables,
+        'comentarios': comentarios,
+        'periodo': periodo,
+        'filtros_activos': hay_filtros,
+        'analisis_ia': analisis_ia,
+    }
+
+    try:
+        pdf_buffer = generar_pdf_reporte_rechazo(datos_pdf)
+    except Exception as exc:
+        logger.error(
+            f'Error generando PDF de feedback de rechazo: {exc}',
+            exc_info=True,
+        )
+        messages.error(request, f'Error al generar el PDF: {exc}')
+        return redirect('servicio_tecnico:dashboard_feedback_rechazo')
+
+    fecha_str = now.strftime('%Y%m%d_%H%M')
+    response = HttpResponse(
+        pdf_buffer.getvalue(), content_type='application/pdf',
+    )
+    response['Content-Disposition'] = (
+        f'attachment; filename="Reporte_Feedback_Rechazo_{fecha_str}.pdf"'
+    )
     return response
 
 

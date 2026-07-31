@@ -43,6 +43,10 @@ class CompatibilidadFase4ReexportsTest(SimpleTestCase):
                 views_feedback_rechazo_dash.api_analisis_sentimiento_rechazo,
             ),
             (
+                st_views.exportar_feedback_rechazo_pdf,
+                views_feedback_rechazo_dash.exportar_feedback_rechazo_pdf,
+            ),
+            (
                 st_views.dashboard_seguimiento_enlaces,
                 views_seguimiento_enlaces.dashboard_seguimiento_enlaces,
             ),
@@ -98,6 +102,11 @@ class CompatibilidadFase4ReexportsTest(SimpleTestCase):
                 'servicio_tecnico:exportar_feedback_rechazo_excel',
                 None,
                 views_feedback_rechazo_dash.exportar_feedback_rechazo_excel,
+            ),
+            (
+                'servicio_tecnico:exportar_feedback_rechazo_pdf',
+                None,
+                views_feedback_rechazo_dash.exportar_feedback_rechazo_pdf,
             ),
             (
                 'servicio_tecnico:dashboard_seguimiento_enlaces',

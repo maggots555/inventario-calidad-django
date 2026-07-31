@@ -25,13 +25,14 @@ class DashboardFeedbackRechazo {
             comentarios: urlsEl.dataset.urlComentarios || '',
             analisisIA: urlsEl.dataset.urlAnalisisIa || '',
             exportar: urlsEl.dataset.urlExportar || '',
+            exportarPdf: urlsEl.dataset.urlExportarPdf || '',
         };
         this.urlDetalle = (urlsEl.dataset.urlDetalle || '').replace('/0/', '/{id}/');
         this.bindEventos();
         this.cargarTodo();
     }
     bindEventos() {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         (_a = document.getElementById('btnAplicarFiltros')) === null || _a === void 0 ? void 0 : _a.addEventListener('click', () => this.cargarTodo());
         (_b = document.getElementById('btnLimpiarFiltros')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', () => this.limpiarFiltros());
         // Tabs
@@ -60,16 +61,32 @@ class DashboardFeedbackRechazo {
             const params = this.obtenerFiltros();
             window.location.href = this.urls.exportar + '?' + params.toString();
         });
+        // Export PDF — Reporte Ejecutivo con los mismos filtros activos
+        // EXPLICACIÓN PARA PRINCIPIANTES: el servidor genera gráficos (~3-6 s);
+        // mostramos spinner y restauramos el botón tras 6 s (espejo de encuestas).
+        (_e = document.getElementById('btnExportarPDF')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = this.obtenerFiltros();
+            const btn = e.currentTarget;
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Generando PDF...';
+            btn.classList.add('disabled');
+            window.location.href = this.urls.exportarPdf + '?' + params.toString();
+            setTimeout(() => {
+                btn.innerHTML = textoOriginal;
+                btn.classList.remove('disabled');
+            }, 6000);
+        });
         // ── Análisis de sentimiento IA (reutiliza pipeline de satisfacción) ──
-        (_e = document.getElementById('btnAnalizarIA')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
+        (_f = document.getElementById('btnAnalizarIA')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
             this.cargarAnalisisIA(false);
         });
-        (_f = document.getElementById('btnRegenerarIA')) === null || _f === void 0 ? void 0 : _f.addEventListener('click', () => {
+        (_g = document.getElementById('btnRegenerarIA')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
             const selectorEl = document.getElementById('iaModeloSelector');
             const modeloElegido = selectorEl ? selectorEl.value : '';
             this.cargarAnalisisIA(true, modeloElegido);
         });
-        (_g = document.getElementById('btnReintentarIA')) === null || _g === void 0 ? void 0 : _g.addEventListener('click', () => {
+        (_h = document.getElementById('btnReintentarIA')) === null || _h === void 0 ? void 0 : _h.addEventListener('click', () => {
             this.cargarAnalisisIA(false);
         });
     }

@@ -490,6 +490,10 @@ urlpatterns = [
     path('feedback-rechazo/dashboard/exportar-excel/',
          views.exportar_feedback_rechazo_excel, name='exportar_feedback_rechazo_excel'),
 
+    # Exportación a PDF — Reporte Ejecutivo del dashboard de feedback de rechazo
+    path('feedback-rechazo/dashboard/exportar-pdf/',
+         views.exportar_feedback_rechazo_pdf, name='exportar_feedback_rechazo_pdf'),
+
     # ========================================================================
     # DASHBOARD DE MÉTRICAS DE SEGUIMIENTO DE CLIENTES (Marzo 2026)
     # ========================================================================

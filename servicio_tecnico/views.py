@@ -243,6 +243,7 @@ from .views_feedback_rechazo_dash import (  # noqa: F401
     api_feedback_rechazo_tendencia,
     dashboard_feedback_rechazo,
     exportar_feedback_rechazo_excel,
+    exportar_feedback_rechazo_pdf,
 )
 from .views_seguimiento_enlaces import (  # noqa: F401
     api_seguimiento_enlaces_embudo,

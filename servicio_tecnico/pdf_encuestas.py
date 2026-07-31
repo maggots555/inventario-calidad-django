@@ -948,31 +948,31 @@ def _bloque_comentarios(comentarios: list, estilos: dict) -> list:
 # SECCIÓN ANÁLISIS DE SENTIMIENTO IA
 # ===========================================================================
 
-def _seccion_analisis_ia(analisis, estilos: dict) -> list:
+def _seccion_analisis_ia(
+    analisis,
+    estilos: dict,
+    *,
+    titulo_positivos: str = '✓  Aspectos Positivos',
+    titulo_negativos: str = '⚠  Áreas de Mejora',
+    vacia_positivos: str = 'Sin temas positivos identificados.',
+    vacia_negativos: str = 'Sin áreas de mejora identificadas.',
+    label_unidad: str = 'encuesta',
+) -> list:
     """
     Genera los flowables de la sección "Análisis de Sentimiento IA".
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función toma un objeto AnalisisSentimientoEncuesta (guardado en la
-    base de datos por el análisis previo con Ollama/Gemma) y lo convierte en
-    tablas y párrafos ReportLab para incluirlos en el PDF.
-
-    Estructura visual:
-      ┌─────────────────────────────────────────────────────┐
-      │  BADGE sentimiento  │  Resumen ejecutivo             │
-      ├─────────────────────┴────────────────────────────────┤
-      │  ✅ Aspectos positivos   │  ⚠ Áreas de mejora        │
-      │  • tema 1               │  • tema 1                  │
-      │  • tema 2               │  • tema 2                  │
-      ├──────────────────────────────────────────────────────┤
-      │  Recomendación IA (fondo azul claro, ancho completo) │
-      ├──────────────────────────────────────────────────────┤
-      │  Generado por: modelo | fecha | total encuestas      │
-      └──────────────────────────────────────────────────────┘
+    base de datos por el análisis previo) y lo convierte en tablas y párrafos
+    ReportLab. Los títulos de columnas se pueden personalizar (satisfacción
+    vs rechazo) sin duplicar todo el layout.
 
     Args:
         analisis: Instancia de AnalisisSentimientoEncuesta
         estilos (dict): Diccionario de estilos de párrafo
+        titulo_positivos / titulo_negativos: encabezados de columnas
+        vacia_positivos / vacia_negativos: texto si la lista está vacía
+        label_unidad: singular para "X encuesta(s)/feedback(s) analizadas"
 
     Returns:
         list: Lista de flowables ReportLab listos para agregar a `elementos`
@@ -983,12 +983,13 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
     _COLORES_SENTIMIENTO = {
         'positivo': (COLOR_VERDE,     COLOR_VERDE_BG,  '#198754'),
         'negativo': (COLOR_ROJO,      COLOR_ROJO_BG,   '#dc3545'),
+        'neutral':  (COLOR_TEXTO_GRIS, COLOR_GRIS_CLARO, '#6c757d'),
         'neutro':   (COLOR_TEXTO_GRIS, COLOR_GRIS_CLARO, '#6c757d'),
         'mixto':    (COLOR_AMBAR,     COLOR_AMBAR_BG,  '#fd7e14'),
     }
-    sent = (analisis.sentimiento_general or 'neutro').lower()
+    sent = (analisis.sentimiento_general or 'neutral').lower()
     color_sent, color_sent_bg, hex_sent = _COLORES_SENTIMIENTO.get(
-        sent, _COLORES_SENTIMIENTO['neutro']
+        sent, _COLORES_SENTIMIENTO['neutral']
     )
 
     # ── Estilos locales ──────────────────────────────────────────────────────
@@ -1033,20 +1034,22 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
     )
 
     # ── Fila 1: Badge sentimiento + Resumen ejecutivo ────────────────────────
-    sent_label = sent.upper()
     icono_sent = {
         'positivo': '✓ POSITIVO',
         'negativo': '✗ NEGATIVO',
+        'neutral':  '~ NEUTRAL',
         'neutro':   '~ NEUTRO',
         'mixto':    '≈ MIXTO',
-    }.get(sent, sent_label)
+    }.get(sent, sent.upper())
 
+    n_items = analisis.total_encuestas or 0
+    plural = '' if n_items == 1 else 's'
     badge_cell = [
         Spacer(1, 4 * mm),
         Paragraph(icono_sent, st_badge),
         Spacer(1, 2 * mm),
         Paragraph(
-            f'{analisis.total_encuestas} encuesta{"s" if analisis.total_encuestas != 1 else ""} analizadas',
+            f'{n_items} {label_unidad}{plural} analizad{"o" if label_unidad == "feedback" else "a"}{plural}',
             ParagraphStyle('IASub', fontSize=7.5, fontName='Helvetica',
                            textColor=COLOR_BLANCO, alignment=TA_CENTER, leading=9),
         ),
@@ -1088,8 +1091,8 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
             return [Paragraph(vacia, st_item)]
         return [Paragraph(f'• {t}', st_item) for t in temas]
 
-    col_pos = [Paragraph('✓  Aspectos Positivos', st_header_col), Spacer(1, 2 * mm)]
-    col_neg = [Paragraph('⚠  Áreas de Mejora', st_header_col), Spacer(1, 2 * mm)]
+    col_pos = [Paragraph(titulo_positivos, st_header_col), Spacer(1, 2 * mm)]
+    col_neg = [Paragraph(titulo_negativos, st_header_col), Spacer(1, 2 * mm)]
 
     fila2_tabla = Table(
         [[col_pos, col_neg]],
@@ -1106,10 +1109,8 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
         ('LINEBELOW',     (0, 0), (-1, 0), 0.5, COLOR_GRIS_BORDE),
     ]))
 
-    # Fila de items (fondo claro) — mismas columnas
-    items_pos = _lista_temas(temas_pos, 'Sin temas positivos identificados.')
-    items_neg = _lista_temas(temas_neg, 'Sin áreas de mejora identificadas.')
-    # Agregar spacers al final de cada columna para padding uniforme
+    items_pos = _lista_temas(temas_pos, vacia_positivos)
+    items_neg = _lista_temas(temas_neg, vacia_negativos)
     col_pos_items = items_pos + [Spacer(1, 4 * mm)]
     col_neg_items = items_neg + [Spacer(1, 4 * mm)]
 
@@ -1159,8 +1160,7 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
         [[Paragraph(
             f'Modelo: {analisis.modelo_usado or "—"} &nbsp;|&nbsp; '
             f'Analizado: {fecha_str} &nbsp;|&nbsp; '
-            f'Basado en {analisis.total_encuestas} encuesta'
-            f'{"s" if analisis.total_encuestas != 1 else ""}',
+            f'Basado en {n_items} {label_unidad}{plural}',
             st_meta,
         )]],
         colWidths=[ancho_util],

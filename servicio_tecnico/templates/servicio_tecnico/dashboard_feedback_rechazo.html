@@ -25,6 +25,10 @@
                class="btn btn-light btn-sm" title="Exportar a Excel">
                 <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
             </a>
+            <a href="#" id="btnExportarPDF"
+               class="btn btn-danger btn-sm" title="Exportar Reporte Ejecutivo PDF">
+                <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+            </a>
         </div>
     </div>
 </div>
@@ -357,6 +361,7 @@
      data-url-comentarios="{% url 'servicio_tecnico:api_feedback_rechazo_comentarios' %}"
      data-url-analisis-ia="{% url 'servicio_tecnico:api_analisis_sentimiento_rechazo' %}"
      data-url-exportar="{% url 'servicio_tecnico:exportar_feedback_rechazo_excel' %}"
+     data-url-exportar-pdf="{% url 'servicio_tecnico:exportar_feedback_rechazo_pdf' %}"
      data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
      data-ai-enabled="{{ ai_enabled|yesno:'true,false' }}"
      data-ai-models="{{ ai_models|join:'||' }}"
