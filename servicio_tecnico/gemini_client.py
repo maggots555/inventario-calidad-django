@@ -488,10 +488,16 @@ def analizar_sentimiento_encuestas(
                              temas_positivos, temas_negativos, recomendacion_ia
             modelo_usado (str)
             error (str) — solo si success=False
+            error_type (str) — solo si success=False; permite cascada en el
+                dispatcher (igual que mejorar_diagnostico / inspección):
+                Recuperables: rate_limit, server_error, timeout, network_error
+                Irrecuperables: hard_error, safety_block, config_error
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Funciona igual que la versión Ollama pero envía los datos a los servidores
     de Google en lugar de un servidor local. Necesita GEMINI_API_KEY configurada.
+    El campo error_type le dice al dispatcher si debe probar el siguiente
+    modelo Gemini o saltar directo a Ollama.
     """
     # Importamos los helpers de ollama_client para reutilizar prompts y parsers
     from .ollama_client import (
@@ -505,6 +511,7 @@ def analizar_sentimiento_encuestas(
         return {
             'success': False,
             'error': 'No hay encuestas para analizar.',
+            'error_type': 'config_error',
         }
 
     if not getattr(settings, 'GEMINI_ENABLED', False):
@@ -514,6 +521,7 @@ def analizar_sentimiento_encuestas(
                 'Google Gemini no está habilitado. '
                 'Activa GEMINI_ENABLED=True y configura GEMINI_API_KEY.'
             ),
+            'error_type': 'config_error',
         }
 
     api_key = getattr(settings, 'GEMINI_API_KEY', '')
@@ -521,6 +529,7 @@ def analizar_sentimiento_encuestas(
         return {
             'success': False,
             'error': 'GEMINI_API_KEY no configurada en el entorno.',
+            'error_type': 'config_error',
         }
 
     timeout = getattr(settings, 'GEMINI_TIMEOUT', 120)
@@ -586,13 +595,18 @@ def analizar_sentimiento_encuestas(
             if block_reason:
                 msg = f'Gemini bloqueó la solicitud: {block_reason}'
                 logger.warning(f'[AnalisisSentimiento][Gemini] {msg}')
-                return {'success': False, 'error': msg}
+                return {
+                    'success': False,
+                    'error': msg,
+                    'error_type': 'safety_block',
+                }
 
         candidates = response_data.get('candidates', [])
         if not candidates:
             return {
                 'success': False,
                 'error': 'Gemini no devolvió candidatos en la respuesta.',
+                'error_type': 'server_error',
             }
 
         finish_reason = candidates[0].get('finishReason', 'STOP')
@@ -600,6 +614,7 @@ def analizar_sentimiento_encuestas(
             return {
                 'success': False,
                 'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+                'error_type': 'safety_block',
             }
 
         contenido = (
@@ -614,6 +629,7 @@ def analizar_sentimiento_encuestas(
             return {
                 'success': False,
                 'error': 'Gemini devolvió una respuesta vacía.',
+                'error_type': 'server_error',
             }
 
         logger.info(
@@ -630,6 +646,8 @@ def analizar_sentimiento_encuestas(
         }
 
     except urllib.error.HTTPError as e:
+        # EXPLICACIÓN PARA PRINCIPIANTES: clasificamos el HTTP para que el
+        # dispatcher sepa si vale la pena probar el siguiente modelo Gemini.
         body = ''
         try:
             body = e.read().decode('utf-8')[:300]
@@ -637,27 +655,64 @@ def analizar_sentimiento_encuestas(
             pass
         msg = f'Error HTTP {e.code} de Gemini: {e.reason}. {body}'
         logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
-        return {'success': False, 'error': msg}
+
+        if e.code == 429:
+            return {
+                'success': False,
+                'error': (
+                    'Se superó el límite de peticiones a Gemini (rate limit). '
+                    'Espera unos segundos y vuelve a intentarlo.'
+                ),
+                'error_type': 'rate_limit',
+            }
+        if e.code in (500, 502, 503, 504):
+            return {
+                'success': False,
+                'error': (
+                    'Error interno en los servidores de Google. '
+                    'Intenta de nuevo en unos minutos.'
+                ),
+                'error_type': 'server_error',
+            }
+        # 4xx (salvo 429) → hard_error: no tiene sentido seguir con más Gemini
+        return {
+            'success': False,
+            'error': msg,
+            'error_type': 'hard_error',
+        }
 
     except urllib.error.URLError as e:
-        msg = f'Error de red al conectar con Gemini: {e.reason}'
-        logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
-        return {'success': False, 'error': msg}
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f'[AnalisisSentimiento][Gemini] Error de red: {error_msg}')
+        if 'timed out' in error_msg.lower() or 'timeout' in error_msg.lower():
+            return {
+                'success': False,
+                'error': (
+                    f'Gemini tardó más de {timeout}s en responder. '
+                    'Intenta de nuevo.'
+                ),
+                'error_type': 'timeout',
+            }
+        return {
+            'success': False,
+            'error': f'Error de red al conectar con Gemini: {error_msg}',
+            'error_type': 'network_error',
+        }
 
     except TimeoutError:
         msg = f'Gemini tardó más de {timeout}s en responder. Intenta de nuevo.'
         logger.error(f'[AnalisisSentimiento][Gemini] Timeout | Modelo: {modelo}')
-        return {'success': False, 'error': msg}
+        return {'success': False, 'error': msg, 'error_type': 'timeout'}
 
     except json.JSONDecodeError as e:
         msg = f'Respuesta no válida de Gemini (no es JSON): {e}'
         logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
-        return {'success': False, 'error': msg}
+        return {'success': False, 'error': msg, 'error_type': 'server_error'}
 
     except Exception as e:
         msg = f'Error inesperado en análisis Gemini: {type(e).__name__}: {e}'
         logger.error(f'[AnalisisSentimiento][Gemini] {msg}', exc_info=True)
-        return {'success': False, 'error': msg}
+        return {'success': False, 'error': msg, 'error_type': 'hard_error'}
 
 
 # ===========================================================================

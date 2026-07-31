@@ -869,24 +869,34 @@ class DashboardEncuestas {
      * Llama al endpoint de análisis IA y renderiza la tarjeta con el resultado.
      * @param forzar        - Si true, ignora el caché y solicita un nuevo análisis.
      * @param modeloElegido - Modelo con prefijo visual, ej: "[Gemini] gemini-2.0-flash".
-     *                        Si está vacío, el backend usa el modelo por defecto.
+     *                        Si está vacío, el backend usa cascada automática
+     *                        (Gemini → Ollama), igual que diagnóstico/inspección.
      */
     cargarAnalisisIA(forzar: boolean = false, modeloElegido: string = ''): void {
         if (!this.urls.analisisIA) return;
 
-        // Actualizar el texto de "cargando" con el modelo que se está usando
+        // Actualizar el texto de "cargando" con el modelo / cascada en uso
         const progresoEl = document.getElementById('iaProgreso');
         if (progresoEl) {
-            const nombreModelo = modeloElegido
-                ? modeloElegido.replace(/^\[Ollama\]\s*|\[Gemini\]\s*/i, '')
-                : (this.aiModelos[0] || 'modelo IA');
-            const esGemini = modeloElegido.toLowerCase().includes('gemini') ||
-                             (!modeloElegido && nombreModelo.toLowerCase().startsWith('gemini'));
-            const proveedor = esGemini ? 'Google Gemini' : 'IA local';
-            progresoEl.innerHTML = (
-                `Procesando encuestas con <strong>${this.escaparHtml(nombreModelo)}</strong> ` +
-                `(${proveedor}). Esto puede tomar unos segundos.`
-            );
+            if (!modeloElegido) {
+                // EXPLICACIÓN PARA PRINCIPIANTES: sin modelo = Automático.
+                // El backend prueba GEMINI_MODELS y, si fallan, cae a Ollama.
+                progresoEl.innerHTML = (
+                    'Procesando encuestas con <strong>cascada automática</strong> ' +
+                    '(Gemini → Ollama). Esto puede tomar unos segundos.'
+                );
+            } else {
+                const nombreModelo = modeloElegido.replace(
+                    /^\[Ollama\]\s*|\[Gemini\]\s*/i,
+                    '',
+                );
+                const esGemini = modeloElegido.toLowerCase().includes('gemini');
+                const proveedor = esGemini ? 'Google Gemini' : 'IA local';
+                progresoEl.innerHTML = (
+                    `Procesando encuestas con <strong>${this.escaparHtml(nombreModelo)}</strong> ` +
+                    `(${proveedor}). Esto puede tomar unos segundos.`
+                );
+            }
         }
 
         this.mostrarEstadoIA('cargando');
@@ -898,7 +908,7 @@ class DashboardEncuestas {
             ...this.obtenerFiltrosJson(),
             forzar,
         };
-        // Solo enviar el modelo si hay uno seleccionado (evita sobrescribir el default)
+        // Solo enviar el modelo si hay uno seleccionado (vacío = cascada automática)
         if (modeloElegido) {
             body['modelo'] = modeloElegido;
         }

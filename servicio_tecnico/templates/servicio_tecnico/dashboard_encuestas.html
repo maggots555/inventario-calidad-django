@@ -407,6 +407,7 @@
                 <span id="iaMetadatos" class="ia-metadatos"></span>
                 {% if ai_enabled and ai_models|length > 1 %}
                 <select id="iaModeloSelector" class="form-select form-select-sm ia-modelo-selector" title="Modelo para regenerar">
+                    <option value="">Automático — Gemini → Ollama (recomendado)</option>
                     {% for modelo in ai_models %}
                     <option value="{{ modelo }}">{{ modelo }}</option>
                     {% endfor %}

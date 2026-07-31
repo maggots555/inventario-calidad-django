@@ -932,7 +932,7 @@ def api_analisis_sentimiento_ia(request):
     2. Obtiene solo las encuestas respondidas (utilizado=True, tipo='satisfaccion')
     3. Calcula un SHA-256 del conjunto → busca en AnalisisSentimientoEncuesta
     4. Si existe ese hash y no se pidió forzar → devuelve el análisis cacheado
-    5. Si no existe o forzar=true → llama a Ollama → guarda → devuelve
+    5. Si no existe o forzar=true → cascada IA (Gemini → Ollama) → guarda → devuelve
 
     Body JSON esperado (todos opcionales):
         fecha_desde    (str YYYY-MM-DD)
@@ -941,11 +941,13 @@ def api_analisis_sentimiento_ia(request):
         sucursal_id    (int)
         tipo_orden     (str: 'diagnostico' | 'venta_mostrador')
         forzar         (bool: true para regenerar aunque exista caché)
+        modelo         (str: vacío = Automático Gemini→Ollama; o "[Gemini] …" / "[Ollama] …")
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta vista es como un "botón de análisis inteligente". Si ya analizamos
     estos datos antes y no cambiaron, devuelve el resultado guardado al instante.
-    Solo llama a la IA cuando es realmente necesario.
+    Solo llama a la IA cuando es realmente necesario. Sin modelo elegido, el
+    dispatcher prueba Gemini en cascada y, si falla, cae a Ollama local.
     """
     import hashlib
     import json as json_stdlib
@@ -967,8 +969,8 @@ def api_analisis_sentimiento_ia(request):
         body = {}
 
     forzar = bool(body.get('forzar', False))
-    # modelo_override: llega con prefijo visual "[Gemini] ..." o "[Ollama] ..."
-    # Si está vacío el dispatcher usa el modelo Ollama por defecto.
+    # modelo_override: vacío = cascada automática (Gemini → Ollama).
+    # Con prefijo "[Gemini] …" / "[Ollama] …" = override (Ollama sin cascada).
     modelo_override = str(body.get('modelo', '')).strip()
 
     # Inyectar los filtros del body como GET para poder reutilizar
@@ -1052,12 +1054,13 @@ def api_analisis_sentimiento_ia(request):
         for enc in encuestas_qs
     ]
 
-    modelo_ia = modelo_override  # Puede ser "[Gemini] gemini-2.0-flash", "[Ollama] gemma4:e4b", etc.
+    modelo_ia = modelo_override  # Vacío = Automático; o "[Gemini] …" / "[Ollama] …"
 
-    # ── 6. Llamar a la IA vía dispatcher (Ollama o Gemini según prefijo) ─────
+    # ── 6. Llamar a la IA vía dispatcher (cascada Gemini → Ollama) ───────────
     logger.info(
         f'[api_analisis_sentimiento_ia] Llamando dispatcher con {len(encuestas_para_ia)} '
-        f'encuestas. Hash: {hash_encuestas[:12]}… forzar={forzar} modelo="{modelo_override or "(default)"}"'
+        f'encuestas. Hash: {hash_encuestas[:12]}… forzar={forzar} '
+        f'modelo="{modelo_override or "(automático Gemini→Ollama)"}"'
     )
 
     resultado_ia = analizar_sentimiento_dispatch(

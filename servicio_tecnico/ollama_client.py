@@ -1491,51 +1491,210 @@ def analizar_sentimiento_dispatch(
     modelo_override: str = '',
 ) -> dict:
     """
-    Dispatcher que enruta el análisis de sentimiento a Ollama o Gemini
-    según el prefijo del modelo recibido del frontend.
+    Dispatcher con cascada Gemini → Ollama para análisis de sentimiento.
+
+    Objetivo de negocio: mismo comportamiento que mejorar_diagnostico_dispatch
+    y analizar_imagenes_ingreso_dispatch — probar modelos Gemini en orden y,
+    si fallan, caer a Ollama local.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    El frontend envía el modelo con un prefijo visual como "[Gemini] gemini-3.6-flash"
-    o "[Ollama] gemma4:e4b". Esta función quita el prefijo, detecta el proveedor
-    y delega al cliente correcto. Es el mismo patrón que mejorar_diagnostico_dispatch().
+    El frontend puede mandar vacío (Automático), "[Gemini] …" u "[Ollama] …".
+    - Vacío / Automático → recorre GEMINI_MODELS; si todos fallan → OLLAMA_MODEL.
+    - Override Gemini → ese modelo primero + resto de GEMINI_MODELS → Ollama.
+    - Override Ollama → solo ese modelo local (sin cascada Gemini).
 
-    Reglas de detección:
-      - Empieza con "gemini" (después de quitar el prefijo) → Google Gemini
-      - Cualquier otro valor → Ollama local
+    Errores recuperables (probar siguiente Gemini):
+      rate_limit, server_error, timeout, network_error
+    Errores duros (cortar ciclo Gemini → ir a Ollama):
+      hard_error, safety_block, config_error
 
     Args:
-        encuestas:       Lista de dicts de encuestas (mismo formato que analizar_sentimiento_encuestas)
-        modelo_override: Modelo con prefijo visual, ej: "[Gemini] gemini-3.6-flash"
-                         Si está vacío usa el modelo Ollama por defecto.
+        encuestas:       Lista de dicts de encuestas (mismo formato que
+                         analizar_sentimiento_encuestas)
+        modelo_override: Vacío = cascada automática. Con prefijo/nombre = override.
 
     Returns:
         dict con success, analisis, modelo_usado (o error)
+
+    Efectos secundarios:
+        Llamadas HTTP a Gemini y/o Ollama; solo logging, sin escritura en BD.
     """
-    # ── 1. Limpiar prefijos visuales ─────────────────────────────────────────
+    # EXPLICACIÓN PARA PRINCIPIANTES: mismos tipos que diagnóstico / inspección.
+    # Si Gemini dice "rate limit" o "timeout", tiene sentido probar el siguiente.
+    # Si la API key es inválida, no sirve seguir con más Gemini → vamos a Ollama.
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+
+    # ── Limpiar prefijos visuales del selector ───────────────────────────────
     nombre_limpio = modelo_override.strip()
+    proveedor_override = None  # 'gemini', 'ollama', o None (modo automático)
+
     for prefijo in ('[Gemini] ', '[Ollama] '):
         if nombre_limpio.startswith(prefijo):
             nombre_limpio = nombre_limpio[len(prefijo):]
+            proveedor_override = 'gemini' if prefijo == '[Gemini] ' else 'ollama'
             break
 
-    # ── 2. Detectar proveedor por nombre del modelo ──────────────────────────
-    # Regla: si empieza con "gemini" → Google Gemini; cualquier otro → Ollama
-    es_gemini = nombre_limpio.lower().startswith('gemini')
+    # Si llega un nombre sin prefijo (compatibilidad), inferimos el proveedor
+    if nombre_limpio and proveedor_override is None:
+        proveedor_override = (
+            'gemini' if nombre_limpio.lower().startswith('gemini') else 'ollama'
+        )
 
-    if es_gemini:
+    # ── Override Ollama explícito: sin cascada ───────────────────────────────
+    # El usuario eligió IA local a propósito; no intentamos Gemini.
+    if proveedor_override == 'ollama':
+        if not getattr(settings, 'OLLAMA_ENABLED', False):
+            return {
+                'success': False,
+                'error': (
+                    'El servicio de Ollama no está habilitado en este entorno. '
+                    'Activa OLLAMA_ENABLED=True en la configuración.'
+                ),
+            }
         logger.info(
-            f'[AnalisisSentimiento][Dispatch] Usando Gemini → {nombre_limpio}'
+            f'[AnalisisSentimiento][Dispatch] Ollama seleccionado explícitamente: '
+            f'{nombre_limpio}'
         )
-        from .gemini_client import analizar_sentimiento_encuestas as gemini_analizar
-        return gemini_analizar(encuestas=encuestas, modelo=nombre_limpio)
+        return analizar_sentimiento_encuestas(
+            encuestas=encuestas,
+            modelo=nombre_limpio,
+        )
+
+    # ── Lista de modelos Gemini a intentar ───────────────────────────────────
+    gemini_models_configurados = list(getattr(settings, 'GEMINI_MODELS', []) or [])
+
+    if nombre_limpio and proveedor_override == 'gemini':
+        # Override Gemini: el elegido primero; el resto como fallback
+        restantes = [m for m in gemini_models_configurados if m != nombre_limpio]
+        modelos_a_intentar = [nombre_limpio] + restantes
+        logger.info(
+            f'[AnalisisSentimiento][Dispatch] Override Gemini: {nombre_limpio} '
+            f'(primero), fallback: {restantes or "ninguno"}'
+        )
     else:
-        # Ollama: si no se especificó modelo, usar el default de settings
-        if not nombre_limpio:
-            nombre_limpio = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+        # Modo automático (Analizar / selector Automático): orden de GEMINI_MODELS
+        modelos_a_intentar = gemini_models_configurados
         logger.info(
-            f'[AnalisisSentimiento][Dispatch] Usando Ollama → {nombre_limpio}'
+            f'[AnalisisSentimiento][Dispatch] Modo automático — modelos Gemini: '
+            f'{modelos_a_intentar}'
         )
-        return analizar_sentimiento_encuestas(encuestas=encuestas, modelo=nombre_limpio)
+
+    # ── Ciclo Gemini ─────────────────────────────────────────────────────────
+    if getattr(settings, 'GEMINI_ENABLED', False) and modelos_a_intentar:
+        try:
+            from . import gemini_client
+        except ImportError as e:
+            logger.error(
+                f'[AnalisisSentimiento][Dispatch] No se pudo importar '
+                f'gemini_client: {e}'
+            )
+            modelos_a_intentar = []
+
+        ultimo_error = 'Sin detalles'
+
+        for idx, modelo_gemini in enumerate(modelos_a_intentar, start=1):
+            logger.info(
+                f'[AnalisisSentimiento][Dispatch] Gemini intento '
+                f'{idx}/{len(modelos_a_intentar)}: {modelo_gemini}'
+            )
+
+            try:
+                resultado = gemini_client.analizar_sentimiento_encuestas(
+                    encuestas=encuestas,
+                    modelo=modelo_gemini,
+                )
+            except Exception as e_exc:
+                # Excepción fuera del flujo normal → tratamos como recuperable
+                ultimo_error = f'Excepción inesperada: {type(e_exc).__name__}: {e_exc}'
+                logger.error(
+                    f'[AnalisisSentimiento][Dispatch] Excepción con '
+                    f'{modelo_gemini}: {ultimo_error}',
+                    exc_info=True,
+                )
+                continue
+
+            if resultado.get('success'):
+                logger.info(
+                    f'[AnalisisSentimiento][Dispatch] Éxito con {modelo_gemini} '
+                    f'(intento {idx}/{len(modelos_a_intentar)})'
+                )
+                return resultado
+
+            error_type = resultado.get('error_type', 'hard_error')
+            ultimo_error = resultado.get('error', 'sin detalles')
+
+            if error_type in ERRORES_REINTENTABLES:
+                logger.warning(
+                    f'[AnalisisSentimiento][Dispatch] {modelo_gemini} → '
+                    f'[{error_type}] {ultimo_error} — Probando siguiente '
+                    f'modelo Gemini...'
+                )
+                continue
+
+            logger.error(
+                f'[AnalisisSentimiento][Dispatch] {modelo_gemini} → '
+                f'[{error_type}] {ultimo_error} — Error irrecuperable, '
+                f'deteniendo ciclo Gemini.'
+            )
+            break
+        else:
+            logger.warning(
+                f'[AnalisisSentimiento][Dispatch] Todos los modelos Gemini '
+                f'agotados ({len(modelos_a_intentar)} intentos). '
+                f'Último error: {ultimo_error}'
+            )
+    else:
+        if not getattr(settings, 'GEMINI_ENABLED', False):
+            logger.info(
+                '[AnalisisSentimiento][Dispatch] Gemini deshabilitado '
+                '(GEMINI_ENABLED=False).'
+            )
+        else:
+            logger.info(
+                '[AnalisisSentimiento][Dispatch] GEMINI_MODELS vacío — '
+                'sin modelos configurados.'
+            )
+
+    # ── Fallback final: Ollama ───────────────────────────────────────────────
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        modelo_ollama = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+        logger.info(
+            f'[AnalisisSentimiento][Dispatch] Fallback a Ollama '
+            f'({modelo_ollama})...'
+        )
+        try:
+            resultado_ollama = analizar_sentimiento_encuestas(
+                encuestas=encuestas,
+                modelo=modelo_ollama,
+            )
+            if resultado_ollama.get('success'):
+                return resultado_ollama
+            logger.warning(
+                f'[AnalisisSentimiento][Dispatch] Ollama también falló: '
+                f'{resultado_ollama.get("error", "sin detalles")}'
+            )
+            return resultado_ollama
+        except Exception as e:
+            logger.error(
+                f'[AnalisisSentimiento][Dispatch] Excepción en fallback '
+                f'Ollama: {e}',
+                exc_info=True,
+            )
+            return {
+                'success': False,
+                'error': f'Error inesperado en Ollama: {e}',
+            }
+
+    logger.warning(
+        '[AnalisisSentimiento][Dispatch] Todos los proveedores de IA fallaron.'
+    )
+    return {
+        'success': False,
+        'error': (
+            'No se pudo analizar el sentimiento con ningún proveedor de IA '
+            'disponible.'
+        ),
+    }
 
 
 # ===========================================================================
