@@ -4,8 +4,9 @@
    Abril 2026 — Sistema SIGMA
    ============================================================================= */
 
-/* === Google Fonts: se cargan en el HTML (preconnect + link).
-   No usar @import aquí: bloquea TODO este CSS hasta que Fonts responda. */
+/* === Google Fonts: Plus Jakarta Sans === */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
 /* === Variables de diseño === */
 :root {
   --st-primary:       #1f6391;
@@ -14,8 +15,7 @@
   --st-accent:        #10b981;
   --st-accent-warm:   #f59e0b;
   --st-danger:        #ef4444;
-  /* Card más transparente para que hijos (footer/responsable) muestren el fondo */
-  --st-card-bg:       rgba(255, 255, 255, 0.28);
+  --st-card-bg:       rgba(255, 255, 255, 0.94);
   --st-radius:        16px;
   --st-radius-sm:     10px;
   --st-shadow:        0 4px 16px rgba(0, 0, 0, 0.06),
@@ -50,15 +50,16 @@
   border-top: 2px solid rgba(56, 189, 248, 0.3);
 }
 
-/* === Fondo de puntos + halo CSS + canvas con gravedad
+/* === Fondo de puntos + spotlight al hover
    EXPLICACIÓN PARA PRINCIPIANTES:
-   - Canvas (.st-fondo-canvas): dibuja los puntitos y los empuja con el mouse.
-   - ::before: halo cyan suave original (no se tocó el “cuadrado” brillante).
-   - ::after: puntos cyan fijos revelados cerca del cursor (máscara original).
-   - .st-fondo-cascada: franja automática (igual que antes).
-   El TS mueve --st-spot-x/y y anima el canvas. */
-
+   - Capa base: puntos grises tenues en toda la pantalla.
+   - ::before: glow cyan suave bajo el cursor (paleta SIC: --st-primary-light).
+   - ::after: mismos puntos en sky/cyan, revelados solo cerca del mouse
+     con una máscara radial (mask-image). El TS mueve --st-spot-x/y.
+   En modo claro el fondo es azul medio: subimos brillo/opacidad para que no se pierda.
+   pointer-events: none → no bloquea clics en la card ni el chat. */
 .st-fondo-puntos {
+  /* Centro del spotlight (el TS actualiza estos valores al mover el puntero) */
   --st-spot-x: 50%;
   --st-spot-y: 50%;
   position: fixed;
@@ -68,26 +69,20 @@
   height: 100%;
   z-index: 0;
   pointer-events: none;
-  /* Sin background de puntos: los dibuja el canvas (así pueden moverse) */
-  background: none;
+  /* Puntos base un poco más claros: se notan sobre el azul medio del tema light */
+  background-image: radial-gradient(
+    circle,
+    rgba(186, 230, 253, 0.28) 1px,
+    transparent 1.5px
+  );
+  background-size: 24px 24px;
 }
 
-.st-fondo-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Halo cyan original (como antes del refuerzo) */
+/* Halo cyan más presente en modo claro (el azul del fondo “come” colores suaves) */
 .st-fondo-puntos::before {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 1;
   background: radial-gradient(
     circle 240px at var(--st-spot-x) var(--st-spot-y),
     rgba(56, 189, 248, 0.22),
@@ -96,17 +91,41 @@
   );
   opacity: 0;
   transition: opacity 0.4s ease;
-  pointer-events: none;
 }
 
-/* Capa ::after desactivada: el brillo cerca del cursor lo hace el canvas
-   (si dejáramos puntos fijos CSS, no seguirían la gravedad). */
+/* Puntos iluminados: casi blancos/cyan claro = mejor contraste en light */
 .st-fondo-puntos::after {
-  content: none;
-  display: none;
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    rgba(224, 242, 254, 0.95) 1.2px,
+    transparent 1.7px
+  );
+  background-size: 24px 24px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  /* Máscara más amplia y con caída gradual = efecto menos “duro” */
+  -webkit-mask-image: radial-gradient(
+    circle 220px at var(--st-spot-x) var(--st-spot-y),
+    #000 0%,
+    #000 18%,
+    rgba(0, 0, 0, 0.55) 42%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    circle 220px at var(--st-spot-x) var(--st-spot-y),
+    #000 0%,
+    #000 18%,
+    rgba(0, 0, 0, 0.55) 42%,
+    transparent 78%
+  );
 }
 
-.st-fondo-puntos[data-activo="1"]::before {
+/* data-activo lo pone el TS mientras hay puntero sobre la ventana */
+.st-fondo-puntos[data-activo="1"]::before,
+.st-fondo-puntos[data-activo="1"]::after {
   opacity: 1;
 }
 
@@ -119,7 +138,6 @@
 .st-fondo-cascada {
   position: absolute;
   inset: 0;
-  z-index: 3;
   pointer-events: none;
   background-image: radial-gradient(
     circle,
@@ -194,9 +212,8 @@
 /* === Card principal (glassmorphism tech) === */
 .st-card {
   background: var(--st-card-bg);
-  /* Blur fuerte en la card contenedora (efecto vidrio) */
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.5);
   /* Borde superior luminoso accent */
   border-top: 2px solid rgba(56, 189, 248, 0.35);
@@ -206,12 +223,7 @@
   max-width: 680px;
   width: 100%;
   margin: 1.5rem 0;
-  /* EXPLICACIÓN PARA PRINCIPIANTES:
-     Usamos forwards (no both) y en el "to" dejamos transform: none.
-     Si la card se queda con transform (aunque sea translateY(0)), el navegador
-     crea un "grupo" y el backdrop-filter de footer/responsable NO puede ver
-     los puntitos del fondo — se ve sólido. */
-  animation: stSlideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: stSlideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   position: relative;
   z-index: 10;
   transition: box-shadow 0.3s ease;
@@ -219,38 +231,24 @@
 
 @keyframes stSlideIn {
   from { opacity: 0; transform: translateY(24px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* === Header de la card ===
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   1) Degradado en rgba (~0.82): se ve azul SIC pero filtra un poco los puntitos.
-   2) backdrop-filter: efecto vidrio sin “borrar” el azul.
-   3) Sin overflow:hidden aquí: en móvil, overflow + blur anidado hacía que
-      logo/texto desaparecieran al scrollear rápido (bug de capas GPU).
-   4) isolation + z-index: decoración detrás, contenido estable delante. */
+/* === Header de la card === */
 .st-card-header {
-  background: linear-gradient(
-    135deg,
-    rgba(12, 45, 74, 0.85) 0%,
-    rgba(14, 77, 111, 0.80) 40%,
-    rgba(22, 78, 99, 0.85) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
   padding: 2rem 1.75rem 1.5rem;
   text-align: center;
   color: white;
   position: relative;
-  isolation: isolate;
+  overflow: hidden;
 }
 
-/* Lineas diagonales geometricas — efecto tech (detrás del contenido) */
+/* Lineas diagonales geometricas — efecto tech */
 .st-card-header::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 0;
   background:
     linear-gradient(135deg, transparent 40%, rgba(56, 189, 248, 0.06) 40%, rgba(56, 189, 248, 0.06) 41%, transparent 41%),
     linear-gradient(135deg, transparent 55%, rgba(56, 189, 248, 0.04) 55%, rgba(56, 189, 248, 0.04) 56%, transparent 56%),
@@ -262,23 +260,15 @@
   content: '';
   position: absolute;
   bottom: 0; left: 10%; right: 10%;
-  z-index: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent);
-  pointer-events: none;
 }
 
-/* EXPLICACIÓN PARA PRINCIPIANTES:
-   translateZ(0) + backface-visibility fuerzan una capa GPU estable.
-   Evita que Safari/Chrome en móvil “pierdan” el logo o el texto al scrollear. */
 .st-header-logo {
   height: 42px;
   margin-bottom: 0.75rem;
   position: relative;
   z-index: 1;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
 .st-header-title {
@@ -289,9 +279,6 @@
   letter-spacing: -0.5px;
   position: relative;
   z-index: 1;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
 .st-header-subtitle {
@@ -308,18 +295,13 @@
   padding: 3px 12px;
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
-/* === Info del equipo — mismo vidrio que la card (no panel sólido) === */
+/* === Info del equipo === */
 .st-equipo-info {
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4fd 100%);
   padding: 1rem 1.75rem;
-  border-bottom: 1px solid rgba(31, 99, 145, 0.1);
+  border-bottom: 1px solid rgba(31, 99, 145, 0.08);
   border-left: 3px solid var(--st-primary);
   display: flex;
   align-items: center;
@@ -353,12 +335,8 @@
 
 .st-equipo-serial {
   font-size: 0.78rem;
-  /* EXPLICACIÓN PARA PRINCIPIANTES:
-     #64748b casi no se leía sobre el vidrio azul-gris.
-     #334155 es el mismo gris azulado, más oscuro y legible. */
-  color: #334155;
+  color: #64748b;
   margin: 2px 0 0;
-  font-weight: 500;
 }
 
 .st-equipo-falla {
@@ -372,14 +350,11 @@
   line-height: 1.4;
 }
 
-/* === Badge de estado — misma opacidad que .st-timeline-content (~0.72) === */
+/* === Badge de estado actual === */
 .st-estado-badge-container {
   padding: 1rem 1.75rem;
   text-align: center;
   border-bottom: 1px solid rgba(0,0,0,0.05);
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .st-estado-badge {
@@ -393,67 +368,44 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   position: relative;
-  /* EXPLICACIÓN PARA PRINCIPIANTES:
-     No usamos overflow:hidden aquí: en varios navegadores eso “apaga”
-     el backdrop-filter y el badge se ve sólido (beige opaco).
-     El shimmer se recorta con clip-path en el ::after. */
-  isolation: isolate;
-  /* Mismo vidrio que .st-banner / push / diagnóstico */
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  overflow: hidden;
 }
 
 /* Efecto shimmer sweep en el badge */
 .st-estado-badge::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  /* Recorte sin overflow:hidden en el padre (protege el blur) */
-  clip-path: inset(0 round 8px);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
-  background-size: 60% 100%;
-  background-repeat: no-repeat;
-  background-position: -100% 0;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
   animation: stShimmerSweep 3s ease-in-out infinite;
-  pointer-events: none;
 }
 
 @keyframes stShimmerSweep {
-  0%   { background-position: -100% 0; }
-  50%  { background-position: 160% 0; }
-  100% { background-position: 160% 0; }
+  0%   { left: -100%; }
+  50%  { left: 100%; }
+  100% { left: 100%; }
 }
 
 .st-estado-badge--activo {
-  /* Opacidad ~0.45 como banners/push: se ven los puntitos detrás */
-  background: rgba(248, 250, 252, 0.45);
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
   color: #1e40af;
-  border: 1px solid rgba(59, 130, 246, 0.28);
-  border-left: 3px solid var(--st-primary-light);
-  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.1), 0 2px 8px rgba(59, 130, 246, 0.12);
 }
 
 .st-estado-badge--finalizado {
-  /* Misma receta que .st-banner--warning (la franja “listo para recoger”) */
-  background: rgba(255, 251, 235, 0.45);
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
   color: #92400e;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-left: 3px solid #f59e0b;
-  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.1), 0 2px 8px rgba(245, 158, 11, 0.12);
 }
 
 .st-estado-badge--entregado {
-  background: rgba(236, 253, 245, 0.45);
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  border-left: 3px solid #10b981;
-  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 2px 8px rgba(16, 185, 129, 0.12);
 }
 
 @keyframes stPulseGlow {
@@ -596,31 +548,21 @@
   50%      { box-shadow: 0 0 0 10px rgba(31, 99, 145, 0); }
 }
 
-/* Contenido del nodo — pasos YA PASADOS: más transparentes
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   El estilo base aplica a todos. El actual (--current) sobrescribe con
-   vidrio más denso. Así el estatus en curso destaca y el historial se ve
-   más “ligero”. */
+/* Contenido del nodo */
 .st-timeline-content {
-  /* Misma receta de vidrio que .st-diagnostico-card */
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  background: #f8fafc;
   border-radius: var(--st-radius-sm);
   padding: 0.65rem 0.9rem;
-  border: 1px solid rgba(226, 232, 240, 0.65);
+  border: 1px solid #e2e8f0;
   border-left: 3px solid #cbd5e1;
   transition: var(--st-ease);
 }
 
-/* Estatus ACTUAL: mismo vidrio denso de antes (sin cambiar) */
 .st-timeline-item--current .st-timeline-content {
-  background: rgba(239, 246, 255, 0.82);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-color: rgba(59, 130, 246, 0.2);
   border-left-color: var(--st-primary-light);
-  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.1);
+  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.08);
 }
 
 .st-timeline-nombre {
@@ -634,24 +576,19 @@
 
 .st-timeline-fecha {
   font-size: 0.72rem;
-  /* EXPLICACIÓN PARA PRINCIPIANTES:
-     Antes #64748b se veía apagado sobre el vidrio azul-gris.
-     #334155 (mismo gris azulado, más oscuro) mejora el contraste. */
-  color: #334155;
+  color: #64748b;
   margin: 2px 0 0;
 }
 
 .st-timeline-hace {
   font-size: 0.68rem;
-  /* Secundario pero legible: #475569 en vez de #94a3b8 */
-  color: #475569;
+  color: #94a3b8;
   font-style: italic;
 }
 
 @keyframes stFadeInUp {
   from { opacity: 0; transform: translateY(8px); }
-  /* none (no translateY(0)): evita romper backdrop-filter de hijos/vidrio */
-  to   { opacity: 1; transform: none; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Nodo de "siguiente paso" (sin fecha, solo texto descriptivo) */
@@ -679,23 +616,19 @@
   padding: 1rem 1.25rem;
   border-radius: var(--st-radius-sm);
   margin-bottom: 1.25rem;
-  animation: stSlideIn 0.5s ease forwards;
+  animation: stSlideIn 0.5s ease both;
   animation-delay: 0.3s;
 }
 
 .st-banner--warning {
-  background: rgba(255, 251, 235, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid rgba(245, 158, 11, 0.25);
   border-left: 4px solid #f59e0b;
 }
 
 .st-banner--success {
-  background: rgba(236, 253, 245, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid rgba(16, 185, 129, 0.25);
   border-left: 4px solid #10b981;
 }
 
@@ -716,15 +649,12 @@
   margin-bottom: 2px;
 }
 
-/* === Sección de contacto (responsable) — vidrio denso como estatus === */
+/* === Sección de contacto === */
 .st-contacto {
-  /* Más transparente + blur fuerte: se deben ver los puntitos a través */
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   border-radius: var(--st-radius-sm);
   padding: 1.25rem;
-  border: 1px solid rgba(226, 232, 240, 0.65);
+  border: 1px solid #e2e8f0;
   border-left: 3px solid var(--st-primary-light);
   margin-top: 0.5rem;
 }
@@ -748,14 +678,6 @@
   font-weight: 800;
   color: #0f172a;
   margin: 0 0 0.85rem;
-}
-
-/* EXPLICACIÓN PARA PRINCIPIANTES:
-   Antes el inline #f59e0b (ámbar brillante) “gritaba” demasiado.
-   #92400e es el mismo tono ámbar, más oscuro y sobrio. */
-.st-contacto-nombre--pendiente {
-  color: #92400e;
-  font-weight: 700;
 }
 
 .st-contacto-actions {
@@ -844,20 +766,10 @@
   line-height: 1;
 }
 
-/* === Sección de entrega (agradecimiento) ===
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   Vidrio más transparente (~0.28) + margen lateral y borde tipo
-   “tarjeta dentro de tarjeta” (prueba visual pedida por el usuario). */
+/* === Sección de entrega (agradecimiento) === */
 .st-gracias {
   text-align: center;
-  padding: 1.5rem 1.75rem 1.25rem;
-  margin: 0.75rem 1rem 0.5rem;
-  border-radius: var(--st-radius-sm);
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  border-left: 3px solid #10b981;
+  padding: 1.5rem 1.75rem 1rem;
 }
 
 .st-gracias-emoji {
@@ -878,48 +790,34 @@
   font-family: var(--st-font-heading);
   font-size: 1.3rem;
   font-weight: 800;
-  /* EXPLICACIÓN PARA PRINCIPIANTES:
-     Antes era #065f46 (verde muy oscuro) y se “perdía” sobre el vidrio
-     azul-gris. Emerald #059669 + ligero resplandor mejora la lectura. */
-  color: #059669;
+  color: #065f46;
   margin: 0 0 0.5rem;
   letter-spacing: -0.3px;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45), 0 0 20px rgba(16, 185, 129, 0.2);
 }
 
 .st-gracias-text {
   font-size: 0.9rem;
-  /* Gris más oscuro = mejor contraste que el #475569 anterior */
-  color: #1e293b;
+  color: #475569;
   line-height: 1.55;
   margin: 0 0 1rem;
-  font-weight: 500;
 }
 
 .st-gracias-fecha {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  /* Pill con vidrio más transparente */
-  background: rgba(236, 253, 245, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  color: #047857;
+  background: #ecfdf5;
+  color: #065f46;
   padding: 0.4rem 1rem;
   border-radius: 50px;
-  border: 1px solid rgba(16, 185, 129, 0.22);
   font-size: 0.82rem;
   font-weight: 600;
   margin-bottom: 1rem;
 }
 
 .st-encuesta-box {
-  /* Ámbar más transparente: se ve el fondo a través */
-  background: rgba(255, 251, 235, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-left: 3px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid rgba(245, 158, 11, 0.2);
   border-radius: var(--st-radius-sm);
   padding: 1.25rem;
   margin: 1rem 0 0;
@@ -961,14 +859,12 @@
   margin: 0 auto;
 }
 
-/* === Footer — mismo vidrio frosted === */
+/* === Footer === */
 .st-footer {
   text-align: center;
   padding: 1.5rem 1.75rem 1.25rem;
   border-top: 1px solid rgba(31, 99, 145, 0.08);
-  background: rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 0 0 var(--st-radius) var(--st-radius);
   position: relative;
 }
@@ -991,7 +887,7 @@
   margin-bottom: 0.85rem;
 }
 
-/* Cada icono: círculo de vidrio (misma familia que la card) */
+/* Cada icono: círculo con borde y sombra */
 .st-footer-red {
   display: inline-flex;
   align-items: center;
@@ -999,12 +895,10 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  background: #fff;
+  border: 1.5px solid rgba(31, 99, 145, 0.12);
   transition: var(--st-ease);
-  box-shadow: 0 1px 4px rgba(31, 99, 145, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 1px 4px rgba(31, 99, 145, 0.06);
   text-decoration: none;
   flex-shrink: 0;
 }
@@ -1054,60 +948,49 @@
 .st-footer-website {
   display: block;
   font-size: 0.7rem;
-  /* Azul oscuro SIC: se lee bien sobre el vidrio del footer */
-  color: var(--st-primary, #1f6391);
+  color: var(--st-primary-light);
   text-decoration: none;
-  font-weight: 600;
-  opacity: 1;
-  transition: opacity 0.2s, color 0.2s;
+  font-weight: 500;
+  opacity: 0.75;
+  transition: opacity 0.2s;
   margin-bottom: 0;
 }
 
 .st-footer-website:hover {
   opacity: 1;
-  color: #0e4d6f;
   text-decoration: underline;
 }
 
-/* === Vigencia badge — vidrio más transparente, tamaño original compacto === */
+/* Texto de "recarga esta página" (solo en estado tracking) */
+.st-footer-refresh {
+  font-size: 0.67rem;
+  color: #94a3b8;
+  margin: 0.6rem 0 0;
+  line-height: 1.5;
+}
+
+/* === Vigencia badge === */
 .st-vigencia {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
   gap: 0.35rem;
-  max-width: 100%;
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  color: #334155;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
   padding: 0.3rem 0.75rem;
   border-radius: 50px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
   font-size: 0.72rem;
   font-weight: 600;
-  line-height: 1.45;
   margin-top: 0.75rem;
 }
 
 /* =====================================================================
    GALERÍA DE IMÁGENES — CARRUSEL TIPO RIEL
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   Misma “tarjeta dentro de tarjeta” que .st-gracias: margen lateral +
-   border-radius + borde accent, para que el vidrio se vea continuo
-   y no a todo el ancho de la card.
    ===================================================================== */
 
 .st-galeria {
   padding: 0.85rem 0 0.75rem;
-  margin: 0.75rem 1rem 0.5rem;
-  border-radius: var(--st-radius-sm);
-  /* Vidrio transparente (~0.28) */
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(31, 99, 145, 0.28);
-  border-left: 3px solid var(--st-primary, #1f6391);
+  border-bottom: 1px solid rgba(31, 99, 145, 0.1);
+  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4fb 100%);
   position: relative;
 }
 
@@ -1134,16 +1017,13 @@
 
 .st-galeria-prev,
 .st-galeria-next {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
-  /* Círculos de vidrio como iconos del footer */
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  border: 1.5px solid rgba(31, 99, 145, 0.25);
+  background: white;
   color: var(--st-primary);
-  font-size: 0.78rem;
+  font-size: 1rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1151,10 +1031,8 @@
   transition: var(--st-ease);
   padding: 0;
   line-height: 1;
-  /* Un poco más chicos visualmente; 32px sigue siendo usable al toque */
-  min-height: 32px;
-  min-width: 32px;
-  box-shadow: 0 1px 4px rgba(31, 99, 145, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .st-galeria-prev:hover,
@@ -1232,7 +1110,7 @@
   transform: scale(1.03) translateY(-1px);
 }
 
-/* Chip de tipo — vidrio esmerilado (opacidad ~0.72 como timeline) */
+/* Chip de tipo sobre la imagen */
 .st-galeria-chip {
   position: absolute;
   bottom: 6px;
@@ -1245,18 +1123,17 @@
   letter-spacing: 0.04em;
   color: white;
   pointer-events: none;
-  backdrop-filter: blur(14px) saturate(1.3);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.st-galeria-chip--ingreso     { background: rgba(100, 116, 139, 0.72); }
-.st-galeria-chip--diagnostico { background: rgba(217, 119, 6,   0.72); }
-.st-galeria-chip--reparacion  { background: rgba(37,  99,  235,  0.72); }
-.st-galeria-chip--egreso      { background: rgba(5,   150, 105,  0.72); }
-.st-galeria-chip--autorizacion{ background: rgba(124, 58,  237,  0.72); }
-.st-galeria-chip--packing     { background: rgba(219, 39,  119,  0.72); }
+.st-galeria-chip--ingreso     { background: rgba(100, 116, 139, 0.88); }
+.st-galeria-chip--diagnostico { background: rgba(217, 119, 6,   0.92); }
+.st-galeria-chip--reparacion  { background: rgba(37,  99,  235,  0.92); }
+.st-galeria-chip--egreso      { background: rgba(5,   150, 105,  0.92); }
+.st-galeria-chip--autorizacion{ background: rgba(124, 58,  237,  0.92); }
+.st-galeria-chip--packing     { background: rgba(219, 39,  119,  0.92); }
 
 /* Dots indicadores */
 .st-galeria-dots {
@@ -1441,216 +1318,23 @@
   pointer-events: none;
 }
 
-/* === Accesibilidad ===
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   Antes acortábamos TODAS las animaciones a 0.01ms. En Android/iOS eso
-   a veces deja a .st-card (que arranca en opacity:0) invisible para siempre.
-   Ahora: apagamos animaciones de entrada y forzamos opacity:1. */
+/* === Accesibilidad === */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-
-  /* Elementos que animan desde opacity:0 — visibles ya */
-  .st-card,
-  .st-timeline-item,
-  .st-banner,
-  .st-gracias-emoji,
-  .st-pieza-card,
-  .st-pieza-tl-step,
-  .st-chat-msg,
-  .st-chat-panel {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  /* Sin spotlight, cascada ni gravedad: solo fondo plano */
+  /* Sin spotlight interactivo ni cascada: solo grilla tenue fija */
   .st-fondo-puntos::before,
-  .st-fondo-puntos[data-activo="1"]::before {
+  .st-fondo-puntos::after,
+  .st-fondo-puntos[data-activo="1"]::before,
+  .st-fondo-puntos[data-activo="1"]::after {
     opacity: 0 !important;
   }
   .st-fondo-cascada {
     animation: none !important;
     opacity: 0 !important;
-  }
-  .st-fondo-canvas {
-    display: none !important;
-  }
-}
-
-/* =====================================================================
-   MÓVIL / TOUCH — aliviar GPU (Android gama media-alta)
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   Muchos backdrop-filter anidados + overflow:hidden hacen que Chrome
-   Android “pierda” capas (contenido invisible). En pantallas ≤900px:
-   1) sin animaciones de entrada (opacity:0),
-   2) sin blur anidado (fondos rgba un poco más opacos).
-   En desktop el vidrio se mantiene.
-   ===================================================================== */
-@media (max-width: 900px) {
-  .st-card,
-  .st-timeline-item,
-  .st-banner,
-  .st-gracias-emoji,
-  .st-pieza-card,
-  .st-pieza-tl-step,
-  .st-diagnostico-card {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  .st-card,
-  .st-card-header,
-  .st-equipo-info,
-  .st-estado-badge,
-  .st-timeline-content,
-  .st-banner--warning,
-  .st-banner--success,
-  .st-contacto,
-  .st-galeria,
-  .st-gracias,
-  .st-gracias-fecha,
-  .st-encuesta-box,
-  .st-vigencia,
-  .st-push-card,
-  .st-diagnostico-card,
-  .st-footer,
-  .st-footer-red,
-  .st-modal,
-  .st-modal-header,
-  .st-pieza-card,
-  .st-pieza-fechas,
-  .st-chat-panel,
-  .st-chat-panel-header,
-  .st-chat-msg--bot .st-chat-msg-bubble,
-  .st-chat-input-area,
-  .st-chat-input-wrapper,
-  .st-chat-chip,
-  .st-chat-bubble,
-  .st-dark-toggle {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-
-  /* Sin blur: un poco más opacos para que se lean igual de bien */
-  .st-card {
-    background: rgba(255, 255, 255, 0.92);
-  }
-  .st-card-header {
-    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
-  }
-  .st-equipo-info {
-    background: rgba(255, 255, 255, 0.85);
-  }
-  .st-estado-badge--activo {
-    background: rgba(248, 250, 252, 0.92);
-  }
-  .st-estado-badge--finalizado {
-    background: rgba(255, 251, 235, 0.92);
-  }
-  .st-estado-badge--entregado {
-    background: rgba(236, 253, 245, 0.92);
-  }
-  .st-timeline-content {
-    background: rgba(255, 255, 255, 0.88);
-  }
-  .st-timeline-item--current .st-timeline-content {
-    background: rgba(239, 246, 255, 0.95);
-  }
-  .st-banner--warning {
-    background: rgba(255, 251, 235, 0.92);
-  }
-  .st-banner--success {
-    background: rgba(236, 253, 245, 0.92);
-  }
-  .st-contacto,
-  .st-push-card,
-  .st-diagnostico-card,
-  .st-galeria,
-  .st-gracias {
-    background: rgba(255, 255, 255, 0.88);
-  }
-  .st-encuesta-box {
-    background: rgba(255, 251, 235, 0.9);
-  }
-  .st-footer {
-    background: rgba(255, 255, 255, 0.9);
-  }
-  .st-modal {
-    background: rgba(255, 255, 255, 0.96);
-  }
-  .st-modal-header {
-    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
-  }
-  .st-pieza-card {
-    background: rgba(255, 255, 255, 0.92);
-  }
-  .st-chat-panel {
-    background: rgba(255, 255, 255, 0.96);
-  }
-  .st-chat-panel-header {
-    background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
-  }
-  .st-chat-msg--bot .st-chat-msg-bubble {
-    background: rgba(241, 245, 249, 0.98);
-  }
-  .st-chat-input-area {
-    background: rgba(255, 255, 255, 0.95);
-  }
-  .st-chat-input-wrapper {
-    background: rgba(248, 250, 252, 0.98);
-  }
-  .st-chat-bubble,
-  .st-dark-toggle {
-    background: rgba(255, 255, 255, 0.35);
-  }
-
-  /* Cascada CSS también pesa en GPU móvil */
-  .st-fondo-cascada {
-    animation: none !important;
-    opacity: 0.35 !important;
-  }
-}
-
-@media (max-width: 900px) {
-  [data-bs-theme="dark"] .st-card {
-    background: rgba(15, 23, 42, 0.92);
-  }
-  [data-bs-theme="dark"] .st-card-header {
-    background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
-  }
-  [data-bs-theme="dark"] .st-equipo-info,
-  [data-bs-theme="dark"] .st-contacto,
-  [data-bs-theme="dark"] .st-push-card,
-  [data-bs-theme="dark"] .st-diagnostico-card,
-  [data-bs-theme="dark"] .st-galeria,
-  [data-bs-theme="dark"] .st-gracias,
-  [data-bs-theme="dark"] .st-footer {
-    background: rgba(15, 23, 42, 0.88);
-  }
-  [data-bs-theme="dark"] .st-timeline-content {
-    background: rgba(15, 23, 42, 0.88);
-  }
-  [data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content {
-    background: rgba(12, 35, 64, 0.95);
-  }
-  [data-bs-theme="dark"] .st-modal,
-  [data-bs-theme="dark"] .st-chat-panel {
-    background: rgba(15, 23, 42, 0.96);
-  }
-  [data-bs-theme="dark"] .st-modal-header,
-  [data-bs-theme="dark"] .st-chat-panel-header {
-    background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
-  }
-  [data-bs-theme="dark"] .st-pieza-card,
-  [data-bs-theme="dark"] .st-chat-msg--bot .st-chat-msg-bubble {
-    background: rgba(30, 41, 59, 0.95);
-  }
-  [data-bs-theme="dark"] .st-chat-bubble,
-  [data-bs-theme="dark"] .st-dark-toggle {
-    background: rgba(30, 41, 59, 0.85);
   }
 }
 
@@ -1658,7 +1342,7 @@
    DARK MODE - Seguimiento de cliente
    ============================================================ */
 [data-bs-theme="dark"] {
-  --st-card-bg: rgba(15, 23, 42, 0.28);
+  --st-card-bg: rgba(15, 23, 42, 0.94);
   --st-glow-primary: 0 0 20px rgba(96, 165, 250, 0.25), 0 0 60px rgba(96, 165, 250, 0.08);
 }
 
@@ -1670,16 +1354,28 @@
 }
 
 [data-bs-theme="dark"] .st-fondo-puntos {
-  background: none;
+  background-image: radial-gradient(
+    circle,
+    rgba(148, 163, 184, 0.18) 1px,
+    transparent 1.5px
+  );
 }
 
-/* En dark: halo original (suave) */
+/* En dark: puntos iluminados un poco más brillantes (siguen en cyan) */
 [data-bs-theme="dark"] .st-fondo-puntos::before {
   background: radial-gradient(
     circle 240px at var(--st-spot-x) var(--st-spot-y),
     rgba(96, 165, 250, 0.12),
     rgba(56, 189, 248, 0.04) 45%,
     transparent 75%
+  );
+}
+
+[data-bs-theme="dark"] .st-fondo-puntos::after {
+  background-image: radial-gradient(
+    circle,
+    rgba(125, 211, 252, 0.85) 1.1px,
+    transparent 1.6px
   );
 }
 
@@ -1722,9 +1418,7 @@
 
 /* Info del equipo - gradiente azul claro → oscuro */
 [data-bs-theme="dark"] .st-equipo-info {
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
+  background: linear-gradient(135deg, #0c2340 0%, #0d2d40 100%);
   border-color: rgba(31, 99, 145, 0.15);
   border-left-color: #60a5fa;
 }
@@ -1741,7 +1435,7 @@
    S/N y la falla van sobre el bloque oscuro del equipo (#0c2340).
    #94a3b8 era demasiado apagado; aclaramos para leer la falla reportada sin esfuerzo. */
 [data-bs-theme="dark"] .st-equipo-serial {
-  color: #e2e8f0;
+  color: #cbd5e1;
 }
 
 [data-bs-theme="dark"] .st-equipo-falla {
@@ -1780,22 +1474,16 @@
 }
 
 [data-bs-theme="dark"] .st-timeline-content {
-  /* Pasados: misma transparencia que .st-diagnostico-card en dark */
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(51, 65, 85, 0.7);
+  background: #0f172a;
+  border-color: #1e293b;
   border-left-color: #334155;
 }
 
 [data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content {
-  /* Actual: mismo denso de antes */
-  background: rgba(12, 35, 64, 0.82);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: linear-gradient(135deg, #0c2340, #1e3a5f);
+  border-color: rgba(59, 130, 246, 0.2);
   border-left-color: #60a5fa;
-  box-shadow: 0 2px 12px rgba(96, 165, 250, 0.08);
+  box-shadow: 0 2px 12px rgba(96, 165, 250, 0.06);
 }
 
 [data-bs-theme="dark"] .st-timeline-nombre {
@@ -1811,27 +1499,22 @@
 }
 
 [data-bs-theme="dark"] .st-timeline-fecha {
-  /* Un tono más claro que el slate medio, para contraste sobre vidrio oscuro */
-  color: #e2e8f0;
-}
-
-[data-bs-theme="dark"] .st-timeline-hace {
   color: #cbd5e1;
 }
 
-/* Banners contextuales — frosted */
+[data-bs-theme="dark"] .st-timeline-hace {
+  color: #94a3b8;
+}
+
+/* Banners contextuales */
 [data-bs-theme="dark"] .st-banner--warning {
-  background: rgba(69, 26, 3, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  background: linear-gradient(135deg, #451a03, #713f12);
   border-color: rgba(245, 158, 11, 0.3);
   border-left-color: #f59e0b;
 }
 
 [data-bs-theme="dark"] .st-banner--success {
-  background: rgba(5, 46, 22, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  background: linear-gradient(135deg, #052e16, #064e3b);
   border-color: rgba(16, 185, 129, 0.3);
   border-left-color: #10b981;
 }
@@ -1840,12 +1523,10 @@
   color: #e2e8f0;
 }
 
-/* Sección de contacto — frosted dark */
+/* Sección de contacto */
 [data-bs-theme="dark"] .st-contacto {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(51, 65, 85, 0.7);
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-color: #1e293b;
   border-left-color: #60a5fa;
 }
 
@@ -1857,47 +1538,31 @@
   color: #e2e8f0;
 }
 
-[data-bs-theme="dark"] .st-contacto-nombre--pendiente {
-  /* Ámbar apagado: se lee, pero no brilla como #f59e0b */
-  color: #d97706;
-}
-
 /* Estado badge */
-[data-bs-theme="dark"] .st-estado-badge-container {
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border-bottom-color: rgba(255, 255, 255, 0.06);
-}
-
 [data-bs-theme="dark"] .st-estado-badge {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Card body: casi transparente — el blur denso está en estatus/timeline */
+/* Card body */
 [data-bs-theme="dark"] .st-card-body {
-  background: rgba(15, 23, 42, 0.22);
+  background: #0f172a;
 }
 
-/* Badge de estado — opacidad ~0.72 como timeline en dark */
+/* Badge de estado — variantes de color */
 [data-bs-theme="dark"] .st-estado-badge--activo {
-  background: rgba(15, 23, 42, 0.45);
+  background: linear-gradient(135deg, #1e3a5f, #1e3560);
   color: #93c5fd;
-  border-color: rgba(59, 130, 246, 0.28);
-  border-left-color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.2);
 }
 [data-bs-theme="dark"] .st-estado-badge--finalizado {
-  /* Misma opacidad/vidrio que .st-banner--warning en dark */
-  background: rgba(69, 26, 3, 0.45);
+  background: linear-gradient(135deg, #451a03, #713f12);
   color: #fcd34d;
-  border-color: rgba(245, 158, 11, 0.3);
-  border-left-color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.2);
 }
 [data-bs-theme="dark"] .st-estado-badge--entregado {
-  background: rgba(6, 78, 59, 0.45);
+  background: linear-gradient(135deg, #064e3b, #065f46);
   color: #6ee7b7;
-  border-color: rgba(16, 185, 129, 0.28);
-  border-left-color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 /* Estado inválido */
@@ -1908,65 +1573,43 @@
   color: #64748b;
 }
 
-/* Sección de agradecimiento (estado entregado) — dark */
-[data-bs-theme="dark"] .st-gracias {
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(16, 185, 129, 0.28);
-  border-left-color: #34d399;
-}
+/* Sección de agradecimiento (estado entregado) */
 [data-bs-theme="dark"] .st-gracias-title {
-  /* Verde menta claro: alto contraste sobre fondo oscuro */
-  color: #6ee7b7;
-  text-shadow: 0 0 18px rgba(52, 211, 153, 0.25);
+  color: #34d399;
 }
 [data-bs-theme="dark"] .st-gracias-text {
-  color: #e2e8f0;
+  color: #94a3b8;
 }
 [data-bs-theme="dark"] .st-gracias-fecha {
-  background: rgba(6, 78, 59, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  color: #6ee7b7;
-  border-color: rgba(16, 185, 129, 0.22);
+  background: rgba(52, 211, 153, 0.1);
+  color: #34d399;
 }
 [data-bs-theme="dark"] .st-encuesta-box {
-  background: rgba(69, 26, 3, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(245, 158, 11, 0.25);
-  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #451a03, #713f12);
+  border-color: rgba(245, 158, 11, 0.2);
 }
 [data-bs-theme="dark"] .st-encuesta-box p {
   color: #fcd34d;
 }
 
-/* Vigencia — dark */
+/* Vigencia */
 [data-bs-theme="dark"] .st-vigencia {
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  color: #cbd5e1;
-  border-color: rgba(51, 65, 85, 0.55);
+  background: rgba(51, 65, 85, 0.5);
+  color: #64748b;
 }
 
-/* Footer — frosted dark */
+/* Footer */
 [data-bs-theme="dark"] .st-footer {
-  background: rgba(12, 26, 46, 0.42);
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
-  border-top-color: rgba(31, 99, 145, 0.12);
+  background: linear-gradient(180deg, #0c1a2e 0%, #0f172a 100%);
+  border-top-color: rgba(31, 99, 145, 0.1);
 }
 [data-bs-theme="dark"] .st-footer::before {
   background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.12), transparent);
 }
 [data-bs-theme="dark"] .st-footer-red {
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: #1e293b;
+  border-color: rgba(99, 179, 237, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 [data-bs-theme="dark"] .st-footer-red:hover,
 [data-bs-theme="dark"] .st-footer-red:focus-visible {
@@ -1990,14 +1633,14 @@
   color: #7dd3fc;
   opacity: 0.95;
 }
+[data-bs-theme="dark"] .st-footer-refresh {
+  color: #94a3b8;
+}
 
-/* Galería — vidrio dark + margen tipo tarjeta interna */
+/* Galería */
 [data-bs-theme="dark"] .st-galeria {
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(31, 99, 145, 0.35);
-  border-left-color: #1f6391;
+  background: linear-gradient(135deg, #0c1a2e 0%, #0d2133 100%);
+  border-bottom-color: rgba(31, 99, 145, 0.1);
 }
 /* Galeria items dark hover */
 [data-bs-theme="dark"] .st-galeria-item:hover {
@@ -2005,17 +1648,14 @@
 }
 [data-bs-theme="dark"] .st-galeria-prev,
 [data-bs-theme="dark"] .st-galeria-next {
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(18px) saturate(1.35);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: #1e293b;
+  border-color: rgba(99, 179, 237, 0.2);
   color: #7dd3fc;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 [data-bs-theme="dark"] .st-galeria-prev:hover,
 [data-bs-theme="dark"] .st-galeria-next:hover {
-  background: rgba(31, 99, 145, 0.75);
-  border-color: #60a5fa;
+  background: #1f6391;
+  border-color: #1f6391;
   color: white;
 }
 [data-bs-theme="dark"] .st-galeria-dot {
@@ -2025,16 +1665,9 @@
   background: #60a5fa;
 }
 
-/* Header dark: mismo azul oscuro, un poco de vidrio */
+/* Info del equipo — estado entregado y tracking en fondo de card */
 [data-bs-theme="dark"] .st-card-header {
-  background: linear-gradient(
-    135deg,
-    rgba(6, 16, 31, 0.85) 0%,
-    rgba(10, 34, 64, 0.80) 40%,
-    rgba(10, 30, 48, 0.85) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
 }
 /* Diagonales dark: lineas mas tenues */
 [data-bs-theme="dark"] .st-card-header::before {
@@ -2129,16 +1762,13 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  /* Vidrio como la card / timeline */
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid rgba(56, 189, 248, 0.25);
   border-left: 3px solid var(--st-primary-light);
   border-radius: var(--st-radius-sm);
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
-  animation: stSlideIn 0.5s ease forwards;
+  animation: stSlideIn 0.5s ease both;
 }
 
 .st-push-icon {
@@ -2359,15 +1989,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(226, 232, 240, 0.65);
+  background-color: var(--gray-50, #f8fafc);
+  border: 1px solid var(--gray-200, #e2e8f0);
   border-left: 3px solid var(--st-primary-light, #1f6391);
   border-radius: var(--st-radius-sm);
   padding: 0.85rem 1rem;
   margin-bottom: 1.25rem;
-  animation: stSlideIn 0.5s ease forwards;
+  animation: stSlideIn 0.5s ease both;
 }
 
 .st-diagnostico-header {
@@ -2434,17 +2062,13 @@
    ============================================================ */
 
 [data-bs-theme="dark"] .st-push-card {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(96, 165, 250, 0.28);
+  background: linear-gradient(135deg, #0f2942, #0c3556);
+  border-color: rgba(96, 165, 250, 0.25);
 }
 
 [data-bs-theme="dark"] .st-diagnostico-card {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(51, 65, 85, 0.7);
+  background-color: #1e293b;
+  border-color: #334155;
 }
 
 [data-bs-theme="dark"] .st-diagnostico-label {
@@ -2533,13 +2157,11 @@
   pointer-events: all;
 }
 
-/* Contenedor del modal — misma receta de vidrio que .st-card */
+/* Contenedor del modal */
 .st-modal {
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-top: 2px solid rgba(56, 189, 248, 0.35);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--st-radius) var(--st-radius) 0 0;
   width: 100%;
   max-width: 680px;
@@ -2552,31 +2174,19 @@
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* EXPLICACIÓN PARA PRINCIPIANTES:
-   Al abrir usamos transform: none (no translateY(0)).
-   Si queda un transform, el backdrop-filter de las tarjetas internas
-   no “ve” el fondo y se ven sólidas. */
 .st-modal-overlay--visible .st-modal {
-  transform: none;
+  transform: translateY(0);
 }
 
-/* Cabecera del modal — mismo vidrio azul que .st-card-header */
+/* Cabecera del modal (mismo gradiente que el card-header) */
 .st-modal-header {
-  background: linear-gradient(
-    135deg,
-    rgba(12, 45, 74, 0.85) 0%,
-    rgba(14, 77, 111, 0.80) 40%,
-    rgba(22, 78, 99, 0.85) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: linear-gradient(135deg, #1f6391 0%, #0e4d6f 60%, #164e63 100%);
   padding: 1.1rem 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.65rem;
   flex-shrink: 0;
   position: relative;
-  isolation: isolate;
 }
 
 .st-modal-header-icon {
@@ -2628,13 +2238,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Tarjeta de cada pieza — vidrio como .st-diagnostico-card ── */
+/* ── Tarjeta de cada pieza ── */
 .st-pieza-card {
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border: 1px solid rgba(226, 232, 240, 0.65);
-  border-left: 3px solid var(--st-primary, #1f6391);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: var(--st-radius-sm);
   padding: 1rem 1.1rem;
   animation: stFadeInUp 0.35s ease both;
@@ -2776,8 +2383,7 @@
 .st-pieza-tl-label--completado { color: #059669; font-weight: 700; }
 .st-pieza-tl-label--actual     { color: #1f6391; font-weight: 800; }
 .st-pieza-tl-label--alerta     { color: #d97706; font-weight: 800; }
-/* Pendiente: gris legible sobre vidrio (antes #cbd5e1 casi invisible) */
-.st-pieza-tl-label--pendiente  { color: #64748b; }
+.st-pieza-tl-label--pendiente  { color: #cbd5e1; }
 .st-pieza-tl-label--problema   { color: #dc2626; font-weight: 800; }
 
 /* Nombre del componente */
@@ -2798,16 +2404,13 @@
   line-height: 1.5;
 }
 
-/* Bloque de fechas — vidrio más suave */
+/* Bloque de fechas */
 .st-pieza-fechas {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   flex-wrap: wrap;
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  border: 1px solid rgba(31, 99, 145, 0.15);
+  background: rgba(31, 99, 145, 0.06);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
 }
@@ -2822,7 +2425,7 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #475569;
+  color: #64748b;
   font-weight: 700;
 }
 
@@ -2862,36 +2465,18 @@
     transform: translateY(0) scale(0.96);
   }
   .st-modal-overlay--visible .st-modal {
-    /* none = backdrop-filter de tarjetas internas funciona */
-    transform: none;
+    transform: translateY(0) scale(1);
   }
 }
 
 /* ── Dark mode overrides: modal ── */
 [data-bs-theme="dark"] .st-modal {
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
-  border-color: rgba(51, 65, 85, 0.7);
-}
-
-[data-bs-theme="dark"] .st-modal-header {
-  background: linear-gradient(
-    135deg,
-    rgba(6, 16, 31, 0.85) 0%,
-    rgba(10, 34, 64, 0.80) 40%,
-    rgba(10, 30, 48, 0.85) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: rgba(15, 23, 42, 0.97);
 }
 
 [data-bs-theme="dark"] .st-pieza-card {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  border-color: rgba(51, 65, 85, 0.7);
-  border-left-color: #60a5fa;
+  background: #1e293b;
+  border-color: #334155;
 }
 
 [data-bs-theme="dark"] .st-pieza-nombre {
@@ -2899,14 +2484,11 @@
 }
 
 [data-bs-theme="dark"] .st-pieza-desc {
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 [data-bs-theme="dark"] .st-pieza-fechas {
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  border-color: rgba(51, 65, 85, 0.55);
+  background: rgba(99, 179, 237, 0.06);
 }
 
 [data-bs-theme="dark"] .st-pieza-fecha-val {
@@ -2945,77 +2527,61 @@
    Mobile-first, touch-friendly (44px mínimo), compatible con modo oscuro.
    ============================================================================= */
 
-/* ── Variables de color específicas del chat ──
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   El panel es vidrio (~0.55) un poco más opaco que la card (0.28)
-   para que mensajes e input se lean bien. Las burbujas del bot
-   van aún más densas (~0.78). El usuario sigue en azul sólido. */
+/* ── Variables de color específicas del chat ── */
 :root {
   --chat-primary:       #1f6391;
   --chat-primary-dark:  #0e4d6f;
-  --chat-bg-panel:      rgba(255, 255, 255, 0.55);
+  --chat-bg-panel:      rgba(255, 255, 255, 0.97);
   --chat-bg-msg-user:   #1f6391;
-  --chat-bg-msg-bot:    rgba(255, 255, 255, 0.78);
+  --chat-bg-msg-bot:    #f1f5f9;
   --chat-text-user:     #ffffff;
-  --chat-text-bot:      #0f172a;
-  --chat-border:        rgba(255, 255, 255, 0.45);
-  --chat-input-bg:      rgba(255, 255, 255, 0.72);
-  --chat-input-border:  rgba(31, 99, 145, 0.28);
-  --chat-shadow:        0 8px 32px rgba(0, 0, 0, 0.22);
+  --chat-text-bot:      #1e293b;
+  --chat-border:        rgba(31, 99, 145, 0.15);
+  --chat-input-bg:      #f8fafc;
+  --chat-input-border:  #cbd5e1;
+  --chat-shadow:        0 8px 32px rgba(0, 0, 0, 0.18);
   --chat-radius-panel:  20px;
   --chat-radius-msg:    18px;
-  --chat-disclaimer:    #475569;
+  --chat-disclaimer:    #94a3b8;
 }
 
-/* ── Burbuja flotante — misma receta visual que .st-dark-toggle ── */
+/* ── Burbuja flotante ── */
 .st-chat-bubble {
   position: fixed;
-  /* Misma altura que el botón de tema */
-  bottom: max(1.25rem, env(safe-area-inset-bottom, 1.25rem));
-  right: calc(1rem + 46px + 12px); /* a la izquierda del tema: margen + 46px + gap */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  right: calc(1rem + 46px + 12px); /* a la izquierda del botón de tema: 1rem + 46px ancho + 12px gap */
   z-index: 1000;
-  width: 46px;
-  height: 46px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  /* Icono siempre blanco (claro y oscuro), como contraste sobre el vidrio */
+  background: linear-gradient(135deg, var(--chat-primary) 0%, var(--chat-primary-dark) 100%);
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-  outline-offset: 3px;
+  box-shadow: 0 4px 20px rgba(31, 99, 145, 0.45);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease;
+  /* Asegurar touch target iOS de 44x44px */
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
 .st-chat-bubble:hover,
 .st-chat-bubble:focus-visible {
-  transform: scale(1.12);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(31, 99, 145, 0.55);
   outline: none;
 }
 
 .st-chat-bubble:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
-/* Abierto: mismo vidrio; el icono cambia a X */
 .st-chat-bubble--active {
-  background: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-
-[data-bs-theme="dark"] .st-chat-bubble,
-[data-bs-theme="dark"] .st-chat-bubble--active {
-  background: rgba(30, 41, 59, 0.7);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
 }
 
 /* ── Íconos dentro de la burbuja (abrir / cerrar) ── */
@@ -3030,13 +2596,6 @@
 .st-chat-bubble-icon--open {
   opacity: 1;
   transform: scale(1) rotate(0deg);
-}
-
-/* Robot / X en blanco (hereda color: #fff del botón) */
-.st-chat-bubble-icon--open .st-chat-robot-svg {
-  color: inherit;
-  display: block;
-  overflow: visible;
 }
 
 .st-chat-bubble-icon--close {
@@ -3077,22 +2636,18 @@
   50%       { transform: scale(1.12); }
 }
 
-/* ── Panel de chat — vidrio legible ── */
+/* ── Panel de chat ── */
 .st-chat-panel {
   position: fixed;
-  /* Encima de la burbuja 46px + gap */
-  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 1.25rem)) + 46px + 12px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px); /* 56px burbuja + 16px gap + 10px */
   right: calc(1rem + 46px + 12px); /* alineado con la burbuja del chat */
   z-index: 999;
   width: min(380px, calc(100vw - 32px));
   max-height: min(560px, calc(100dvh - 120px));
   background: var(--chat-bg-panel);
-  backdrop-filter: blur(36px) saturate(1.35);
-  -webkit-backdrop-filter: blur(36px) saturate(1.35);
   border-radius: var(--chat-radius-panel);
   box-shadow: var(--chat-shadow);
   border: 1px solid var(--chat-border);
-  border-top: 2px solid rgba(56, 189, 248, 0.35);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3101,34 +2656,24 @@
   transform: translateY(16px) scale(0.97);
   pointer-events: none;
   transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
+  /* La burbuja de chat no debe tapar el toggle de modo oscuro */
 }
 
-/* EXPLICACIÓN PARA PRINCIPIANTES:
-   transform: none al abrir → el backdrop-filter del panel “ve” el fondo.
-   translateY(0) scale(1) dejaría un transform residual y el vidrio falla. */
 .st-chat-panel--visible {
   opacity: 1;
-  transform: none;
+  transform: translateY(0) scale(1);
   pointer-events: all;
 }
 
-/* ── Header del panel — mismo azul vidrio que .st-card-header ── */
+/* ── Header del panel ── */
 .st-chat-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(12, 45, 74, 0.88) 0%,
-    rgba(14, 77, 111, 0.85) 40%,
-    rgba(22, 78, 99, 0.88) 100%
-  );
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: linear-gradient(135deg, var(--chat-primary) 0%, var(--chat-primary-dark) 100%);
   color: #fff;
   flex-shrink: 0;
-  isolation: isolate;
 }
 
 .st-chat-panel-header-info {
@@ -3250,7 +2795,7 @@
 
 @keyframes chatMsgIn {
   from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .st-chat-msg--user {
@@ -3271,19 +2816,14 @@
 }
 
 .st-chat-msg--user .st-chat-msg-bubble {
-  /* Azul sólido: máximo contraste para lo que escribe el cliente */
   background: var(--chat-bg-msg-user);
   color: var(--chat-text-user);
   border-bottom-right-radius: 5px;
 }
 
 .st-chat-msg--bot .st-chat-msg-bubble {
-  /* Vidrio denso: se lee bien, con un toque de transparencia */
   background: var(--chat-bg-msg-bot);
-  backdrop-filter: blur(16px) saturate(1.25);
-  -webkit-backdrop-filter: blur(16px) saturate(1.25);
   color: var(--chat-text-bot);
-  border: 1px solid rgba(226, 232, 240, 0.65);
   border-bottom-left-radius: 5px;
 }
 
@@ -3354,15 +2894,13 @@
 }
 
 .st-chat-chip {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  background: rgba(31, 99, 145, 0.08);
   color: var(--chat-primary);
-  border: 1px solid rgba(31, 99, 145, 0.28);
+  border: 1px solid rgba(31, 99, 145, 0.25);
   border-radius: 20px;
   padding: 5px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
   white-space: nowrap;
@@ -3371,7 +2909,7 @@
 }
 
 .st-chat-chip:hover {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(31, 99, 145, 0.15);
   transform: translateY(-1px);
 }
 
@@ -3379,13 +2917,10 @@
   transform: translateY(0);
 }
 
-/* ── Área de input — vidrio denso para escribir con claridad ── */
+/* ── Área de input ── */
 .st-chat-input-area {
   padding: 10px 14px 12px;
   border-top: 1px solid var(--chat-border);
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(18px) saturate(1.25);
-  -webkit-backdrop-filter: blur(18px) saturate(1.25);
   flex-shrink: 0;
 }
 
@@ -3394,8 +2929,6 @@
   align-items: flex-end;
   gap: 8px;
   background: var(--chat-input-bg);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
   border: 1.5px solid var(--chat-input-border);
   border-radius: 16px;
   padding: 8px 10px;
@@ -3517,13 +3050,13 @@
     right: 8px;
     left: 8px;
     width: auto;
-    bottom: calc(max(0.75rem, env(safe-area-inset-bottom, 0.75rem)) + 46px + 12px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
     border-radius: 18px;
   }
 
   .st-chat-bubble {
-    right: calc(0.75rem + 46px + 10px); /* a la izquierda del tema */
-    bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+    right: calc(0.75rem + 46px + 10px); /* a la izquierda del tema: margen + ancho + gap */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
   /* En mobile: tema pegado a la derecha */
@@ -3539,30 +3072,13 @@
    ============================================================================= */
 
 [data-bs-theme="dark"] {
-  --chat-bg-panel:      rgba(15, 23, 42, 0.58);
-  --chat-bg-msg-bot:    rgba(30, 41, 59, 0.82);
+  --chat-bg-panel:      rgba(15, 23, 42, 0.97);
+  --chat-bg-msg-bot:    #1e293b;
   --chat-text-bot:      #e2e8f0;
-  --chat-border:        rgba(51, 65, 85, 0.75);
-  --chat-input-bg:      rgba(30, 41, 59, 0.78);
-  --chat-input-border:  rgba(96, 165, 250, 0.28);
-  --chat-disclaimer:    #94a3b8;
-}
-
-[data-bs-theme="dark"] .st-chat-panel-header {
-  background: linear-gradient(
-    135deg,
-    rgba(6, 16, 31, 0.90) 0%,
-    rgba(10, 34, 64, 0.88) 40%,
-    rgba(10, 30, 48, 0.90) 100%
-  );
-}
-
-[data-bs-theme="dark"] .st-chat-msg--bot .st-chat-msg-bubble {
-  border-color: rgba(51, 65, 85, 0.7);
-}
-
-[data-bs-theme="dark"] .st-chat-input-area {
-  background: rgba(15, 23, 42, 0.35);
+  --chat-border:        rgba(51, 65, 85, 0.8);
+  --chat-input-bg:      #1e293b;
+  --chat-input-border:  #334155;
+  --chat-disclaimer:    #475569;
 }
 
 [data-bs-theme="dark"] .st-chat-input {
@@ -3570,7 +3086,7 @@
 }
 
 [data-bs-theme="dark"] .st-chat-input::placeholder {
-  color: #64748b;
+  color: #475569;
 }
 
 [data-bs-theme="dark"] .st-chat-messages::-webkit-scrollbar-thumb {
@@ -3578,15 +3094,13 @@
 }
 
 [data-bs-theme="dark"] .st-chat-chip {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  color: #93c5fd;
-  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.25);
 }
 
 [data-bs-theme="dark"] .st-chat-chip:hover {
-  background: rgba(30, 41, 59, 0.75);
+  background: rgba(96, 165, 250, 0.18);
 }
 
 [data-bs-theme="dark"] .st-chat-whatsapp-link {
