@@ -28,8 +28,9 @@
 </head>
 <body class="st-body"{% if estado != 'invalido' %} data-eventos-url="{% url 'eventos_seguimiento_cliente' token=token %}"{% if url_diagnostico_pdf %} data-diagnostico-pdf-url="{{ url_diagnostico_pdf }}"{% endif %}{% endif %}>
 
-{# Fondo de puntos: spotlight al hover + cascada tenue automática #}
+{# Fondo: halo CSS original + cascada + canvas (gravedad/pulso en puntitos) #}
 <div class="st-fondo-puntos" aria-hidden="true">
+  <canvas id="st-fondo-canvas" class="st-fondo-canvas"></canvas>
   <span class="st-fondo-cascada"></span>
 </div>
 
@@ -51,8 +52,74 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
         data-ai-enabled="true"
         {% if whatsapp_url %}data-whatsapp-url="{{ whatsapp_url }}"{% endif %}>
   <span class="st-chat-bubble-icon st-chat-bubble-icon--open" aria-hidden="true">
-    {# Icono robot IA #}
-    <img src="{% static 'images/utilitys/icon_chat_robot.svg' %}" width="28" height="28" alt="" style="filter: brightness(0) invert(1);">
+    <!-- EXPLICACIÓN PARA PRINCIPIANTES:
+       El SVG animado va INLINE (no &lt;img&gt;): si se carga como imagen,
+       el navegador suele ignorar las animaciones CSS del archivo. -->
+    <svg class="st-chat-robot-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24" fill="none">
+      <style>
+        @keyframes stChatRobotFloat {
+          0%, 100% { transform: translateY(0); }
+          50%       { transform: translateY(-2.5px); }
+        }
+        @keyframes stChatRobotBlink {
+          0%, 90%, 100% { transform: scaleY(1); }
+          95%           { transform: scaleY(0.08); }
+        }
+        @keyframes stChatRobotPulseDot {
+          0%, 100% { r: 2.5; opacity: 1; }
+          50%       { r: 3.8; opacity: 0.6; }
+        }
+        @keyframes stChatRobotEyeGlow {
+          0%, 100% { opacity: 0.18; }
+          50%       { opacity: 0.38; }
+        }
+        @keyframes stChatRobotDotBlink {
+          0%, 100% { opacity: 0.7; }
+          50%       { opacity: 0.2; }
+        }
+        .st-chat-robot-body  { animation: stChatRobotFloat 3s ease-in-out infinite; }
+        .st-chat-robot-eye-l { transform-origin: 24px 26px; animation: stChatRobotBlink 4s ease-in-out infinite; }
+        .st-chat-robot-eye-r { transform-origin: 40px 26px; animation: stChatRobotBlink 4s ease-in-out infinite 0.15s; }
+        .st-chat-robot-glow-l { animation: stChatRobotEyeGlow 3s ease-in-out infinite; }
+        .st-chat-robot-glow-r { animation: stChatRobotEyeGlow 3s ease-in-out infinite 1s; }
+        .st-chat-robot-antenna { animation: stChatRobotPulseDot 2s ease-in-out infinite; }
+        .st-chat-robot-dot-1 { animation: stChatRobotDotBlink 1.6s ease-in-out infinite; }
+        .st-chat-robot-dot-2 { animation: stChatRobotDotBlink 1.6s ease-in-out infinite 0.8s; }
+        @media (prefers-reduced-motion: reduce) {
+          .st-chat-robot-body,
+          .st-chat-robot-eye-l,
+          .st-chat-robot-eye-r,
+          .st-chat-robot-glow-l,
+          .st-chat-robot-glow-r,
+          .st-chat-robot-antenna,
+          .st-chat-robot-dot-1,
+          .st-chat-robot-dot-2 { animation: none !important; }
+        }
+      </style>
+      <line x1="32" y1="6" x2="32" y2="14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      <circle class="st-chat-robot-antenna" cx="32" cy="4.5" r="2.5" fill="currentColor"/>
+      <g class="st-chat-robot-body">
+        <rect x="14" y="14" width="36" height="26" rx="7" ry="7" fill="currentColor" opacity="0.15"/>
+        <rect x="14" y="14" width="36" height="26" rx="7" ry="7" stroke="currentColor" stroke-width="2.2"/>
+        <g class="st-chat-robot-eye-l">
+          <circle class="st-chat-robot-glow-l" cx="24" cy="26" r="4" fill="currentColor"/>
+          <circle cx="24" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+          <circle cx="25.2" cy="24.8" r="1.4" fill="currentColor"/>
+        </g>
+        <g class="st-chat-robot-eye-r">
+          <circle class="st-chat-robot-glow-r" cx="40" cy="26" r="4" fill="currentColor"/>
+          <circle cx="40" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+          <circle cx="41.2" cy="24.8" r="1.4" fill="currentColor"/>
+        </g>
+        <path d="M25 32.5 Q32 37 39 32.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+        <rect x="9" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+        <rect x="50" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+        <rect x="20" y="42" width="24" height="14" rx="5" ry="5" fill="currentColor" opacity="0.15"/>
+        <rect x="20" y="42" width="24" height="14" rx="5" ry="5" stroke="currentColor" stroke-width="2.2"/>
+        <circle class="st-chat-robot-dot-1" cx="28" cy="49" r="2" fill="currentColor"/>
+        <circle class="st-chat-robot-dot-2" cx="36" cy="49" r="2" fill="currentColor"/>
+      </g>
+    </svg>
   </span>
   <span class="st-chat-bubble-icon st-chat-bubble-icon--close" aria-hidden="true">
     {# Icono X para cerrar #}
@@ -636,8 +703,7 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
         {% endif %}
       </div>
       {% else %}
-      <p class="st-contacto-nombre" style="color:#f59e0b;">Pendiente de asignar</p>
-      <p style="font-size:0.85rem;color:#6b7280;">Se te notificará cuando se asigne a tu responsable.</p>
+      <p class="st-contacto-nombre st-contacto-nombre--pendiente">Pendiente de asignar</p>
       {% endif %}
     </div>
 
@@ -697,7 +763,6 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
       Comercialización y Servicios
     </p>
     <a href="https://sicfix.mx" class="st-footer-website" target="_blank" rel="noopener">sicfix.mx</a>
-    <p class="st-footer-refresh">🔄 Para actualizar el estado, recarga esta página.</p>
   </div>
 
 </div>
