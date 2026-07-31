@@ -21,11 +21,11 @@
     })();
   </script>
   <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
-  {# EXPLICACIÓN PARA PRINCIPIANTES:
+  <!-- EXPLICACIÓN PARA PRINCIPIANTES:
      El CSS grande (~100KB) es render-blocking: el móvil espera y se ve blanco.
      1) Este <style> pinta ya fondo + card + header (system fonts).
      2) El CSS completo entra async (preload → stylesheet) y “pulirá” detalles.
-     3) Fonts van diferidas (no bloquean el primer paint). #}
+     3) Fonts van diferidas (no bloquean el primer paint). -->
   <style>
     html, body {
       margin: 0;
