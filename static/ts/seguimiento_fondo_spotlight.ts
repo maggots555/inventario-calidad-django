@@ -11,6 +11,7 @@
  *
  * Efectos: solo CSS variables en .st-fondo-puntos; no toca BD ni red.
  * Accesibilidad: si el usuario pide reducir movimiento, no seguimos el cursor.
+ * Estabilidad: try/catch para que un fallo aquí no tumbe la página.
  */
 
 /** Radio del halo en CSS (debe coincidir con el mask del stylesheet). */
@@ -50,38 +51,43 @@ function apagarSpotlight(fondo: HTMLElement): void {
  * @returns void — sale temprano si no hay elemento o si reduce motion
  */
 function inicializarFondoSpotlight(): void {
-    const fondo = document.querySelector('.st-fondo-puntos') as HTMLElement | null;
-    if (!fondo) {
-        return;
-    }
-
-    // EXPLICACIÓN PARA PRINCIPIANTES: si el SO pide menos animación,
-    // dejamos la grilla fija y no movemos el foco con el mouse.
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (reduceMotion.matches) {
-        return;
-    }
-
-    const onPointerMove = (evento: PointerEvent): void => {
-        actualizarSpotlight(fondo, evento.clientX, evento.clientY);
-    };
-
-    // En móvil: al soltar el dedo, ocultamos el halo cyan.
-    // En mouse: el clic (pointerup) NO apaga; solo mouseleave.
-    const onPointerUp = (evento: PointerEvent): void => {
-        if (evento.pointerType === 'touch' || evento.pointerType === 'pen') {
-            apagarSpotlight(fondo);
+    try {
+        const fondo = document.querySelector('.st-fondo-puntos') as HTMLElement | null;
+        if (!fondo) {
+            return;
         }
-    };
 
-    const onPointerLeave = (): void => {
-        apagarSpotlight(fondo);
-    };
+        // EXPLICACIÓN PARA PRINCIPIANTES: si el SO pide menos animación,
+        // dejamos la grilla fija y no movemos el foco con el mouse.
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (reduceMotion.matches) {
+            return;
+        }
 
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUp, { passive: true });
-    window.addEventListener('pointercancel', onPointerUp, { passive: true });
-    document.documentElement.addEventListener('mouseleave', onPointerLeave);
+        const onPointerMove = (evento: PointerEvent): void => {
+            actualizarSpotlight(fondo, evento.clientX, evento.clientY);
+        };
+
+        // En móvil: al soltar el dedo, ocultamos el halo cyan.
+        // En mouse: el clic (pointerup) NO apaga; solo mouseleave.
+        const onPointerUp = (evento: PointerEvent): void => {
+            if (evento.pointerType === 'touch' || evento.pointerType === 'pen') {
+                apagarSpotlight(fondo);
+            }
+        };
+
+        const onPointerLeave = (): void => {
+            apagarSpotlight(fondo);
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { passive: true });
+        window.addEventListener('pointerup', onPointerUp, { passive: true });
+        window.addEventListener('pointercancel', onPointerUp, { passive: true });
+        document.documentElement.addEventListener('mouseleave', onPointerLeave);
+    } catch (error) {
+        // Un fallo del spotlight no debe romper card/chat/timeline.
+        console.warn('[Seguimiento fondo] No se pudo iniciar el spotlight:', error);
+    }
 }
 
 // Arranque al cargar el DOM (script al final del body o DOMContentLoaded).
