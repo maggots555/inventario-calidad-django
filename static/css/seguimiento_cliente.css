@@ -1394,6 +1394,18 @@
   }
 }
 
+/* Touch / coarse: sin capas de spotlight (máscaras caras en GPU) */
+@media (pointer: coarse) {
+  .st-fondo-puntos::before,
+  .st-fondo-puntos::after,
+  .st-fondo-puntos[data-activo="1"]::before,
+  .st-fondo-puntos[data-activo="1"]::after {
+    content: none !important;
+    display: none !important;
+    opacity: 0 !important;
+  }
+}
+
 /* ============================================================
    DARK MODE - Seguimiento de cliente
    ============================================================ */

@@ -11,6 +11,7 @@
  *
  * Efectos: solo CSS variables en .st-fondo-puntos; no toca BD ni red.
  * Accesibilidad: si el usuario pide reducir movimiento, no seguimos el cursor.
+ * Móvil (pointer: coarse): no-op — el spotlight aporta poco y mueve máscaras caras.
  * Estabilidad: try/catch para que un fallo aquí no tumbe la página.
  */
 
@@ -64,12 +65,18 @@ function inicializarFondoSpotlight(): void {
             return;
         }
 
+        // En touch/móvil el spotlight mueve máscaras CSS caras y aporta poco.
+        const coarsePointer = window.matchMedia('(pointer: coarse)');
+        if (coarsePointer.matches) {
+            return;
+        }
+
         const onPointerMove = (evento: PointerEvent): void => {
             actualizarSpotlight(fondo, evento.clientX, evento.clientY);
         };
 
-        // En móvil: al soltar el dedo, ocultamos el halo cyan.
         // En mouse: el clic (pointerup) NO apaga; solo mouseleave.
+        // (Touch ya salió arriba con pointer: coarse.)
         const onPointerUp = (evento: PointerEvent): void => {
             if (evento.pointerType === 'touch' || evento.pointerType === 'pen') {
                 apagarSpotlight(fondo);

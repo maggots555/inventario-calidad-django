@@ -9,42 +9,145 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Seguimiento SIC">
   <title>Seguimiento de Orden — SIC</title>
-  <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
-  <!-- EXPLICACIÓN PARA PRINCIPIANTES:
-     1) CSS crítico inline: el body no pinta blanco mientras baja el CSS grande.
-     2) CSS del portal antes que Fonts: la UI se ve pronto.
-     3) Fonts con preconnect + link (no @import en el CSS). -->
-  <style>
-    html, body.st-body {
-      background: #0a1628;
-      margin: 0;
-    }
-    html[data-bs-theme="dark"], html[data-bs-theme="dark"] body.st-body {
-      background: #020617;
-    }
-    .st-card {
-      opacity: 1;
-      visibility: visible;
-    }
-  </style>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="{% static 'css/seguimiento_cliente.css' %}">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-  {% if estado != 'invalido' %}
-  <!-- Manifest PWA propio de este token (no el manifest global del sistema interno) -->
-  <link rel="manifest" href="{% url 'manifest_seguimiento' token=token %}">
-  {% endif %}
-  {# Script anti-flash: aplica el tema ANTES del render para evitar parpadeo blanco #}
+  {# Anti-flash de tema: lo PRIMERO, antes de pintar links/CSS #}
   <script>
     (function () {
       var t = localStorage.getItem('theme');
       if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.setAttribute('data-bs-theme', 'dark');
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', '#0f172a');
       }
     })();
   </script>
+  <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
+  {# EXPLICACIÓN PARA PRINCIPIANTES:
+     El CSS grande (~100KB) es render-blocking: el móvil espera y se ve blanco.
+     1) Este <style> pinta ya fondo + card + header (system fonts).
+     2) El CSS completo entra async (preload → stylesheet) y “pulirá” detalles.
+     3) Fonts van diferidas (no bloquean el primer paint). #}
+  <style>
+    html, body {
+      margin: 0;
+      background: #0a1628;
+      color: #1e293b;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    html[data-bs-theme="dark"],
+    html[data-bs-theme="dark"] body {
+      background: #020617;
+      color: #e2e8f0;
+    }
+    .st-body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: linear-gradient(150deg, #0a1628 0%, #0e2a45 25%, #0c3556 50%, #0a2f3d 75%, #071e2b 100%);
+      padding: env(safe-area-inset-top, 1rem) 1rem env(safe-area-inset-bottom, 1rem);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    html[data-bs-theme="dark"] .st-body {
+      background: linear-gradient(150deg, #020617 0%, #0a1628 25%, #0c1e33 50%, #071520 75%, #020617 100%);
+    }
+    .st-layout-wrapper {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      justify-content: center;
+    }
+    .st-layout-center {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .st-banner-slot--skyscraper {
+      display: none;
+    }
+    .st-card {
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-top: 2px solid rgba(56, 189, 248, 0.35);
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      max-width: 680px;
+      width: 100%;
+      margin: 1.5rem 0;
+      overflow: hidden;
+      opacity: 1;
+      visibility: visible;
+      position: relative;
+      z-index: 10;
+      box-sizing: border-box;
+    }
+    html[data-bs-theme="dark"] .st-card {
+      background: rgba(15, 23, 42, 0.97);
+      border-color: rgba(51, 65, 85, 0.8);
+    }
+    .st-card-header {
+      background: linear-gradient(135deg, #0c2d4a 0%, #0e4d6f 40%, #164e63 100%);
+      padding: 2rem 1.75rem 1.5rem;
+      text-align: center;
+      color: #fff;
+    }
+    html[data-bs-theme="dark"] .st-card-header {
+      background: linear-gradient(135deg, #06101f 0%, #0a2240 40%, #0a1e30 100%);
+    }
+    .st-header-logo { height: 42px; margin-bottom: 0.75rem; }
+    .st-header-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin: 0;
+      color: #fff;
+    }
+    .st-header-subtitle {
+      font-size: 0.82rem;
+      opacity: 0.75;
+      margin: 0.5rem 0 0;
+      color: #fff;
+    }
+    .st-fondo-puntos {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+  </style>
+  {# CSS completo: async — no bloquea el primer paint #}
+  <link rel="preload"
+        href="{% static 'css/seguimiento_cliente.css' %}"
+        as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="{% static 'css/seguimiento_cliente.css' %}">
+  </noscript>
+  <script>
+    /* Fallback si el navegador no dispara onload en preload-as-style */
+    (function () {
+      var links = document.querySelectorAll('link[rel="preload"][as="style"]');
+      for (var i = 0; i < links.length; i++) {
+        var l = links[i];
+        if (l.sheet) { l.rel = 'stylesheet'; }
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  {# Fonts diferidas: no bloquean paint; system-ui basta al inicio #}
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
+        rel="stylesheet"
+        media="print"
+        onload="this.media='all'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  </noscript>
+  {% if estado != 'invalido' %}
+  <!-- Manifest PWA propio de este token (no el manifest global del sistema interno) -->
+  <link rel="manifest" href="{% url 'manifest_seguimiento' token=token %}">
+  {% endif %}
 </head>
 <body class="st-body"{% if estado != 'invalido' %} data-eventos-url="{% url 'eventos_seguimiento_cliente' token=token %}"{% if url_diagnostico_pdf %} data-diagnostico-pdf-url="{{ url_diagnostico_pdf }}"{% endif %}{% endif %}>
 
