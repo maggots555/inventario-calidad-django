@@ -60,13 +60,22 @@ python scripts/poblado/poblar_scorecard.py
 ❌ NO hace falta suite pesada: solo docs; CSS cosmético; rename sin cambio de comportamiento;
    el usuario pide explícitamente no testear aún
 
-Mínimo: humo (resolve/reexport/import/status) → mejor 1 feliz + 1 borde
+Cuándo humo vs integración (usar solo lo necesario):
+- Humo (reexport + resolve/__module__/import): al extraer o crear views_*.py /
+  services/utils que urls.py consume vía fachada views.py
+- Integración (RequestFactory/Client + BD, mock .delay/IO): al tocar flujo de negocio
+  multi-paso (ej. cotización↔ST: aprobar → generar compras / vincular / rechazo)
+- Regla unitaria (modelo/util): si el cambio es solo una función/regla aislada
+
+Mínimo: humo si hubo modularización → mejor 1 feliz + 1 borde de negocio si aplica
 No enviar correos/PDF/FFmpeg reales en CI — mockear .delay() / IO
 Dónde: almacen/tests/ o servicio_tecnico/tests/ (no scripts sueltos salvo scripts/testing/)
 ```
 
 ```bash
 python manage.py test almacen
+python manage.py test almacen.tests.test_modularizacion_views
+python manage.py test almacen.tests.test_integracion_cotizacion_st
 python manage.py test almacen.tests.test_profit_cotizacion
 python manage.py test almacen.tests.test_sincronizar_componente_st
 python manage.py test almacen.tests.test_generar_compras_sin_orden
@@ -89,7 +98,7 @@ python manage.py test servicio_tecnico.tests
 - FBV preferidas; `get_object_or_404`; feedback con `messages`; URLs con nombre (`redirect` / `{% url %}`).
 - Models: docstring, `__str__()`, `Meta` con `verbose_name`.
 - Forms: widgets con clases Bootstrap (`form-control`, etc.).
-- Vistas nuevas de ST: módulo `views_*.py` + reexport (ver Modularidad), no hinchar `views.py`.
+- Vistas nuevas (ST y Almacén): módulo `views_*.py` + reexport (ver Modularidad); **no** hinchar `views.py`.
 
 **TypeScript:** ver §4 (única lista crítica). Tipado explícito; no `any`.
 
@@ -115,7 +124,7 @@ inventario-calidad-django/
 │   ├── plotly_visualizations.py, ml_*, ollama/gemini, sicser_*, utils_*
 │   └── ...
 ├── scorecard/
-├── almacen/                # cotizador; utils/; tests/ formales; tasks.py
+├── almacen/                # cotizador; views.py fachada; views_*.py; utils/; tests/; tasks.py
 ├── notificaciones/         # Push staff + cliente
 ├── static/
 │   ├── ts/                 # FUENTE (editar aquí) — módulos por feature, ver §5
@@ -158,22 +167,40 @@ inventario-calidad-django/
 - HSTS con `DEBUG=False`
 - Fetch/TS: leer cookie CSRF de producción (no asumir `csrftoken`)
 
-### Modularidad de vistas — no re-inflar monolitos (Julio 2026)
+### Modularidad de vistas — no re-inflar monolitos (Julio–Agosto 2026)
 
-**Contexto:** `servicio_tecnico/views.py` llegó a ~19 000 LOC; se modularizó (`views_*.py` + `services/` + reexports). Hoy es principalmente reexports + `detalle_orden`. Objetivo cumplido: archivos navegables.
+**CRITICAL — no agrandar vistas:** está **prohibido** seguir hinchando `views.py` (ni módulos `views_*.py` ya grandes) con features nuevas. Toda integración o función nueva debe nacer **modular**.
+
+**Contexto ST:** `servicio_tecnico/views.py` llegó a ~19 000 LOC; se modularizó (`views_*.py` + `services/` + reexports). Hoy es principalmente reexports + `detalle_orden`.
+
+**Contexto Almacén (Ago 2026):** `almacen/views.py` (~7400 LOC) se partió igual: fachada de reexports + `views_*.py` + helpers en `utils/`. `urls.py` sigue con `from . import views`.
 
 ```
 ❌ NUNCA features grandes en un views.py denso
-❌ NUNCA meter dashboards/AJAX/APIs nuevas en el monolito residual
+❌ NUNCA meter dashboards/AJAX/APIs/nuevas reglas en el monolito residual
+❌ NUNCA “solo una función más” en un views_*.py que ya pase ~800–1000 LOC
 ❌ NUNCA cambiar urls.py si views.py ya reexporta (salvo pedido explícito)
 ❌ NUNCA lógica de negocio en templates → services/ o utils/
 
-✅ Módulo hermano por dominio: views_mi_feature.py | services/mi_helper.py | tests/
-✅ Reexport desde views.py si urls usa views.foo
-✅ Preferir < ~800–1000 LOC; si crece, partir ANTES de seguir sumando
-✅ En services/: from servicio_tecnico.models import ... (NO from .models)
-✅ Comportamiento nuevo/cambiado → test (ver §1 Política de tests)
+✅ Módulo hermano por dominio: views_<dominio>.py + reexport en views.py
+✅ Lógica compartida / helpers: services/ (ST) o utils/ (Almacén y similares)
+✅ Evitar imports circulares: sacar helpers a utils/services ANTES de partir vistas
+✅ Preferir < ~800–1000 LOC por archivo; si crece, partir ANTES de seguir sumando
+✅ En ST services/: from servicio_tecnico.models import ... (NO from .models)
+✅ En Almacén utils/: from almacen.models import ... (patrón ya usado en sync/PDF)
+✅ Comportamiento nuevo/cambiado → test (humo y/o integración según §1)
 ```
+
+**Dónde va cada cosa (regla práctica):**
+
+| Pieza | Dónde |
+|-------|--------|
+| Vista HTTP (request → response) | `views_<dominio>.py` (ej. `views_cotizacion_cliente.py`) |
+| Helper/regla reutilizable sin HTTP | `services/` (ST) o `utils/` (Almacén) |
+| Decoradores de permiso/cache | `decorators.py` de la app |
+| Fachada para `urls.py` | `views.py` solo reexports (`# noqa: F401`) |
+
+**Servicio Técnico — mapa breve:**
 
 | Módulo | Dominio |
 |--------|---------|
@@ -185,7 +212,21 @@ inventario-calidad-django/
 | `services/` | historial, multimedia, notificaciones_piezas, ventas_mostrador_analytics |
 | `views.py` | reexports + `detalle_orden` |
 
-**Pendiente opcional (no urgente):** `detalle_orden` → `views_detalle_orden.py`; luego handlers por `form_type`. Features nuevas van a módulos propios.
+**Almacén — mapa breve (post-modularización):**
+
+| Módulo | Dominio |
+|--------|---------|
+| `views_catalogo.py` | dashboard, productos, proveedores, categorías, bajas, APIs producto |
+| `views_unidades.py` | UnidadInventario + APIs + buscar/crear orden |
+| `views_compras.py` | CompraProducto (lista, recibir, devoluciones) |
+| `views_solicitudes_cotizacion.py` | SolicitudCotizacion CRUD/detalle/servicios/imágenes |
+| `views_cotizacion_cliente.py` | envío cliente, PDF, respuestas, motivos rechazo |
+| `views_cotizacion_sync_st.py` | generar compras, vincular/crear orden FL |
+| `views_dashboard_distribucion.py` / `views_parametros_cotizador.py` | distribución + panel márgenes |
+| `utils/` | sync ST, PDF, profit/REAC, `cotizacion_reacondicionado_helpers` |
+| `views.py` | **solo** reexports (fachada) |
+
+**Pendiente opcional (no urgente):** ST `detalle_orden` → `views_detalle_orden.py`; luego handlers por `form_type`. Features nuevas van a módulos propios — **también en Almacén**.
 
 Misma idea en TS/CSS: no un único archivo gigante; no hinchar más `detalle_orden.html` con CSS/JS inline.
 
@@ -274,7 +315,7 @@ Banners: `BannerPromocional` + `banner_carousel.ts`.
 ✅ Al tocar cotizaciones/sync: python manage.py test almacen
 ```
 
-Archivos: `almacen/models.py`, `almacen/views.py` (`vincular_orden_solicitud`, `generar_compras_solicitud`, …), `almacen/utils/`.
+Archivos: `almacen/models.py`; vistas en `views_cotizacion_sync_st.py` / `views_cotizacion_cliente.py` / etc. (reexport vía `views.py`); `almacen/utils/`.
 
 ### Dark mode
 
@@ -348,8 +389,8 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 20. No writes inventados a SICSER
 21. Push solo en `ESTADOS_PUSH_*`
 22. CSRF prod = `sigma_csrftoken`
-23. No re-inflar monolitos de vistas — §4 Modularidad; en `services/` no `from .models`
-24. Comportamiento nuevo → test (§1); excepción: docs/CSS cosmético o pedido del usuario
+23. No re-inflar monolitos ni agrandar `views_*.py` — §4 Modularidad (ST y Almacén); helpers en `services/`/`utils/`
+24. Comportamiento nuevo → test humo y/o integración según §1; excepción: docs/CSS cosmético o pedido del usuario
 
 ---
 
@@ -432,7 +473,7 @@ Todas ya llevan `db_alias` en firma; nuevas igual.
 
 ---
 
-**Last Updated**: Julio 2026  
+**Last Updated**: Agosto 2026  
 **Django Version**: 5.2.14
 **Python Version**: 3.12+
 **TypeScript Version**: 5.9.3
