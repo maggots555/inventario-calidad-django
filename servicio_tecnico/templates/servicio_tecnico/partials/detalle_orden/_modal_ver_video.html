@@ -1,0 +1,50 @@
+{% comment %}
+  Partial de detalle_orden — _modal_ver_video.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================ -->
+<!-- MODAL: REPRODUCTOR DE VIDEO IN-APP (#modalVerVideo)         -->
+<!-- Fullscreen — video ocupa toda la pantalla (sin barras)      -->
+<!-- Evita abrir el navegador externo (rompe el PWA)             -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalVerVideo" tabindex="-1"
+     aria-labelledby="modalVerVideoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-black position-relative">
+
+            <!-- Cabecera flotante sobre el video: título + cerrar -->
+            <div class="modal-ver-video-header">
+                <span id="modalVerVideoTitulo" class="modal-ver-video-titulo">
+                    <i class="bi bi-play-circle-fill me-1"></i>Video
+                </span>
+                <button type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+            </div>
+
+            <!-- Video ocupa todo el espacio disponible -->
+            <div class="modal-body p-0 d-flex align-items-center justify-content-center"
+                 style="height:100%;">
+                <video id="modalVerVideoPlayer"
+                       controls
+                       playsinline
+                       preload="metadata"
+                       style="width:100%; height:100%; object-fit:contain; display:block;">
+                </video>
+            </div>
+
+        </div>
+    </div>
+</div><!-- /#modalVerVideo -->
+
+<!-- Botón flotante para ir a galería de imágenes -->
+<button id="btnIrGaleria" class="btn-ir-galeria" aria-label="Ir a Galería de Imágenes" title="Ver galería de imágenes">
+    <i class="bi bi-camera"></i>
+</button>
+
+<!-- Botón flotante para ir a galería de videos -->
+<button id="btnIrGaleriaVideo" class="btn-ir-galeria-video" aria-label="Ir a Galería de Videos" title="Ver galería de videos">
+    <i class="bi bi-camera-video"></i>
+</button>

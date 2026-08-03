@@ -1,0 +1,88 @@
+{% load static %}
+{% comment %}
+  Partial de detalle_orden — _modal_camara_integrada.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================ -->
+<!-- MODAL: VISOR DE CÁMARA INTEGRADO -->
+<!-- ============================================================ -->
+{# data-worker-url: URL del Web Worker JPEG (compresión en segundo plano). #}
+<div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static" data-worker-url="{% static 'js/jpeg_encode_worker.js' %}">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+            <div class="modal-header modal-header-camera text-white">
+                <h5 class="modal-title" id="modalCamaraIntegradaLabel">
+                    <i class="bi bi-camera-fill"></i> Capturar Imágenes
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" id="btnCerrarCamara"></button>
+            </div>
+            <div class="modal-body p-0 position-relative">
+                <!-- Visor de video de la cámara -->
+                <div class="camera-viewer-container">
+                    <video id="videoPreview" autoplay playsinline class="camera-video"></video>
+                    
+                    <!-- Canvas oculto para capturar frames -->
+                    <canvas id="canvasCaptura" class="d-none"></canvas>
+                    
+                    <!-- Overlay con información -->
+                    <div class="camera-overlay">
+                        <div class="camera-info">
+                            <!-- Badge circular: Cámara activa (F/T) estilo WhatsApp -->
+                            <div class="camera-badge-circle" id="badgeCamaraActiva">
+                                <i class="bi bi-camera-fill"></i>
+                                <span id="infoCamaras">T</span>
+                            </div>
+                            
+                            <!-- Badge circular: Contador de fotos estilo WhatsApp -->
+                            <div class="camera-badge-circle" id="badgeFotosTomadas">
+                                <i class="bi bi-check-lg"></i>
+                                <span id="contadorFotos">0</span>
+                            </div>
+                            
+                            <!-- Badge circular: Orientación detectada (DEBUG) -->
+                            <div class="camera-badge-circle" id="badgeOrientacion" title="Orientación del dispositivo">
+                                <i class="bi bi-phone"></i>
+                                <span id="infoOrientacion">0°</span>
+                            </div>
+                            
+                            <!-- Badge circular: Toggle manual de orientación (NUEVO) -->
+                            <div class="camera-badge-circle camera-badge-clickable" id="badgeToggleOrientacion" title="Cambiar orientación manualmente">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                <span id="infoModoOrientacion">🤖</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Selector de lentes (múltiples cámaras traseras) -->
+                        <div class="camera-lens-selector" id="selectorLentes" style="display: none;">
+                            <!-- Los botones se generan dinámicamente desde TypeScript -->
+                        </div>
+                    </div>
+                    
+                    <!-- Mensaje de error (oculto por defecto) -->
+                    <div class="camera-error" id="cameraError" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <p id="mensajeError">No se pudo acceder a la cámara</p>
+                        <small id="detalleError">Verifica los permisos del navegador</small>
+                    </div>
+                </div>
+                
+                <!-- Controles de la cámara -->
+                <div class="camera-controls">
+                    <button type="button" class="btn btn-lg btn-outline-light" id="btnCambiarCamara" title="Cambiar cámara">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    
+                    <button type="button" class="btn btn-capture" id="btnCapturar" title="Capturar foto">
+                        <i class="bi bi-circle"></i>
+                    </button>
+                    
+                    {# Sin data-bs-dismiss: finalizarCaptura espera encodes pendientes y luego cierra. #}
+                    <button type="button" class="btn btn-lg btn-success" id="btnFinalizarCaptura" title="Finalizar captura">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

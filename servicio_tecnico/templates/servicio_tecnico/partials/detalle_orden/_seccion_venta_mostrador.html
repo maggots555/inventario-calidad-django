@@ -1,0 +1,328 @@
+{% comment %}
+  Partial de detalle_orden — _seccion_venta_mostrador.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 3.5: GESTIÓN DE VENTA MOSTRADOR -->
+    <!-- SIEMPRE VISIBLE - UI Contextual según tipo_servicio (Refactor Oct 2025) -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card section-card">
+                <!-- HEADER CONTEXTUAL: Cambia color y texto según tipo de orden -->
+                <div class="section-header" style="background: {% if orden.tipo_servicio == 'diagnostico' %}#1e40af{% else %}#9a3412{% endif %};">
+                    {% if orden.tipo_servicio == 'diagnostico' %}
+                        <!-- UI para DIAGNÓSTICO: Ventas adicionales (complemento) -->
+                        <div class="d-flex justify-content-between align-items-center w-100">
+                            <div>
+                                <i class="bi bi-cart-plus"></i>
+                                💰 Ventas Adicionales de Mostrador
+                                {% if venta_mostrador %}
+                                    <span class="badge bg-light text-dark ms-2">{{ venta_mostrador.folio_venta }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-light text-dark">Complemento</span>
+                        </div>
+                    {% else %}
+                        <!-- UI para DIRECTO: Venta principal -->
+                        <div class="d-flex justify-content-between align-items-center w-100">
+                            <div>
+                                <i class="bi bi-shop"></i>
+                                🛒 Venta Mostrador Principal
+                                {% if venta_mostrador %}
+                                    <span class="badge bg-dark ms-2">{{ venta_mostrador.folio_venta }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-light text-dark">Servicio Directo</span>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    
+                    {% if not venta_mostrador %}
+                        <!-- ========================================== -->
+                        <!-- NO EXISTE VENTA MOSTRADOR - Mostrar botón crear -->
+                        <!-- ========================================== -->
+                        <div class="alert {% if orden.tipo_servicio == 'diagnostico' %}alert-info{% else %}alert-warning{% endif %} d-flex align-items-center mb-4">
+                            <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                            <div>
+                                {% if orden.tipo_servicio == 'diagnostico' %}
+                                    <h6 class="mb-1">Ventas Adicionales Opcionales</h6>
+                                    <p class="mb-0 small">
+                                        Si el cliente adquiere <strong>accesorios, kits, cables u otros productos</strong>
+                                        durante el diagnóstico o reparación, regístralos aquí como ventas complementarias.
+                                    </p>
+                                {% else %}
+                                    <h6 class="mb-1">No hay venta mostrador registrada para esta orden</h6>
+                                    <p class="mb-0 small">Crea una venta mostrador para servicios directos sin diagnóstico: instalación de piezas, reinstalación de SO, limpieza, etc.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button type="button" class="btn {% if orden.tipo_servicio == 'diagnostico' %}btn-outline-primary{% else %}btn-warning{% endif %} btn-lg" onclick="abrirModalVentaMostrador()">
+                                <i class="bi bi-plus-circle"></i>
+                                {% if orden.tipo_servicio == 'diagnostico' %}
+                                    Agregar Ventas Adicionales
+                                {% else %}
+                                    Crear Venta Mostrador
+                                {% endif %}
+                            </button>
+                        </div>
+                    
+                    {% else %}
+                        <!-- ========================================== -->
+                        <!-- EXISTE VENTA MOSTRADOR - Mostrar información -->
+                        <!-- ========================================== -->
+                        
+                        <div class="row mb-4">
+                            <!-- Panel Izquierdo: Información del Paquete -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #f6d365;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-box-seam"></i> Información del Paquete
+                                        </h6>
+                                        
+                                        <!-- Paquete Seleccionado -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Paquete:</label>
+                                            <div>
+                                                {% if venta_mostrador.paquete == 'premium' %}
+                                                    <span class="badge" style="background-color: #9b59b6; font-size: 1rem;">
+                                                        <i class="bi bi-star-fill"></i> PREMIUM
+                                                    </span>
+                                                {% elif venta_mostrador.paquete == 'oro' %}
+                                                    <span class="badge" style="background-color: #FFD700; color: #000; font-size: 1rem;">
+                                                        <i class="bi bi-trophy-fill"></i> ORO
+                                                    </span>
+                                                {% elif venta_mostrador.paquete == 'plata' %}
+                                                    <span class="badge" style="background-color: #C0C0C0; color: #000; font-size: 1rem;">
+                                                        <i class="bi bi-award-fill"></i> PLATA
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary" style="font-size: 1rem;">
+                                                        Sin Paquete
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Costo del Paquete -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Costo Paquete:</label>
+                                            <p class="mb-0"><strong>${{ venta_mostrador.costo_paquete|floatformat:2 }}</strong></p>
+                                        </div>
+                                        
+                                        <!-- Servicios Adicionales -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Servicios Adicionales:</label>
+                                            <ul class="list-unstyled mb-0">
+                                                {% if venta_mostrador.incluye_cambio_pieza %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Cambio de Pieza - <strong>${{ venta_mostrador.costo_cambio_pieza|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if venta_mostrador.incluye_limpieza %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Limpieza - <strong>${{ venta_mostrador.costo_limpieza|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if venta_mostrador.incluye_kit_limpieza %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Kit de Limpieza - <strong>${{ venta_mostrador.costo_kit|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if venta_mostrador.incluye_reinstalacion_so %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Reinstalación SO - <strong>${{ venta_mostrador.costo_reinstalacion|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if venta_mostrador.incluye_respaldo %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Respaldo de Información - <strong>${{ venta_mostrador.costo_respaldo|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if not venta_mostrador.incluye_cambio_pieza and not venta_mostrador.incluye_limpieza and not venta_mostrador.incluye_kit_limpieza and not venta_mostrador.incluye_reinstalacion_so and not venta_mostrador.incluye_respaldo %}
+                                                    <li class="text-muted"><em>Sin servicios adicionales</em></li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                        
+                                        <!-- Notas Adicionales -->
+                                        {% if venta_mostrador.notas_adicionales %}
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Notas:</label>
+                                                <p class="mb-0 small">{{ venta_mostrador.notas_adicionales }}</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Panel Derecho: Resumen Financiero -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #fda085;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-cash-stack"></i> Resumen Financiero
+                                        </h6>
+                                        
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td class="text-muted">Paquete Base:</td>
+                                                <td class="text-end"><strong>${{ venta_mostrador.costo_paquete|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% if venta_mostrador.incluye_cambio_pieza %}
+                                                <tr>
+                                                    <td class="text-muted">+ Cambio Pieza:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_cambio_pieza|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if venta_mostrador.incluye_limpieza %}
+                                                <tr>
+                                                    <td class="text-muted">+ Limpieza:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_limpieza|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if venta_mostrador.incluye_kit_limpieza %}
+                                                <tr>
+                                                    <td class="text-muted">+ Kit Limpieza:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_kit|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if venta_mostrador.incluye_reinstalacion_so %}
+                                                <tr>
+                                                    <td class="text-muted">+ Reinstalación SO:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_reinstalacion|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if venta_mostrador.incluye_respaldo %}
+                                                <tr>
+                                                    <td class="text-muted">+ Respaldo de Información:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_respaldo|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if piezas_venta_mostrador %}
+                                                <tr>
+                                                    <td class="text-muted">+ Piezas Vendidas:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.total_piezas_vendidas|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            <tr style="border-top: 2px solid #dee2e6;">
+                                                <td class="text-muted"><strong>TOTAL VENTA:</strong></td>
+                                                <td class="text-end">
+                                                    <h5 class="mb-0 text-warning" id="totalVentaMostrador">
+                                                        ${{ venta_mostrador.total_venta|floatformat:2 }}
+                                                    </h5>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Información de Comisión -->
+                                        {% if venta_mostrador.genera_comision %}
+                                            <div class="alert alert-success mt-3 mb-0">
+                                                <small>
+                                                    <i class="bi bi-percent"></i>
+                                                    <strong>Esta venta genera comisión</strong>
+                                                </small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabla de Piezas Vendidas -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-tools"></i> Piezas Vendidas Individualmente
+                                    <span class="badge bg-secondary">{{ piezas_venta_mostrador.count }}</span>
+                                </h6>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalPiezaVentaMostrador()">
+                                    <i class="bi bi-plus-circle"></i> Agregar Pieza
+                                </button>
+                            </div>
+                            
+                            {% if piezas_venta_mostrador %}
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0" id="tablaPiezasVentaMostrador">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Descripción</th>
+                                                    <th>Componente</th>
+                                                    <th class="text-center">Cantidad</th>
+                                                    <th class="text-end">Precio Unit.</th>
+                                                    <th class="text-end">Subtotal</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for pieza in piezas_venta_mostrador %}
+                                                    <tr data-pieza-id="{{ pieza.id }}">
+                                                        <td>
+                                                            <strong>{{ pieza.descripcion_pieza }}</strong>
+                                                            {% if pieza.notas %}
+                                                                <br><small class="text-muted">{{ pieza.notas|truncatewords:15 }}</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if pieza.componente %}
+                                                                <span class="badge bg-info">{{ pieza.componente.nombre }}</span>
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">{{ pieza.cantidad }}</td>
+                                                        <td class="text-end">${{ pieza.precio_unitario|floatformat:2 }}</td>
+                                                        <td class="text-end"><strong>${{ pieza.subtotal|floatformat:2 }}</strong></td>
+                                                        <td class="text-center">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                                                                    onclick="editarPiezaVentaMostrador({{ pieza.id }})" 
+                                                                    title="Editar">
+                                                                📝
+                                                            </button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                                    onclick="eliminarPiezaVentaMostrador({{ pieza.id }})" 
+                                                                    title="Eliminar">
+                                                                🗑️
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-inbox" style="font-size: 3rem;"></i><br>
+                                        No hay piezas vendidas individualmente
+                                    </p>
+                                    <button type="button" class="btn btn-primary" onclick="abrirModalPiezaVentaMostrador()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primera Pieza
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- ⛔ BOTÓN DE CONVERSIÓN ELIMINADO (Oct 2025) -->
+                        <!-- Venta mostrador ahora es complemento opcional, no requiere conversión -->
+                    
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    

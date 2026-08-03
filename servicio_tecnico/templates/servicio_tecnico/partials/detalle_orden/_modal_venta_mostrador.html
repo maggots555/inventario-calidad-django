@@ -1,0 +1,168 @@
+{% comment %}
+  Partial de detalle_orden — _modal_venta_mostrador.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================================ -->
+<!-- MODAL: CREAR/EDITAR VENTA MOSTRADOR -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalVentaMostrador" tabindex="-1" aria-labelledby="modalVentaMostradorLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header text-white venta-mostrador-header">
+                <h5 class="modal-title" id="modalVentaMostradorLabel">
+                    <i class="bi bi-shop"></i> <span id="modalVentaMostradorTitulo">Crear Venta Mostrador</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formVentaMostrador">
+                {% csrf_token %}
+                
+                <div class="modal-body">
+                    <!-- Alerta de errores (oculta por defecto) -->
+                    <div class="alert alert-danger d-none" id="alertErroresVentaMostrador" role="alert">
+                        <strong>❌ Errores:</strong>
+                        <ul id="listaErroresVentaMostrador" class="mb-0"></ul>
+                    </div>
+                    
+                    <!-- Selección de Paquete -->
+                    <div class="mb-4 p-3 venta-paquete-section">
+                        <h6 class="mb-3">
+                            <i class="bi bi-box-seam"></i> Selección de Paquete
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="id_paquete_venta" class="form-label">
+                                Paquete <span class="text-danger">*</span>
+                            </label>
+                            {{ form_venta_mostrador.paquete }}
+                        </div>
+
+                        <!-- Campo de precio abierto para el paquete -->
+                        <div id="divCostoPaquete" style="display: none;" class="mb-3">
+                            <label for="id_costo_paquete" class="form-label small">
+                                Precio del Paquete <span class="text-danger">*</span>
+                            </label>
+                            {{ form_venta_mostrador.costo_paquete }}
+                            <div class="form-text text-muted small">El precio sugerido se carga automáticamente, puedes modificarlo.</div>
+                        </div>
+
+                        <!-- Descripciones de paquetes -->
+                        <div id="descripcionPaquete" class="alert alert-info small mb-0" style="display: none;">
+                            <div id="textoPaquete"></div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Servicios Adicionales -->
+                    <h6 class="mb-3">
+                        <i class="bi bi-plus-circle"></i> Servicios Adicionales
+                    </h6>
+                    
+                    <div class="row">
+                        <!-- Cambio de Pieza -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_cambio_pieza }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_cambio_pieza.id_for_label }}">
+                                    🔧 Cambio de Pieza
+                                </label>
+                            </div>
+                            <div id="divCostoCambioPieza" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_cambio_pieza.id_for_label }}" class="form-label small">
+                                    Costo de Cambio de Pieza <span class="text-danger">*</span>
+                                </label>
+                                {{ form_venta_mostrador.costo_cambio_pieza }}
+                            </div>
+                        </div>
+                        
+                        <!-- Limpieza -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_limpieza }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_limpieza.id_for_label }}">
+                                    🧹 Limpieza de Equipo
+                                </label>
+                            </div>
+                            <div id="divCostoLimpieza" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_limpieza.id_for_label }}" class="form-label small">
+                                    Costo de Limpieza <span class="text-danger">*</span>
+                                </label>
+                                {{ form_venta_mostrador.costo_limpieza }}
+                            </div>
+                        </div>
+                        
+                        <!-- Kit de Limpieza -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_kit_limpieza }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_kit_limpieza.id_for_label }}">
+                                    🧼 Kit de Limpieza
+                                </label>
+                            </div>
+                            <div id="divCostoKit" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_kit.id_for_label }}" class="form-label small">
+                                    Costo del Kit <span class="text-danger">*</span>
+                                </label>
+                                {{ form_venta_mostrador.costo_kit }}
+                            </div>
+                        </div>
+                        
+                        <!-- Reinstalación SO -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_reinstalacion_so }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_reinstalacion_so.id_for_label }}">
+                                    🖥️ Reinstalación de Sistema Operativo
+                                </label>
+                            </div>
+                            <div id="divCostoReinstalacion" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_reinstalacion.id_for_label }}" class="form-label small">
+                                    Costo de Reinstalación <span class="text-danger">*</span>
+                                </label>
+                                {{ form_venta_mostrador.costo_reinstalacion }}
+                            </div>
+                        </div>
+                        
+                        <!-- Respaldo de Información -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_respaldo }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_respaldo.id_for_label }}">
+                                    💾 Respaldo de Información
+                                </label>
+                            </div>
+                            <div id="divCostoRespaldo" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_respaldo.id_for_label }}" class="form-label small">
+                                    Costo del Respaldo <span class="text-danger">*</span>
+                                </label>
+                                {{ form_venta_mostrador.costo_respaldo }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Notas Adicionales -->
+                    <div class="mb-3">
+                        <label for="{{ form_venta_mostrador.notas_adicionales.id_for_label }}" class="form-label">
+                            <i class="bi bi-sticky"></i> Notas Adicionales
+                        </label>
+                        {{ form_venta_mostrador.notas_adicionales }}
+                        <small class="form-text text-muted">Información adicional sobre la venta</small>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-check-circle"></i> Crear Venta Mostrador
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

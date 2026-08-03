@@ -1,0 +1,83 @@
+{% comment %}
+  Partial de detalle_orden — _modal_confirmar_feedback.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE ENVÍO DE FEEDBACK DE RECHAZO -->
+<!-- ============================================================ -->
+<!-- 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modal aparece DESPUÉS de que el operador registra un rechazo de cotización.
+    Le permite OPTAR por enviar o NO el correo de feedback al cliente.
+    
+    FLUJO:
+    1. Operador guarda rechazo en formulario
+    2. Backend crea FeedbackCliente con token
+    3. Backend guarda ID y email en sesión (feedback_pendiente_id, feedback_pendiente_email)
+    4. Vista redirect a detalle_orden con esos valores en contexto
+    5. Este modal se muestra automáticamente (JavaScript detecta la variable)
+    6. Operador decide: "Enviar correo" o "Cancelar"
+-->
+{% if feedback_pendiente_id and feedback_pendiente_email %}
+<div class="modal fade" id="modalConfirmarFeedback" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-left: 5px solid #0d6efd;">
+            <div class="modal-header modal-header-purple text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-envelope-paper"></i> Enviar Feedback al Cliente
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3" style="border-left: 4px solid #0dcaf0;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>Sistema de Feedback de Rechazo</strong>
+                    <p class="mb-0 mt-2 small">
+                        El sistema ha preparado un correo para solicitar la opinión del cliente 
+                        sobre por qué rechazó la cotización. Esto nos ayuda a mejorar.
+                    </p>
+                </div>
+                
+                <p class="mb-2">
+                    <strong><i class="bi bi-envelope"></i> Destinatario:</strong><br>
+                    <code class="bg-light p-2 d-inline-block rounded">{{ feedback_pendiente_email }}</code>
+                </p>
+                
+                <p class="mb-3">
+                    <strong><i class="bi bi-file-text"></i> Contenido del correo:</strong>
+                </p>
+                <ul class="small text-muted">
+                    <li>Link personalizado y seguro (válido 7 días)</li>
+                    <li>Solicitud de comentario sobre el motivo del rechazo</li>
+                    <li>Información del equipo para contexto</li>
+                    <li>Límite de 1000 caracteres para el comentario</li>
+                </ul>
+                
+                <div class="alert alert-warning mb-0 mt-3" style="border-left: 4px solid #ffc107;">
+                    <small>
+                        <i class="bi bi-lightning-fill"></i>
+                        <strong>Nota:</strong> El envío es opcional. Si prefieres NO enviar el correo, 
+                        simplemente cancela. El rechazo ya ha sido registrado.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_feedback' feedback_pendiente_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="cancelar">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> No Enviar Correo
+                    </button>
+                </form>
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_feedback' feedback_pendiente_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="enviar">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send-fill"></i> Enviar Correo al Cliente
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

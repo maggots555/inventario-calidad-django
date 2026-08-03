@@ -1,0 +1,35 @@
+{% comment %}
+  Partial de detalle_orden — _modal_confirmacion_salida_camara.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE SALIDA DE CÁMARA CON FOTOS PENDIENTES -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalConfirmacionSalidaCamara" tabindex="-1" aria-labelledby="modalConfirmacionSalidaCamaraLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-warning">
+                <h5 class="modal-title" id="modalConfirmacionSalidaCamaraLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i> ¿Salir sin guardar?
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">
+                    <strong>Tienes <span id="cantidadFotosPendientes">0</span> foto(s) capturada(s) sin finalizar.</strong>
+                </p>
+                <p class="text-muted mt-2 mb-0">
+                    Si sales ahora, las fotos capturadas se descartarán y tendrás que volver a tomarlas.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-left"></i> Volver a la cámara
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarSalida">
+                    <i class="bi bi-trash"></i> Salir y descartar fotos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

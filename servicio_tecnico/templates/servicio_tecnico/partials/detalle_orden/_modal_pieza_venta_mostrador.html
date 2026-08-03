@@ -1,0 +1,104 @@
+{% comment %}
+  Partial de detalle_orden — _modal_pieza_venta_mostrador.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================================ -->
+<!-- MODAL: AGREGAR/EDITAR PIEZA VENTA MOSTRADOR -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalPiezaVentaMostrador" tabindex="-1" aria-labelledby="modalPiezaVentaMostradorLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-primary text-white">
+                <h5 class="modal-title" id="modalPiezaVentaMostradorLabel">
+                    <i class="bi bi-tools"></i> <span id="modalPiezaVentaMostradorTitulo">Agregar Pieza</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formPiezaVentaMostrador">
+                {% csrf_token %}
+                <input type="hidden" id="piezaVentaMostradorId" name="pieza_id" value="">
+                
+                <div class="modal-body">
+                    <!-- Alerta de errores (oculta por defecto) -->
+                    <div class="alert alert-danger d-none" id="alertErroresPiezaVentaMostrador" role="alert">
+                        <strong>❌ Errores:</strong>
+                        <ul id="listaErroresPiezaVentaMostrador" class="mb-0"></ul>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Componente (opcional) -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form_pieza_venta_mostrador.componente.id_for_label }}" class="form-label">
+                                {{ form_pieza_venta_mostrador.componente.label }}
+                                <small class="text-muted">(opcional)</small>
+                            </label>
+                            {{ form_pieza_venta_mostrador.componente }}
+                            <small class="form-text text-muted">Si la pieza está en el catálogo, selecciónala aquí</small>
+                        </div>
+                        
+                        <!-- Descripción (obligatorio) -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form_pieza_venta_mostrador.descripcion_pieza.id_for_label }}" class="form-label">
+                                {{ form_pieza_venta_mostrador.descripcion_pieza.label }} 
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form_pieza_venta_mostrador.descripcion_pieza }}
+                            <small class="form-text text-muted">Ej: RAM 8GB DDR4 Kingston, Cable HDMI 2m</small>
+                        </div>
+                        
+                        <!-- Cantidad -->
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form_pieza_venta_mostrador.cantidad.id_for_label }}" class="form-label">
+                                {{ form_pieza_venta_mostrador.cantidad.label }} 
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form_pieza_venta_mostrador.cantidad }}
+                        </div>
+                        
+                        <!-- Precio Unitario -->
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form_pieza_venta_mostrador.precio_unitario.id_for_label }}" class="form-label">
+                                {{ form_pieza_venta_mostrador.precio_unitario.label }} 
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form_pieza_venta_mostrador.precio_unitario }}
+                        </div>
+                        
+                        <!-- Subtotal (calculado) -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Subtotal</label>
+                            <div class="form-control-plaintext bg-light p-2 text-center rounded">
+                                <strong id="subtotalPiezaVentaMostrador">$0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label for="{{ form_pieza_venta_mostrador.notas.id_for_label }}" class="form-label">
+                            {{ form_pieza_venta_mostrador.notas.label }}
+                        </label>
+                        {{ form_pieza_venta_mostrador.notas }}
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> <span id="btnPiezaVentaMostradorTexto">Agregar Pieza</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================ -->
+<!-- ⛔ MODAL DE CONVERSIÓN A DIAGNÓSTICO ELIMINADO (Oct 2025) -->
+<!-- Funcionalidad eliminada: Venta mostrador ahora es complemento opcional -->
+<!-- ============================================================================ -->
+
+<!-- ============================================================================ -->

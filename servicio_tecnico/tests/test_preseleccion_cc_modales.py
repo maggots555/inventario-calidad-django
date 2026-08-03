@@ -165,18 +165,30 @@ class PreseleccionCcLogicaTest(SimpleTestCase):
 class PreseleccionCcTemplateHumoTest(SimpleTestCase):
     """
     Humo: el HTML real de detalle_orden incluye la regla MIS en los 3 modales.
+
+    EXPLICACIÓN PARA PRINCIPIANTES (Fase A):
+    El markup de los modales ya no vive solo en detalle_orden.html; está en
+    partials/detalle_orden/. Por eso leemos el orquestador + todos los partials.
     """
 
     def test_tres_modales_tienen_regla_carry_in_mis(self):
-        # EXPLICACIÓN PARA PRINCIPIANTES: leemos el archivo del template y
-        # buscamos que cada modal (diag / img / videos) tenga el elif de MIS.
-        ruta = (
+        # EXPLICACIÓN PARA PRINCIPIANTES: juntamos el HTML del orquestador y
+        # de los partials, y buscamos que cada modal tenga el elif de MIS.
+        base = (
             Path(__file__).resolve().parents[1]
             / 'templates'
             / 'servicio_tecnico'
-            / 'detalle_orden.html'
         )
-        contenido = ruta.read_text(encoding='utf-8')
+        trozos = [(base / 'detalle_orden.html').read_text(encoding='utf-8')]
+        partials_dir = base / 'partials' / 'detalle_orden'
+        # Si aún no existiera la carpeta (regresión), el test debe fallar claro.
+        self.assertTrue(
+            partials_dir.is_dir(),
+            'Faltan partials/detalle_orden/ (Fase A de modularización del template)',
+        )
+        for ruta in sorted(partials_dir.glob('_*.html')):
+            trozos.append(ruta.read_text(encoding='utf-8'))
+        contenido = '\n'.join(trozos)
 
         # Cada bloque de checkbox debe incluir la condición CARRY IN + es_mis
         self.assertIn("id=\"diag_emp_{{ empleado.id }}\"", contenido)

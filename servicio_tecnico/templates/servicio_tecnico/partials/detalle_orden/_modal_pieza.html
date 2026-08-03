@@ -1,0 +1,138 @@
+{% comment %}
+  Partial de detalle_orden — _modal_pieza.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================================ -->
+<!-- MODAL: GESTIONAR PIEZA COTIZADA (Agregar/Editar) -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalPieza" tabindex="-1" aria-labelledby="modalPiezaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-header-primary text-white">
+                <h5 class="modal-title" id="modalPiezaLabel">
+                    <i class="bi bi-gear"></i> <span id="modalPiezaTitulo">Agregar Pieza</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formPieza">
+                {% csrf_token %}
+                <input type="hidden" id="piezaId" name="pieza_id" value="">
+                
+                <div class="modal-body">
+                    <!-- Alerta de errores (oculta por defecto) -->
+                    <div class="alert alert-danger d-none" id="alertErroresPieza" role="alert">
+                        <strong>❌ Errores:</strong>
+                        <ul id="listaErroresPieza" class="mb-0"></ul>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Columna izquierda -->
+                        <div class="col-md-6">
+                            <!-- Componente -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.componente.id_for_label }}" class="form-label">
+                                    {{ form_pieza.componente.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form_pieza.componente }}
+                                {% if form_pieza.componente.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.componente.help_text }}</small>
+                                {% endif %}
+                                {% if form_pieza.componente.errors %}
+                                    <div class="text-danger small">{{ form_pieza.componente.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Cantidad -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.cantidad.id_for_label }}" class="form-label">
+                                    {{ form_pieza.cantidad.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form_pieza.cantidad }}
+                                {% if form_pieza.cantidad.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.cantidad.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Costo Unitario -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.costo_unitario.id_for_label }}" class="form-label">
+                                    {{ form_pieza.costo_unitario.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form_pieza.costo_unitario }}
+                                {% if form_pieza.costo_unitario.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.costo_unitario.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- ✨ NUEVO: Proveedor (Noviembre 2025) -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.proveedor.id_for_label }}" class="form-label">
+                                    {{ form_pieza.proveedor.label }}
+                                </label>
+                                {{ form_pieza.proveedor }}
+                                {% if form_pieza.proveedor.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.proveedor.help_text }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Columna derecha -->
+                        <div class="col-md-6">
+                            <!-- Orden de Prioridad -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.orden_prioridad.id_for_label }}" class="form-label">
+                                    {{ form_pieza.orden_prioridad.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form_pieza.orden_prioridad }}
+                                {% if form_pieza.orden_prioridad.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.orden_prioridad.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Es Necesaria -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form_pieza.es_necesaria }}
+                                    <label class="form-check-label" for="{{ form_pieza.es_necesaria.id_for_label }}">
+                                        {{ form_pieza.es_necesaria.label }}
+                                    </label>
+                                </div>
+                                {% if form_pieza.es_necesaria.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.es_necesaria.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Sugerida por Técnico -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    {{ form_pieza.sugerida_por_tecnico }}
+                                    <label class="form-check-label" for="{{ form_pieza.sugerida_por_tecnico.id_for_label }}">
+                                        {{ form_pieza.sugerida_por_tecnico.label }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Descripción Adicional (full width) -->
+                    <div class="mb-3">
+                        <label for="{{ form_pieza.descripcion_adicional.id_for_label }}" class="form-label">
+                            {{ form_pieza.descripcion_adicional.label }}
+                        </label>
+                        {{ form_pieza.descripcion_adicional }}
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> <span id="btnPiezaTexto">Agregar Pieza</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

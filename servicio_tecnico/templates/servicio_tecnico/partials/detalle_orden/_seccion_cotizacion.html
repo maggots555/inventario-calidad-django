@@ -1,0 +1,855 @@
+{% comment %}
+  Partial de detalle_orden — _seccion_cotizacion.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 3: GESTIÓN DE COTIZACIÓN -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header" style="background: #065f46;">
+                    <i class="bi bi-currency-dollar"></i>
+                    Gestión de Cotización
+                </div>
+                <div class="card-body">
+                    
+                    {% if not cotizacion %}
+                        <!-- ========================================== -->
+                        <!-- NO EXISTE COTIZACIÓN: MO en la orden + Generar -->
+                        <!-- EXPLICACIÓN: La mano de obra se guarda en la -->
+                        <!-- orden sin crear cotización ni cambiar estado. -->
+                        <!-- "Generar cotización" crea Cotizacion y copia MO. -->
+                        <!-- ========================================== -->
+                        <div class="alert alert-info d-flex align-items-center mb-4">
+                            <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                            <div>
+                                <h6 class="mb-1">Mano de obra y cotización (pasos separados)</h6>
+                                <p class="mb-0 small">
+                                    Primero registra la <strong>mano de obra</strong> (queda en la orden).
+                                    Cuando quieras abrir la cotización para agregar piezas, usa
+                                    <strong>Generar cotización</strong>. El estado de la orden
+                                    <em>no</em> cambia automáticamente.
+                                </p>
+                            </div>
+                        </div>
+
+                        {# EXPLICACIÓN PARA PRINCIPIANTES:                                    #}
+                        {# Son DOS formularios (Guardar MO vs Generar cotización).             #}
+                        {# HTML no permite anidar <form>, así que van en columnas Bootstrap   #}
+                        {# (~1/3 textbox | ~1/3 Guardar | ~1/3 Generar) para llenar el ancho. #}
+                        <label
+                            {% if form_guardar_mano_obra %}
+                                for="{{ form_guardar_mano_obra.costo_mano_obra.id_for_label }}"
+                            {% else %}
+                                for="id_costo_mano_obra"
+                            {% endif %}
+                            class="form-label">
+                            <i class="bi bi-tools"></i>
+                            {% if form_guardar_mano_obra %}
+                                {{ form_guardar_mano_obra.costo_mano_obra.label }}
+                            {% else %}
+                                Costo de Mano de Obra
+                            {% endif %}
+                        </label>
+
+                        {% if form_guardar_mano_obra %}
+                            {{ form_guardar_mano_obra.costo_mano_obra.errors }}
+                        {% endif %}
+
+                        <div class="row g-2 align-items-center mb-1">
+                            {# Form 1 ocupa 8/12: mitad textbox + mitad botón Guardar #}
+                            <div class="col-12 col-md-8">
+                                <form method="post" id="formGuardarManoObra" class="row g-2 align-items-center">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="guardar_mano_obra">
+                                    <div class="col-sm-6">
+                                        {% if form_guardar_mano_obra %}
+                                            {{ form_guardar_mano_obra.costo_mano_obra }}
+                                        {% else %}
+                                            <input type="number" name="costo_mano_obra" id="id_costo_mano_obra"
+                                                   class="form-control" step="0.01" min="0"
+                                                   value="{{ orden.costo_mano_obra|floatformat:2 }}" required>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <button type="submit" class="btn btn-outline-primary w-100">
+                                            <i class="bi bi-save"></i> Guardar mano de obra
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {# Form 2 ocupa 4/12: Generar a todo el ancho de su columna #}
+                            <div class="col-12 col-md-4">
+                                <form method="post" id="formGenerarCotizacion" class="w-100"
+                                      onsubmit="return confirm('¿Generar la cotización con la mano de obra registrada? El estado de la orden no cambiará automáticamente.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="generar_cotizacion">
+                                    <input type="hidden" name="costo_mano_obra" id="hiddenCostoManoObraGenerar"
+                                           value="{{ orden.costo_mano_obra|floatformat:2 }}">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="bi bi-plus-circle"></i> Generar cotización
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <small class="text-muted d-block">
+                            {% if form_guardar_mano_obra %}
+                                {{ form_guardar_mano_obra.costo_mano_obra.help_text }}
+                            {% else %}
+                                Costo del servicio técnico (diagnóstico + reparación). Se guarda en la orden; al generar la cotización se copia automáticamente.
+                            {% endif %}
+                        </small>
+                        <small class="text-muted d-block mt-1">
+                            <strong>Generar cotización</strong> crea el registro y habilita agregar piezas.
+                            Si Almacén ya vinculó una solicitud, la cotización puede existir sin este botón.
+                        </small>
+
+                        <script>
+                        // EXPLICACIÓN: Al generar, copiamos el valor visible del input de MO
+                        // por si el técnico lo cambió sin pulsar "Guardar" antes.
+                        (function () {
+                            var formGen = document.getElementById('formGenerarCotizacion');
+                            var formMo = document.getElementById('formGuardarManoObra');
+                            var hidden = document.getElementById('hiddenCostoManoObraGenerar');
+                            if (formGen && formMo && hidden) {
+                                formGen.addEventListener('submit', function () {
+                                    var inputMo = formMo.querySelector('[name="costo_mano_obra"]');
+                                    if (inputMo) {
+                                        hidden.value = inputMo.value;
+                                    }
+                                });
+                            }
+                        })();
+                        </script>
+
+                    {% else %}
+                        <!-- ========================================== -->
+                        <!-- EXISTE COTIZACIÓN - Mostrar información -->
+                        <!-- ========================================== -->
+                        
+                        <div class="row mb-4">
+                            <!-- Panel Izquierdo: Estado y Decisión -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #f093fb;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-clipboard-check"></i> Estado de la Cotización
+                                        </h6>
+                                        
+                                        <!-- Estado Actual -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Decisión del Cliente:</label>
+                                            <div>
+                                                {% if cotizacion.usuario_acepto is None %}
+                                                    <span class="badge bg-warning text-dark" style="font-size: 1rem;">
+                                                        <i class="bi bi-hourglass-split"></i> Sin Respuesta
+                                                    </span>
+                                                {% elif cotizacion.usuario_acepto %}
+                                                    <span class="badge bg-success" style="font-size: 1rem;">
+                                                        <i class="bi bi-check-circle-fill"></i> ACEPTADA
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-danger" style="font-size: 1rem;">
+                                                        <i class="bi bi-x-circle-fill"></i> RECHAZADA
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Fecha de Envío (editable) -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Fecha de Envío:</label>
+                                            <form method="post" class="d-flex align-items-center gap-2" id="formEditarFechaEnvio">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="form_type" value="editar_fecha_envio">
+                                                <input type="datetime-local" 
+                                                       name="fecha_envio" 
+                                                       class="form-control form-control-sm" 
+                                                       style="max-width: 220px;"
+                                                       value="{{ cotizacion.fecha_envio|date:'Y-m-d\TH:i' }}">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm" title="Guardar fecha">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <small class="text-muted">Editable para ajustar métricas</small>
+                                        </div>
+                                        
+                                        {% if cotizacion.fecha_respuesta %}
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Fecha de Respuesta:</label>
+                                                <p class="mb-0"><strong>{{ cotizacion.fecha_respuesta|date:"d/m/Y H:i" }}</strong></p>
+                                            </div>
+                                        {% else %}
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Días sin Respuesta:</label>
+                                                <p class="mb-0">
+                                                    <span class="badge {% if cotizacion.dias_sin_respuesta > 7 %}bg-danger{% elif cotizacion.dias_sin_respuesta > 3 %}bg-warning{% else %}bg-info{% endif %}">
+                                                        {{ cotizacion.dias_sin_respuesta }} día{{ cotizacion.dias_sin_respuesta|pluralize }}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- Información de Rechazo (si aplica) -->
+                                        {% if not cotizacion.usuario_acepto and cotizacion.usuario_acepto is not None %}
+                                            <div class="alert alert-danger mt-3">
+                                                <strong><i class="bi bi-exclamation-triangle"></i> Motivo del Rechazo:</strong><br>
+                                                {{ cotizacion.get_motivo_rechazo_display }}
+                                                {% if cotizacion.detalle_rechazo %}
+                                                    <br><small>{{ cotizacion.detalle_rechazo }}</small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- Formulario de Gestión (Solo si sin respuesta) -->
+                                        {% if cotizacion.usuario_acepto is None and form_gestionar_cotizacion %}
+                                            <hr>
+                                            <h6 class="mb-3"><i class="bi bi-hand-index"></i> Registrar Decisión del Cliente</h6>
+                                            
+                                            <form method="post" id="formGestionarCotizacion">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="form_type" value="gestionar_cotizacion">
+                                                
+                                                <!-- Acción: Aceptar o Rechazar -->
+                                                <div class="mb-3">
+                                                    {{ form_gestionar_cotizacion.accion.errors }}
+                                                    <label class="form-label">{{ form_gestionar_cotizacion.accion.label }}</label>
+                                                    <div class="d-flex gap-3">
+                                                        {% for radio in form_gestionar_cotizacion.accion %}
+                                                            <div class="form-check">
+                                                                {{ radio.tag }}
+                                                                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                                                    {% if 'aceptar' in radio.choice_value %}
+                                                                        <i class="bi bi-check-circle text-success"></i> {{ radio.choice_label }}
+                                                                    {% else %}
+                                                                        <i class="bi bi-x-circle text-danger"></i> {{ radio.choice_label }}
+                                                                    {% endif %}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- 🆕 NUEVO: Descuento de Mano de Obra (solo visible al aceptar) -->
+                                                <div id="divDescontoManoObra" style="display: none;">
+                                                    <div class="alert alert-success mb-3" style="border-left: 4px solid #28a745;">
+                                                        <div class="form-check">
+                                                            {{ form_gestionar_cotizacion.descontar_mano_obra }}
+                                                            <label for="id_descontar_mano_obra" class="form-check-label">
+                                                                <strong>{{ form_gestionar_cotizacion.descontar_mano_obra.label }}</strong>
+                                                                <br>
+                                                                <small class="text-muted">
+                                                                    💵 Costo actual de mano de obra: <strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong>
+                                                                    - Si activas esta opción, el diagnóstico será gratuito
+                                                                </small>
+                                                            </label>
+                                                        </div>
+                                                        <div class="mt-3 p-2" style="background-color: rgba(255,255,255,0.6); border-radius: 6px;">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <span class="text-muted">💰 Total con piezas:</span>
+                                                                <span id="totalSinDescuento" class="fw-bold">
+                                                                    ${{ cotizacion.costo_total_piezas|add:cotizacion.costo_mano_obra|floatformat:2 }}
+                                                                </span>
+                                                            </div>
+                                                            <div class="d-flex justify-content-between align-items-center mt-1" id="filaDescuento" style="display:none;">
+                                                                <span class="text-danger">✂️ Descuento mano de obra:</span>
+                                                                <span class="text-danger fw-bold">-${{ cotizacion.costo_mano_obra|floatformat:2 }}</span>
+                                                            </div>
+                                                            <hr class="my-2" id="separadorTotal" style="display:none;">
+                                                            <div class="d-flex justify-content-between align-items-center" id="filaTotalFinal" style="display:none;">
+                                                                <span class="text-success fw-bold">🎁 TOTAL A PAGAR:</span>
+                                                                <span class="text-success fw-bold fs-5" id="totalConDescuento">
+                                                                    ${{ cotizacion.costo_total_piezas|floatformat:2 }}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Campos de Rechazo (solo visibles si rechaza) -->
+                                                <div id="camposRechazo" style="display: none;">
+                                                    <div class="mb-3">
+                                                        {{ form_gestionar_cotizacion.motivo_rechazo.errors }}
+                                                        <label for="{{ form_gestionar_cotizacion.motivo_rechazo.id_for_label }}" class="form-label">
+                                                            {{ form_gestionar_cotizacion.motivo_rechazo.label }}
+                                                        </label>
+                                                        {{ form_gestionar_cotizacion.motivo_rechazo }}
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        {{ form_gestionar_cotizacion.detalle_rechazo.errors }}
+                                                        <label for="{{ form_gestionar_cotizacion.detalle_rechazo.id_for_label }}" class="form-label">
+                                                            {{ form_gestionar_cotizacion.detalle_rechazo.label }}
+                                                        </label>
+                                                        {{ form_gestionar_cotizacion.detalle_rechazo }}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="d-grid">
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="bi bi-save"></i> Guardar Decisión
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Panel Derecho: Resumen Financiero -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #4facfe;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-cash-stack"></i> Resumen Financiero
+                                        </h6>
+                                        
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td class="text-muted">Mano de Obra:</td>
+                                                <td class="text-end">
+                                                    <form method="post" class="d-inline-flex align-items-center gap-1" id="formEditarManoObra">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="form_type" value="editar_mano_obra">
+                                                        <span class="text-muted">$</span>
+                                                        <input type="number" 
+                                                               name="costo_mano_obra" 
+                                                               class="form-control form-control-sm text-end" 
+                                                               style="max-width: 110px;"
+                                                               step="0.01"
+                                                               min="0"
+                                                               value="{{ cotizacion.costo_mano_obra|floatformat:2 }}">
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm" title="Guardar mano de obra">
+                                                            <i class="bi bi-check-lg"></i>
+                                                        </button>
+                                                    </form>
+                                                    {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
+                                                        <span class="badge bg-success ms-1" title="Descuento aplicado">
+                                                            🎁 GRATIS
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Total Piezas Cotizadas (costo empresa):</td>
+                                                <td class="text-end"><strong>${{ cotizacion.costo_total_piezas|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}
+                                            <tr>
+                                                <td class="text-muted">Total piezas aceptadas (precio cliente, sin IVA):</td>
+                                                <td class="text-end text-primary"><strong>${{ cotizacion.precio_piezas_aceptadas_cliente|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% if cotizacion.margen_estimado > 0 %}
+                                            <tr>
+                                                <td class="text-muted">Margen estimado (piezas aceptadas, sin IVA):</td>
+                                                <td class="text-end text-info"><strong>${{ cotizacion.margen_estimado|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% endif %}
+                                            {% endif %}
+                                            {% if cotizacion.usuario_acepto is not None %}
+                                                <!-- Mostrar desglose de piezas solo si hay decisión -->
+                                                {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
+                                                    <tr>
+                                                        <td class="text-muted">Piezas Aceptadas:</td>
+                                                        <td class="text-end text-success"><strong>${{ cotizacion.costo_piezas_aceptadas|floatformat:2 }}</strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-muted">Piezas Rechazadas:</td>
+                                                        <td class="text-end text-danger">
+                                                            <strong>${{ cotizacion.costo_piezas_rechazadas|floatformat:2 }}</strong>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endif %}
+                                            <tr style="border-top: 2px solid #dee2e6;">
+                                                <td class="text-muted"><strong>{% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}TOTAL COTIZACIÓN (costo interno):{% else %}TOTAL COTIZACIÓN:{% endif %}</strong></td>
+                                                <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
+                                            </tr>
+                                            
+                                            <!-- 🆕 NUEVO: Mostrar descuento de mano de obra si aplica -->
+                                            {% if cotizacion.usuario_acepto and cotizacion.descontar_mano_obra %}
+                                                <tr style="border-top: 2px solid #ffc107;">
+                                                    <td class="text-danger">
+                                                        <strong><i class="bi bi-scissors"></i> Descuento Mano de Obra:</strong>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <h5 class="mb-0 text-danger">
+                                                            -${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}
+                                                        </h5>
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                            
+                                            <!-- Total a pagar (actualizado para usar costo_total_final) -->
+                                            {% if cotizacion.usuario_acepto %}
+                                                <tr style="border-top: 2px solid #28a745;">
+                                                    <td class="text-success"><strong>🎯 TOTAL A PAGAR:</strong></td>
+                                                    <td class="text-end">
+                                                        <h5 class="mb-0 text-success">
+                                                            ${{ cotizacion.costo_total_final|floatformat:2 }}
+                                                        </h5>
+                                                    </td>
+                                                </tr>
+                                                
+                                                <!-- Mostrar ahorro si hay descuento -->
+                                                {% if cotizacion.descontar_mano_obra %}
+                                                    <tr>
+                                                        <td colspan="2" class="text-center">
+                                                            <div class="alert alert-success mb-0 mt-2 py-2" style="border-left: 4px solid #28a745;">
+                                                                <small>
+                                                                    <i class="bi bi-gift-fill"></i>
+                                                                    <strong>¡Beneficio aplicado!</strong>
+                                                                    El cliente ahorra <strong>${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}</strong> en mano de obra
+                                                                </small>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endif %}
+                                        </table>
+                                        
+                                        <!-- Desglose de piezas aceptadas/rechazadas (solo si hay decisión) -->
+                                        {% if cotizacion.usuario_acepto is not None %}
+                                            <hr class="my-3">
+                                            <h6 class="mb-2">
+                                                <i class="bi bi-list-check"></i> Desglose de Piezas
+                                            </h6>
+                                            
+                                            <!-- Piezas Aceptadas -->
+                                            {% with piezas_aceptadas=piezas_cotizadas|dictsort:"aceptada_por_cliente" %}
+                                                {% for pieza in piezas_cotizadas %}
+                                                    {% if pieza.aceptada_por_cliente %}
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
+                                                             style="background-color: rgba(40, 167, 69, 0.1); border-left: 3px solid #28a745; border-radius: 4px;">
+                                                            <div>
+                                                                <small>
+                                                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                                                    <strong>{{ pieza.componente.nombre }}</strong>
+                                                                    <span class="text-muted">× {{ pieza.cantidad }}</span>
+                                                                </small>
+                                                            </div>
+                                                            <small class="text-success fw-bold">${{ pieza.costo_total|floatformat:2 }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endwith %}
+                                            
+                                            <!-- Piezas Rechazadas -->
+                                            {% for pieza in piezas_cotizadas %}
+                                                {% if pieza.aceptada_por_cliente == False %}
+                                                    <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
+                                                         style="background-color: rgba(220, 53, 69, 0.1); border-left: 3px solid #dc3545; border-radius: 4px;">
+                                                        <div>
+                                                            <small>
+                                                                <i class="bi bi-x-circle-fill text-danger"></i>
+                                                                <strong class="text-muted text-decoration-line-through">{{ pieza.componente.nombre }}</strong>
+                                                                <span class="text-muted">× {{ pieza.cantidad }}</span>
+                                                            </small>
+                                                        </div>
+                                                        <small class="text-danger fw-bold text-decoration-line-through">${{ pieza.costo_total|floatformat:2 }}</small>
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabla de Piezas Cotizadas -->
+                        {% if piezas_cotizadas %}
+                            <div class="card mb-4">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-tools"></i> Piezas Cotizadas 
+                                        <span class="badge bg-secondary">{{ piezas_cotizadas.count }}</span>
+                                    </h6>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalPieza()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Pieza
+                                    </button>
+                                </div>
+                                <!-- Alerta: Piezas sincronizadas desde Almacén -->
+                                {% if orden.solicitudes_cotizacion.exists %}
+                                    <div class="alert alert-info mb-0 mx-3 mt-3" style="border-left: 4px solid #0dcaf0;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-box-seam-fill me-2" style="font-size: 1.5rem;"></i>
+                                            <div>
+                                                <strong>Piezas de Almacén:</strong> Esta orden tiene una 
+                                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' orden.solicitudes_cotizacion.first.pk %}" class="alert-link">
+                                                    solicitud de cotización
+                                                </a> 
+                                                en el módulo de Almacén. Las piezas marcadas con 
+                                                <span class="badge bg-info"><i class="bi bi-box-seam"></i> Almacén</span> 
+                                                se gestionan desde ahí. Para aprobar/rechazar, usa el módulo de Almacén.
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                <!-- Mensaje de Ayuda (solo visible si cotización pendiente) -->
+                                {% if cotizacion.usuario_acepto is None %}
+                                    <div class="alert alert-info mb-0 mx-3 mt-3" style="border-left: 4px solid #0dcaf0;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
+                                            <div>
+                                                <strong>💡 Instrucciones:</strong> Selecciona con los checkboxes las piezas que el cliente <strong>acepta</strong>.
+                                                Al guardar la decisión, solo las piezas seleccionadas serán aceptadas. 
+                                                Si rechazas la cotización, todas las piezas se marcarán como rechazadas automáticamente.
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0" id="tablaPiezas">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <!-- Nueva columna: Checkbox para seleccionar piezas (solo si cotización pendiente) -->
+                                                    {% if cotizacion.usuario_acepto is None %}
+                                                        <th class="text-center" style="width: 60px;">
+                                                            <div class="form-check d-flex justify-content-center">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       id="selectAllPiezas" 
+                                                                       checked 
+                                                                       title="Seleccionar/Deseleccionar todas"
+                                                                       style="cursor: pointer;">
+                                                            </div>
+                                                            <small class="text-muted" style="font-size: 0.7rem;">Todas</small>
+                                                        </th>
+                                                    {% endif %}
+                                                    <th>Prioridad</th>
+                                                    <th>Componente</th>
+                                                    <th>Descripción</th>
+                                                    <th class="text-center">Cantidad</th>
+                                                    <th class="text-end" title="Costo proveedor / empresa">Costo empresa</th>
+                                                    <th class="text-end" title="Costo total proveedor">Total empresa</th>
+                                                    <th class="text-end" title="Precio cotizado al cliente (sin IVA)">Precio cliente</th>
+                                                    <th class="text-end" title="Total precio al cliente (sin IVA)">Total cliente</th>
+                                                    <th class="text-center">Proveedor</th>
+                                                    <th class="text-center">Necesaria</th>
+                                                    <th class="text-center">Cliente</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for pieza in piezas_cotizadas %}
+                                                    <tr data-pieza-id="{{ pieza.id }}" class="pieza-row">
+                                                        <!-- Checkbox de selección (solo si cotización pendiente) -->
+                                                        {% if cotizacion.usuario_acepto is None %}
+                                                            <td class="text-center">
+                                                                <div class="form-check d-flex justify-content-center">
+                                                                    <input class="form-check-input pieza-checkbox" 
+                                                                           type="checkbox" 
+                                                                           name="piezas_seleccionadas" 
+                                                                           value="{{ pieza.id }}"
+                                                                           checked
+                                                                           title="Seleccionar esta pieza"
+                                                                           style="cursor: pointer;">
+                                                                </div>
+                                                            </td>
+                                                        {% endif %}
+                                                        <td>
+                                                            <span class="badge bg-secondary">{{ pieza.orden_prioridad }}</span>
+                                                        </td>
+                                                        <td><strong>{{ pieza.componente.nombre }}</strong></td>
+                                                        <td>
+                                                            <small class="text-muted">
+                                                                {{ pieza.descripcion_adicional|default:"—" }}
+                                                            </small>
+                                                        </td>
+                                                        <td class="text-center">{{ pieza.cantidad }}</td>
+                                                        <td class="text-end text-muted">${{ pieza.costo_unitario|floatformat:2 }}</td>
+                                                        <td class="text-end text-muted"><strong>${{ pieza.costo_total|floatformat:2 }}</strong></td>
+                                                        <td class="text-end">
+                                                            {% if pieza.precio_unitario_cliente %}
+                                                            <strong class="text-primary">${{ pieza.precio_unitario_cliente|floatformat:2 }}</strong>
+                                                            {% else %}
+                                                            <small class="text-muted">Pendiente</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {% if pieza.precio_total_cliente %}
+                                                            <strong class="text-primary">${{ pieza.precio_total_cliente|floatformat:2 }}</strong>
+                                                            {% else %}
+                                                            <small class="text-muted">—</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if pieza.proveedor %}
+                                                                <span class="badge bg-secondary" style="font-size: 0.75rem;">🏪 {{ pieza.proveedor }}</span>
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if pieza.es_necesaria %}
+                                                                <span class="badge bg-danger">Sí</span>
+                                                            {% else %}
+                                                                <span class="badge bg-info">Mejora</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if pieza.aceptada_por_cliente is None %}
+                                                                <span class="badge bg-warning text-dark">⏳ Sin resp.</span>
+                                                            {% elif pieza.aceptada_por_cliente %}
+                                                                <span class="badge bg-success">✅ Aceptada</span>
+                                                            {% else %}
+                                                                <span class="badge bg-danger">❌ Rechazada</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if pieza.linea_cotizacion_almacen %}
+                                                                <!-- Pieza sincronizada desde Almacén -->
+                                                                <span class="badge bg-info" title="Pieza sincronizada desde cotización de Almacén">
+                                                                    <i class="bi bi-box-seam"></i> Almacén
+                                                                </span>
+                                                                <span class="text-muted" title="Editar en módulo de Almacén">
+                                                                    🔒
+                                                                </span>
+                                                            {% else %}
+                                                                <!-- Pieza creada manualmente en ST -->
+                                                                <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                                                                        onclick="editarPieza({{ pieza.id }})" title="Editar">
+                                                                    📝
+                                                                </button>
+                                                                {% if cotizacion.usuario_acepto %}
+                                                                    <span class="text-muted" title="No se puede eliminar (cotización aceptada)">
+                                                                        🔒
+                                                                    </span>
+                                                                {% else %}
+                                                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                                            onclick="eliminarPieza({{ pieza.id }})" title="Eliminar">
+                                                                        🗑️
+                                                                    </button>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card mb-4">
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-tools" style="font-size: 3rem;"></i><br>
+                                        No hay piezas cotizadas aún
+                                    </p>
+                                    <button type="button" class="btn btn-primary" onclick="abrirModalPieza()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primera Pieza
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Seguimiento de Proveedores -->
+                        {% if seguimientos_piezas %}
+                            <div class="card">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="mb-0">
+                                            <i class="bi bi-truck"></i> Seguimiento de Pedidos a Proveedores
+                                            <span class="badge bg-secondary">{{ seguimientos_piezas.count }}</span>
+                                        </h6>
+                                        {% if seguimientos_retrasados_count > 0 %}
+                                            <span class="badge badge-retraso-global">
+                                                ⚠️ {{ seguimientos_retrasados_count }} Pedido{{ seguimientos_retrasados_count|pluralize }} con Retraso
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Seguimiento
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3" id="contenedorSeguimientos">
+                                        {% for seguimiento in seguimientos_piezas %}
+                                            <div class="col-md-6">
+                                                <div class="card h-100 border-start border-4 seguimiento-card
+                                                    {% if seguimiento.estado == 'recibido' %}border-success
+                                                    {% elif seguimiento.estado == 'incorrecto' %}border-danger
+                                                    {% elif seguimiento.estado == 'danado' %}border-danger
+                                                    {% elif seguimiento.estado == 'retrasado' %}border-danger
+                                                    {% elif seguimiento.estado == 'transito' %}border-info
+                                                    {% elif seguimiento.estado == 'confirmado' %}border-primary
+                                                    {% elif seguimiento.estado == 'pedido' %}border-secondary
+                                                    {% else %}border-secondary{% endif %}" 
+                                                    data-seguimiento-id="{{ seguimiento.id }}">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <h6 class="card-title mb-0">
+                                                                <i class="bi bi-building"></i> {{ seguimiento.proveedor }}
+                                                            </h6>
+                                                            <span class="badge 
+                                                                {% if seguimiento.estado == 'recibido' %}bg-success
+                                                                {% elif seguimiento.estado == 'incorrecto' %}bg-danger
+                                                                {% elif seguimiento.estado == 'danado' %}bg-warning text-dark
+                                                                {% elif seguimiento.estado == 'retrasado' %}bg-danger
+                                                                {% elif seguimiento.estado == 'transito' %}bg-info
+                                                                {% elif seguimiento.estado == 'confirmado' %}bg-primary
+                                                                {% elif seguimiento.estado == 'pedido' %}bg-secondary
+                                                                {% else %}bg-warning text-dark{% endif %}">
+                                                                {{ seguimiento.get_estado_display }}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <p class="card-text small mb-2">
+                                                            <strong>Pedido:</strong> {{ seguimiento.numero_pedido|default:"Sin número" }}<br>
+                                                            <strong>Piezas:</strong> {{ seguimiento.descripcion_piezas|truncatewords:10 }}
+                                                        </p>
+                                                        
+                                                        <!-- NUEVO: Mostrar piezas específicas vinculadas -->
+                                                        {% if seguimiento.piezas.exists %}
+                                                            <div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;">
+                                                                <small class="text-primary fw-bold">
+                                                                    <i class="bi bi-box-seam"></i> Piezas Vinculadas:
+                                                                </small>
+                                                                <ul class="list-unstyled mb-0 mt-1">
+                                                                    {% for pieza in seguimiento.piezas.all %}
+                                                                        <li class="small text-muted">
+                                                                            <i class="bi bi-check2"></i> {{ pieza.componente.nombre }} × {{ pieza.cantidad }}
+                                                                        </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
+                                                        
+                                                        <div class="small">
+                                                            <div class="row">
+                                                                <div class="col-6">
+                                                                    <strong>Pedido:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_pedido|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <strong>Estimado:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_entrega_estimada|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            </div>
+                                                            {% if seguimiento.fecha_entrega_real %}
+                                                                <div class="mt-2">
+                                                                    <strong>Entregado:</strong> <small>{{ seguimiento.fecha_entrega_real|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            {% elif seguimiento.esta_retrasado %}
+                                                                <div class="alert alert-danger p-2 mt-2 mb-0">
+                                                                    <small><i class="bi bi-exclamation-triangle"></i> <strong>⚠️ RETRASO: {{ seguimiento.dias_retraso }} día{{ seguimiento.dias_retraso|pluralize }}</strong></small>
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        
+                                                        {% if seguimiento.notas_seguimiento %}
+                                                            <div class="mt-2 pt-2 border-top">
+                                                                <small class="text-muted">
+                                                                    <i class="bi bi-sticky"></i> {{ seguimiento.notas_seguimiento|truncatewords:20 }}
+                                                                </small>
+                                                            </div>
+                                                        {% endif %}
+                                                        
+                                                        <!-- Botones de acción -->
+                                                        <div class="mt-3">
+                                                            <!-- Fila 1: Cambio rápido de estado -->
+                                                            {% if seguimiento.estado not in 'recibido,incorrecto,danado' %}
+                                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                    {% if seguimiento.estado == 'pedido' %}
+                                                                        <button type="button" class="btn btn-info" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'confirmado')" 
+                                                                                title="Confirmar pedido">
+                                                                            ✅ Confirmar
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado' %}
+                                                                        <button type="button" class="btn btn-warning" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'transito')" 
+                                                                                title="Marcar en tránsito">
+                                                                            � En Tránsito
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado,transito' %}
+                                                                        <button type="button" class="btn btn-danger" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'retrasado')" 
+                                                                                title="Marcar como retrasado">
+                                                                            ⚠️ Retrasado
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    <button type="button" class="btn btn-success" 
+                                                                            onclick="marcarRecibido({{ seguimiento.id }})" 
+                                                                            title="Marcar como recibido">
+                                                                        📬 Recibido
+                                                                    </button>
+                                                                </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Fila 2: Reportar problemas con pieza recibida (NUEVO Nov 2025) -->
+                                                            {% if seguimiento.estado == 'recibido' %}
+                                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                    <button type="button" class="btn btn-outline-danger" 
+                                                                            onclick="marcarIncorrecto({{ seguimiento.id }})" 
+                                                                            title="La pieza recibida es incorrecta">
+                                                                        ❌ Pieza Incorrecta
+                                                                    </button>
+                                                                    <button type="button" class="btn btn-outline-warning" 
+                                                                            onclick="marcarDanado({{ seguimiento.id }})" 
+                                                                            title="La pieza recibida está dañada o no funciona">
+                                                                        ⚠️ Pieza Dañada
+                                                                    </button>
+                                                                </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Fila 3: Editar, Eliminar y Reenviar -->
+                                                            <div class="btn-group btn-group-sm w-100" role="group">
+                                                                <button type="button" class="btn btn-outline-primary" 
+                                                                        onclick="editarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Editar">
+                                                                    📝 Editar
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-danger" 
+                                                                        onclick="eliminarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Eliminar">
+                                                                    🗑️ Eliminar
+                                                                </button>
+                                                                {% if seguimiento.estado == 'recibido' %}
+                                                                    <button type="button" class="btn btn-outline-info" 
+                                                                            onclick="reenviarNotificacion({{ seguimiento.id }})" 
+                                                                            title="Reenviar notificación al técnico">
+                                                                        � Reenviar
+                                                                    </button>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card">
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-truck" style="font-size: 3rem;"></i><br>
+                                        No hay seguimientos de proveedores aún
+                                    </p>
+                                    <button type="button" class="btn btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primer Seguimiento
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    

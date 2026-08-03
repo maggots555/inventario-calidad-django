@@ -1,0 +1,260 @@
+{% comment %}
+  Partial de detalle_orden — _modal_editar_info_equipo.html
+  Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
+  NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+{% endcomment %}
+<!-- ============================================================ -->
+<!-- MODAL: EDITAR INFORMACIÓN PRINCIPAL DEL EQUIPO -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalEditarInfoEquipo" tabindex="-1" aria-labelledby="modalEditarInfoEquipoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header modal-header-primary text-white">
+                <h5 class="modal-title" id="modalEditarInfoEquipoLabel">
+                    <i class="bi bi-pencil-square"></i> Editar Información del Equipo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body">
+                <form method="post" id="formEditarInfoEquipo">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="editar_info_equipo">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Importante:</strong> Puedes actualizar cualquier información del equipo que haya sido omitida o necesite corrección.
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Tipo de Equipo -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.tipo_equipo.errors }}
+                            <label for="{{ form_editar_info.tipo_equipo.id_for_label }}" class="form-label">
+                                {{ form_editar_info.tipo_equipo.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form_editar_info.tipo_equipo }}
+                            {% if form_editar_info.tipo_equipo.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.tipo_equipo.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Gama -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.gama.errors }}
+                            <label for="{{ form_editar_info.gama.id_for_label }}" class="form-label">
+                                {{ form_editar_info.gama.label }}
+                            </label>
+                            {{ form_editar_info.gama }}
+                            {% if form_editar_info.gama.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.gama.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Marca -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.marca.errors }}
+                            <label for="{{ form_editar_info.marca.id_for_label }}" class="form-label">
+                                {{ form_editar_info.marca.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form_editar_info.marca }}
+                            {% if form_editar_info.marca.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.marca.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Modelo -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.modelo.errors }}
+                            <label for="{{ form_editar_info.modelo.id_for_label }}" class="form-label">
+                                {{ form_editar_info.modelo.label }}
+                            </label>
+                            {{ form_editar_info.modelo }}
+                            {% if form_editar_info.modelo.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.modelo.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Número de Serie -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.numero_serie.errors }}
+                            <label for="{{ form_editar_info.numero_serie.id_for_label }}" class="form-label">
+                                {{ form_editar_info.numero_serie.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form_editar_info.numero_serie }}
+                            {% if form_editar_info.numero_serie.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.numero_serie.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Orden del Cliente -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.orden_cliente.errors }}
+                            <label for="{{ form_editar_info.orden_cliente.id_for_label }}" class="form-label">
+                                {{ form_editar_info.orden_cliente.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form_editar_info.orden_cliente }}
+                            {% if form_editar_info.orden_cliente.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.orden_cliente.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- ✅ NUEVO: Email del Cliente (Noviembre 2025) -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.email_cliente.errors }}
+                            <label for="{{ form_editar_info.email_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-envelope-fill text-primary"></i>
+                                {{ form_editar_info.email_cliente.label }}
+                                <span class="badge bg-danger ms-2">Obligatorio</span>
+                            </label>
+                            {{ form_editar_info.email_cliente }}
+                            {% if form_editar_info.email_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.email_cliente.help_text|safe }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- ✅ NUEVO: Datos adicionales del cliente (Junio 2026) -->
+                        <div class="col-12 mb-2">
+                            <hr class="my-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person-vcard"></i> <strong>Datos adicionales del cliente</strong> (opcionales, para facturación)
+                            </small>
+                        </div>
+                        
+                        <!-- Nombre del Cliente -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.nombre_cliente.errors }}
+                            <label for="{{ form_editar_info.nombre_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-person-fill text-info"></i>
+                                {{ form_editar_info.nombre_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.nombre_cliente }}
+                            {% if form_editar_info.nombre_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.nombre_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- RFC del Cliente -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.rfc_cliente.errors }}
+                            <label for="{{ form_editar_info.rfc_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-card-checklist text-warning"></i>
+                                {{ form_editar_info.rfc_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.rfc_cliente }}
+                            {% if form_editar_info.rfc_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.rfc_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Teléfono del Cliente -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.telefono_cliente.errors }}
+                            <label for="{{ form_editar_info.telefono_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-telephone-fill text-success"></i>
+                                {{ form_editar_info.telefono_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.telefono_cliente }}
+                            {% if form_editar_info.telefono_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.telefono_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+
+                        <!-- Dirección del Cliente (Formato Garantía Dell / facturación) -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.direccion_cliente.errors }}
+                            <label for="{{ form_editar_info.direccion_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-geo-alt-fill text-danger"></i>
+                                {{ form_editar_info.direccion_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.direccion_cliente }}
+                            {% if form_editar_info.direccion_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.direccion_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Equipo Enciende -->
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check">
+                                {{ form_editar_info.equipo_enciende }}
+                                <label class="form-check-label" for="{{ form_editar_info.equipo_enciende.id_for_label }}">
+                                    {{ form_editar_info.equipo_enciende.label }}
+                                </label>
+                            </div>
+                            {% if form_editar_info.equipo_enciende.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.equipo_enciende.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- MIS: Mail-In Service -->
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check">
+                                {{ form_editar_info.es_mis }}
+                                <label class="form-check-label" for="{{ form_editar_info.es_mis.id_for_label }}">
+                                    {{ form_editar_info.es_mis.label }}
+                                </label>
+                            </div>
+                            {% if form_editar_info.es_mis.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.es_mis.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <hr class="my-3">
+                        
+                        <!-- Tiene Cargador -->
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check">
+                                {{ form_editar_info.tiene_cargador }}
+                                <label class="form-check-label" for="{{ form_editar_info.tiene_cargador.id_for_label }}">
+                                    {{ form_editar_info.tiene_cargador.label }}
+                                </label>
+                            </div>
+                            {% if form_editar_info.tiene_cargador.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.tiene_cargador.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Número de Serie del Cargador -->
+                        <div class="col-md-12 mb-3" id="divNumeroSerieCargadorModal" style="display: none;">
+                            {{ form_editar_info.numero_serie_cargador.errors }}
+                            <label for="{{ form_editar_info.numero_serie_cargador.id_for_label }}" class="form-label">
+                                {{ form_editar_info.numero_serie_cargador.label }}
+                            </label>
+                            {{ form_editar_info.numero_serie_cargador }}
+                            {% if form_editar_info.numero_serie_cargador.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.numero_serie_cargador.help_text }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit" form="formEditarInfoEquipo" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
