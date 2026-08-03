@@ -1,5 +1,5 @@
 """
-Tests de humo tras modularizar vistas de Almacén (Fase 0 + Fase 1 + Fase 2).
+Tests de humo tras modularizar vistas de Almacén (Fase 0 .. Fase 3).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
@@ -16,6 +16,7 @@ from django.urls import resolve, reverse
 
 from almacen import views as almacen_views
 from almacen import views_catalogo
+from almacen import views_compras
 from almacen import views_dashboard_distribucion
 from almacen import views_parametros_cotizador
 from almacen import views_unidades
@@ -228,6 +229,132 @@ class CompatibilidadReexportsFase2Test(SimpleTestCase):
                 'almacen:api_buscar_crear_orden',
                 {},
                 views_unidades.api_buscar_crear_orden_cliente,
+            ),
+        ]
+        for name, kwargs, expected in casos:
+            match = resolve(reverse(name, kwargs=kwargs))
+            self.assertIs(match.func, expected, msg=name)
+
+
+class CompatibilidadReexportsFase3Test(SimpleTestCase):
+    """
+    Verifica reexports y resolución de URLs de la Fase 3.
+
+    Módulo extraído:
+        - views_compras (CompraProducto + panel_cotizaciones)
+
+    Nota: los helpers _clave_grupo_compra_cotizacion y
+    _agrupar_compras_por_orden son privados del módulo y NO se reexportan.
+    """
+
+    def test_views_reexporta_compras_representativo(self):
+        """Símbolos clave de compras siguen en views con la misma identidad."""
+        pares = [
+            ('lista_compras', views_compras.lista_compras),
+            ('panel_cotizaciones', views_compras.panel_cotizaciones),
+            ('crear_compra', views_compras.crear_compra),
+            ('detalle_compra', views_compras.detalle_compra),
+            ('editar_compra', views_compras.editar_compra),
+            ('aprobar_cotizacion', views_compras.aprobar_cotizacion),
+            ('rechazar_cotizacion', views_compras.rechazar_cotizacion),
+            ('recibir_compra', views_compras.recibir_compra),
+            ('reportar_problema_compra', views_compras.reportar_problema_compra),
+            ('iniciar_devolucion', views_compras.iniciar_devolucion),
+            ('confirmar_devolucion', views_compras.confirmar_devolucion),
+            ('cancelar_compra', views_compras.cancelar_compra),
+            ('recibir_unidad_compra', views_compras.recibir_unidad_compra),
+            ('problema_unidad_compra', views_compras.problema_unidad_compra),
+        ]
+        for attr, expected in pares:
+            self.assertIs(getattr(almacen_views, attr), expected, msg=attr)
+
+    def test_helpers_agrupacion_no_se_reexportan(self):
+        """
+        Los helpers de agrupación viven solo en views_compras.
+
+        EXPLICACIÓN: son detalle de implementación de lista_compras;
+        no forman parte del contrato público de urls.py.
+        """
+        self.assertTrue(callable(views_compras._clave_grupo_compra_cotizacion))
+        self.assertTrue(callable(views_compras._agrupar_compras_por_orden))
+        self.assertFalse(hasattr(almacen_views, '_clave_grupo_compra_cotizacion'))
+        self.assertFalse(hasattr(almacen_views, '_agrupar_compras_por_orden'))
+
+    def test_modulo_correcto_fase3(self):
+        """__module__ apunta a views_compras."""
+        self.assertEqual(
+            almacen_views.lista_compras.__module__,
+            'almacen.views_compras',
+        )
+        self.assertEqual(
+            almacen_views.recibir_compra.__module__,
+            'almacen.views_compras',
+        )
+        self.assertEqual(
+            almacen_views.panel_cotizaciones.__module__,
+            'almacen.views_compras',
+        )
+
+    def test_urls_compras_resuelven_al_modulo_nuevo(self):
+        """reverse/resolve de compras apuntan a views_compras."""
+        casos = [
+            ('almacen:lista_compras', {}, views_compras.lista_compras),
+            ('almacen:panel_cotizaciones', {}, views_compras.panel_cotizaciones),
+            ('almacen:crear_compra', {}, views_compras.crear_compra),
+            (
+                'almacen:detalle_compra',
+                {'pk': 1},
+                views_compras.detalle_compra,
+            ),
+            (
+                'almacen:editar_compra',
+                {'pk': 1},
+                views_compras.editar_compra,
+            ),
+            (
+                'almacen:aprobar_cotizacion',
+                {'pk': 1},
+                views_compras.aprobar_cotizacion,
+            ),
+            (
+                'almacen:rechazar_cotizacion',
+                {'pk': 1},
+                views_compras.rechazar_cotizacion,
+            ),
+            (
+                'almacen:recibir_compra',
+                {'pk': 1},
+                views_compras.recibir_compra,
+            ),
+            (
+                'almacen:reportar_problema',
+                {'pk': 1},
+                views_compras.reportar_problema_compra,
+            ),
+            (
+                'almacen:iniciar_devolucion',
+                {'pk': 1},
+                views_compras.iniciar_devolucion,
+            ),
+            (
+                'almacen:confirmar_devolucion',
+                {'pk': 1},
+                views_compras.confirmar_devolucion,
+            ),
+            (
+                'almacen:cancelar_compra',
+                {'pk': 1},
+                views_compras.cancelar_compra,
+            ),
+            (
+                'almacen:recibir_unidad',
+                {'compra_pk': 1, 'pk': 1},
+                views_compras.recibir_unidad_compra,
+            ),
+            (
+                'almacen:problema_unidad',
+                {'compra_pk': 1, 'pk': 1},
+                views_compras.problema_unidad_compra,
             ),
         ]
         for name, kwargs, expected in casos:
