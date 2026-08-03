@@ -37,10 +37,24 @@ function urlBase64ToUint8Array(base64String) {
     }
     return buffer.buffer;
 }
-/** Obtiene el CSRF token de las cookies de Django (requerido para POST). */
+/**
+ * Lee la cookie CSRF de Django (requerida para POST a suscribir/cancelar push).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * En producción (DEBUG=False) Django usa la cookie `sigma_csrftoken`
+ * (ver config/settings.py). En desarrollo sigue siendo `csrftoken`.
+ * Hay que buscar ambos nombres; si solo leemos csrftoken, en prod el
+ * header X-CSRFToken va vacío y Django responde 403.
+ */
 function getCsrfToken() {
-    const match = document.cookie.match(/csrftoken=([^;]+)/);
-    return match ? match[1] : '';
+    const cookieNames = ['sigma_csrftoken', 'csrftoken'];
+    for (const name of cookieNames) {
+        const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+        if (match) {
+            return match[1];
+        }
+    }
+    return '';
 }
 /** POST con JSON y CSRF automático. */
 async function postJson(url, body) {
