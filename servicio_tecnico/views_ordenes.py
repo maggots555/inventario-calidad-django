@@ -5,7 +5,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 Home de Servicio Técnico, alta de órdenes (diagnóstico / venta mostrador),
 listas activas/finalizadas y acciones de cerrar.
 urls.py sigue usando views.<nombre> porque views.py reexporta estos símbolos.
-NO incluye detalle_orden (eso es Fase 10 — alto riesgo).
+NO incluye detalle_orden (eso vive en views_detalle_orden.py — Fase 10 / B).
 """
 
 from django.contrib import messages

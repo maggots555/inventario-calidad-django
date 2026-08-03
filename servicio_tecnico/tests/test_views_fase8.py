@@ -8,7 +8,7 @@ No renderizamos Plotly ni generamos Excel reales en CI. Solo confirmamos:
 2) views.py reexporta (compatibilidad).
 3) Helpers de venta mostrador viven en services/.
 4) Imports críticos existen (regresión NameError).
-5) detalle_orden sigue en el monolito (Fase 10).
+5) detalle_orden ya vive en views_detalle_orden (Fase 10 / B) y se reexporta.
 """
 
 from django.test import SimpleTestCase
@@ -163,13 +163,18 @@ class CompatibilidadDashboardsFase8Test(SimpleTestCase):
                 match = resolve(url)
                 self.assertIs(match.func, expected, msg=f'Fallo en {name}')
 
-    def test_detalle_orden_sigue_en_monolito(self):
-        """Fase 10: detalle_orden aún no se movió (inicio/listas ya son Fase 9)."""
+    def test_detalle_orden_vive_en_views_detalle_orden(self):
+        """
+        Fase 10 / B: detalle_orden salió del monolito.
+
+        EXPLICACIÓN: urls.py sigue con views.detalle_orden (reexport);
+        el __module__ real apunta al archivo hermano.
+        """
         self.assertEqual(
             st_views.detalle_orden.__module__,
-            'servicio_tecnico.views',
+            'servicio_tecnico.views_detalle_orden',
         )
-        # Fase 9 movió inicio/listas a views_ordenes
+        # Fase 9 movió inicio/listas a views_ordenes (sin regresión)
         self.assertEqual(
             st_views.inicio.__module__,
             'servicio_tecnico.views_ordenes',

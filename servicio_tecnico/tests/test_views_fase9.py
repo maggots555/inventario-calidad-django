@@ -7,7 +7,7 @@ No creamos órdenes reales en CI. Solo confirmamos que:
 1) urls.py resuelve cada ruta a views_ordenes.
 2) views.py reexporta (compatibilidad).
 3) Imports críticos existen (regresión NameError).
-4) detalle_orden sigue en el monolito (Fase 10).
+4) detalle_orden ya vive en views_detalle_orden (Fase 10 / B) y se reexporta.
 """
 
 from django.test import SimpleTestCase
@@ -89,15 +89,25 @@ class CompatibilidadOrdenesFase9Test(SimpleTestCase):
                 match = resolve(url)
                 self.assertIs(match.func, expected, msg=f'Fallo en {name}')
 
-    def test_detalle_orden_sigue_en_monolito(self):
-        """Fase 10: detalle_orden aún no se movió."""
+    def test_detalle_orden_vive_en_views_detalle_orden(self):
+        """
+        Fase 10 / B: módulo hermano + URL sigue resolviendo al reexport.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        resolve() debe devolver la misma función que st_views.detalle_orden
+        (que a su vez es la de views_detalle_orden.py).
+        """
+        from servicio_tecnico import views_detalle_orden as vdo
+
         self.assertEqual(
             st_views.detalle_orden.__module__,
-            'servicio_tecnico.views',
+            'servicio_tecnico.views_detalle_orden',
         )
+        self.assertIs(st_views.detalle_orden, vdo.detalle_orden)
         url = reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': 1})
         match = resolve(url)
         self.assertIs(match.func, st_views.detalle_orden)
+        self.assertIs(match.func, vdo.detalle_orden)
 
     def test_imports_criticos(self):
         """Regresión NameError: forms/models/paginator en views_ordenes."""
@@ -124,4 +134,37 @@ class CompatibilidadOrdenesFase9Test(SimpleTestCase):
                 self.assertTrue(
                     hasattr(views_ordenes, nombre),
                     msg=f'Falta {nombre} en views_ordenes',
+                )
+
+    def test_imports_criticos_detalle_orden(self):
+        """
+        Regresión NameError: imports de nivel módulo en views_detalle_orden.
+
+        EXPLICACIÓN: al mudarla desde views.py, los símbolos que antes venían
+        del import global del monolito deben vivir en el módulo nuevo.
+        """
+        from servicio_tecnico import views_detalle_orden as vdo
+
+        for nombre in (
+            'OrdenServicio',
+            'HistorialOrden',
+            'Cotizacion',
+            'EstadoRHITSO',
+            'Empleado',
+            'ComponenteEquipo',
+            'ConfiguracionAdicionalForm',
+            'GuardarManoObraForm',
+            'GestionarCotizacionForm',
+            'comprimir_y_guardar_imagen',
+            'registrar_historial',
+            'COMPONENTES_DIAGNOSTICO_ORDEN',
+            'ESTADO_ORDEN_CHOICES',
+            'JsonResponse',
+            'mark_safe',
+            'permission_required_with_message',
+        ):
+            with self.subTest(nombre=nombre):
+                self.assertTrue(
+                    hasattr(vdo, nombre),
+                    msg=f'Falta {nombre} en views_detalle_orden',
                 )

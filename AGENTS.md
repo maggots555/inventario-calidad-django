@@ -115,7 +115,7 @@ inventario-calidad-django/
 ├── config/                 # settings, urls, storage, constants, multi-país, PWA views
 ├── inventario/             # inventario + empleados; ForcePasswordChangeMiddleware
 ├── servicio_tecnico/       # app principal ST
-│   ├── views.py            # reexports + detalle_orden (NO re-inflar monolito)
+│   ├── views.py            # solo reexports (NO re-inflar monolito)
 │   ├── views_*.py          # vistas por dominio
 │   ├── services/           # historial, multimedia, notifs, analytics VM
 │   ├── decorators.py       # permission_required_with_message, cache_page_dashboard
@@ -171,7 +171,7 @@ inventario-calidad-django/
 
 **CRITICAL — no agrandar vistas:** está **prohibido** seguir hinchando `views.py` (ni módulos `views_*.py` ya grandes) con features nuevas. Toda integración o función nueva debe nacer **modular**.
 
-**Contexto ST:** `servicio_tecnico/views.py` llegó a ~19 000 LOC; se modularizó (`views_*.py` + `services/` + reexports). Hoy es principalmente reexports + `detalle_orden`.
+**Contexto ST:** `servicio_tecnico/views.py` llegó a ~19 000 LOC; se modularizó (`views_*.py` + `services/` + reexports). Hoy es **solo fachada de reexports**; `detalle_orden` vive en `views_detalle_orden.py` (Fase B).
 
 **Contexto Almacén (Ago 2026):** `almacen/views.py` (~7400 LOC) se partió igual: fachada de reexports + `views_*.py` + helpers en `utils/`. `urls.py` sigue con `from . import views`.
 
@@ -210,7 +210,8 @@ inventario-calidad-django/
 | `views_piezas_*` / `views_venta_mostrador_ajax.py` | AJAX piezas / VM |
 | `views_multimedia.py`, `views_seguimiento_cliente.py`, `views_encuestas.py`, … | Multimedia, portal, APIs |
 | `services/` | historial, multimedia, notificaciones_piezas, ventas_mostrador_analytics |
-| `views.py` | reexports + `detalle_orden` |
+| `views_detalle_orden.py` | Shell `detalle_orden` (POST `form_type` + context GET) |
+| `views.py` | solo reexports (`urls.py` → `views.foo`) |
 
 **Almacén — mapa breve (post-modularización):**
 
@@ -226,7 +227,7 @@ inventario-calidad-django/
 | `utils/` | sync ST, PDF, profit/REAC, `cotizacion_reacondicionado_helpers` |
 | `views.py` | **solo** reexports (fachada) |
 
-**Pendiente opcional (no urgente):** ST `detalle_orden` → `views_detalle_orden.py`; luego handlers por `form_type`. Features nuevas van a módulos propios — **también en Almacén**.
+**Pendiente opcional (Fase C):** partir handlers `form_type` / context GET de `views_detalle_orden.py` + sacar mega-script inline del template a TypeScript. Features nuevas van a módulos propios — **también en Almacén**.
 
 Misma idea en TS/CSS: no un único archivo gigante; no hinchar más `detalle_orden.html` con CSS/JS inline.
 
