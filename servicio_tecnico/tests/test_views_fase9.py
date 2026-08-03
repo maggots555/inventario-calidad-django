@@ -136,35 +136,44 @@ class CompatibilidadOrdenesFase9Test(SimpleTestCase):
                     msg=f'Falta {nombre} en views_ordenes',
                 )
 
-    def test_imports_criticos_detalle_orden(self):
+    def test_imports_criticos_detalle_orden_fase_c(self):
         """
-        Regresión NameError: imports de nivel módulo en views_detalle_orden.
+        Regresión NameError tras Fase C (dispatcher + handlers + context).
 
-        EXPLICACIÓN: al mudarla desde views.py, los símbolos que antes venían
-        del import global del monolito deben vivir en el módulo nuevo.
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        La vista quedó delgada; los imports viven en los módulos hermanos.
+        Aquí comprobamos que cada pieza clave sigue importable.
         """
         from servicio_tecnico import views_detalle_orden as vdo
+        from servicio_tecnico import views_detalle_orden_cotizacion as vcot
+        from servicio_tecnico import views_detalle_orden_estado as vest
+        from servicio_tecnico import views_detalle_orden_multimedia as vmed
+        from servicio_tecnico.services import detalle_orden_context as ctx
 
-        for nombre in (
-            'OrdenServicio',
-            'HistorialOrden',
-            'Cotizacion',
-            'EstadoRHITSO',
-            'Empleado',
-            'ComponenteEquipo',
-            'ConfiguracionAdicionalForm',
-            'GuardarManoObraForm',
-            'GestionarCotizacionForm',
-            'comprimir_y_guardar_imagen',
-            'registrar_historial',
-            'COMPONENTES_DIAGNOSTICO_ORDEN',
-            'ESTADO_ORDEN_CHOICES',
-            'JsonResponse',
-            'mark_safe',
-            'permission_required_with_message',
+        self.assertTrue(callable(vdo.detalle_orden))
+        self.assertTrue(callable(ctx.build_detalle_orden_context))
+        # Dispatcher conoce los form_type críticos
+        for form_type in (
+            'guardar_mano_obra',
+            'gestionar_cotizacion',
+            'subir_imagenes',
+            'cambio_estado',
+            'crear_cotizacion',
+            'generar_cotizacion',
         ):
-            with self.subTest(nombre=nombre):
-                self.assertTrue(
-                    hasattr(vdo, nombre),
-                    msg=f'Falta {nombre} en views_detalle_orden',
-                )
+            with self.subTest(form_type=form_type):
+                self.assertIn(form_type, vdo._FORM_TYPE_HANDLERS)
+
+        casos = [
+            (vest, ('ConfiguracionAdicionalForm', 'CambioEstadoForm', 'registrar_historial')),
+            (vmed, ('SubirImagenesForm', 'comprimir_y_guardar_imagen', 'JsonResponse')),
+            (vcot, ('GuardarManoObraForm', 'GestionarCotizacionForm', 'Cotizacion', 'Decimal')),
+            (ctx, ('COMPONENTES_DIAGNOSTICO_ORDEN', 'Empleado', 'mark_safe')),
+        ]
+        for modulo, nombres in casos:
+            for nombre in nombres:
+                with self.subTest(modulo=modulo.__name__, nombre=nombre):
+                    self.assertTrue(
+                        hasattr(modulo, nombre),
+                        msg=f'Falta {nombre} en {modulo.__name__}',
+                    )

@@ -227,7 +227,7 @@ inventario-calidad-django/
 | `utils/` | sync ST, PDF, profit/REAC, `cotizacion_reacondicionado_helpers` |
 | `views.py` | **solo** reexports (fachada) |
 
-**Pendiente opcional (Fase C):** partir handlers `form_type` / context GET de `views_detalle_orden.py` + sacar mega-script inline del template a TypeScript. Features nuevas van a módulos propios — **también en Almacén**.
+**detalle_orden (Fases A–C, Ago 2026):** partials en `templates/.../partials/detalle_orden/`; vista delgada en `views_detalle_orden.py` + handlers (`views_detalle_orden_estado|multimedia|cotizacion.py`) + context en `services/detalle_orden_context.py`; JS de página en `static/ts/detalle_orden_*.ts` (config JSON `#detalle-orden-page-config`). Features nuevas van a módulos propios — **también en Almacén**.
 
 Misma idea en TS/CSS: no un único archivo gigante; no hinchar más `detalle_orden.html` con CSS/JS inline.
 
