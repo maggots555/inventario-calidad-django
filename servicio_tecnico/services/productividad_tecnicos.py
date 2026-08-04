@@ -2,22 +2,22 @@
 Productividad de técnicos: consultas y generación de Excel.
 
 Objetivo de negocio:
-    Reportar, por técnico asignado actual, cuántas reparaciones productivas
-    (órdenes finalizadas/entregadas con cotización aceptada o VM), qué ventas
-    mostrador hicieron y cuántos diagnósticos registraron en un período.
+    Separar claramente el flujo OOW (diagnóstico/reparación + posible upsell VM)
+    del flujo FL (venta mostrador pura, sin diagnóstico), por técnico y período.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
-    Este módulo NO vive en views_dashboard_cotizaciones.py (ya es muy grande).
-    La vista HTTP solo lee filtros GET y llama a generar_workbook_…;
-    aquí está toda la lógica de QuerySets y openpyxl.
+    tipo_servicio='diagnostico' → nació como reparación/diagnóstico (folio OOW-…).
+    tipo_servicio='venta_mostrador' → nació solo para mostrador (folio FL-…).
+    Una orden OOW puede tener VM adicional (upsell); un FL nunca es "reparación".
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Exists, OuterRef, Prefetch, Q, QuerySet
 from django.utils import timezone
 from openpyxl import Workbook
@@ -30,15 +30,18 @@ from servicio_tecnico.models import Cotizacion, OrdenServicio, PiezaVentaMostrad
 # Estados que cuentan como "trabajo terminado" (egreso / listo o ya entregado).
 ESTADOS_FINALIZADOS = ('finalizado', 'entregado')
 
-# Nombres de las 4 hojas del Excel (orden fijo para tests).
+# Nombres de las 5 hojas del Excel (orden fijo para tests).
 HOJAS_EXCEL = (
     'Resumen por técnico',
-    'Detalle reparaciones',
-    'Detalle ventas mostrador',
+    'Detalle reparaciones OOW',
+    'Detalle upsell OOW',
+    'Detalle VM pura FL',
     'Detalle diagnósticos',
 )
 
 _PAQUETES_MAP = dict(PAQUETES_CHOICES)
+
+TipoFlujoVM = Literal['upsell_oow', 'vm_pura_fl']
 
 
 def _datos_cliente_equipo(orden: OrdenServicio) -> tuple[str, str]:
@@ -51,12 +54,7 @@ def _datos_cliente_equipo(orden: OrdenServicio) -> tuple[str, str]:
     Returns:
         Tupla (orden_cliente, service_tag). Si no hay detalle, strings vacíos.
     """
-    # EXPLICACIÓN PARA PRINCIPIANTES: en el Excel de negocio se usa el folio
-    # que ve el cliente (orden_cliente), no el ORD-interno del sistema.
-    # Service Tag = numero_serie del equipo.
-    # getattr NO evita DoesNotExist en OneToOne inverso de Django.
-    from django.core.exceptions import ObjectDoesNotExist
-
+    # EXPLICACIÓN: folio de negocio = orden_cliente; Service Tag = numero_serie.
     try:
         detalle = orden.detalle_equipo
     except ObjectDoesNotExist:
@@ -68,15 +66,7 @@ def _datos_cliente_equipo(orden: OrdenServicio) -> tuple[str, str]:
 
 
 def _normalizar_fecha_inicio(fecha: date | datetime | str | None) -> datetime | None:
-    """
-    Convierte el filtro de inicio a datetime aware (inicio del día).
-
-    Args:
-        fecha: string 'YYYY-MM-DD', date, datetime o None.
-
-    Returns:
-        datetime timezone-aware o None si no hay filtro.
-    """
+    """Convierte el filtro de inicio a datetime aware (inicio del día)."""
     if fecha is None or fecha == '':
         return None
     if isinstance(fecha, str):
@@ -91,15 +81,7 @@ def _normalizar_fecha_inicio(fecha: date | datetime | str | None) -> datetime | 
 
 
 def _normalizar_fecha_fin(fecha: date | datetime | str | None) -> datetime | None:
-    """
-    Convierte el filtro de fin a datetime aware (fin del día).
-
-    Args:
-        fecha: string 'YYYY-MM-DD', date, datetime o None.
-
-    Returns:
-        datetime timezone-aware o None si no hay filtro.
-    """
+    """Convierte el filtro de fin a datetime aware (fin del día)."""
     if fecha is None or fecha == '':
         return None
     if isinstance(fecha, str):
@@ -114,15 +96,7 @@ def _normalizar_fecha_fin(fecha: date | datetime | str | None) -> datetime | Non
 
 
 def _fecha_a_date(fecha: date | datetime | str | None) -> date | None:
-    """
-    Extrae solo la parte date para filtrar DateField (fecha_fin_diagnostico).
-
-    Args:
-        fecha: valor crudo del filtro GET o None.
-
-    Returns:
-        date o None.
-    """
+    """Extrae solo la parte date para filtrar DateField."""
     if fecha is None or fecha == '':
         return None
     if isinstance(fecha, str):
@@ -141,20 +115,7 @@ def _aplicar_filtros_comunes(
     tecnico_id: int | str | None = None,
     gama: str | None = None,
 ) -> QuerySet[OrdenServicio]:
-    """
-    Aplica filtros opcionales de sucursal, técnico y gama sobre órdenes.
-
-    Args:
-        qs: QuerySet base de OrdenServicio.
-        sucursal_id: PK de sucursal o None.
-        tecnico_id: PK de Empleado (técnico) o None.
-        gama: 'alta' | 'media' | 'baja' o None.
-
-    Returns:
-        QuerySet filtrado.
-    """
-    # EXPLICACIÓN PARA PRINCIPIANTES: estos filtros son los mismos del
-    # Dashboard de Cotizaciones; así el Excel respeta lo que el usuario eligió.
+    """Aplica filtros opcionales de sucursal, técnico y gama."""
     if sucursal_id:
         qs = qs.filter(sucursal_id=sucursal_id)
     if tecnico_id:
@@ -174,14 +135,9 @@ def queryset_ordenes_finalizadas(
     """
     Órdenes en estado finalizado/entregado con fecha_finalizacion en el período.
 
-    Args:
-        fecha_inicio / fecha_fin: rango sobre fecha_finalizacion.
-        sucursal_id / tecnico_id / gama: filtros opcionales.
-
     Returns:
         QuerySet de OrdenServicio con select_related útiles.
     """
-    # Paso 1: solo egresos (listos o ya entregados al cliente).
     qs = OrdenServicio.objects.filter(
         estado__in=ESTADOS_FINALIZADOS,
         fecha_finalizacion__isnull=False,
@@ -191,7 +147,6 @@ def queryset_ordenes_finalizadas(
         'detalle_equipo',
     )
 
-    # Paso 2: ventana temporal por fecha de finalización (no por ingreso).
     inicio = _normalizar_fecha_inicio(fecha_inicio)
     fin = _normalizar_fecha_fin(fecha_fin)
     if inicio is not None:
@@ -215,18 +170,13 @@ def obtener_reparaciones_productivas(
     gama: str | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Reparaciones productivas: finalizadas con cotización aceptada o con VM.
+    Reparaciones OOW: diagnóstico + finalizada + cotización aceptada.
 
-    Args:
-        fecha_inicio / fecha_fin / sucursal_id / tecnico_id / gama: filtros.
+    Ya NO incluye FL ni órdenes solo-VM (esas van a upsell o VM pura).
 
     Returns:
-        Lista de dicts listos para Excel (una fila por orden).
-
-    Efectos secundarios:
-        Solo lectura ORM; no escribe en BD.
+        Lista de dicts (una fila por orden OOW con cot aceptada).
     """
-    # Subconsultas: ¿tiene cot aceptada? ¿tiene VM?
     cot_aceptada = Cotizacion.objects.filter(
         orden_id=OuterRef('pk'),
         usuario_acepto=True,
@@ -241,54 +191,57 @@ def obtener_reparaciones_productivas(
             tecnico_id=tecnico_id,
             gama=gama,
         )
+        # Solo flujo con diagnóstico (OOW), no venta_mostrador (FL).
+        .filter(tipo_servicio='diagnostico')
         .annotate(
             _cot_aceptada=Exists(cot_aceptada),
             _tiene_vm=Exists(tiene_vm),
         )
-        .filter(Q(_cot_aceptada=True) | Q(_tiene_vm=True))
+        .filter(_cot_aceptada=True)
         .select_related('cotizacion', 'venta_mostrador')
         .order_by('tecnico_asignado_actual__nombre_completo', 'fecha_finalizacion')
     )
 
     filas: list[dict[str, Any]] = []
     for orden in qs:
-        # Valor aceptado solo si hay cotización aceptada (propiedad del modelo).
-        cot_ok = bool(getattr(orden, '_cot_aceptada', False))
         valor_cot = Decimal('0.00')
-        if cot_ok and hasattr(orden, 'cotizacion'):
-            try:
-                valor_cot = orden.cotizacion.costo_total_final or Decimal('0.00')
-            except Cotizacion.DoesNotExist:
-                valor_cot = Decimal('0.00')
+        try:
+            valor_cot = orden.cotizacion.costo_total_final or Decimal('0.00')
+        except Cotizacion.DoesNotExist:
+            valor_cot = Decimal('0.00')
 
+        tiene_upsell = bool(getattr(orden, '_tiene_vm', False))
         folio_vm = ''
-        if getattr(orden, '_tiene_vm', False):
+        if tiene_upsell:
             try:
                 folio_vm = orden.venta_mostrador.folio_venta
             except VentaMostrador.DoesNotExist:
                 folio_vm = ''
+                tiene_upsell = False
 
         tecnico = orden.tecnico_asignado_actual
         orden_cliente, service_tag = _datos_cliente_equipo(orden)
         filas.append({
             'orden_id': orden.pk,
-            # folio = orden del cliente (no el número interno ORD-…)
             'folio': orden_cliente,
             'service_tag': service_tag,
+            'tipo_servicio': orden.tipo_servicio,
             'tecnico_id': tecnico.pk if tecnico else None,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
             'sucursal': orden.sucursal.nombre if orden.sucursal else '',
             'estado': orden.estado,
             'fecha_finalizacion': orden.fecha_finalizacion,
-            'cot_aceptada': cot_ok,
-            'tiene_vm': bool(getattr(orden, '_tiene_vm', False)),
+            'cot_aceptada': True,
+            'tiene_upsell_vm': tiene_upsell,
             'valor_cot_aceptada': valor_cot,
             'folio_vm': folio_vm,
         })
     return filas
 
 
-def obtener_ventas_mostrador_productivas(
+def _filas_vm_por_tipo_servicio(
+    tipo_servicio: str,
+    tipo_flujo: TipoFlujoVM,
     fecha_inicio: date | datetime | str | None = None,
     fecha_fin: date | datetime | str | None = None,
     sucursal_id: int | str | None = None,
@@ -296,16 +249,14 @@ def obtener_ventas_mostrador_productivas(
     gama: str | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Ventas mostrador de órdenes finalizadas/entregadas en el período.
-
-    El período se alinea con fecha_finalizacion de la orden (productividad por
-    egreso), no con fecha_venta suelta.
+    Construye filas de detalle VM filtradas por tipo_servicio de la orden.
 
     Args:
-        fecha_inicio / fecha_fin / sucursal_id / tecnico_id / gama: filtros.
+        tipo_servicio: 'diagnostico' (upsell OOW) o 'venta_mostrador' (FL).
+        tipo_flujo: etiqueta de negocio para el Excel/resumen.
 
     Returns:
-        Lista de dicts con desglose de paquete, servicios y piezas.
+        Lista de dicts con desglose de servicios/paquetes.
     """
     qs = (
         queryset_ordenes_finalizadas(
@@ -315,7 +266,10 @@ def obtener_ventas_mostrador_productivas(
             tecnico_id=tecnico_id,
             gama=gama,
         )
-        .filter(venta_mostrador__isnull=False)
+        .filter(
+            tipo_servicio=tipo_servicio,
+            venta_mostrador__isnull=False,
+        )
         .select_related(
             'venta_mostrador',
             'tecnico_asignado_actual',
@@ -338,7 +292,6 @@ def obtener_ventas_mostrador_productivas(
         except VentaMostrador.DoesNotExist:
             continue
 
-        # Resumen textual de piezas para una sola celda del Excel.
         piezas = list(vm.piezas_vendidas.all())
         resumen_piezas = '; '.join(
             f'{p.descripcion_pieza} x{p.cantidad}' for p in piezas
@@ -350,6 +303,8 @@ def obtener_ventas_mostrador_productivas(
             'orden_id': orden.pk,
             'folio': orden_cliente,
             'service_tag': service_tag,
+            'tipo_servicio': orden.tipo_servicio,
+            'tipo_flujo': tipo_flujo,
             'folio_vm': vm.folio_venta,
             'tecnico_id': tecnico.pk if tecnico else None,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
@@ -373,6 +328,54 @@ def obtener_ventas_mostrador_productivas(
     return filas
 
 
+def obtener_upsell_oow(
+    fecha_inicio: date | datetime | str | None = None,
+    fecha_fin: date | datetime | str | None = None,
+    sucursal_id: int | str | None = None,
+    tecnico_id: int | str | None = None,
+    gama: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Upsell OOW: órdenes con diagnóstico finalizadas que además tienen VM.
+
+    Returns:
+        Filas con desglose de servicios adicionales sobre una reparación.
+    """
+    return _filas_vm_por_tipo_servicio(
+        tipo_servicio='diagnostico',
+        tipo_flujo='upsell_oow',
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama,
+    )
+
+
+def obtener_vm_pura_fl(
+    fecha_inicio: date | datetime | str | None = None,
+    fecha_fin: date | datetime | str | None = None,
+    sucursal_id: int | str | None = None,
+    tecnico_id: int | str | None = None,
+    gama: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    VM pura FL: órdenes tipo venta_mostrador (sin diagnóstico) finalizadas.
+
+    Returns:
+        Filas con desglose de servicios de mostrador puro.
+    """
+    return _filas_vm_por_tipo_servicio(
+        tipo_servicio='venta_mostrador',
+        tipo_flujo='vm_pura_fl',
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama,
+    )
+
+
 def obtener_diagnosticos_realizados(
     fecha_inicio: date | datetime | str | None = None,
     fecha_fin: date | datetime | str | None = None,
@@ -383,16 +386,7 @@ def obtener_diagnosticos_realizados(
     """
     Diagnósticos SIC no vacíos atribuidos al técnico asignado actual.
 
-    Fecha usada:
-        - Preferente: detalle_equipo.fecha_fin_diagnostico en el rango.
-        - Fallback: si fecha_fin_diagnostico es null, se usa fecha_ingreso
-          de la orden (mismo criterio documentado en el plan).
-
-    Args:
-        fecha_inicio / fecha_fin / sucursal_id / tecnico_id / gama: filtros.
-
-    Returns:
-        Lista de dicts para la hoja de diagnósticos.
+    Fecha: fecha_fin_diagnostico en rango; si es null, fallback a fecha_ingreso.
     """
     qs = OrdenServicio.objects.filter(
         detalle_equipo__isnull=False,
@@ -413,13 +407,11 @@ def obtener_diagnosticos_realizados(
         gama=gama,
     )
 
-    # Rango: DateField vs DateTimeField requieren filtros distintos.
     d_inicio = _fecha_a_date(fecha_inicio)
     d_fin = _fecha_a_date(fecha_fin)
     inicio_dt = _normalizar_fecha_inicio(fecha_inicio)
     fin_dt = _normalizar_fecha_fin(fecha_fin)
 
-    # EXPLICACIÓN: (tiene fecha_fin en rango) OR (sin fecha_fin Y ingreso en rango).
     cond_con_fecha = Q(detalle_equipo__fecha_fin_diagnostico__isnull=False)
     cond_sin_fecha = Q(detalle_equipo__fecha_fin_diagnostico__isnull=True)
 
@@ -447,7 +439,6 @@ def obtener_diagnosticos_realizados(
         if not texto:
             continue
 
-        # Fecha mostrada: fin diagnóstico o, si falta, ingreso.
         fecha_diag: date | datetime | None = detalle.fecha_fin_diagnostico
         if fecha_diag is None:
             fecha_diag = orden.fecha_ingreso
@@ -469,86 +460,95 @@ def obtener_diagnosticos_realizados(
     return filas
 
 
+def _contadores_vm_vacios(prefijo: str) -> dict[str, int | Decimal]:
+    """Inicializa contadores de desglose VM con prefijo Upsell_ o FL_."""
+    return {
+        f'{prefijo}conteo': 0,
+        f'{prefijo}ingreso': Decimal('0.00'),
+        f'{prefijo}limpieza': 0,
+        f'{prefijo}reinstalacion': 0,
+        f'{prefijo}respaldo': 0,
+        f'{prefijo}cambio_pieza': 0,
+        f'{prefijo}kit': 0,
+        f'{prefijo}paquete_premium': 0,
+        f'{prefijo}paquete_oro': 0,
+        f'{prefijo}paquete_plata': 0,
+    }
+
+
+def _acumular_desglose_vm(bucket: dict[str, Any], fila: dict[str, Any], prefijo: str) -> None:
+    """Suma una fila VM al bucket del técnico con el prefijo dado."""
+    bucket[f'{prefijo}conteo'] += 1
+    bucket[f'{prefijo}ingreso'] += fila.get('total_vm') or Decimal('0.00')
+    if fila.get('incluye_limpieza'):
+        bucket[f'{prefijo}limpieza'] += 1
+    if fila.get('incluye_reinstalacion'):
+        bucket[f'{prefijo}reinstalacion'] += 1
+    if fila.get('incluye_respaldo'):
+        bucket[f'{prefijo}respaldo'] += 1
+    if fila.get('incluye_cambio_pieza'):
+        bucket[f'{prefijo}cambio_pieza'] += 1
+    if fila.get('incluye_kit'):
+        bucket[f'{prefijo}kit'] += 1
+    paquete = fila.get('paquete') or 'ninguno'
+    if paquete == 'premium':
+        bucket[f'{prefijo}paquete_premium'] += 1
+    elif paquete == 'oro':
+        bucket[f'{prefijo}paquete_oro'] += 1
+    elif paquete == 'plata':
+        bucket[f'{prefijo}paquete_plata'] += 1
+
+
 def agregar_resumen_por_tecnico(
     reparaciones: list[dict[str, Any]],
-    ventas: list[dict[str, Any]],
+    upsell_oow: list[dict[str, Any]],
+    vm_pura_fl: list[dict[str, Any]],
     diagnosticos: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """
-    Une las tres métricas en una fila por técnico.
-
-    Incluye desglose de servicios de venta mostrador (limpieza, reinstalación,
-    respaldo, cambio de pieza, kit) y paquetes (premium/oro/plata).
+    Une las cuatro métricas en una fila por técnico (conteos OOW / FL separados).
 
     Args:
-        reparaciones: salida de obtener_reparaciones_productivas.
-        ventas: salida de obtener_ventas_mostrador_productivas.
-        diagnosticos: salida de obtener_diagnosticos_realizados.
+        reparaciones: OOW con cot aceptada.
+        upsell_oow: VM sobre órdenes diagnóstico.
+        vm_pura_fl: VM sobre órdenes venta_mostrador.
+        diagnosticos: diagnósticos SIC.
 
     Returns:
-        Lista ordenada por nombre de técnico con conteos y sumas.
+        Lista ordenada por nombre de técnico.
     """
-    # Clave: tecnico_id (o nombre si falta id).
     por_tecnico: dict[Any, dict[str, Any]] = {}
 
     def _bucket(tecnico_id: Any, tecnico: str, sucursal: str) -> dict[str, Any]:
         clave = tecnico_id if tecnico_id is not None else f'nombre:{tecnico}'
         if clave not in por_tecnico:
-            # EXPLICACIÓN PARA PRINCIPIANTES: cada técnico arranca en 0;
-            # luego sumamos reparaciones, VM, diagnósticos y cada servicio VM.
-            por_tecnico[clave] = {
+            base: dict[str, Any] = {
                 'tecnico_id': tecnico_id,
                 'tecnico': tecnico,
                 'sucursales': set(),
-                'reparaciones': 0,
-                'ventas_mostrador': 0,
+                'reparaciones_oow': 0,
                 'diagnosticos': 0,
                 'valor_cot_aceptada': Decimal('0.00'),
-                'ingreso_vm': Decimal('0.00'),
-                # Desglose VM — cuántas veces vendió cada servicio/paquete
-                'vm_limpieza': 0,
-                'vm_reinstalacion': 0,
-                'vm_respaldo': 0,
-                'vm_cambio_pieza': 0,
-                'vm_kit': 0,
-                'vm_paquete_premium': 0,
-                'vm_paquete_oro': 0,
-                'vm_paquete_plata': 0,
             }
+            base.update(_contadores_vm_vacios('upsell_'))
+            base.update(_contadores_vm_vacios('fl_'))
+            por_tecnico[clave] = base
         if sucursal:
             por_tecnico[clave]['sucursales'].add(sucursal)
         return por_tecnico[clave]
 
     for fila in reparaciones:
         b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
-        b['reparaciones'] += 1
+        b['reparaciones_oow'] += 1
         b['valor_cot_aceptada'] += fila.get('valor_cot_aceptada') or Decimal('0.00')
 
-    for fila in ventas:
+    for fila in upsell_oow:
         b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
-        b['ventas_mostrador'] += 1
-        b['ingreso_vm'] += fila.get('total_vm') or Decimal('0.00')
+        _acumular_desglose_vm(b, fila, 'upsell_')
 
-        # Contar cada servicio activo en esa VM (una venta puede tener varios).
-        if fila.get('incluye_limpieza'):
-            b['vm_limpieza'] += 1
-        if fila.get('incluye_reinstalacion'):
-            b['vm_reinstalacion'] += 1
-        if fila.get('incluye_respaldo'):
-            b['vm_respaldo'] += 1
-        if fila.get('incluye_cambio_pieza'):
-            b['vm_cambio_pieza'] += 1
-        if fila.get('incluye_kit'):
-            b['vm_kit'] += 1
-
-        # Paquetes (solo premium/oro/plata; "ninguno" no suma).
-        paquete = fila.get('paquete') or 'ninguno'
-        if paquete == 'premium':
-            b['vm_paquete_premium'] += 1
-        elif paquete == 'oro':
-            b['vm_paquete_oro'] += 1
-        elif paquete == 'plata':
-            b['vm_paquete_plata'] += 1
+    for fila in vm_pura_fl:
+        b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
+        _acumular_desglose_vm(b, fila, 'fl_')
 
     for fila in diagnosticos:
         b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
@@ -557,24 +557,9 @@ def agregar_resumen_por_tecnico(
     resultado: list[dict[str, Any]] = []
     for b in por_tecnico.values():
         sucursales = sorted(b['sucursales'])
-        resultado.append({
-            'tecnico': b['tecnico'],
-            'tecnico_id': b['tecnico_id'],
-            'sucursales': ', '.join(sucursales),
-            'reparaciones': b['reparaciones'],
-            'ventas_mostrador': b['ventas_mostrador'],
-            'diagnosticos': b['diagnosticos'],
-            'valor_cot_aceptada': b['valor_cot_aceptada'],
-            'ingreso_vm': b['ingreso_vm'],
-            'vm_limpieza': b['vm_limpieza'],
-            'vm_reinstalacion': b['vm_reinstalacion'],
-            'vm_respaldo': b['vm_respaldo'],
-            'vm_cambio_pieza': b['vm_cambio_pieza'],
-            'vm_kit': b['vm_kit'],
-            'vm_paquete_premium': b['vm_paquete_premium'],
-            'vm_paquete_oro': b['vm_paquete_oro'],
-            'vm_paquete_plata': b['vm_paquete_plata'],
-        })
+        fila_out = {k: v for k, v in b.items() if k != 'sucursales'}
+        fila_out['sucursales'] = ', '.join(sucursales)
+        resultado.append(fila_out)
 
     resultado.sort(key=lambda x: x['tecnico'].lower())
     return resultado
@@ -626,7 +611,9 @@ def _fmt_fecha(valor: date | datetime | None) -> str:
     if valor is None:
         return ''
     if isinstance(valor, datetime):
-        return timezone.localtime(valor).strftime('%d/%m/%Y %H:%M') if timezone.is_aware(valor) else valor.strftime('%d/%m/%Y %H:%M')
+        if timezone.is_aware(valor):
+            return timezone.localtime(valor).strftime('%d/%m/%Y %H:%M')
+        return valor.strftime('%d/%m/%Y %H:%M')
     return valor.strftime('%d/%m/%Y')
 
 
@@ -635,200 +622,34 @@ def _si_no(valor: bool) -> str:
     return 'Sí' if valor else 'No'
 
 
-def generar_workbook_productividad_tecnicos(
-    fecha_inicio: date | datetime | str | None = None,
-    fecha_fin: date | datetime | str | None = None,
-    sucursal_id: int | str | None = None,
-    tecnico_id: int | str | None = None,
-    gama: str | None = None,
-) -> Workbook | None:
+def _escribir_hoja_detalle_vm(
+    wb: Workbook,
+    nombre_hoja: str,
+    titulo: str,
+    filas_vm: list[dict[str, Any]],
+    filtros_texto: str,
+    estilos: dict[str, Any],
+) -> None:
     """
-    Arma el Excel de productividad con 4 hojas.
+    Escribe una hoja de detalle VM (upsell OOW o VM pura FL).
 
     Args:
-        fecha_inicio / fecha_fin / sucursal_id / tecnico_id / gama: filtros GET.
-
-    Returns:
-        Workbook openpyxl, o None si no hay ninguna fila en las tres métricas.
-
-    Efectos secundarios:
-        Solo lectura ORM; el archivo se serializa en la vista HTTP.
+        wb: Workbook destino.
+        nombre_hoja / titulo: identificación de la hoja.
+        filas_vm: datos ya filtrados por tipo de flujo.
+        filtros_texto / estilos: cabecera común.
     """
-    filtros = {
-        'fecha_inicio': fecha_inicio,
-        'fecha_fin': fecha_fin,
-        'sucursal_id': sucursal_id,
-        'tecnico_id': tecnico_id,
-        'gama': gama,
-    }
+    ws = wb.create_sheet(nombre_hoja)
+    ws.merge_cells('A1:P1')
+    ws['A1'] = titulo
+    ws['A1'].font = estilos['title_font']
+    ws['A1'].fill = estilos['title_fill']
+    ws['A1'].alignment = estilos['title_align']
+    ws.merge_cells('A2:P2')
+    ws['A2'] = filtros_texto
+    ws['A2'].font = estilos['subtitle_font']
 
-    reparaciones = obtener_reparaciones_productivas(**filtros)
-    ventas = obtener_ventas_mostrador_productivas(**filtros)
-    diagnosticos = obtener_diagnosticos_realizados(**filtros)
-
-    # Sin datos en ninguna métrica → la vista mostrará warning y redirigirá.
-    if not reparaciones and not ventas and not diagnosticos:
-        return None
-
-    resumen = agregar_resumen_por_tecnico(reparaciones, ventas, diagnosticos)
-    estilos = _estilos_excel()
-
-    wb = Workbook()
-    wb.remove(wb.active)
-
-    filtros_texto = (
-        f"Período: {fecha_inicio or 'Inicio'} - {fecha_fin or 'Actual'}"
-    )
-    if sucursal_id:
-        filtros_texto += f' | Sucursal ID: {sucursal_id}'
-    if tecnico_id:
-        filtros_texto += f' | Técnico ID: {tecnico_id}'
-    if gama:
-        filtros_texto += f' | Gama: {gama}'
-    generado = timezone.localtime().strftime('%d/%m/%Y %H:%M:%S')
-
-    # ------------------------------------------------------------------
-    # HOJA 1: Resumen por técnico
-    # ------------------------------------------------------------------
-    # Columnas amplias: métricas base + desglose de servicios/paquetes VM.
-    num_cols_resumen = 15
-    ultima_col = get_column_letter(num_cols_resumen)
-
-    ws1 = wb.create_sheet(HOJAS_EXCEL[0])
-    ws1.merge_cells(f'A1:{ultima_col}1')
-    ws1['A1'] = 'PRODUCTIVIDAD TÉCNICOS — RESUMEN'
-    ws1['A1'].font = estilos['title_font']
-    ws1['A1'].fill = estilos['title_fill']
-    ws1['A1'].alignment = estilos['title_align']
-    ws1.merge_cells(f'A2:{ultima_col}2')
-    ws1['A2'] = filtros_texto
-    ws1['A2'].font = estilos['subtitle_font']
-    ws1['A2'].alignment = Alignment(horizontal='center')
-    ws1.merge_cells(f'A3:{ultima_col}3')
-    ws1['A3'] = (
-        f'Generado: {generado} | '
-        'Columnas VM = cuántas ventas incluyeron cada servicio/paquete'
-    )
-    ws1['A3'].font = estilos['subtitle_font']
-    ws1['A3'].alignment = Alignment(horizontal='center')
-
-    headers1 = [
-        'Técnico',
-        'Sucursal(es)',
-        'Reparaciones',
-        'Ventas mostrador',
-        'Diagnósticos',
-        'Valor cotización aceptada',
-        'Ingreso VM',
-        'Limpieza y mant.',
-        'Reinstalación SO',
-        'Respaldo info',
-        'Cambio de pieza',
-        'Kit limpieza',
-        'Paquete Premium',
-        'Paquete Oro',
-        'Paquete Plata',
-    ]
-    _aplicar_header(ws1, 5, headers1, estilos)
-    fila = 6
-    for row in resumen:
-        # Columnas 1–5: identidad y conteos principales
-        valores_base = [
-            row['tecnico'],
-            row['sucursales'],
-            row['reparaciones'],
-            row['ventas_mostrador'],
-            row['diagnosticos'],
-        ]
-        for col, val in enumerate(valores_base, 1):
-            ws1.cell(row=fila, column=col, value=val).border = estilos['border']
-
-        # Columnas 6–7: montos
-        c_val = ws1.cell(row=fila, column=6, value=float(row['valor_cot_aceptada']))
-        c_val.number_format = estilos['number_fmt']
-        c_val.border = estilos['border']
-        c_vm = ws1.cell(row=fila, column=7, value=float(row['ingreso_vm']))
-        c_vm.number_format = estilos['number_fmt']
-        c_vm.border = estilos['border']
-
-        # Columnas 8–15: desglose servicios y paquetes VM
-        desglose_vm = [
-            row['vm_limpieza'],
-            row['vm_reinstalacion'],
-            row['vm_respaldo'],
-            row['vm_cambio_pieza'],
-            row['vm_kit'],
-            row['vm_paquete_premium'],
-            row['vm_paquete_oro'],
-            row['vm_paquete_plata'],
-        ]
-        for col, val in enumerate(desglose_vm, 8):
-            ws1.cell(row=fila, column=col, value=val).border = estilos['border']
-        fila += 1
-    _auto_ajustar(ws1)
-
-    # ------------------------------------------------------------------
-    # HOJA 2: Detalle reparaciones
-    # ------------------------------------------------------------------
-    ws2 = wb.create_sheet(HOJAS_EXCEL[1])
-    ws2.merge_cells('A1:J1')
-    ws2['A1'] = 'DETALLE REPARACIONES PRODUCTIVAS'
-    ws2['A1'].font = estilos['title_font']
-    ws2['A1'].fill = estilos['title_fill']
-    ws2['A1'].alignment = estilos['title_align']
-    ws2.merge_cells('A2:J2')
-    ws2['A2'] = filtros_texto
-    ws2['A2'].font = estilos['subtitle_font']
-
-    headers2 = [
-        'Orden cliente',
-        'Service Tag',
-        'Técnico',
-        'Sucursal',
-        'Estado',
-        'Fecha finalización',
-        '¿Cot aceptada?',
-        '¿Tiene VM?',
-        'Valor aceptado cot',
-        'Folio VM',
-    ]
-    _aplicar_header(ws2, 4, headers2, estilos)
-    fila = 5
-    for row in reparaciones:
-        vals = [
-            row['folio'],
-            row['service_tag'],
-            row['tecnico'],
-            row['sucursal'],
-            row['estado'],
-            _fmt_fecha(row['fecha_finalizacion']),
-            _si_no(row['cot_aceptada']),
-            _si_no(row['tiene_vm']),
-            float(row['valor_cot_aceptada']),
-            row['folio_vm'],
-        ]
-        for col, val in enumerate(vals, 1):
-            cell = ws2.cell(row=fila, column=col, value=val)
-            cell.border = estilos['border']
-            if col == 9:
-                cell.number_format = estilos['number_fmt']
-        fila += 1
-    _auto_ajustar(ws2)
-
-    # ------------------------------------------------------------------
-    # HOJA 3: Detalle ventas mostrador
-    # ------------------------------------------------------------------
-    ws3 = wb.create_sheet(HOJAS_EXCEL[2])
-    ws3.merge_cells('A1:P1')
-    ws3['A1'] = 'DETALLE VENTAS MOSTRADOR'
-    ws3['A1'].font = estilos['title_font']
-    ws3['A1'].fill = estilos['title_fill']
-    ws3['A1'].alignment = estilos['title_align']
-    ws3.merge_cells('A2:P2')
-    ws3['A2'] = filtros_texto
-    ws3['A2'].font = estilos['subtitle_font']
-
-    headers3 = [
+    headers = [
         'Orden cliente',
         'Service Tag',
         'Folio VM',
@@ -846,9 +667,9 @@ def generar_workbook_productividad_tecnicos(
         'Piezas',
         'Total VM',
     ]
-    _aplicar_header(ws3, 4, headers3, estilos)
+    _aplicar_header(ws, 4, headers, estilos)
     fila = 5
-    for row in ventas:
+    for row in filas_vm:
         vals = [
             row['folio'],
             row['service_tag'],
@@ -868,30 +689,236 @@ def generar_workbook_productividad_tecnicos(
             float(row['total_vm']),
         ]
         for col, val in enumerate(vals, 1):
-            cell = ws3.cell(row=fila, column=col, value=val)
+            cell = ws.cell(row=fila, column=col, value=val)
             cell.border = estilos['border']
-            # Costos: paquete(6), limpieza(8), reinst(10), respaldo(12), total(16)
             if col in (6, 8, 10, 12, 16):
                 cell.number_format = estilos['number_fmt']
         fila += 1
-    _auto_ajustar(ws3)
+    _auto_ajustar(ws)
+
+
+def generar_workbook_productividad_tecnicos(
+    fecha_inicio: date | datetime | str | None = None,
+    fecha_fin: date | datetime | str | None = None,
+    sucursal_id: int | str | None = None,
+    tecnico_id: int | str | None = None,
+    gama: str | None = None,
+) -> Workbook | None:
+    """
+    Arma el Excel de productividad con 5 hojas (OOW / upsell / FL / diagnósticos).
+
+    Returns:
+        Workbook openpyxl, o None si no hay ninguna fila en las métricas.
+    """
+    filtros = {
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
+        'sucursal_id': sucursal_id,
+        'tecnico_id': tecnico_id,
+        'gama': gama,
+    }
+
+    reparaciones = obtener_reparaciones_productivas(**filtros)
+    upsell_oow = obtener_upsell_oow(**filtros)
+    vm_pura_fl = obtener_vm_pura_fl(**filtros)
+    diagnosticos = obtener_diagnosticos_realizados(**filtros)
+
+    if not reparaciones and not upsell_oow and not vm_pura_fl and not diagnosticos:
+        return None
+
+    resumen = agregar_resumen_por_tecnico(
+        reparaciones, upsell_oow, vm_pura_fl, diagnosticos,
+    )
+    estilos = _estilos_excel()
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    filtros_texto = (
+        f"Período: {fecha_inicio or 'Inicio'} - {fecha_fin or 'Actual'}"
+    )
+    if sucursal_id:
+        filtros_texto += f' | Sucursal ID: {sucursal_id}'
+    if tecnico_id:
+        filtros_texto += f' | Técnico ID: {tecnico_id}'
+    if gama:
+        filtros_texto += f' | Gama: {gama}'
+    generado = timezone.localtime().strftime('%d/%m/%Y %H:%M:%S')
 
     # ------------------------------------------------------------------
-    # HOJA 4: Detalle diagnósticos
+    # HOJA 1: Resumen por técnico (OOW y FL separados)
     # ------------------------------------------------------------------
-    ws4 = wb.create_sheet(HOJAS_EXCEL[3])
-    ws4.merge_cells('A1:G1')
-    ws4['A1'] = 'DETALLE DIAGNÓSTICOS'
-    ws4['A1'].font = estilos['title_font']
-    ws4['A1'].fill = estilos['title_fill']
-    ws4['A1'].alignment = estilos['title_align']
-    ws4.merge_cells('A2:G2')
-    ws4['A2'] = (
+    headers1 = [
+        'Técnico',
+        'Sucursal(es)',
+        'Reparaciones OOW',
+        'Upsell OOW',
+        'VM pura FL',
+        'Diagnósticos',
+        'Valor cot OOW',
+        'Ingreso upsell OOW',
+        'Ingreso VM FL',
+        'Upsell limpieza',
+        'Upsell reinst. SO',
+        'Upsell respaldo',
+        'Upsell cambio pieza',
+        'Upsell kit',
+        'Upsell Prem.',
+        'Upsell Oro',
+        'Upsell Plata',
+        'FL limpieza',
+        'FL reinst. SO',
+        'FL respaldo',
+        'FL cambio pieza',
+        'FL kit',
+        'FL Prem.',
+        'FL Oro',
+        'FL Plata',
+    ]
+    num_cols = len(headers1)
+    ultima = get_column_letter(num_cols)
+
+    ws1 = wb.create_sheet(HOJAS_EXCEL[0])
+    ws1.merge_cells(f'A1:{ultima}1')
+    ws1['A1'] = 'PRODUCTIVIDAD TÉCNICOS — RESUMEN (OOW vs FL)'
+    ws1['A1'].font = estilos['title_font']
+    ws1['A1'].fill = estilos['title_fill']
+    ws1['A1'].alignment = estilos['title_align']
+    ws1.merge_cells(f'A2:{ultima}2')
+    ws1['A2'] = filtros_texto
+    ws1['A2'].font = estilos['subtitle_font']
+    ws1['A2'].alignment = Alignment(horizontal='center')
+    ws1.merge_cells(f'A3:{ultima}3')
+    ws1['A3'] = (
+        f'Generado: {generado} | '
+        'OOW = diagnóstico/reparación; Upsell = VM adicional en OOW; '
+        'FL = venta mostrador sin diagnóstico'
+    )
+    ws1['A3'].font = estilos['subtitle_font']
+    ws1['A3'].alignment = Alignment(horizontal='center')
+
+    _aplicar_header(ws1, 5, headers1, estilos)
+    fila = 6
+    for row in resumen:
+        vals = [
+            row['tecnico'],
+            row['sucursales'],
+            row['reparaciones_oow'],
+            row['upsell_conteo'],
+            row['fl_conteo'],
+            row['diagnosticos'],
+            float(row['valor_cot_aceptada']),
+            float(row['upsell_ingreso']),
+            float(row['fl_ingreso']),
+            row['upsell_limpieza'],
+            row['upsell_reinstalacion'],
+            row['upsell_respaldo'],
+            row['upsell_cambio_pieza'],
+            row['upsell_kit'],
+            row['upsell_paquete_premium'],
+            row['upsell_paquete_oro'],
+            row['upsell_paquete_plata'],
+            row['fl_limpieza'],
+            row['fl_reinstalacion'],
+            row['fl_respaldo'],
+            row['fl_cambio_pieza'],
+            row['fl_kit'],
+            row['fl_paquete_premium'],
+            row['fl_paquete_oro'],
+            row['fl_paquete_plata'],
+        ]
+        for col, val in enumerate(vals, 1):
+            cell = ws1.cell(row=fila, column=col, value=val)
+            cell.border = estilos['border']
+            if col in (7, 8, 9):
+                cell.number_format = estilos['number_fmt']
+        fila += 1
+    _auto_ajustar(ws1)
+
+    # ------------------------------------------------------------------
+    # HOJA 2: Detalle reparaciones OOW
+    # ------------------------------------------------------------------
+    ws2 = wb.create_sheet(HOJAS_EXCEL[1])
+    ws2.merge_cells('A1:J1')
+    ws2['A1'] = 'DETALLE REPARACIONES OOW (diagnóstico + cot aceptada)'
+    ws2['A1'].font = estilos['title_font']
+    ws2['A1'].fill = estilos['title_fill']
+    ws2['A1'].alignment = estilos['title_align']
+    ws2.merge_cells('A2:J2')
+    ws2['A2'] = filtros_texto
+    ws2['A2'].font = estilos['subtitle_font']
+
+    headers2 = [
+        'Orden cliente',
+        'Service Tag',
+        'Técnico',
+        'Sucursal',
+        'Estado',
+        'Fecha finalización',
+        '¿Cot aceptada?',
+        '¿Tiene upsell VM?',
+        'Valor aceptado cot',
+        'Folio VM',
+    ]
+    _aplicar_header(ws2, 4, headers2, estilos)
+    fila = 5
+    for row in reparaciones:
+        vals = [
+            row['folio'],
+            row['service_tag'],
+            row['tecnico'],
+            row['sucursal'],
+            row['estado'],
+            _fmt_fecha(row['fecha_finalizacion']),
+            _si_no(row['cot_aceptada']),
+            _si_no(row['tiene_upsell_vm']),
+            float(row['valor_cot_aceptada']),
+            row['folio_vm'],
+        ]
+        for col, val in enumerate(vals, 1):
+            cell = ws2.cell(row=fila, column=col, value=val)
+            cell.border = estilos['border']
+            if col == 9:
+                cell.number_format = estilos['number_fmt']
+        fila += 1
+    _auto_ajustar(ws2)
+
+    # ------------------------------------------------------------------
+    # HOJAS 3 y 4: Upsell OOW / VM pura FL
+    # ------------------------------------------------------------------
+    _escribir_hoja_detalle_vm(
+        wb,
+        HOJAS_EXCEL[2],
+        'DETALLE UPSELL OOW (adicionales sobre diagnóstico)',
+        upsell_oow,
+        filtros_texto,
+        estilos,
+    )
+    _escribir_hoja_detalle_vm(
+        wb,
+        HOJAS_EXCEL[3],
+        'DETALLE VM PURA FL (sin diagnóstico)',
+        vm_pura_fl,
+        filtros_texto,
+        estilos,
+    )
+
+    # ------------------------------------------------------------------
+    # HOJA 5: Detalle diagnósticos
+    # ------------------------------------------------------------------
+    ws5 = wb.create_sheet(HOJAS_EXCEL[4])
+    ws5.merge_cells('A1:G1')
+    ws5['A1'] = 'DETALLE DIAGNÓSTICOS'
+    ws5['A1'].font = estilos['title_font']
+    ws5['A1'].fill = estilos['title_fill']
+    ws5['A1'].alignment = estilos['title_align']
+    ws5.merge_cells('A2:G2')
+    ws5['A2'] = (
         f'{filtros_texto} | Fecha: fin diagnóstico o, si falta, fecha de ingreso'
     )
-    ws4['A2'].font = estilos['subtitle_font']
+    ws5['A2'].font = estilos['subtitle_font']
 
-    headers4 = [
+    headers5 = [
         'Orden cliente',
         'Service Tag',
         'Técnico',
@@ -900,7 +927,7 @@ def generar_workbook_productividad_tecnicos(
         'Longitud texto',
         'Extracto diagnóstico',
     ]
-    _aplicar_header(ws4, 4, headers4, estilos)
+    _aplicar_header(ws5, 4, headers5, estilos)
     fila = 5
     for row in diagnosticos:
         vals = [
@@ -913,41 +940,9 @@ def generar_workbook_productividad_tecnicos(
             row['extracto'],
         ]
         for col, val in enumerate(vals, 1):
-            cell = ws4.cell(row=fila, column=col, value=val)
+            cell = ws5.cell(row=fila, column=col, value=val)
             cell.border = estilos['border']
         fila += 1
-    _auto_ajustar(ws4)
+    _auto_ajustar(ws5)
 
     return wb
-
-
-def hay_datos_productividad(
-    fecha_inicio: date | datetime | str | None = None,
-    fecha_fin: date | datetime | str | None = None,
-    sucursal_id: int | str | None = None,
-    tecnico_id: int | str | None = None,
-    gama: str | None = None,
-) -> bool:
-    """
-    True si al menos una de las tres métricas tiene filas (útil para tests).
-
-    Args:
-        Mismos filtros que generar_workbook_productividad_tecnicos.
-
-    Returns:
-        bool
-    """
-    filtros = {
-        'fecha_inicio': fecha_inicio,
-        'fecha_fin': fecha_fin,
-        'sucursal_id': sucursal_id,
-        'tecnico_id': tecnico_id,
-        'gama': gama,
-    }
-    if obtener_reparaciones_productivas(**filtros):
-        return True
-    if obtener_ventas_mostrador_productivas(**filtros):
-        return True
-    if obtener_diagnosticos_realizados(**filtros):
-        return True
-    return False

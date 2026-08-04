@@ -1,13 +1,13 @@
 """
-Tests de productividad técnicos (Excel export).
+Tests de productividad técnicos (Excel export) — OOW vs FL.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-Validamos las reglas de negocio del plan:
-1) Solo cuentan órdenes finalizadas/entregadas con cot aceptada o VM.
-2) Órdenes sin cot/VM o aún en reparación no entran.
-3) Diagnósticos con texto SIC sí aparecen.
-4) El workbook tiene exactamente las 4 hojas acordadas.
+Validamos las reglas del plan Separar OOW vs FL:
+1) Reparación = solo diagnóstico + cot aceptada (no mete FL).
+2) Upsell OOW = diagnóstico finalizado con VM.
+3) VM pura FL = tipo_servicio venta_mostrador con VM; no cuenta como reparación.
+4) El workbook tiene exactamente 5 hojas.
 """
 
 from datetime import date, timedelta
@@ -32,25 +32,18 @@ from servicio_tecnico.services.productividad_tecnicos import (
     generar_workbook_productividad_tecnicos,
     obtener_diagnosticos_realizados,
     obtener_reparaciones_productivas,
-    obtener_ventas_mostrador_productivas,
+    obtener_upsell_oow,
+    obtener_vm_pura_fl,
 )
 
 
 class ProductividadTecnicosServiceTest(TestCase):
-    """
-    Integración ligera contra BD: reglas de conteo del service.
-
-    Objetivo: asegurar que el Excel no cuente órdenes “a medias”.
-    """
+    """Integración ligera: reglas OOW / upsell / FL."""
 
     databases = {'default', 'mexico'}
 
     def setUp(self):
-        """
-        Crea sucursal + técnico y un rango de fechas de prueba.
-
-        Efectos secundarios: registros en BD de test.
-        """
+        """Crea sucursal + técnico y rango de fechas."""
         self.sucursal = Sucursal.objects.create(
             nombre='Sucursal Prod Técnicos',
             ciudad='CDMX',
@@ -69,7 +62,6 @@ class ProductividadTecnicosServiceTest(TestCase):
             rol='tecnico',
             contraseña_configurada=True,
         )
-        # Ventana: hoy ± margen (fecha_finalizacion / ingreso dentro del rango).
         self.hoy = timezone.now()
         self.fecha_inicio = (self.hoy - timedelta(days=7)).date().isoformat()
         self.fecha_fin = (self.hoy + timedelta(days=1)).date().isoformat()
@@ -79,29 +71,29 @@ class ProductividadTecnicosServiceTest(TestCase):
         self,
         *,
         estado: str = 'finalizado',
+        tipo_servicio: str = 'diagnostico',
         con_fecha_fin: bool = True,
         orden_cliente: str | None = None,
         diagnostico: str = '',
         fecha_fin_diagnostico: date | None = None,
     ) -> OrdenServicio:
         """
-        Helper: orden mínima + detalle de equipo.
+        Helper: orden mínima + detalle.
 
         Args:
-            estado: código de ESTADO_ORDEN_CHOICES.
-            con_fecha_fin: si True, setea fecha_finalizacion = ahora.
-            orden_cliente: folio cliente único.
-            diagnostico: texto SIC (vacío = sin diagnóstico contable).
-            fecha_fin_diagnostico: DateField opcional del detalle.
-
-        Returns:
-            OrdenServicio creada.
+            tipo_servicio: 'diagnostico' (OOW) o 'venta_mostrador' (FL).
         """
         self._contador += 1
-        folio = orden_cliente or f'OOW-PROD-{self._contador:03d}'
+        if orden_cliente:
+            folio = orden_cliente
+        elif tipo_servicio == 'venta_mostrador':
+            folio = f'FL-PROD-{self._contador:03d}'
+        else:
+            folio = f'OOW-PROD-{self._contador:03d}'
+
         orden = OrdenServicio.objects.create(
             sucursal=self.sucursal,
-            tipo_servicio='diagnostico',
+            tipo_servicio=tipo_servicio,
             estado=estado,
             tecnico_asignado_actual=self.empleado,
             costo_mano_obra=Decimal('0.00'),
@@ -125,16 +117,14 @@ class ProductividadTecnicosServiceTest(TestCase):
         return orden
 
     def _folio_cliente(self, orden: OrdenServicio) -> str:
-        """Atajo: orden_cliente del detalle (lo que muestra el Excel)."""
         return orden.detalle_equipo.orden_cliente
 
     def _service_tag(self, orden: OrdenServicio) -> str:
-        """Atajo: número de serie = Service Tag."""
         return orden.detalle_equipo.numero_serie
 
-    def test_finalizada_con_cot_aceptada_cuenta_reparacion(self):
-        """Feliz: finalizada + cotización aceptada → entra en reparaciones."""
-        orden = self._crear_orden(estado='finalizado')
+    def test_oow_con_cot_aceptada_cuenta_reparacion(self):
+        """OOW finalizada + cot aceptada → reparaciones OOW."""
+        orden = self._crear_orden(estado='finalizado', tipo_servicio='diagnostico')
         Cotizacion.objects.create(
             orden=orden,
             usuario_acepto=True,
@@ -146,15 +136,15 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_fin=self.fecha_fin,
         )
         folio = self._folio_cliente(orden)
-        folios = [f['folio'] for f in filas]
-        self.assertIn(folio, folios)
+        self.assertIn(folio, [f['folio'] for f in filas])
         fila = next(f for f in filas if f['folio'] == folio)
         self.assertTrue(fila['cot_aceptada'])
         self.assertEqual(fila['service_tag'], self._service_tag(orden))
+        self.assertFalse(fila['tiene_upsell_vm'])
 
-    def test_finalizada_solo_vm_cuenta_reparacion_y_vm(self):
-        """Feliz: finalizada solo con VM → reparación + hoja VM + desglose resumen."""
-        orden = self._crear_orden(estado='entregado')
+    def test_oow_con_vm_es_upsell_no_reparacion_sin_cot(self):
+        """OOW finalizada solo con VM (sin cot) → upsell; NO reparación."""
+        orden = self._crear_orden(estado='entregado', tipo_servicio='diagnostico')
         VentaMostrador.objects.create(
             orden=orden,
             paquete='plata',
@@ -165,42 +155,115 @@ class ProductividadTecnicosServiceTest(TestCase):
             costo_reinstalacion=Decimal('80.00'),
         )
 
+        folio = self._folio_cliente(orden)
         reparaciones = obtener_reparaciones_productivas(
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
         )
-        ventas = obtener_ventas_mostrador_productivas(
+        upsell = obtener_upsell_oow(
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
         )
-        folio = self._folio_cliente(orden)
-        self.assertTrue(any(f['folio'] == folio for f in reparaciones))
-        self.assertTrue(any(f['folio'] == folio for f in ventas))
-        vm_fila = next(f for f in ventas if f['folio'] == folio)
+        fl = obtener_vm_pura_fl(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+
+        self.assertFalse(any(f['folio'] == folio for f in reparaciones))
+        self.assertTrue(any(f['folio'] == folio for f in upsell))
+        self.assertFalse(any(f['folio'] == folio for f in fl))
+
+        vm_fila = next(f for f in upsell if f['folio'] == folio)
+        self.assertEqual(vm_fila['tipo_flujo'], 'upsell_oow')
         self.assertTrue(vm_fila['incluye_limpieza'])
-        self.assertEqual(vm_fila['paquete'], 'plata')
-        self.assertEqual(vm_fila['service_tag'], self._service_tag(orden))
 
-        # Resumen: el técnico debe reflejar limpieza, reinstalación y paquete plata.
-        resumen = agregar_resumen_por_tecnico(reparaciones, ventas, [])
-        self.assertEqual(len(resumen), 1)
-        self.assertEqual(resumen[0]['vm_limpieza'], 1)
-        self.assertEqual(resumen[0]['vm_reinstalacion'], 1)
-        self.assertEqual(resumen[0]['vm_respaldo'], 0)
-        self.assertEqual(resumen[0]['vm_cambio_pieza'], 0)
-        self.assertEqual(resumen[0]['vm_paquete_plata'], 1)
-        self.assertEqual(resumen[0]['vm_paquete_premium'], 0)
+        resumen = agregar_resumen_por_tecnico([], upsell, fl, [])
+        self.assertEqual(resumen[0]['upsell_limpieza'], 1)
+        self.assertEqual(resumen[0]['upsell_reinstalacion'], 1)
+        self.assertEqual(resumen[0]['upsell_paquete_plata'], 1)
+        self.assertEqual(resumen[0]['fl_conteo'], 0)
+        self.assertEqual(resumen[0]['reparaciones_oow'], 0)
 
-    def test_finalizada_sin_cot_ni_vm_no_cuenta_reparacion(self):
-        """Borde: finalizada sin cot aceptada ni VM → no es reparación productiva."""
+    def test_oow_con_cot_y_vm_aparece_en_reparacion_y_upsell(self):
+        """OOW + cot aceptada + VM → reparación Y upsell."""
+        orden = self._crear_orden(estado='finalizado', tipo_servicio='diagnostico')
+        Cotizacion.objects.create(
+            orden=orden,
+            usuario_acepto=True,
+            costo_mano_obra=Decimal('150.00'),
+        )
+        VentaMostrador.objects.create(
+            orden=orden,
+            paquete='ninguno',
+            incluye_limpieza=True,
+            costo_limpieza=Decimal('40.00'),
+        )
+        folio = self._folio_cliente(orden)
+
+        reparaciones = obtener_reparaciones_productivas(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+        upsell = obtener_upsell_oow(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+        self.assertTrue(any(f['folio'] == folio for f in reparaciones))
+        self.assertTrue(any(f['folio'] == folio for f in upsell))
+        rep = next(f for f in reparaciones if f['folio'] == folio)
+        self.assertTrue(rep['tiene_upsell_vm'])
+
+    def test_fl_con_vm_solo_en_vm_pura_no_reparacion(self):
+        """FL finalizada + VM → solo VM pura; nunca reparación ni upsell OOW."""
+        orden = self._crear_orden(
+            estado='finalizado',
+            tipo_servicio='venta_mostrador',
+        )
+        VentaMostrador.objects.create(
+            orden=orden,
+            paquete='oro',
+            costo_paquete=Decimal('200.00'),
+            incluye_kit_limpieza=True,
+            costo_kit=Decimal('30.00'),
+        )
+        folio = self._folio_cliente(orden)
+
+        reparaciones = obtener_reparaciones_productivas(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+        upsell = obtener_upsell_oow(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+        fl = obtener_vm_pura_fl(
+            fecha_inicio=self.fecha_inicio,
+            fecha_fin=self.fecha_fin,
+        )
+
+        self.assertFalse(any(f['folio'] == folio for f in reparaciones))
+        self.assertFalse(any(f['folio'] == folio for f in upsell))
+        self.assertTrue(any(f['folio'] == folio for f in fl))
+        self.assertEqual(
+            next(f for f in fl if f['folio'] == folio)['tipo_flujo'],
+            'vm_pura_fl',
+        )
+
+        resumen = agregar_resumen_por_tecnico(reparaciones, upsell, fl, [])
+        self.assertEqual(resumen[0]['fl_conteo'], 1)
+        self.assertEqual(resumen[0]['fl_kit'], 1)
+        self.assertEqual(resumen[0]['fl_paquete_oro'], 1)
+        self.assertEqual(resumen[0]['upsell_conteo'], 0)
+        self.assertEqual(resumen[0]['reparaciones_oow'], 0)
+
+    def test_finalizada_sin_cot_no_cuenta_reparacion(self):
+        """OOW finalizada sin cot aceptada → no reparación."""
         orden = self._crear_orden(estado='finalizado')
-        # Cotización pendiente (None) no debe contar.
         Cotizacion.objects.create(
             orden=orden,
             usuario_acepto=None,
             costo_mano_obra=Decimal('100.00'),
         )
-
         filas = obtener_reparaciones_productivas(
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
@@ -210,17 +273,13 @@ class ProductividadTecnicosServiceTest(TestCase):
         )
 
     def test_en_reparacion_con_cot_aceptada_no_cuenta(self):
-        """Borde: aún en reparación aunque cot aceptada → fuera del reporte."""
-        orden = self._crear_orden(
-            estado='reparacion',
-            con_fecha_fin=False,
-        )
+        """Aún en reparación → fuera aunque cot aceptada."""
+        orden = self._crear_orden(estado='reparacion', con_fecha_fin=False)
         Cotizacion.objects.create(
             orden=orden,
             usuario_acepto=True,
             costo_mano_obra=Decimal('150.00'),
         )
-
         filas = obtener_reparaciones_productivas(
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
@@ -230,14 +289,13 @@ class ProductividadTecnicosServiceTest(TestCase):
         )
 
     def test_diagnostico_con_texto_aparece(self):
-        """Diagnóstico SIC no vacío con fecha_fin en período → hoja diagnósticos."""
+        """Diagnóstico SIC no vacío → hoja diagnósticos."""
         orden = self._crear_orden(
             estado='diagnostico',
             con_fecha_fin=False,
             diagnostico='Falla en board principal; requiere reballing BGA.',
             fecha_fin_diagnostico=self.hoy.date(),
         )
-
         filas = obtener_diagnosticos_realizados(
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
@@ -245,12 +303,11 @@ class ProductividadTecnicosServiceTest(TestCase):
         folio = self._folio_cliente(orden)
         self.assertTrue(any(f['folio'] == folio for f in filas))
         fila = next(f for f in filas if f['folio'] == folio)
-        self.assertGreater(fila['longitud_texto'], 10)
         self.assertIn('board', fila['extracto'].lower())
         self.assertEqual(fila['service_tag'], self._service_tag(orden))
 
-    def test_workbook_tiene_cuatro_hojas(self):
-        """Workbook con datos tiene exactamente las 4 hojas del plan."""
+    def test_workbook_tiene_cinco_hojas(self):
+        """Workbook con datos tiene exactamente las 5 hojas del plan."""
         orden = self._crear_orden(estado='finalizado')
         Cotizacion.objects.create(
             orden=orden,
@@ -270,13 +327,18 @@ class ProductividadTecnicosServiceTest(TestCase):
         )
         self.assertIsNotNone(wb)
         self.assertEqual(tuple(wb.sheetnames), HOJAS_EXCEL)
+        self.assertEqual(len(HOJAS_EXCEL), 5)
 
         resumen = agregar_resumen_por_tecnico(
             obtener_reparaciones_productivas(
                 fecha_inicio=self.fecha_inicio,
                 fecha_fin=self.fecha_fin,
             ),
-            obtener_ventas_mostrador_productivas(
+            obtener_upsell_oow(
+                fecha_inicio=self.fecha_inicio,
+                fecha_fin=self.fecha_fin,
+            ),
+            obtener_vm_pura_fl(
                 fecha_inicio=self.fecha_inicio,
                 fecha_fin=self.fecha_fin,
             ),
@@ -285,23 +347,16 @@ class ProductividadTecnicosServiceTest(TestCase):
                 fecha_fin=self.fecha_fin,
             ),
         )
-        self.assertTrue(any(r['reparaciones'] >= 1 for r in resumen))
+        self.assertTrue(any(r['reparaciones_oow'] >= 1 for r in resumen))
         self.assertTrue(any(r['diagnosticos'] >= 1 for r in resumen))
 
 
 class ProductividadTecnicosVistaTest(TestCase):
-    """
-    HTTP: descarga Excel o redirect si no hay datos.
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Usamos RequestFactory (no Client) para evitar PaisMiddleware, que enruta
-    lecturas a la BD 'mexico' mientras setUp escribe en 'default'.
-    """
+    """HTTP: descarga Excel o redirect si no hay datos."""
 
     databases = {'default', 'mexico'}
 
     def setUp(self):
-        """Usuario con permiso de dashboard gerencial + factory."""
         from django.contrib.messages.storage.fallback import FallbackStorage
         from django.contrib.sessions.backends.db import SessionStore
         from django.test import RequestFactory
@@ -338,15 +393,6 @@ class ProductividadTecnicosVistaTest(TestCase):
         self.url = reverse('servicio_tecnico:exportar_productividad_tecnicos')
 
     def _get(self, query: dict | None = None):
-        """
-        Arma GET autenticado con session + messages hacia la vista export.
-
-        Args:
-            query: query string (filtros de fechas, etc.).
-
-        Returns:
-            HttpResponse de exportar_productividad_tecnicos.
-        """
         from servicio_tecnico.views_export_productividad_tecnicos import (
             exportar_productividad_tecnicos,
         )
@@ -359,7 +405,7 @@ class ProductividadTecnicosVistaTest(TestCase):
         return exportar_productividad_tecnicos(request)
 
     def test_sin_datos_redirige_con_mensaje(self):
-        """Sin filas → redirect al dashboard (no 500)."""
+        """Sin filas → redirect al dashboard."""
         response = self._get({
             'fecha_inicio': '2099-01-01',
             'fecha_fin': '2099-01-31',
@@ -368,7 +414,7 @@ class ProductividadTecnicosVistaTest(TestCase):
         self.assertIn('dashboard', response.url)
 
     def test_con_datos_descarga_xlsx(self):
-        """Con reparación productiva → attachment Excel."""
+        """Con reparación OOW → attachment Excel."""
         hoy = timezone.now()
         orden = OrdenServicio.objects.create(
             sucursal=self.sucursal,
@@ -401,12 +447,6 @@ class ProductividadTecnicosVistaTest(TestCase):
             'fecha_fin': (hoy + timedelta(days=1)).date().isoformat(),
         })
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            'spreadsheetml',
-            response['Content-Type'],
-        )
-        self.assertIn(
-            'Productividad_Tecnicos_',
-            response['Content-Disposition'],
-        )
+        self.assertIn('spreadsheetml', response['Content-Type'])
+        self.assertIn('Productividad_Tecnicos_', response['Content-Disposition'])
         self.assertTrue(len(response.content) > 100)
