@@ -147,4 +147,5 @@ class AsignarResponsablesFormFiltroTest(TestCase):
         self.assertNotIn(self.dispatcher.pk, ids_en_lista)
         self.assertNotIn(self.compras.pk, ids_en_lista)
 
-        self.assertEqual(AsignarResponsablesForm.ROL_TECNICO_ASIGNADO, 'tecnico')
+        self.assertEqual(AsignarResponsablesForm.ROL_TECNICO_ASIGNADO, Empleado.ROL_TECNICO)
+        self.assertEqual(Empleado.ROL_TECNICO, 'tecnico')

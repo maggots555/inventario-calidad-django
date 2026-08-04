@@ -281,10 +281,10 @@ def crear_orden_fl_desde_cotizacion(request, pk):
     if request.method == 'GET':
         # ====== PREPARAR DATOS PARA EL MODAL ======
 
-        # Obtener lista de técnicos de laboratorio activos para el selector
+        # Obtener lista de técnicos activos (rol del sistema) para el selector
         tecnicos = Empleado.objects.filter(
             activo=True,
-            cargo__icontains='TECNICO DE LABORATORIO'
+            rol=Empleado.ROL_TECNICO,
         ).select_related('sucursal').order_by('nombre_completo')
 
         # Auto-generar sugerencia de número FL- con formato FL-YYYY-NNNN

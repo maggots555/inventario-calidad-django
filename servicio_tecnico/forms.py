@@ -1038,8 +1038,8 @@ class AsignarResponsablesForm(forms.ModelForm):
     # EXPLICACIÓN: coinciden con Empleado.ROL_CHOICES — valores internos, no etiquetas.
     ROLES_RESPONSABLE_SEGUIMIENTO = ('recepcionista', 'dispatcher')
 
-    # Rol permitido en el select de técnico asignado.
-    ROL_TECNICO_ASIGNADO = 'tecnico'
+    # Fuente única: inventario.Empleado.ROL_TECNICO (evita string suelto 'tecnico').
+    ROL_TECNICO_ASIGNADO = Empleado.ROL_TECNICO
 
     class Meta:
         model = OrdenServicio

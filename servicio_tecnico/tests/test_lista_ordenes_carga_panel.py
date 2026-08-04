@@ -86,17 +86,18 @@ class ListaOrdenesCargaPanelTests(TestCase):
         self.usuario.user_permissions.add(perm)
 
         # Sucursal + técnico: la vista arma tecnicos_por_sucursal con empleados
-        # activos de áreas de laboratorio (si el filtro de la vista los incluye).
+        # activos cuyo rol del sistema es técnico (Empleado.ROL_TECNICO).
         self.sucursal = Sucursal.objects.create(
             nombre='Sucursal Test Carga Panel',
             ciudad='CDMX',
         )
-        # La vista solo lista empleados con este cargo exacto
+        # La vista lista empleados con rol técnico activos (no por texto de cargo)
         self.tecnico = Empleado.objects.create(
             nombre_completo='Técnico Panel Carga',
-            cargo='TECNICO DE LABORATORIO',
+            cargo='Técnico Lab',
             area='Laboratorio OOW',
             sucursal=self.sucursal,
+            rol=Empleado.ROL_TECNICO,
             activo=True,
         )
 

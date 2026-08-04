@@ -1037,11 +1037,11 @@ class SolicitudBajaForm(forms.ModelForm):
             self.fields['unidad_inventario'].queryset = queryset_unidades
         
         # ========== CONFIGURACIÓN TECNICO_ASIGNADO ==========
-        # Cargar solo técnicos de laboratorio activos
-        # El campo cargo contiene "TECNICO DE LABORATORIO" para los técnicos
+        # Solo empleados activos con rol técnico (Empleado.ROL_TECNICO).
+        # EXPLICACIÓN: ya no filtramos por el texto libre del cargo.
         self.fields['tecnico_asignado'].queryset = Empleado.objects.filter(
             activo=True,
-            cargo__icontains='TECNICO DE LABORATORIO'
+            rol=Empleado.ROL_TECNICO,
         ).order_by('nombre_completo')
         
         # Inicialmente no requerido - JavaScript lo hará requerido dinámicamente

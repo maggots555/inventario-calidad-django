@@ -102,10 +102,10 @@ def inicio(request):
         })
     
     # ========================================================================
-    # SECCIÓN 3: ÓRDENES POR TÉCNICO (Solo técnicos de laboratorio activos)
+    # SECCIÓN 3: ÓRDENES POR TÉCNICO (Solo empleados con rol técnico activos)
     # ========================================================================
     ordenes_por_tecnico = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True
     ).exclude(
         estado__in=['entregado', 'cancelado']
@@ -560,7 +560,7 @@ def lista_ordenes_activas(request):
     # PASO 1: Consultar órdenes activas por técnico con todos los datos
     # ========================================================================
     ordenes_activas_por_tecnico = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True
     ).exclude(
         estado__in=['entregado', 'cancelado']
@@ -575,7 +575,7 @@ def lista_ordenes_activas(request):
     # PASO 2: Equipos "No Enciende" activos por técnico
     # ========================================================================
     equipos_no_encienden_raw = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True,
         detalle_equipo__equipo_enciende=False
     ).exclude(
@@ -589,7 +589,7 @@ def lista_ordenes_activas(request):
     # PASO 3: Equipos por gama activos por técnico
     # ========================================================================
     equipos_por_gama_raw = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True
     ).exclude(
         estado__in=['entregado', 'cancelado']
@@ -612,7 +612,7 @@ def lista_ordenes_activas(request):
     # PASO 4: Folios (FL-) activos por técnico
     # ========================================================================
     folios_fl_raw = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True,
         detalle_equipo__orden_cliente__istartswith='FL-'
     ).exclude(
@@ -778,7 +778,7 @@ def lista_ordenes_activas(request):
     ultimas_asignaciones = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
         es_sistema=False,
-        tecnico_nuevo__cargo='TECNICO DE LABORATORIO',
+        tecnico_nuevo__rol=Empleado.ROL_TECNICO,
         tecnico_nuevo__activo=True
     ).values('tecnico_nuevo__id').annotate(
         ultima_fecha=Max('fecha_evento')
@@ -792,9 +792,9 @@ def lista_ordenes_activas(request):
     # Ahora agrupamos por sucursal Y área (ej: Satélite → LABORATORIO DELL).
     # Esto permite asignaciones más precisas según la especialización del técnico.
     
-    # Obtener todos los técnicos de laboratorio activos con su sucursal
+    # Obtener todos los técnicos activos (rol del sistema) con su sucursal
     tecnicos_laboratorio = Empleado.objects.filter(
-        cargo='TECNICO DE LABORATORIO',
+        rol=Empleado.ROL_TECNICO,
         activo=True
     ).select_related('sucursal').order_by('sucursal__nombre', 'area', 'nombre_completo')
     

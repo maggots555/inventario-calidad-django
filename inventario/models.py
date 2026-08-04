@@ -617,7 +617,12 @@ class Empleado(models.Model):
         ('tecnico', 'Técnico'),
         ('almacenista', 'Almacenista'),
     ]
-    
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Constante de negocio para filtros ORM (home ST, panel carga, baja, FL, detalle_orden).
+    # Usar Empleado.ROL_TECNICO en lugar del texto libre del campo cargo.
+    ROL_TECNICO = 'tecnico'
+
     rol = models.CharField(
         max_length=30,
         choices=ROL_CHOICES,

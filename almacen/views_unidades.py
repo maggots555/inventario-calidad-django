@@ -826,7 +826,7 @@ def api_tecnicos_disponibles(request):
     
     Los técnicos se filtran por:
     - activo=True: Solo empleados activos
-    - cargo__icontains='TECNICO DE LABORATORIO': Solo técnicos de laboratorio
+    - rol=Empleado.ROL_TECNICO: Solo rol técnico del sistema (no texto de cargo)
     
     Retorna:
     - success: bool indicando si la operación fue exitosa
@@ -847,10 +847,10 @@ def api_tecnicos_disponibles(request):
     from inventario.models import Empleado
     
     try:
-        # Filtrar técnicos de laboratorio activos
+        # Filtrar técnicos activos por rol del sistema
         tecnicos = Empleado.objects.filter(
             activo=True,
-            cargo__icontains='TECNICO DE LABORATORIO'
+            rol=Empleado.ROL_TECNICO,
         ).select_related('sucursal').order_by('nombre_completo')
         
         # Construir lista de técnicos
