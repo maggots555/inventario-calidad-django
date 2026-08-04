@@ -19,6 +19,7 @@ from servicio_tecnico import views_dashboard_cotizaciones
 from servicio_tecnico import views_dashboard_oow_fl
 from servicio_tecnico import views_dashboard_rhitso
 from servicio_tecnico import views_dashboard_seguimiento_piezas
+from servicio_tecnico import views_export_productividad_tecnicos
 from servicio_tecnico.services import ventas_mostrador_analytics as vm_analytics
 
 
@@ -86,6 +87,15 @@ class CompatibilidadDashboardsFase8Test(SimpleTestCase):
             st_views.exportar_analisis_aceptaciones,
             views_dashboard_cotizaciones.exportar_analisis_aceptaciones,
         )
+        # Productividad técnicos: módulo hermano (no hincha el dashboard)
+        self.assertIs(
+            st_views.exportar_productividad_tecnicos,
+            views_export_productividad_tecnicos.exportar_productividad_tecnicos,
+        )
+        self.assertEqual(
+            views_export_productividad_tecnicos.exportar_productividad_tecnicos.__module__,
+            'servicio_tecnico.views_export_productividad_tecnicos',
+        )
 
     def test_views_reexporta_seguimiento_piezas(self):
         """Dashboard piezas vía views."""
@@ -145,6 +155,11 @@ class CompatibilidadDashboardsFase8Test(SimpleTestCase):
                 'servicio_tecnico:exportar_analisis_aceptaciones',
                 {},
                 views_dashboard_cotizaciones.exportar_analisis_aceptaciones,
+            ),
+            (
+                'servicio_tecnico:exportar_productividad_tecnicos',
+                {},
+                views_export_productividad_tecnicos.exportar_productividad_tecnicos,
             ),
             (
                 'servicio_tecnico:dashboard_seguimiento_piezas',

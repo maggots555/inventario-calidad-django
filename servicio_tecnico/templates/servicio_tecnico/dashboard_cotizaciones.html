@@ -82,6 +82,11 @@
                            class="btn btn-exportar btn-exportar-aceptaciones">
                             <i class="bi bi-file-earmark-excel"></i> Análisis Aceptaciones
                         </a>
+                        <a href="{% url 'servicio_tecnico:exportar_productividad_tecnicos' %}?{{ request.GET.urlencode }}"
+                           class="btn btn-exportar"
+                           title="Reparaciones finalizadas con cot/VM, ventas mostrador y diagnósticos por técnico">
+                            <i class="bi bi-file-earmark-excel"></i> Productividad técnicos
+                        </a>
                     </div>
                 </div>
             </div>

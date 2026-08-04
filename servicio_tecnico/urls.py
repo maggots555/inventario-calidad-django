@@ -240,6 +240,14 @@ urlpatterns = [
     path('cotizaciones/dashboard/exportar-aceptaciones/', 
          views.exportar_analisis_aceptaciones, 
          name='exportar_analisis_aceptaciones'),
+
+    # Exportación Excel: Productividad técnicos (reparaciones finalizadas +
+    # cot/VM aceptada, ventas mostrador desglosadas, diagnósticos SIC)
+    path(
+        'cotizaciones/dashboard/exportar-productividad-tecnicos/',
+        views.exportar_productividad_tecnicos,
+        name='exportar_productividad_tecnicos',
+    ),
     
     # ========================================================================
     # API: BÚSQUEDA DE ÓRDENES (Noviembre 2025)

@@ -107,6 +107,9 @@ from .views_dashboard_cotizaciones import (  # noqa: F401
     exportar_analisis_rechazos,
     exportar_dashboard_cotizaciones,
 )
+from .views_export_productividad_tecnicos import (  # noqa: F401
+    exportar_productividad_tecnicos,
+)
 from .views_dashboard_seguimiento_piezas import (  # noqa: F401
     dashboard_seguimiento_piezas,
     exportar_dashboard_seguimiento_piezas,
