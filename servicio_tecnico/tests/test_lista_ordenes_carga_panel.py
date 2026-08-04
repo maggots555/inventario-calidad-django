@@ -91,7 +91,7 @@ class ListaOrdenesCargaPanelTests(TestCase):
             nombre='Sucursal Test Carga Panel',
             ciudad='CDMX',
         )
-        # La vista lista empleados con rol técnico activos (no por texto de cargo)
+        # La vista lista empleados con rol técnico activos Y flag de carga.
         self.tecnico = Empleado.objects.create(
             nombre_completo='Técnico Panel Carga',
             cargo='Técnico Lab',
@@ -99,6 +99,17 @@ class ListaOrdenesCargaPanelTests(TestCase):
             sucursal=self.sucursal,
             rol=Empleado.ROL_TECNICO,
             activo=True,
+            mostrar_en_carga_trabajo=True,
+        )
+        # Técnico oculto del panel (sigue pudiendo asignarse a órdenes)
+        self.tecnico_oculto = Empleado.objects.create(
+            nombre_completo='Técnico Oculto Carga XYZ',
+            cargo='Técnico Lab',
+            area='Laboratorio OOW',
+            sucursal=self.sucursal,
+            rol=Empleado.ROL_TECNICO,
+            activo=True,
+            mostrar_en_carga_trabajo=False,
         )
 
         self.url_activas = reverse('servicio_tecnico:lista_activas')
@@ -143,3 +154,19 @@ class ListaOrdenesCargaPanelTests(TestCase):
         self.assertNotIn('panelCargaTecnicos', content)
         self.assertNotIn('cargaTecnicosStrip', content)
         self.assertNotIn('lista_ordenes_carga.css', content)
+
+    def test_activas_respeta_flag_mostrar_en_carga_trabajo(self) -> None:
+        """
+        Objetivo: solo técnicos con mostrar_en_carga_trabajo=True salen en el panel.
+
+        Efectos: GET lista_activas; el HTML incluye al visible y excluye al oculto.
+        """
+        user = User.objects.get(pk=self.usuario.pk)
+        request = _request_con_usuario(self.factory, user, self.url_activas)
+        response = lista_ordenes_activas(request)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertIn(self.tecnico.nombre_completo, content)
+        self.assertNotIn(self.tecnico_oculto.nombre_completo, content)

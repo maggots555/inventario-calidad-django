@@ -186,7 +186,7 @@
                         </div>
 
                         <!-- Estado del Empleado -->
-                        <div class="row mb-4">
+                        <div class="row mb-3">
                             <div class="col-md-12">
                                 <div class="form-check">
                                     {{ form.activo }}
@@ -197,6 +197,26 @@
                                 <small class="form-text text-muted">
                                     Desmarcar si el empleado ya no trabaja en la empresa
                                 </small>
+                            </div>
+                        </div>
+
+                        <!-- Panel de carga ST (solo relevante con rol Técnico) -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    {{ form.mostrar_en_carga_trabajo }}
+                                    <label class="form-check-label" for="{{ form.mostrar_en_carga_trabajo.id_for_label }}">
+                                        {{ form.mostrar_en_carga_trabajo.label }}
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    {{ form.mostrar_en_carga_trabajo.help_text }}
+                                </small>
+                                {% if form.mostrar_en_carga_trabajo.errors %}
+                                    <div class="text-danger small">
+                                        {{ form.mostrar_en_carga_trabajo.errors.0 }}
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
 

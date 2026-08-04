@@ -117,8 +117,15 @@ class MovimientoAdmin(admin.ModelAdmin):
 
 @admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
-    list_display = ('nombre_completo', 'cargo', 'area', 'rol', 'sucursal', 'jefe_directo', 'email', 'tiene_foto', 'estado_acceso_display', 'activo', 'fecha_ingreso')
-    list_filter = ('area', 'cargo', 'rol', 'sucursal', 'activo', 'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_ingreso')
+    list_display = (
+        'nombre_completo', 'cargo', 'area', 'rol', 'sucursal', 'jefe_directo',
+        'email', 'tiene_foto', 'estado_acceso_display', 'mostrar_en_carga_trabajo',
+        'activo', 'fecha_ingreso',
+    )
+    list_filter = (
+        'area', 'cargo', 'rol', 'sucursal', 'activo', 'mostrar_en_carga_trabajo',
+        'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_ingreso',
+    )
     search_fields = ('nombre_completo', 'cargo', 'area', 'email')
     ordering = ['nombre_completo']
     readonly_fields = ('fecha_ingreso', 'fecha_actualizacion', 'user', 'tiene_acceso_sistema', 'fecha_envio_credenciales', 'contraseña_configurada', 'fecha_activacion_acceso', 'preview_foto')
@@ -137,7 +144,11 @@ class EmpleadoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('Estado', {
-            'fields': ('activo',)
+            'fields': ('activo', 'mostrar_en_carga_trabajo'),
+            'description': (
+                '“Mostrar en carga de trabajo” controla si el técnico aparece '
+                'en el panel de órdenes activas (solo aplica con rol Técnico).'
+            ),
         }),
         ('Fechas', {
             'fields': ('fecha_ingreso', 'fecha_actualizacion'),

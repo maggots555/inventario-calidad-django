@@ -561,7 +561,8 @@ def lista_ordenes_activas(request):
     # ========================================================================
     ordenes_activas_por_tecnico = OrdenServicio.objects.filter(
         tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
-        tecnico_asignado_actual__activo=True
+        tecnico_asignado_actual__activo=True,
+        tecnico_asignado_actual__mostrar_en_carga_trabajo=True,
     ).exclude(
         estado__in=['entregado', 'cancelado']
     ).values(
@@ -577,6 +578,7 @@ def lista_ordenes_activas(request):
     equipos_no_encienden_raw = OrdenServicio.objects.filter(
         tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True,
+        tecnico_asignado_actual__mostrar_en_carga_trabajo=True,
         detalle_equipo__equipo_enciende=False
     ).exclude(
         estado__in=['entregado', 'cancelado']
@@ -590,7 +592,8 @@ def lista_ordenes_activas(request):
     # ========================================================================
     equipos_por_gama_raw = OrdenServicio.objects.filter(
         tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
-        tecnico_asignado_actual__activo=True
+        tecnico_asignado_actual__activo=True,
+        tecnico_asignado_actual__mostrar_en_carga_trabajo=True,
     ).exclude(
         estado__in=['entregado', 'cancelado']
     ).values(
@@ -614,6 +617,7 @@ def lista_ordenes_activas(request):
     folios_fl_raw = OrdenServicio.objects.filter(
         tecnico_asignado_actual__rol=Empleado.ROL_TECNICO,
         tecnico_asignado_actual__activo=True,
+        tecnico_asignado_actual__mostrar_en_carga_trabajo=True,
         detalle_equipo__orden_cliente__istartswith='FL-'
     ).exclude(
         estado__in=['entregado', 'cancelado']
@@ -779,7 +783,8 @@ def lista_ordenes_activas(request):
         tipo_evento='cambio_tecnico',
         es_sistema=False,
         tecnico_nuevo__rol=Empleado.ROL_TECNICO,
-        tecnico_nuevo__activo=True
+        tecnico_nuevo__activo=True,
+        tecnico_nuevo__mostrar_en_carga_trabajo=True,
     ).values('tecnico_nuevo__id').annotate(
         ultima_fecha=Max('fecha_evento')
     )
@@ -792,10 +797,12 @@ def lista_ordenes_activas(request):
     # Ahora agrupamos por sucursal Y área (ej: Satélite → LABORATORIO DELL).
     # Esto permite asignaciones más precisas según la especialización del técnico.
     
-    # Obtener todos los técnicos activos (rol del sistema) con su sucursal
+    # Técnicos activos visibles en el panel (rol + flag configurable).
+    # EXPLICACIÓN: mostrar_en_carga_trabajo se marca/desmarca en editar empleado.
     tecnicos_laboratorio = Empleado.objects.filter(
         rol=Empleado.ROL_TECNICO,
-        activo=True
+        activo=True,
+        mostrar_en_carga_trabajo=True,
     ).select_related('sucursal').order_by('sucursal__nombre', 'area', 'nombre_completo')
     
     # Agrupar técnicos por (sucursal_id, area) - usamos una tupla como clave

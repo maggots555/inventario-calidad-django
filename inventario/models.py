@@ -562,7 +562,20 @@ class Empleado(models.Model):
     )
     
     activo = models.BooleanField(default=True, help_text="Empleado activo en la empresa")
-    
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Controla si el técnico aparece en el panel "Carga de trabajo" de órdenes activas.
+    # default=True: al migrar, el panel se ve igual; desmarca a quien no quieras ver.
+    # No afecta selects de asignación (detalle_orden, baja, FL).
+    mostrar_en_carga_trabajo = models.BooleanField(
+        default=True,
+        verbose_name='Mostrar en carga de trabajo',
+        help_text=(
+            'Si está activo, este técnico aparece en el panel de carga '
+            'de órdenes activas (solo aplica con rol Técnico).'
+        ),
+    )
+
     # Fechas de control
     fecha_ingreso = models.DateTimeField(auto_now_add=True, help_text="Fecha de registro en el sistema")
     fecha_actualizacion = models.DateTimeField(auto_now=True, help_text="Última actualización del registro")

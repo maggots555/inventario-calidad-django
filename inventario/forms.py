@@ -405,7 +405,11 @@ class EmpleadoForm(forms.ModelForm):
     """
     class Meta:
         model = Empleado
-        fields = ['nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp', 'foto_perfil', 'sucursal', 'jefe_directo', 'rol', 'activo']
+        fields = [
+            'nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp',
+            'foto_perfil', 'sucursal', 'jefe_directo', 'rol', 'activo',
+            'mostrar_en_carga_trabajo',
+        ]
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -444,6 +448,9 @@ class EmpleadoForm(forms.ModelForm):
                 'class': 'form-control'
             }),
             'activo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'mostrar_en_carga_trabajo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
         }
