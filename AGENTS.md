@@ -410,6 +410,8 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 | Tests Almacén | `python manage.py test almacen` |
 | Tests ST | `python manage.py test servicio_tecnico.tests` |
 | Seed | `python scripts/poblado/poblar_sistema.py` |
+| Deps Python (reproducible) | `pip install -r requirements.lock` |
+| Deps Python (intent / actualizar) | editar `requirements.txt` → install → `pip freeze > requirements.lock` |
 
 ---
 

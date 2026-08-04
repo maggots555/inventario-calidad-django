@@ -1,3 +1,23 @@
+# =============================================================================
+# requirements.txt — lista “humana” de dependencias SIGMA (intención)
+# =============================================================================
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# -------------------------------
+# Aquí declaras qué necesita el proyecto. Algunas líneas usan == (versión fija)
+# y otras >= (mínimo aceptable). Para instalar SIEMPRE las mismas versiones
+# en otra máquina o en CI, usa el archivo hermano:
+#
+#   pip install -r requirements.lock
+#
+# Flujo recomendado al agregar/actualizar una librería:
+#   1) Edita este archivo (requirements.txt)
+#   2) pip install -r requirements.txt
+#   3) pip freeze > requirements.lock
+#   4) Prueba (manage.py test / runserver) y commitea ambos archivos
+#
+# =============================================================================
+
 Django==5.2.14
 openpyxl==3.1.5
 qrcode[pil]==7.4.2
@@ -21,3 +41,17 @@ django-redis>=5.4.0
 
 # Notificaciones Push (Web Push API)
 pywebpush>=2.0.0
+
+# =============================================================================
+# Producción (NO están en el venv de desarrollo típico / requirements.lock)
+# =============================================================================
+# En el servidor (PostgreSQL + Gunicorn) instálalas además del lock, por ejemplo:
+#
+#   pip install -r requirements.lock
+#   pip install "gunicorn>=23.0.0" "psycopg2-binary>=2.9.9"
+#
+# O crea un venv de prod y añade estas dos líneas a un requirements-prod.txt
+# propio del servidor cuando quieras pinnearlas también.
+#
+# gunicorn>=23.0.0
+# psycopg2-binary>=2.9.9
