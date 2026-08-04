@@ -533,6 +533,15 @@
             <div class="totales-header">Resumen de Cotización</div>
             <div class="totales-body">
 
+                {# EXPLICACIÓN: mismo desglose que el PDF — Subtotal → IVA → Total #}
+                <div class="total-row">
+                    <span class="etiqueta">Subtotal (sin IVA)</span>
+                    <span class="monto">${{ calculo.precio_sin_iva|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row">
+                    <span class="etiqueta">IVA (16%)</span>
+                    <span class="monto">${{ calculo.iva|floatformat:2 }} MXN</span>
+                </div>
                 <!-- Total con IVA — siempre visible y destacado (reparación completa) -->
                 <div class="total-row destacado">
                     <span class="etiqueta">TOTAL CON IVA (16%)</span>

@@ -386,6 +386,9 @@ def calcular_precio_cliente(
 
     # PDF/cotización solo con servicios adicionales: sin profit ni fijos
     if costo_total == 0 and servicios_con_iva > 0:
+        # EXPLICACIÓN: iva = diferencia entre con IVA y sin IVA (mismo criterio que el PDF)
+        precio_sin_iva_solo_serv = round(servicios_sin_iva, 2)
+        precio_con_iva_solo_serv = round(servicios_con_iva, 2)
         return {
             'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
             'total_costos_internos': round(servicios_con_iva, 2),
@@ -393,8 +396,9 @@ def calcular_precio_cliente(
             'precio_piezas_sin_iva': 0.0,
             'precio_fijos_sin_iva': 0.0,
             'diagnostico': 0.0,
-            'precio_sin_iva': round(servicios_sin_iva, 2),
-            'precio_con_iva': round(servicios_con_iva, 2),
+            'precio_sin_iva': precio_sin_iva_solo_serv,
+            'iva': round(precio_con_iva_solo_serv - precio_sin_iva_solo_serv, 2),
+            'precio_con_iva': precio_con_iva_solo_serv,
             'precio_menos_diagnostico': None,
             'ganancia_bruta_dinero': 0.0,
             'ganancia_bruta_porcentaje': 0.0,
@@ -416,6 +420,9 @@ def calcular_precio_cliente(
 
     precio_sin_iva = precio_sin_iva_piezas + servicios_sin_iva
     precio_con_iva = precio_con_iva_piezas + servicios_con_iva
+    # EXPLICACIÓN: el IVA individual se deriva del total; no se hardcodea un %
+    # aparte para que coincida con piezas (×1.16) + servicios (ya con IVA).
+    iva = precio_con_iva - precio_sin_iva
 
     # Legacy: el descuento de diagnóstico ya no existe en reparación
     _ = incluir_descuento_diagnostico
@@ -429,6 +436,7 @@ def calcular_precio_cliente(
         # 0 = el cargo de diagnóstico no forma parte de esta cotización
         'diagnostico': 0.0,
         'precio_sin_iva': round(precio_sin_iva, 2),
+        'iva': round(iva, 2),
         'precio_con_iva': round(precio_con_iva, 2),
         'precio_menos_diagnostico': None,
         'ganancia_bruta_dinero': matematica['ganancia_bruta_dinero'],
@@ -1436,19 +1444,20 @@ class PDFCotizacionCliente:
         Construye la sección "Cotización" con el desglose de totales.
 
         EXPLICACIÓN:
-        Esta sección muestra solo los valores que el cliente necesita ver:
-        - Total con IVA (siempre visible)
-        - Total con IVA menos diagnóstico (solo si aplica y el usuario eligió mostrarlo)
-        
+        Esta sección muestra al cliente el mismo desglose que reacondicionado:
+        - Subtotal (sin IVA)
+        - IVA (16%) individual
+        - Total con IVA (fila destacada navy)
+
         Los costos internos (margen, overhead) NO se muestran al cliente.
-        Los valores están calculados en _calcular_totales().
+        Los valores vienen de _calcular_totales() / calcular_precios_*.
 
         Args:
-            calculo: Dict con todos los valores calculados.
+            calculo: Dict con precio_sin_iva, iva (opcional) y precio_con_iva.
         """
         elementos = [self._crear_header_seccion('Cotización')]
 
-        # Estilo para la columna de etiqueta
+        # Estilo para la columna de etiqueta (filas normales: Subtotal / IVA)
         estilo_etiqueta = ParagraphStyle(
             'TotalEtiqueta',
             fontName='Helvetica',
@@ -1456,7 +1465,7 @@ class PDFCotizacionCliente:
             textColor=COLOR_NEGRO,
             alignment=TA_LEFT,
         )
-        # Estilo para la columna de monto
+        # Estilo para la columna de monto (filas normales)
         estilo_monto = ParagraphStyle(
             'TotalMonto',
             fontName='Helvetica',
@@ -1464,7 +1473,7 @@ class PDFCotizacionCliente:
             textColor=COLOR_NEGRO,
             alignment=TA_RIGHT,
         )
-        # Estilo para las filas destacadas (Total con IVA y Total a pagar)
+        # Estilo para la fila destacada (TOTAL CON IVA)
         estilo_destacado = ParagraphStyle(
             'TotalDestacado',
             fontName='Helvetica-Bold',
@@ -1484,8 +1493,30 @@ class PDFCotizacionCliente:
         ancho_util = letter[0] - 2 * MARGEN
         col_widths_totales = [ancho_util * 0.60, ancho_util * 0.40]
 
-        # Construir filas de totales
-        filas_totales = []
+        # Montos: si falta 'iva' en el dict, se deriva (compatibilidad)
+        precio_sin_iva = float(calculo.get('precio_sin_iva', 0) or 0)
+        precio_con_iva = float(calculo.get('precio_con_iva', 0) or 0)
+        iva = calculo.get('iva')
+        if iva is None:
+            iva = precio_con_iva - precio_sin_iva
+        iva = float(iva)
+
+        # Construir filas: Subtotal → IVA → TOTAL (mismo orden que reacondicionado)
+        filas_totales = [
+            [
+                Paragraph('Subtotal (sin IVA):', estilo_etiqueta),
+                Paragraph(f"${precio_sin_iva:,.2f}", estilo_monto),
+            ],
+            [
+                Paragraph('IVA (16%):', estilo_etiqueta),
+                Paragraph(f"${iva:,.2f}", estilo_monto),
+            ],
+            [
+                Paragraph('TOTAL CON IVA:', estilo_destacado_etq),
+                Paragraph(f"${precio_con_iva:,.2f}", estilo_destacado),
+            ],
+        ]
+        # Índice 2 = última fila (TOTAL CON IVA) con fondo navy
         estilos_totales = [
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING',    (0, 0), (-1, -1), 5),
@@ -1493,22 +1524,11 @@ class PDFCotizacionCliente:
             ('LEFTPADDING',   (0, 0), (-1, -1), 8),
             ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
             ('GRID', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
+            ('BACKGROUND', (0, 2), (-1, 2), COLOR_NAVY),
         ]
 
-        fila_idx = 0
-
-        # Fila destacada: Total con IVA (SIEMPRE visible, fondo navy)
-        filas_totales.append([
-            Paragraph('TOTAL CON IVA:', estilo_destacado_etq),
-            Paragraph(f"${calculo['precio_con_iva']:,.2f}", estilo_destacado),
-        ])
-        idx_total_iva = fila_idx
-        fila_idx += 1
-        estilos_totales.append(('BACKGROUND', (0, idx_total_iva), (-1, idx_total_iva), COLOR_NAVY))
-
-        # EXPLICACIÓN: ya no se muestran filas de "descuento diagnóstico" ni
-        # "TOTAL A PAGAR (aplicando descuento…)". El diagnóstico se cobra al
-        # ingresar el equipo; aquí el cliente paga la reparación completa.
+        # EXPLICACIÓN: el diagnóstico se cobra al ingresar el equipo; aquí el
+        # cliente ve solo subtotal, IVA y el total de la reparación completa.
 
         tabla_totales = Table(filas_totales, colWidths=col_widths_totales)
         tabla_totales.setStyle(TableStyle(estilos_totales))

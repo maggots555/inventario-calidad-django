@@ -426,8 +426,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // PDF/cotización solo con servicios activos: suma directa
+        // PDF/cotización solo con servicios activos: suma directa + desglose IVA
         if (soloServicios) {
+            // EXPLICACIÓN: los servicios ya traen IVA; sin IVA = ÷ 1.16
+            const subtotalSinIvaSoloServ = serviciosConIva / 1.16;
+            const ivaSoloServ = serviciosConIva - subtotalSinIvaSoloServ;
             calcBody.innerHTML = `
                 <div class="calc-row">
                     <span class="etq">Servicios adicionales (IVA incluido)</span>
@@ -435,6 +438,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="calc-desglose-panel" style="display:block">
                     ${renderDesgloseHTML()}
+                </div>
+                <div class="calc-row">
+                    <span class="etq">Subtotal (sin IVA)</span>
+                    <span class="val">${fmtPeso(subtotalSinIvaSoloServ)}</span>
+                </div>
+                <div class="calc-row">
+                    <span class="etq">IVA (16%)</span>
+                    <span class="val">${fmtPeso(ivaSoloServ)}</span>
                 </div>
                 <div class="calc-row total-iva">
                     <span class="etq">TOTAL CON IVA (16%)</span>
@@ -446,7 +457,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Profit solo sobre piezas (sin diluir ni descontar diagnóstico)
         const res = calcularPrecioCliente(tipo, costoLineas, manoObra);
+        // EXPLICACIÓN: servicios ya vienen con IVA; su parte sin IVA se obtiene ÷ 1.16
+        const serviciosSinIva = serviciosConIva > 0 ? serviciosConIva / 1.16 : 0;
+        const subtotalSinIvaTotal = res.precio_sin_iva + serviciosSinIva;
         const precioConIvaTotal = res.precio_con_iva + serviciosConIva;
+        const ivaTotal = precioConIvaTotal - subtotalSinIvaTotal;
 
         // Construir las filas de resultado en HTML
         calcBody.innerHTML = `
@@ -474,8 +489,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="val">${fmtPct(res.porcentaje_profit)}</span>
             </div>
             <div class="calc-row">
-                <span class="etq">Reparación y piezas (sin IVA, con margen)</span>
-                <span class="val">${fmtPeso(res.precio_piezas_sin_iva)}</span>
+                <span class="etq">Subtotal (sin IVA)</span>
+                <span class="val">${fmtPeso(subtotalSinIvaTotal)}</span>
+            </div>
+            <div class="calc-row">
+                <span class="etq">IVA (16%)</span>
+                <span class="val">${fmtPeso(ivaTotal)}</span>
             </div>
             <div class="calc-row total-iva">
                 <span class="etq">TOTAL CON IVA (16%)</span>

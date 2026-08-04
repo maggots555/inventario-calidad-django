@@ -96,6 +96,9 @@ class ProfitCotizacionExcelTest(SimpleTestCase):
         )
         self.assertEqual(suma_subtotales, calculo['precio_sin_iva'])
         self.assertEqual(calculo['precio_sin_iva'], 1562.50)
+        # Desglose cliente: Subtotal $1562.50 + IVA $250 = Total $1812.50
+        self.assertEqual(calculo['iva'], 250.0)
+        self.assertEqual(calculo['precio_con_iva'], 1812.50)
         self.assertIsNone(calculo.get('precio_menos_diagnostico'))
         self.assertEqual(calculo['diagnostico'], 0)
 
@@ -108,9 +111,30 @@ class ProfitCotizacionExcelTest(SimpleTestCase):
         )
         self.assertEqual(resultado['precio_sin_iva'], 1562.50)
         self.assertEqual(resultado['precio_con_iva'], round(1562.50 * 1.16, 2))
+        # Desglose Subtotal + IVA + Total (lo que ve el cliente en PDF/email)
+        self.assertEqual(resultado['iva'], 250.0)
+        self.assertEqual(
+            resultado['iva'],
+            round(resultado['precio_con_iva'] - resultado['precio_sin_iva'], 2),
+        )
         self.assertEqual(resultado['ganancia_bruta_dinero'], 177.50)
         self.assertIsNone(resultado.get('precio_menos_diagnostico'))
         self.assertEqual(resultado['diagnostico'], 0.0)
+
+    def test_calcular_precio_cliente_iva_solo_servicios(self):
+        """Solo servicios: también expone clave iva para el desglose del email."""
+        resultado = calcular_precio_cliente(
+            costo_piezas=0,
+            tipo_servicio='estandar',
+            servicios_con_iva=1160.0,
+        )
+        self.assertEqual(resultado['precio_con_iva'], 1160.0)
+        self.assertAlmostEqual(resultado['precio_sin_iva'], 1000.0, places=2)
+        self.assertAlmostEqual(resultado['iva'], 160.0, places=2)
+        self.assertEqual(
+            round(resultado['precio_sin_iva'] + resultado['iva'], 2),
+            resultado['precio_con_iva'],
+        )
 
     def test_solo_servicios_sin_profit(self):
         """Cotización solo con servicios adicionales: suma directa."""
