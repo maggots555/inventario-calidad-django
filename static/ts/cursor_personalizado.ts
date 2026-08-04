@@ -31,6 +31,7 @@ type CursorId =
     | 'hongo'
     | 'metallica'
     | 'ganso'
+    | 'mariposa'
     | 'system';
 
 /**
@@ -232,6 +233,40 @@ const CURSOR_VARIANTES: Record<Exclude<CursorId, 'system'>, CursorVariant> = {
   </g>
 </svg>`.trim(),
     },
+    mariposa: {
+        id: 'mariposa',
+        nombre: 'Mariposa',
+        descripcion: 'Mariposa azul con antenas (hotspot).',
+        accent: '#3b82f6',
+        svgMarkup: `
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <filter id="dropShadowMariposaRuntime" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#dropShadowMariposaRuntime)">
+    <path d="M14 12 C10 6 4 4 2 7 C1 10 4 14 9 15 C11 15 13 14 14 12 Z" fill="#3b82f6" stroke="#1e40af" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M14 15 C11 16 6 18 5 22 C5 25 9 26 13 23 C14 21 14 18 14 15 Z" fill="#2563eb" stroke="#1e40af" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M16 12 C20 6 26 4 28 7 C29 10 26 14 21 15 C19 15 17 14 16 12 Z" fill="#3b82f6" stroke="#1e40af" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M16 15 C19 16 24 18 25 22 C25 25 21 26 17 23 C16 21 16 18 16 15 Z" fill="#2563eb" stroke="#1e40af" stroke-width="1" stroke-linejoin="round"/>
+    <ellipse cx="7.5" cy="9.5" rx="2.2" ry="1.6" fill="#93c5fd" opacity="0.9"/>
+    <ellipse cx="22.5" cy="9.5" rx="2.2" ry="1.6" fill="#93c5fd" opacity="0.9"/>
+    <ellipse cx="9" cy="20" rx="1.6" ry="1.3" fill="#bfdbfe" opacity="0.85"/>
+    <ellipse cx="21" cy="20" rx="1.6" ry="1.3" fill="#bfdbfe" opacity="0.85"/>
+    <ellipse cx="15" cy="16" rx="1.6" ry="7" fill="#1e293b" stroke="#0f172a" stroke-width="0.7"/>
+    <ellipse cx="15" cy="11" rx="1.35" ry="1.6" fill="#334155" stroke="#0f172a" stroke-width="0.6"/>
+    <path d="M14.2 9.5 C12.5 6 10 3.5 7.5 2.5" stroke="#1e293b" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+    <path d="M15.8 9.5 C17.5 6 20 3.5 22.5 2.5" stroke="#1e293b" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+    <circle cx="7.5" cy="2.5" r="1.15" fill="#3b82f6" stroke="#1e40af" stroke-width="0.6"/>
+    <circle cx="22.5" cy="2.5" r="1.15" fill="#3b82f6" stroke="#1e40af" stroke-width="0.6"/>
+    <circle class="cursor-core-dot" cx="15" cy="14" r="1.2" fill="#93c5fd" opacity="0.95"/>
+  </g>
+</svg>`.trim(),
+    },
 };
 
 /** Opción “cursor del sistema” (sin SVG custom). */
@@ -250,6 +285,7 @@ const CURSOR_IDS_VALIDOS: CursorId[] = [
     'hongo',
     'metallica',
     'ganso',
+    'mariposa',
     'system',
 ];
 

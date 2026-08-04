@@ -1080,6 +1080,12 @@ body {
     box-shadow: 0 0 4px rgba(249, 115, 22, 0.35);
 }
 
+/* Estela Mariposa (azul) */
+.cursor-trail--mariposa {
+    background-color: rgba(59, 130, 246, 0.55);
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.35);
+}
+
 /* ===== OCULTAR CURSOR PERSONALIZADO EN TELEFONOS / TABLETS =====
    Solo dispositivos con puntero primario grueso y sin hover (dedo).
    NO usar max-width: el zoom o una ventana estrecha en PC no debe

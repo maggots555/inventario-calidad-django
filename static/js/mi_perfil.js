@@ -169,6 +169,7 @@ const CURSOR_NOMBRES = {
     hongo: 'Hongo Mario',
     metallica: 'Metallica M',
     ganso: 'Ganso',
+    mariposa: 'Mariposa',
     system: 'Sistema',
 };
 /**
