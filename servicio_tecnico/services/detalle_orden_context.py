@@ -201,10 +201,11 @@ def build_detalle_orden_context(request, orden):
     # ESTADÍSTICAS DE TÉCNICOS (Para alertas de carga de trabajo)
     # ========================================================================
 
-    # Obtener todos los técnicos de laboratorio para mostrar sus estadísticas
+    # Técnicos activos por rol (mismo criterio que AsignarResponsablesForm).
+    # EXPLICACIÓN: las alertas de carga deben coincidir con quien sale en el select.
     tecnicos_laboratorio = Empleado.objects.filter(
         activo=True,
-        cargo__icontains='TECNICO DE LABORATORIO'
+        rol=AsignarResponsablesForm.ROL_TECNICO_ASIGNADO,
     )
 
     # Crear diccionario con estadísticas de cada técnico

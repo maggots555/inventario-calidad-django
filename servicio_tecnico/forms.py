@@ -1017,27 +1017,34 @@ class CambioEstadoForm(forms.ModelForm):
 class AsignarResponsablesForm(forms.ModelForm):
     """
     Formulario para asignar responsables de la orden (técnico y seguimiento).
-    
+
     EXPLICACIÓN PARA PRINCIPIANTES:
     Este formulario permite cambiar quién es responsable de la orden:
-    
-    - tecnico_asignado_actual: El técnico que repara el equipo (SOLO TECNICOS DE LABORATORIO)
+
+    - tecnico_asignado_actual: El técnico que repara el equipo
     - responsable_seguimiento: La persona que da seguimiento al caso
-    
-    FILTROS APLICADOS:
-    - Técnicos: Solo empleados con cargo "TECNICO DE LABORATORIO" y activos
-    - Responsables: Todos los empleados activos
-    
+
+    FILTROS APLICADOS (ambos por Empleado.rol, no por texto libre de cargo):
+    - Técnicos: Solo empleados activos con rol='tecnico'
+    - Responsables: Solo empleados activos con rol recepcionista o dispatcher
+
     Cuando cambias estos responsables:
     1. Se actualiza la orden
     2. Se registra el cambio en el historial
     3. Se guarda quién era el técnico anterior (si aplica)
     """
-    
+
+    # Roles de negocio permitidos en el select de seguimiento (detalle_orden).
+    # EXPLICACIÓN: coinciden con Empleado.ROL_CHOICES — valores internos, no etiquetas.
+    ROLES_RESPONSABLE_SEGUIMIENTO = ('recepcionista', 'dispatcher')
+
+    # Rol permitido en el select de técnico asignado.
+    ROL_TECNICO_ASIGNADO = 'tecnico'
+
     class Meta:
         model = OrdenServicio
         fields = ['tecnico_asignado_actual', 'responsable_seguimiento']
-        
+
         widgets = {
             'tecnico_asignado_actual': forms.Select(attrs={
                 'class': 'form-control form-select',
@@ -1047,42 +1054,42 @@ class AsignarResponsablesForm(forms.ModelForm):
                 'class': 'form-control form-select',
             }),
         }
-        
+
         labels = {
             'tecnico_asignado_actual': 'Técnico Asignado',
             'responsable_seguimiento': 'Responsable de Seguimiento',
         }
-        
+
         help_texts = {
-            'tecnico_asignado_actual': 'Técnico de laboratorio que reparará el equipo',
-            'responsable_seguimiento': 'Persona encargada del seguimiento',
+            'tecnico_asignado_actual': 'Técnico (rol del sistema) que reparará el equipo',
+            'responsable_seguimiento': 'Recepcionista o Dispatcher encargado del seguimiento',
         }
-    
+
     def __init__(self, *args, **kwargs):
         """
         EXPLICACIÓN PARA PRINCIPIANTES:
         Este método se ejecuta cuando se crea el formulario.
         Aquí aplicamos filtros especiales:
-        
-        1. Para TÉCNICOS: Solo mostramos empleados con cargo "TECNICO DE LABORATORIO"
-        2. Para RESPONSABLES: Mostramos todos los empleados activos
-        
-        El filtro usa __icontains que es case-insensitive (no importa mayúsculas/minúsculas)
+
+        1. Para TÉCNICOS: Solo empleados activos con rol='tecnico'
+        2. Para RESPONSABLES: Solo recepcionistas y dispatchers activos
+
+        Ambos usan el campo estructurado `rol` (ROL_CHOICES), no el cargo en texto libre.
+        Así un empleado con cargo mal escrito pero rol correcto sí aparece, y viceversa.
         """
         super().__init__(*args, **kwargs)
-        
-        # FILTRO ESPECIAL: Solo técnicos de laboratorio activos
-        # __icontains = búsqueda case-insensitive (ignora mayúsculas/minúsculas)
-        tecnicos_laboratorio = Empleado.objects.filter(
+
+        # Solo rol técnico activo — ya no dependemos del string del cargo.
+        self.fields['tecnico_asignado_actual'].queryset = Empleado.objects.filter(
             activo=True,
-            cargo__icontains='TECNICO DE LABORATORIO'
+            rol=self.ROL_TECNICO_ASIGNADO,
         ).order_by('nombre_completo')
-        
-        self.fields['tecnico_asignado_actual'].queryset = tecnicos_laboratorio
-        
-        # Para responsables: todos los empleados activos
+
+        # Solo roles de recepción/dispatch: quien opera el seguimiento al cliente.
+        # activo=True excluye bajas; rol__in usa los valores de ROL_CHOICES.
         self.fields['responsable_seguimiento'].queryset = Empleado.objects.filter(
-            activo=True
+            activo=True,
+            rol__in=self.ROLES_RESPONSABLE_SEGUIMIENTO,
         ).order_by('nombre_completo')
 
 
