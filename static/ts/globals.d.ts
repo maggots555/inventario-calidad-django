@@ -21,5 +21,15 @@ interface Window {
      * Definido en static/ts/csrf.ts y cargado desde base.html.
      */
     getCsrfToken?: () => string;
+    /** Venta mostrador (static/ts/venta_mostrador.ts) — onclick del detalle de orden */
+    abrirModalVentaMostrador?: () => void;
+    abrirModalPiezaVentaMostrador?: (esEdicion?: boolean, piezaId?: number | null) => void;
+    editarPiezaVentaMostrador?: (piezaId: number) => void;
+    eliminarPiezaVentaMostrador?: (piezaId: number) => void;
+    toggleCambioPiezaCosto?: () => void;
+    toggleLimpiezaCosto?: () => void;
+    toggleKitCosto?: () => void;
+    toggleReinstalacionCosto?: () => void;
+    toggleRespaldoCosto?: () => void;
 }
 
