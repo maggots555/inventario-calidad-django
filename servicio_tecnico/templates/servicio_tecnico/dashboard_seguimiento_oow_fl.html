@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Dashboard Seguimiento OOW-/FL- - {{ block.super }}{% endblock %}
+{% block title %}Dashboard Seguimiento OOW/FL (fuera de garantía) - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <!-- Loader épico de dashboard -->
@@ -45,7 +45,7 @@
                 <span class="loader-progress-pct" id="loaderProgressPct">0%</span>
             </div>
         </div>
-        <div class="loader-dashboard-name" id="loaderDashboardName">Dashboard OOW- / FL-</div>
+        <div class="loader-dashboard-name" id="loaderDashboardName">Dashboard OOW / FL (fuera de garantía)</div>
     </div>
     <div class="loader-tip">
         <span class="tip-label">💡 Dato:</span>
@@ -65,10 +65,10 @@
                 <div>
                     <h2 class="mb-1">
                         <i class="bi bi-graph-up-arrow"></i>
-                        Dashboard de Seguimiento OOW-/FL-
+                        Dashboard de Seguimiento OOW/FL
                     </h2>
                     <p class="text-muted mb-0">
-                        Análisis completo y métricas de órdenes con prefijo OOW- y FL-
+                        Análisis y métricas de órdenes fuera de garantía (OOW diagnóstico y FL venta mostrador)
                     </p>
                 </div>
                 <div>
@@ -90,17 +90,18 @@
         <form method="get" id="formFiltros" class="row g-3">
             <div class="col-md-3">
                 <label for="prefijo" class="form-label fw-bold">
-                    <i class="bi bi-funnel"></i> Prefijo
+                    <i class="bi bi-funnel"></i> Tipo (OOW / FL)
                 </label>
+                {# name=prefijo se mantiene por URLs/bookmarks; filtra por tipo_servicio #}
                 <select name="prefijo" id="prefijo" class="form-select">
                     <option value="ambos" {% if filtros.prefijo == 'ambos' %}selected{% endif %}>
-                        OOW- y FL- (Ambos)
+                        Ambos (fuera de garantía)
                     </option>
                     <option value="OOW" {% if filtros.prefijo == 'OOW' %}selected{% endif %}>
-                        Solo OOW-
+                        OOW (con diagnóstico)
                     </option>
                     <option value="FL" {% if filtros.prefijo == 'FL' %}selected{% endif %}>
-                        Solo FL-
+                        FL (venta mostrador)
                     </option>
                 </select>
             </div>
@@ -190,7 +191,7 @@
             <div class="card metric-card h-100" style="border-left-color: #1f6391;">
                 <div class="card-body">
                     <p class="metric-value text-primary">{{ metricas.total_ordenes }}</p>
-                    <p class="metric-label">Total Órdenes OOW-/FL-</p>
+                    <p class="metric-label">Total Órdenes Fuera de Garantía</p>
                 </div>
             </div>
         </div>
@@ -1832,9 +1833,9 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 (function() {
     new DashboardLoader({
-        tituloExtra: 'Dashboard OOW- / FL-',
+        tituloExtra: 'Dashboard OOW / FL (fuera de garantía)',
         mensajes: [
-            'Consultando órdenes OOW- y FL-...',
+            'Consultando órdenes fuera de garantía...',
             'Calculando tiempos de resolución...',
             'Procesando métricas por responsable...',
             'Generando gráficas de seguimiento...',
@@ -1843,7 +1844,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'Construyendo tablas de desglose...',
         ],
         tips: [
-            'Las órdenes OOW- son equipos fuera de garantía. Las FL- son garantias de laboratorio externo.',
+            'OOW = fuera de garantía con diagnóstico. FL = fuera de garantía en venta mostrador (sin diagnóstico).',
             'Usa los filtros de responsable para comparar el rendimiento entre técnicos.',
             'Las alertas en rojo indican órdenes con más de 15 días sin actualización.',
             'Puedes exportar el reporte completo a Excel desde el botón superior derecho.',

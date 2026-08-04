@@ -1,10 +1,18 @@
 """
-Dashboard de seguimiento OOW-/FL- + export Excel (Fase 8).
+Dashboard de seguimiento OOW/FL (fuera de garantía) + export Excel (Fase 8).
 
 urls.py sigue usando views.<nombre> porque views.py reexporta estos símbolos.
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+--------------------------------
+Antes este dashboard filtraba por texto del folio del cliente (OOW- / FL-).
+Ahora usa el campo booleano es_fuera_garantia de la orden, que es la fuente
+de verdad de “¿esta orden es fuera de garantía?”. El select OOW vs FL sigue
+existiendo, pero distingue por tipo_servicio (diagnóstico vs venta mostrador).
 """
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import QuerySet
 from django.shortcuts import render
 
 from inventario.models import Empleado, Sucursal
@@ -17,8 +25,45 @@ from .services.ventas_mostrador_analytics import (
 )
 
 
+def queryset_base_oow_fl(prefijo_filtro: str = 'ambos') -> QuerySet:
+    """
+    Queryset base del dashboard OOW/FL: solo órdenes fuera de garantía.
+
+    Objetivo de negocio:
+        El dashboard debe mostrar órdenes marcadas como fuera de garantía
+        (es_fuera_garantia=True), no “cualquier folio que empiece con OOW-/FL-”.
+
+    Args:
+        prefijo_filtro: Valor del query param `prefijo` (se mantiene el nombre
+            por compatibilidad de URLs/bookmarks):
+            - 'ambos' (default): todas las fuera de garantía
+            - 'OOW': fuera de garantía + tipo_servicio='diagnostico'
+            - 'FL': fuera de garantía + tipo_servicio='venta_mostrador'
+
+    Returns:
+        QuerySet de OrdenServicio filtrado (sin select_related aún).
+
+    Efectos secundarios:
+        Ninguno (solo lectura ORM).
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # 1) Primero el booleano indexado: “¿es fuera de garantía?”
+    # 2) Luego, si el usuario eligió OOW o FL, refinamos por tipo de servicio.
+    ordenes = OrdenServicio.objects.filter(es_fuera_garantia=True)
+
+    if prefijo_filtro == 'OOW':
+        # OOW ≈ equipo fuera de garantía con diagnóstico técnico
+        ordenes = ordenes.filter(tipo_servicio='diagnostico')
+    elif prefijo_filtro == 'FL':
+        # FL ≈ venta mostrador (sin diagnóstico) fuera de garantía
+        ordenes = ordenes.filter(tipo_servicio='venta_mostrador')
+    # 'ambos' u otro valor: solo es_fuera_garantia=True
+
+    return ordenes
+
+
 # ============================================================================
-# DASHBOARD DE SEGUIMIENTO ESPECIALIZADO OOW-/FL-
+# DASHBOARD DE SEGUIMIENTO ESPECIALIZADO OOW/FL (FUERA DE GARANTÍA)
 # ============================================================================
 
 @login_required
@@ -26,12 +71,18 @@ from .services.ventas_mostrador_analytics import (
 @cache_page_dashboard
 def dashboard_seguimiento_oow_fl(request):
     """
-    Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
+    Dashboard especializado para seguimiento de órdenes fuera de garantía (OOW/FL).
+
+    Args:
+        request: HttpRequest con filtros GET (prefijo, responsable, fechas, etc.).
 
     Returns:
-        HttpResponse: Renderiza el template con todo el contexto de datos
+        HttpResponse: Renderiza el template con todo el contexto de datos.
+
+    Efectos secundarios:
+        Ninguno de escritura; solo lecturas ORM y render del template.
     """
-    from django.db.models import Q, Count, Sum, Avg, F, When, Case, Value, CharField
+    from django.db.models import Count, Sum, Avg, F, When, Case, Value, CharField
     from django.db.models.functions import Coalesce
     from decimal import Decimal
     from datetime import timedelta
@@ -51,26 +102,14 @@ def dashboard_seguimiento_oow_fl(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     estado_filtro = request.GET.get('estado', '')
     sucursal_id = request.GET.get('sucursal_id', '')
+    # Query param se llama `prefijo` por compatibilidad; la lógica ya no usa el string del folio
     prefijo_filtro = request.GET.get('prefijo', 'ambos')  # 'OOW', 'FL', o 'ambos'
     
     # =========================================================================
-    # PASO 2: CONSTRUIR QUERY BASE (FILTRO PRINCIPAL POR PREFIJO)
+    # PASO 2: QUERY BASE (es_fuera_garantia + opcional tipo_servicio)
     # =========================================================================
     
-    # Query base: órdenes con prefijo OOW- o FL- en orden_cliente
-    if prefijo_filtro == 'OOW':
-        ordenes = OrdenServicio.objects.filter(
-            detalle_equipo__orden_cliente__istartswith='OOW-'
-        )
-    elif prefijo_filtro == 'FL':
-        ordenes = OrdenServicio.objects.filter(
-            detalle_equipo__orden_cliente__istartswith='FL-'
-        )
-    else:  # 'ambos' (default)
-        ordenes = OrdenServicio.objects.filter(
-            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
-            Q(detalle_equipo__orden_cliente__istartswith='FL-')
-        )
+    ordenes = queryset_base_oow_fl(prefijo_filtro)
     
     # Optimizar consultas con select_related y prefetch_related
     ordenes = ordenes.select_related(
@@ -683,15 +722,18 @@ def dashboard_seguimiento_oow_fl(request):
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_excel_dashboard_oow_fl(request):
     """
-    Exporta el dashboard OOW-/FL- a Excel con múltiples hojas de análisis
+    Exporta el dashboard OOW/FL (fuera de garantía) a Excel con varias hojas.
 
-    Requiere: openpyxl instalado (pip install openpyxl)
-    
+    Args:
+        request: HttpRequest con los mismos filtros GET que el dashboard.
+
     Returns:
-        HttpResponse: Archivo Excel para descarga
+        HttpResponse: Archivo Excel para descarga, o JsonResponse si falta openpyxl.
+
+    Efectos secundarios:
+        Ninguno de escritura en BD; solo genera el archivo en memoria.
     """
     from django.http import HttpResponse
-    from django.db.models import Q
     from datetime import datetime
     
     try:
@@ -722,20 +764,8 @@ def exportar_excel_dashboard_oow_fl(request):
     sucursal_id = request.GET.get('sucursal_id', '')
     prefijo_filtro = request.GET.get('prefijo', 'ambos')
     
-    # Query base: órdenes con prefijo OOW- o FL-
-    if prefijo_filtro == 'OOW':
-        ordenes = OrdenServicio.objects.filter(
-            detalle_equipo__orden_cliente__istartswith='OOW-'
-        )
-    elif prefijo_filtro == 'FL':
-        ordenes = OrdenServicio.objects.filter(
-            detalle_equipo__orden_cliente__istartswith='FL-'
-        )
-    else:  # 'ambos' (default)
-        ordenes = OrdenServicio.objects.filter(
-            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
-            Q(detalle_equipo__orden_cliente__istartswith='FL-')
-        )
+    # Misma regla que el dashboard: booleano + tipo_servicio (no string del folio)
+    ordenes = queryset_base_oow_fl(prefijo_filtro)
     
     # Optimizar consultas
     ordenes = ordenes.select_related(
@@ -806,7 +836,9 @@ def exportar_excel_dashboard_oow_fl(request):
     # Determinar texto de filtros para el título
     filtros_texto = []
     if prefijo_filtro != 'ambos':
-        filtros_texto.append(f"Prefijo: {prefijo_filtro}-")
+        # EXPLICACIÓN: el param sigue llamándose prefijo, pero el texto refleja tipo de servicio
+        etiqueta_tipo = 'OOW (diagnóstico)' if prefijo_filtro == 'OOW' else 'FL (venta mostrador)'
+        filtros_texto.append(f"Tipo: {etiqueta_tipo}")
     if responsable_id == 'sin_asignar':
         filtros_texto.append("Responsable: Sin asignar")
     elif responsable_id:
@@ -1381,7 +1413,7 @@ def exportar_excel_dashboard_oow_fl(request):
     nombre_archivo_partes = ['Dashboard_OOW_FL']
     
     if prefijo_filtro != 'ambos':
-        nombre_archivo_partes.append(f'Prefijo_{prefijo_filtro}')
+        nombre_archivo_partes.append(f'Tipo_{prefijo_filtro}')
     
     if responsable_id == 'sin_asignar':
         nombre_archivo_partes.append('Resp_Sin_Asignar')
