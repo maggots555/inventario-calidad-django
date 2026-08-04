@@ -89,13 +89,13 @@ async function manejarClickGenerar(event) {
  * Encola la tarea de generación e inicia el polling.
  */
 async function lanzarGeneracion(ordenId, urlGenerar) {
-    var _a;
+    var _a, _b, _c;
     mostrarEstadoGenerando();
     try {
         const respuesta = await fetch(urlGenerar, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': obtenerCsrfToken(),
+                'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
@@ -104,7 +104,7 @@ async function lanzarGeneracion(ordenId, urlGenerar) {
             mostrarError(datos.error || 'No se pudo iniciar la generación del video.');
             return;
         }
-        actualizarMensajeGenerando((_a = datos.n_fotos) !== null && _a !== void 0 ? _a : 0);
+        actualizarMensajeGenerando((_c = datos.n_fotos) !== null && _c !== void 0 ? _c : 0);
         iniciarPollingGeneracion(datos.task_id);
     }
     catch (err) {
@@ -189,13 +189,14 @@ async function manejarClickDescargar(event) {
  * @param urlComprimir - URL del endpoint POST de compresión
  */
 async function lanzarCompresion(btn, urlComprimir) {
+    var _a, _b;
     // Poner el botón en estado "comprimiendo"
     setBtnDescargaEstado(btn, 'comprimiendo');
     try {
         const respuesta = await fetch(urlComprimir, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': obtenerCsrfToken(),
+                'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
@@ -408,24 +409,6 @@ function mostrarError(mensaje) {
         panelError.classList.remove('d-none');
     if (msgError)
         msgError.textContent = mensaje;
-}
-// ============================================================================
-// UTILIDADES
-// ============================================================================
-/**
- * Obtiene el CSRF token de las cookies de Django.
- * Soporta sigma_csrftoken (producción) y csrftoken (desarrollo).
- * Mismo patrón que ollama_sic.ts y voz_diagnostico.ts.
- */
-function obtenerCsrfToken() {
-    const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match = document.cookie.match(regex);
-        if (match)
-            return decodeURIComponent(match[1]);
-    }
-    return '';
 }
 // ============================================================================
 // ARRANQUE

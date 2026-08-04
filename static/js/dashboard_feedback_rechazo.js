@@ -598,17 +598,9 @@ class DashboardFeedbackRechazo {
      * CSRF: en producción la cookie es sigma_csrftoken; en dev csrftoken.
      */
     obtenerCsrfToken() {
-        const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-        const cookies = document.cookie.split(';');
-        for (const name of cookieNames) {
-            for (const raw of cookies) {
-                const cookie = raw.trim();
-                if (cookie.startsWith(name + '=')) {
-                    return decodeURIComponent(cookie.substring(name.length + 1));
-                }
-            }
-        }
-        return '';
+        var _a, _b;
+        // CSRF global (csrf.ts)
+        return (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
     }
     // ── Helpers ───────────────────────────────────────────────────────
     renderizarBadgeEstado(estado, diasRestantes) {

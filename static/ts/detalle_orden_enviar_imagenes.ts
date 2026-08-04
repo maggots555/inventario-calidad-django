@@ -11,16 +11,9 @@
         show?: () => void;
     };
 
+    /** CSRF global (csrf.ts incluye fallback al input del formulario). */
     function getCsrfTokenImagenes(): string {
-        const names: string[] = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of names) {
-            const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-            if (match) {
-                return decodeURIComponent(match[1]);
-            }
-        }
-        const input = document.querySelector('[name=csrfmiddlewaretoken]') as HTMLInputElement | null;
-        return input?.value ?? '';
+        return window.getCsrfToken?.() ?? '';
     }
 
     function _el(id: string): DomEl {

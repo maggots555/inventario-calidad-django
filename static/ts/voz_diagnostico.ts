@@ -44,19 +44,6 @@ const VOZ_MAX_DURACION_MS: number = 60_000;
 const VOZ_IDIOMA: string = 'es-MX';
 
 // ============================================================================
-// FUNCIÓN AUXILIAR: Obtener CSRF token desde cookies
-// ============================================================================
-function getVozCsrfToken(): string {
-    const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex: RegExp = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match: RegExpMatchArray | null = document.cookie.match(regex);
-        if (match) return decodeURIComponent(match[1]);
-    }
-    return '';
-}
-
-// ============================================================================
 // INTERFACES
 // ============================================================================
 
@@ -355,7 +342,7 @@ class VozDiagnostico {
         fetch(VOZ_ENDPOINT, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': getVozCsrfToken(),
+                'X-CSRFToken': window.getCsrfToken?.() ?? '',
             },
             body: formData,
         })

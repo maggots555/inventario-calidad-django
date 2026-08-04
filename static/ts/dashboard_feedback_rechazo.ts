@@ -723,17 +723,8 @@ class DashboardFeedbackRechazo {
      * CSRF: en producción la cookie es sigma_csrftoken; en dev csrftoken.
      */
     private obtenerCsrfToken(): string {
-        const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-        const cookies = document.cookie.split(';');
-        for (const name of cookieNames) {
-            for (const raw of cookies) {
-                const cookie = raw.trim();
-                if (cookie.startsWith(name + '=')) {
-                    return decodeURIComponent(cookie.substring(name.length + 1));
-                }
-            }
-        }
-        return '';
+        // CSRF global (csrf.ts)
+        return window.getCsrfToken?.() ?? '';
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

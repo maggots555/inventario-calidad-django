@@ -15,16 +15,6 @@
      */
     /** Máximo de correos para compartir el PDF del formato Garantía */
     const MAX_EMAILS_ENVIO = 3;
-    function leerCookieCsrf() {
-        const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of cookieNames) {
-            const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-            if (match) {
-                return decodeURIComponent(match[1]);
-            }
-        }
-        return '';
-    }
     function byId(id) {
         return document.getElementById(id);
     }
@@ -994,11 +984,12 @@
             }
         };
         const postJson = async (url, body) => {
+            var _a, _b;
             const resp = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': leerCookieCsrf(),
+                    'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify(body),
@@ -1137,6 +1128,7 @@
             lista.appendChild(p);
         };
         const eliminarEvidencia = async (item) => {
+            var _a, _b;
             const rawId = item.dataset.imagenId || '';
             const imagenId = Number.parseInt(rawId, 10);
             if (!Number.isFinite(imagenId) || imagenId <= 0) {
@@ -1156,7 +1148,7 @@
             try {
                 const resp = await fetch(url, {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': leerCookieCsrf() },
+                    headers: { 'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '' },
                     credentials: 'same-origin',
                 });
                 const data = (await resp.json());
@@ -1186,6 +1178,7 @@
             }
         });
         const subirEvidencia = async (input, tipo) => {
+            var _a, _b;
             const file = input.files && input.files[0];
             if (!file) {
                 return;
@@ -1198,7 +1191,7 @@
             try {
                 const resp = await fetch(urlEvidencia, {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': leerCookieCsrf() },
+                    headers: { 'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '' },
                     credentials: 'same-origin',
                     body: fd,
                 });

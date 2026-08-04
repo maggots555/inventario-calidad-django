@@ -20,23 +20,6 @@
     email?: string;
   }
 
-  /**
-   * Lee la cookie CSRF (producción usa sigma_csrftoken).
-   */
-  function obtenerCsrfToken(): string {
-    const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-    const cookies = document.cookie.split(';');
-    for (const name of cookieNames) {
-      for (const row of cookies) {
-        const trimmed = row.trim();
-        if (trimmed.startsWith(`${name}=`)) {
-          return decodeURIComponent(trimmed.substring(name.length + 1));
-        }
-      }
-    }
-    return '';
-  }
-
   function marcarBotonNotificado(btn: HTMLButtonElement): void {
     btn.disabled = true;
     btn.classList.remove('btn-success');
@@ -73,7 +56,7 @@
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'X-CSRFToken': obtenerCsrfToken(),
+          'X-CSRFToken': window.getCsrfToken?.() ?? '',
           Accept: 'application/json',
         },
         credentials: 'same-origin',

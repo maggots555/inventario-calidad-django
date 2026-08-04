@@ -1583,7 +1583,7 @@ function initDiagnosticoModal() {
      * Envía el nuevo email al servidor vía AJAX.
      */
     async function guardarEmailCliente() {
-        var _a;
+        var _a, _b;
         console.log('[Diagnostico Modal] guardarEmailCliente() llamada');
         console.log('[Diagnostico Modal] detalleEquipoId:', detalleEquipoId);
         console.log('[Diagnostico Modal] inputEditarEmail:', inputEditarEmail === null || inputEditarEmail === void 0 ? void 0 : inputEditarEmail.value);
@@ -1629,7 +1629,7 @@ function initDiagnosticoModal() {
         inputEditarEmail.readOnly = true;
         try {
             // Obtener token CSRF
-            const csrfToken = ((_a = document.querySelector('[name=csrfmiddlewaretoken]')) === null || _a === void 0 ? void 0 : _a.value) || '';
+            const csrfToken = (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
             const response = await fetch(`/servicio-tecnico/api/detalle-equipo/${detalleEquipoId}/actualizar-email/`, {
                 method: 'POST',
                 headers: {

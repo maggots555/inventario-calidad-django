@@ -111,7 +111,7 @@ async function lanzarGeneracion(ordenId: number, urlGenerar: string): Promise<vo
         const respuesta = await fetch(urlGenerar, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': obtenerCsrfToken(),
+                'X-CSRFToken': window.getCsrfToken?.() ?? '',
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
@@ -249,7 +249,7 @@ async function lanzarCompresion(btn: HTMLButtonElement, urlComprimir: string): P
         const respuesta = await fetch(urlComprimir, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': obtenerCsrfToken(),
+                'X-CSRFToken': window.getCsrfToken?.() ?? '',
                 'X-Requested-With': 'XMLHttpRequest',
             },
         });
@@ -484,25 +484,6 @@ function mostrarError(mensaje: string): void {
     if (panelBotones)   panelBotones.classList.remove('d-none');
     if (panelError)     panelError.classList.remove('d-none');
     if (msgError)       msgError.textContent = mensaje;
-}
-
-// ============================================================================
-// UTILIDADES
-// ============================================================================
-
-/**
- * Obtiene el CSRF token de las cookies de Django.
- * Soporta sigma_csrftoken (producción) y csrftoken (desarrollo).
- * Mismo patrón que ollama_sic.ts y voz_diagnostico.ts.
- */
-function obtenerCsrfToken(): string {
-    const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex: RegExp = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match: RegExpMatchArray | null = document.cookie.match(regex);
-        if (match) return decodeURIComponent(match[1]);
-    }
-    return '';
 }
 
 // ============================================================================

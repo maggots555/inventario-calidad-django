@@ -40,19 +40,6 @@ const VOZ_MAX_DURACION_MS = 60000;
 /** Idioma para la transcripción */
 const VOZ_IDIOMA = 'es-MX';
 // ============================================================================
-// FUNCIÓN AUXILIAR: Obtener CSRF token desde cookies
-// ============================================================================
-function getVozCsrfToken() {
-    const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match = document.cookie.match(regex);
-        if (match)
-            return decodeURIComponent(match[1]);
-    }
-    return '';
-}
-// ============================================================================
 // TIPOS para Web Speech API (no siempre en @types/dom estándar)
 // ============================================================================
 // Nota: no redeclaramos SpeechRecognitionEvent ni SpeechRecognitionErrorEvent
@@ -287,6 +274,7 @@ class VozDiagnostico {
     }
     /** Envía el audio grabado al backend para transcripción */
     enviarAudioAlServidor(mimeType) {
+        var _a, _b;
         if (this.audioChunks.length === 0) {
             this.mostrarError('No se capturó audio. Intenta de nuevo.');
             this.setEstado('inactivo');
@@ -301,7 +289,7 @@ class VozDiagnostico {
         fetch(VOZ_ENDPOINT, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': getVozCsrfToken(),
+                'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
             },
             body: formData,
         })

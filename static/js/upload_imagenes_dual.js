@@ -1202,6 +1202,7 @@ class UploadImagenesDual {
         });
         // Aceptar → POST al endpoint de envío
         (_b = document.getElementById('btnEgresoModalAceptar')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', async () => {
+            var _a, _b;
             const btnAceptar = document.getElementById('btnEgresoModalAceptar');
             const btnCancelar = document.getElementById('btnEgresoModalCancelar');
             if (btnAceptar) {
@@ -1211,9 +1212,8 @@ class UploadImagenesDual {
             if (btnCancelar)
                 btnCancelar.disabled = true;
             try {
-                // Obtener CSRF token del DOM
-                const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-                const csrfToken = (csrfInput === null || csrfInput === void 0 ? void 0 : csrfInput.value) || '';
+                // CSRF global (csrf.ts / base.html)
+                const csrfToken = (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
                 const resp = await fetch(urlEnviar, {
                     method: 'POST',
                     headers: {
@@ -1413,6 +1413,7 @@ class UploadImagenesDual {
             }
         });
         (_c = document.getElementById('btnRewindModalAceptar')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', async () => {
+            var _a, _b;
             const btnAceptar = document.getElementById('btnRewindModalAceptar');
             const btnCancelar = document.getElementById('btnRewindModalCancelar');
             if (btnAceptar) {
@@ -1422,8 +1423,7 @@ class UploadImagenesDual {
             if (btnCancelar)
                 btnCancelar.disabled = true;
             try {
-                const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-                const csrfToken = (csrfInput === null || csrfInput === void 0 ? void 0 : csrfInput.value) || '';
+                const csrfToken = (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
                 const resp = await fetch(urlEnviarRewind, {
                     method: 'POST',
                     headers: {

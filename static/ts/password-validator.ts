@@ -436,11 +436,7 @@ class PasswordValidator {
      * En producción Django usa 'sigma_csrftoken'; en desarrollo usa 'csrftoken'.
      */
     private getCSRFToken(): string {
-        const cookies = document.cookie.split('; ');
-        const productionToken = cookies.find(row => row.startsWith('sigma_csrftoken='))?.split('=')[1];
-        if (productionToken) return productionToken;
-        const devToken = cookies.find(row => row.startsWith('csrftoken='))?.split('=')[1];
-        return devToken || '';
+        return window.getCsrfToken?.() ?? '';
     }
 }
 

@@ -48,17 +48,6 @@ interface PadState {
   tieneTrazos: boolean;
 }
 
-function leerCookieCsrf(): string {
-  const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-  for (const name of cookieNames) {
-    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    if (match) {
-      return decodeURIComponent(match[1]);
-    }
-  }
-  return '';
-}
-
 function byId(id: string): HTMLElement | null {
   return document.getElementById(id);
 }
@@ -1179,7 +1168,7 @@ function inicializarFormatoOow(): void {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRFToken': leerCookieCsrf(),
+        'X-CSRFToken': window.getCsrfToken?.() ?? '',
       },
       credentials: 'same-origin',
       body: JSON.stringify(body),
@@ -1290,7 +1279,7 @@ function inicializarFormatoOow(): void {
     try {
       const resp = await fetch(urlEvidencia, {
         method: 'POST',
-        headers: { 'X-CSRFToken': leerCookieCsrf() },
+        headers: { 'X-CSRFToken': window.getCsrfToken?.() ?? '' },
         credentials: 'same-origin',
         body: fd,
       });
@@ -1406,7 +1395,7 @@ function inicializarFormatoOow(): void {
     try {
       const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'X-CSRFToken': leerCookieCsrf() },
+        headers: { 'X-CSRFToken': window.getCsrfToken?.() ?? '' },
         credentials: 'same-origin',
       });
       const data = (await resp.json()) as { success?: boolean; error?: string; mensaje?: string };

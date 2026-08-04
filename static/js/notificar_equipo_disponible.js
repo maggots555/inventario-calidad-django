@@ -11,22 +11,6 @@
  */
 (function () {
     'use strict';
-    /**
-     * Lee la cookie CSRF (producción usa sigma_csrftoken).
-     */
-    function obtenerCsrfToken() {
-        const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-        const cookies = document.cookie.split(';');
-        for (const name of cookieNames) {
-            for (const row of cookies) {
-                const trimmed = row.trim();
-                if (trimmed.startsWith(`${name}=`)) {
-                    return decodeURIComponent(trimmed.substring(name.length + 1));
-                }
-            }
-        }
-        return '';
-    }
     function marcarBotonNotificado(btn) {
         btn.disabled = true;
         btn.classList.remove('btn-success');
@@ -36,6 +20,7 @@
         btn.title = 'Ya se notificó al cliente';
     }
     async function enviarNotificacion(btn) {
+        var _a, _b;
         const url = btn.dataset.url;
         if (!url) {
             window.alert('No se encontró la URL de notificación.');
@@ -57,7 +42,7 @@
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': obtenerCsrfToken(),
+                    'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                     Accept: 'application/json',
                 },
                 credentials: 'same-origin',

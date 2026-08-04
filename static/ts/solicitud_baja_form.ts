@@ -1260,22 +1260,7 @@ class SolicitudBajaFormHandler {
      * Se intenta primero el nombre de producción y luego el predeterminado.
      */
     private getCSRFToken(): string {
-        const names = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of names) {
-            let cookieValue = '';
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            if (cookieValue) return cookieValue;
-        }
-        return '';
+        return window.getCsrfToken?.() ?? '';
     }
     
     /**

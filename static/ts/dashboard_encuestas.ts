@@ -1016,15 +1016,7 @@ class DashboardEncuestas {
      * usa el nombre por defecto 'csrftoken'. Se intenta primero el de producción.
      */
     private obtenerCsrfToken(): string {
-        const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-        const cookies = document.cookie.split(';');
-        for (const nombre of cookieNames) {
-            const found = cookies.find(row => row.trim().startsWith(nombre + '='));
-            if (found) {
-                return decodeURIComponent(found.trim().substring(nombre.length + 1));
-            }
-        }
-        return '';
+        return window.getCsrfToken?.() ?? '';
     }
 }
 

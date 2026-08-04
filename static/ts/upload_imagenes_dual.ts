@@ -1539,9 +1539,8 @@ class UploadImagenesDual {
             if (btnCancelar) btnCancelar.disabled = true;
 
             try {
-                // Obtener CSRF token del DOM
-                const csrfInput = document.querySelector<HTMLInputElement>('[name=csrfmiddlewaretoken]');
-                const csrfToken = csrfInput?.value || '';
+                // CSRF global (csrf.ts / base.html)
+                const csrfToken = window.getCsrfToken?.() ?? '';
 
                 const resp = await fetch(urlEnviar, {
                     method: 'POST',
@@ -1763,8 +1762,7 @@ class UploadImagenesDual {
             if (btnCancelar) btnCancelar.disabled = true;
 
             try {
-                const csrfInput = document.querySelector<HTMLInputElement>('[name=csrfmiddlewaretoken]');
-                const csrfToken = csrfInput?.value || '';
+                const csrfToken = window.getCsrfToken?.() ?? '';
 
                 const resp = await fetch(urlEnviarRewind, {
                     method: 'POST',

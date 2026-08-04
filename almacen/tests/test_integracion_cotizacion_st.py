@@ -11,24 +11,21 @@ llaman las vistas HTTP (RequestFactory) para recorrer el flujo de negocio:
 3) Sin orden: vincular orden → entonces sí se pueden generar compras.
 4) Rechazo total: rechazar todas + motivo catálogo → Cotizacion ST coherente.
 
+Los fixtures compartidos viven en helpers_integracion_cotizacion.py
+(también los usa test_e2e_flujo_dinero.py).
+
 Celery / envío de correo se mockean (.delay) para no tocar IO real en CI.
 """
 
-from decimal import Decimal
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
-from django.contrib.messages.storage.fallback import FallbackStorage
-from django.contrib.sessions.backends.db import SessionStore
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.urls import reverse
 
-from almacen.models import (
-    CompraProducto,
-    LineaCotizacion,
-    ProductoAlmacen,
-    Proveedor,
-    SolicitudCotizacion,
+from almacen.models import CompraProducto
+from almacen.tests.helpers_integracion_cotizacion import (
+    BaseIntegracionCotizacionMixin,
+    request_post,
 )
 from almacen.utils.sincronizar_rechazo_cotizacion_st import (
     solicitud_requiere_motivo_rechazo_st,
@@ -39,164 +36,10 @@ from almacen.views import (
     registrar_motivo_rechazo_st,
     vincular_orden_solicitud,
 )
-from inventario.models import Empleado, Sucursal
-from scorecard.models import ComponenteEquipo
-from servicio_tecnico.models import Cotizacion, DetalleEquipo, OrdenServicio
+from servicio_tecnico.models import Cotizacion
 
 
-User = get_user_model()
-
-
-def _request_post(factory: RequestFactory, user, url: str, data: dict | None = None):
-    """
-    Arma un POST autenticado con sesión y messages.
-
-    Args:
-        factory: RequestFactory de Django.
-        user: Usuario autenticado (superuser en estos tests).
-        url: Ruta absoluta o relativa del POST.
-        data: Dict de campos del formulario (opcional).
-
-    Returns:
-        HttpRequest listo para pasar a la vista.
-    """
-    request = factory.post(url, data or {})
-    request.user = user
-    # Session + messages: las vistas usan messages.* y redirect
-    request.session = SessionStore()
-    request._messages = FallbackStorage(request)
-    return request
-
-
-class _BaseIntegracionCotizacionMixin:
-    """
-    Fixtures compartidas para los escenarios de integración.
-
-    Objetivo: no repetir la creación de sucursal/usuario/producto en cada clase.
-    """
-
-    databases = {'default', 'mexico'}
-
-    def _crear_contexto_base(self, *, sufijo: str):
-        """
-        Crea sucursal, usuario superuser, empleado, proveedor y producto.
-
-        Args:
-            sufijo: Texto único para códigos (evita choques unique entre tests).
-
-        Efectos secundarios:
-            Inserta filas en Sucursal, User, Empleado, Proveedor, ProductoAlmacen.
-        """
-        self.factory = RequestFactory()
-        self.sucursal = Sucursal.objects.create(
-            nombre=f'Sucursal Integración {sufijo}',
-            codigo=f'TST-INT-{sufijo}'[:20],
-            activa=True,
-            ciudad='CDMX',
-            direccion='Calle Integración 1',
-            horario_atencion='Lun-Vie 9-18',
-        )
-        self.user = User.objects.create_user(
-            username=f'user_int_{sufijo}',
-            password='testpass123',
-            is_superuser=True,
-        )
-        self.empleado = Empleado.objects.create(
-            user=self.user,
-            nombre_completo=f'Integración {sufijo}',
-            cargo='Front Desk',
-            area='FRONTDESK',
-            email=f'int.{sufijo}@test.local',
-            sucursal=self.sucursal,
-            rol='recepcionista',
-            activo=True,
-            tiene_acceso_sistema=True,
-            contraseña_configurada=True,
-        )
-        self.proveedor = Proveedor.objects.create(
-            nombre=f'Proveedor Integración {sufijo}',
-            activo=True,
-        )
-        # ComponenteEquipo "RAM" ayuda al resolver_componente al sincronizar PiezaCotizada
-        self.componente = ComponenteEquipo.objects.get_or_create(
-            nombre='RAM',
-            defaults={'activo': True, 'tipo_equipo': 'todos'},
-        )[0]
-        self.producto = ProductoAlmacen.objects.create(
-            codigo_producto=f'SKU-INT-{sufijo}',
-            nombre=f'MEMORIA RAM DDR4 16GB INT {sufijo}',
-            tipo_producto='unico',
-            costo_unitario=Decimal('150.00'),
-            stock_actual=0,
-            proveedor_principal=self.proveedor,
-        )
-
-    def _crear_orden_con_detalle(self, *, orden_cliente: str, estado: str = 'cotizacion'):
-        """
-        Crea OrdenServicio + DetalleEquipo mínimos.
-
-        Returns:
-            OrdenServicio creada (con detalle_equipo).
-        """
-        orden = OrdenServicio.objects.create(
-            sucursal=self.sucursal,
-            tipo_servicio='diagnostico',
-            estado=estado,
-            tecnico_asignado_actual=self.empleado,
-        )
-        DetalleEquipo.objects.create(
-            orden=orden,
-            orden_cliente=orden_cliente,
-            tipo_equipo='Laptop',
-            marca='DELL',
-            modelo='Latitude',
-            numero_serie=f'SN-{orden_cliente}',
-            email_cliente='cliente.integracion@test.local',
-            nombre_cliente='Cliente Integración',
-        )
-        return orden
-
-    def _crear_solicitud_con_linea(
-        self,
-        *,
-        orden=None,
-        sin_orden_activa: bool = False,
-        estado: str = 'enviada_cliente',
-        estado_linea: str = 'pendiente',
-    ):
-        """
-        Crea SolicitudCotizacion + LineaCotizacion vinculadas al producto/proveedor.
-
-        Args:
-            orden: OrdenServicio o None (modo sin orden).
-            sin_orden_activa: Flag de cotización previa al ingreso.
-            estado: Estado inicial de la solicitud.
-            estado_linea: Estado inicial de la línea.
-
-        Returns:
-            tuple: (solicitud, linea)
-        """
-        solicitud = SolicitudCotizacion.objects.create(
-            orden_servicio=orden,
-            sin_orden_activa=sin_orden_activa,
-            estado=estado,
-            creado_por=self.user,
-            service_tag='SN-SIN-ORDEN' if sin_orden_activa else '',
-        )
-        linea = LineaCotizacion.objects.create(
-            solicitud=solicitud,
-            producto=self.producto,
-            proveedor=self.proveedor,
-            descripcion_pieza=self.producto.nombre,
-            cantidad=1,
-            costo_unitario=Decimal('150.00'),
-            precio_unitario_cliente=Decimal('300.00'),
-            estado_cliente=estado_linea,
-        )
-        return solicitud, linea
-
-
-class IntegracionCotizacionConOrdenTest(_BaseIntegracionCotizacionMixin, TestCase):
+class IntegracionCotizacionConOrdenTest(BaseIntegracionCotizacionMixin, TestCase):
     """
     Flujo feliz con orden vinculada desde el inicio + rechazo total sync ST.
 
@@ -240,7 +83,7 @@ class IntegracionCotizacionConOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:generar_compras_solicitud',
             kwargs={'pk': self.solicitud.pk},
         )
-        request = _request_post(self.factory, self.user, url, {})
+        request = request_post(self.factory, self.user, url, {})
         respuesta = generar_compras_solicitud(request, self.solicitud.pk)
         self.assertEqual(respuesta.status_code, 302)
 
@@ -272,7 +115,7 @@ class IntegracionCotizacionConOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:rechazar_todas_lineas',
             kwargs={'pk': self.solicitud.pk},
         )
-        request_rechazar = _request_post(
+        request_rechazar = request_post(
             self.factory,
             self.user,
             url_rechazar,
@@ -294,7 +137,7 @@ class IntegracionCotizacionConOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:registrar_motivo_rechazo_st',
             kwargs={'pk': self.solicitud.pk},
         )
-        request_motivo = _request_post(
+        request_motivo = request_post(
             self.factory,
             self.user,
             url_motivo,
@@ -317,7 +160,7 @@ class IntegracionCotizacionConOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
         mock_delay.assert_not_called()
 
 
-class IntegracionCotizacionSinOrdenTest(_BaseIntegracionCotizacionMixin, TestCase):
+class IntegracionCotizacionSinOrdenTest(BaseIntegracionCotizacionMixin, TestCase):
     """
     Flujo sin orden activa: bloqueo de compras y desbloqueo al vincular.
 
@@ -355,7 +198,7 @@ class IntegracionCotizacionSinOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:generar_compras_solicitud',
             kwargs={'pk': self.solicitud.pk},
         )
-        request = _request_post(self.factory, self.user, url, {})
+        request = request_post(self.factory, self.user, url, {})
         respuesta = generar_compras_solicitud(request, self.solicitud.pk)
         self.assertEqual(respuesta.status_code, 302)
 
@@ -382,7 +225,7 @@ class IntegracionCotizacionSinOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:vincular_orden_solicitud',
             kwargs={'pk': self.solicitud.pk},
         )
-        request_vincular = _request_post(
+        request_vincular = request_post(
             self.factory,
             self.user,
             url_vincular,
@@ -402,7 +245,7 @@ class IntegracionCotizacionSinOrdenTest(_BaseIntegracionCotizacionMixin, TestCas
             'almacen:generar_compras_solicitud',
             kwargs={'pk': self.solicitud.pk},
         )
-        request_compras = _request_post(self.factory, self.user, url_compras, {})
+        request_compras = request_post(self.factory, self.user, url_compras, {})
         resp_compras = generar_compras_solicitud(request_compras, self.solicitud.pk)
         self.assertEqual(resp_compras.status_code, 302)
 

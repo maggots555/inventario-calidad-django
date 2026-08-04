@@ -709,6 +709,9 @@
     <script src="{% static 'js/cursor_personalizado.js' %}"></script>
     <script src="{% static 'js/dark_mode.js' %}"></script>
 
+    {# CSRF único (window.getCsrfToken): debe ir ANTES de cualquier fetch staff #}
+    <script src="{% static 'js/csrf.js' %}"></script>
+
     <!-- Panel de Notificaciones Celery 🔔 -->
     {% if user.is_authenticated %}
     <script src="{% static 'js/notificaciones.js' %}"></script>

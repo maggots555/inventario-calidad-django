@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // un FormData POST al endpoint API.
     // --------------------------------------------------------
     btnConfirmar === null || btnConfirmar === void 0 ? void 0 : btnConfirmar.addEventListener('click', async () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         if (!tipoServicioInput || !alertaDiv)
             return;
         // Ocultar alerta previa
@@ -502,13 +502,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(config.urlApi, {
                 method: 'POST',
                 body: formData,
-                headers: { 'X-CSRFToken': config.csrfToken },
+                headers: { 'X-CSRFToken': (_k = (_j = window.getCsrfToken) === null || _j === void 0 ? void 0 : _j.call(window)) !== null && _k !== void 0 ? _k : config.csrfToken },
             });
             // Parsear la respuesta JSON
             const data = await response.json();
             if (data.success) {
                 // Éxito: mostrar mensaje y cerrar modal después de 2 segundos
-                mostrarAlerta('success', `<i class="bi bi-check-circle me-1"></i>${(_j = data.mensaje) !== null && _j !== void 0 ? _j : 'Correo enviado correctamente.'}`);
+                mostrarAlerta('success', `<i class="bi bi-check-circle me-1"></i>${(_l = data.mensaje) !== null && _l !== void 0 ? _l : 'Correo enviado correctamente.'}`);
                 setTimeout(() => {
                     var _a, _b;
                     const modal = document.querySelector('#modalEnviarCotizacionCliente');
@@ -520,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else {
                 // Error: mostrar el mensaje de error
-                mostrarAlerta('danger', `<i class="bi bi-exclamation-triangle me-1"></i>${(_k = data.error) !== null && _k !== void 0 ? _k : 'Error desconocido.'}`);
+                mostrarAlerta('danger', `<i class="bi bi-exclamation-triangle me-1"></i>${(_m = data.error) !== null && _m !== void 0 ? _m : 'Error desconocido.'}`);
                 restaurarBoton();
             }
         }

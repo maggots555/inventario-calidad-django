@@ -623,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(config.urlApi, {
                 method:  'POST',
                 body:    formData,
-                headers: { 'X-CSRFToken': config.csrfToken },
+                headers: { 'X-CSRFToken': window.getCsrfToken?.() ?? config.csrfToken },
             });
 
             // Parsear la respuesta JSON

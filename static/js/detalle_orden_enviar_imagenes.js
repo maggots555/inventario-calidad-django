@@ -4,17 +4,10 @@
  * Build: pnpm run build → static/js/detalle_orden_enviar_imagenes.js
  */
 (function detalleOrdenEnviarImagenesMain() {
+    /** CSRF global (csrf.ts incluye fallback al input del formulario). */
     function getCsrfTokenImagenes() {
-        var _a;
-        const names = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of names) {
-            const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-            if (match) {
-                return decodeURIComponent(match[1]);
-            }
-        }
-        const input = document.querySelector('[name=csrfmiddlewaretoken]');
-        return (_a = input === null || input === void 0 ? void 0 : input.value) !== null && _a !== void 0 ? _a : '';
+        var _a, _b;
+        return (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
     }
     function _el(id) {
         return document.getElementById(id);

@@ -24,20 +24,6 @@ const OLLAMA_MIN_CHARS = 20;
 const OLLAMA_ENDPOINT = '/servicio-tecnico/api/pulir-diagnostico-sic/';
 const GUARDAR_DIAG_ENDPOINT = '/servicio-tecnico/api/guardar-diagnostico-sic/';
 // ============================================================================
-// FUNCIÓN: Obtener el CSRF token desde las cookies
-// Soporta el nombre personalizado del proyecto (sigma_csrftoken) y el estándar.
-// ============================================================================
-function getOllamaCsrfToken() {
-    const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match = document.cookie.match(regex);
-        if (match)
-            return decodeURIComponent(match[1]);
-    }
-    return '';
-}
-// ============================================================================
 // FUNCIÓN PRINCIPAL: iniciarMejorarDiagSIC
 // Recibe las referencias del DOM ya validadas y registra todos los listeners.
 // ============================================================================
@@ -185,7 +171,7 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
     // No enviamos "modelo": el backend recorre GEMINI_MODELS y cae a Ollama.
     // ========================================================================
     async function llamarCascadaAutomatica() {
-        var _a, _b;
+        var _a, _b, _c, _d;
         cargando = true;
         mostrarEstadoCargando();
         // Leer la falla principal del equipo para enriquecer el prompt
@@ -204,21 +190,21 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             const response = await fetch(OLLAMA_ENDPOINT, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getOllamaCsrfToken(),
+                    'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                 },
                 body: formData,
             });
             const data = await response.json();
             if (data.success && data.diagnostico_mejorado) {
                 textoPropuesto = data.diagnostico_mejorado;
-                mostrarResultado(data.diagnostico_mejorado, (_a = data.modelo_usado) !== null && _a !== void 0 ? _a : 'IA', {
+                mostrarResultado(data.diagnostico_mejorado, (_c = data.modelo_usado) !== null && _c !== void 0 ? _c : 'IA', {
                     tiempo_ms: data.tiempo_ms,
                     chars_original: data.chars_original,
                     chars_mejorado: data.chars_mejorado,
                 });
             }
             else {
-                mostrarError((_b = data.error) !== null && _b !== void 0 ? _b : 'Error desconocido al procesar la solicitud.');
+                mostrarError((_d = data.error) !== null && _d !== void 0 ? _d : 'Error desconocido al procesar la solicitud.');
             }
         }
         catch (err) {
@@ -235,7 +221,7 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
     // GUARDAR EN BD el diagnóstico aceptado (solo ese campo)
     // ========================================================================
     async function guardarDiagnosticoAceptado(texto) {
-        var _a;
+        var _a, _b, _c;
         if (!datosEquipo.ordenId) {
             mostrarError('No se pudo identificar la orden para guardar el diagnóstico.');
             return false;
@@ -253,7 +239,7 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             const response = await fetch(GUARDAR_DIAG_ENDPOINT, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getOllamaCsrfToken(),
+                    'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
                 },
                 body: formData,
             });
@@ -261,7 +247,7 @@ function iniciarMejorarDiagSIC(textarea, botonMejorar, modalEl, datosEquipo) {
             if (data.success) {
                 return true;
             }
-            mostrarError((_a = data.error) !== null && _a !== void 0 ? _a : 'No se pudo guardar el diagnóstico.');
+            mostrarError((_c = data.error) !== null && _c !== void 0 ? _c : 'No se pudo guardar el diagnóstico.');
             btnAceptar.innerHTML = etiquetaOriginal;
             btnAceptar.disabled = false;
             btnReintentar.disabled = false;

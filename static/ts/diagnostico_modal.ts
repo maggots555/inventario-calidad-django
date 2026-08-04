@@ -1823,7 +1823,7 @@ function initDiagnosticoModal(): void {
         
         try {
             // Obtener token CSRF
-            const csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]') as HTMLInputElement)?.value || '';
+            const csrfToken = window.getCsrfToken?.() ?? '';
             
             const response = await fetch(
                 `/servicio-tecnico/api/detalle-equipo/${detalleEquipoId}/actualizar-email/`,

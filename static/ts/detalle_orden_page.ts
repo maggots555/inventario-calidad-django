@@ -3,7 +3,7 @@
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Antes era JS inline en el template. Ahora lee #detalle-orden-page-config
- * y CSRF de cookie (sigma_csrftoken / csrftoken).
+ * y CSRF vía window.getCsrfToken (static/ts/csrf.ts / base.html).
  *
  * Todo vive dentro de un IIFE para no chocar con otros .ts globales.
  * Build: pnpm run build → static/js/detalle_orden_page.js
@@ -63,15 +63,9 @@
         };
     }).bootstrap;
 
+    /** CSRF global (csrf.ts); fallback vacío si el script aún no cargó. */
     function getCsrfToken(): string {
-        const names: string[] = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of names) {
-            const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-            if (match) {
-                return decodeURIComponent(match[1]);
-            }
-        }
-        return '';
+        return window.getCsrfToken?.() ?? '';
     }
 
     function _el(id: string): DomEl {

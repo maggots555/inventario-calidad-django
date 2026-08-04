@@ -16,5 +16,10 @@ interface Window {
     sigmaLoader: InstanceType<typeof DashboardLoader> | null;
     /** Abre modal de cámara y escribe el código detectado en un input */
     abrirScannerCodigo?: (opciones: AbrirScannerCodigoOpciones) => void;
+    /**
+     * Token CSRF (cookie sigma_csrftoken / csrftoken o input del form).
+     * Definido en static/ts/csrf.ts y cargado desde base.html.
+     */
+    getCsrfToken?: () => string;
 }
 

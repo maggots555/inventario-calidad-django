@@ -4,7 +4,7 @@
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Antes era JS inline en el template. Ahora lee #detalle-orden-page-config
- * y CSRF de cookie (sigma_csrftoken / csrftoken).
+ * y CSRF vía window.getCsrfToken (static/ts/csrf.ts / base.html).
  *
  * Todo vive dentro de un IIFE para no chocar con otros .ts globales.
  * Build: pnpm run build → static/js/detalle_orden_page.js
@@ -12,15 +12,10 @@
 (function detalleOrdenPageMain() {
     var _a, _b, _c;
     const bootstrap = window.bootstrap;
+    /** CSRF global (csrf.ts); fallback vacío si el script aún no cargó. */
     function getCsrfToken() {
-        const names = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of names) {
-            const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-            if (match) {
-                return decodeURIComponent(match[1]);
-            }
-        }
-        return '';
+        var _a, _b;
+        return (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
     }
     function _el(id) {
         return document.getElementById(id);

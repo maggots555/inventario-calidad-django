@@ -533,16 +533,9 @@ class PanelNotificaciones {
      * Busca ambos nombres de cookie (desarrollo y producción).
      */
     getCsrfToken() {
-        // Intentar con el nombre de producción primero, luego el default de Django
-        const cookieNames = ['sigma_csrftoken', 'csrftoken'];
-        for (const name of cookieNames) {
-            const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-            const match = document.cookie.match(regex);
-            if (match) {
-                return match[1];
-            }
-        }
-        return '';
+        var _a, _b;
+        // Helper global: static/ts/csrf.ts (cargado en base.html)
+        return (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '';
     }
     /**
      * Escapa caracteres HTML para prevenir ataques XSS.

@@ -24,20 +24,6 @@ const OLLAMA_MIN_CHARS: number = 20;
 const OLLAMA_ENDPOINT: string = '/servicio-tecnico/api/pulir-diagnostico-sic/';
 const GUARDAR_DIAG_ENDPOINT: string = '/servicio-tecnico/api/guardar-diagnostico-sic/';
 
-// ============================================================================
-// FUNCIÓN: Obtener el CSRF token desde las cookies
-// Soporta el nombre personalizado del proyecto (sigma_csrftoken) y el estándar.
-// ============================================================================
-function getOllamaCsrfToken(): string {
-    const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
-    for (const name of cookieNames) {
-        const regex: RegExp = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
-        const match: RegExpMatchArray | null = document.cookie.match(regex);
-        if (match) return decodeURIComponent(match[1]);
-    }
-    return '';
-}
-
 // Interfaces para tipado de la respuesta del API
 interface OllamaResponse {
     success: boolean;
@@ -260,7 +246,7 @@ function iniciarMejorarDiagSIC(
             const response = await fetch(OLLAMA_ENDPOINT, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getOllamaCsrfToken(),
+                    'X-CSRFToken': window.getCsrfToken?.() ?? '',
                 },
                 body: formData,
             });
@@ -315,7 +301,7 @@ function iniciarMejorarDiagSIC(
             const response = await fetch(GUARDAR_DIAG_ENDPOINT, {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getOllamaCsrfToken(),
+                    'X-CSRFToken': window.getCsrfToken?.() ?? '',
                 },
                 body: formData,
             });
