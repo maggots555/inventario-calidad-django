@@ -129,6 +129,7 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 - ✅ **Encuestas de Satisfacción**: Sistema NPS con envío automático por correo y dashboard de resultados
 - ✅ **Concentrado Semanal CIS**: Reporte semanal con exportación a Excel mensual
 - ✅ **Correo de Cotización Rechazada**: Notificación con feedback del cliente mediante token seguro
+- ✅ **PDF y Análisis de Feedback de Rechazos**: PDF de rechazos + analizador de sentimiento/feedback (cascada Ollama/Gemini)
 - ✅ Venta mostrador con paquetes predefinidos y servicios adicionales
 - ✅ Integración con sistema de calidad para reingresos
 - ✅ **Buscador Inteligente de Reingresos**: Búsqueda de orden original con chip visual
@@ -939,7 +940,11 @@ source venv/bin/activate
 3. **Instalar dependencias**
 
 ```bash
-pip install -r requirements.txt
+# Recomendado: mismas versiones que producción/CI
+pip install -r requirements.lock
+
+# Alternativa (lista “humana” / intención; puede resolver versiones distintas):
+# pip install -r requirements.txt
 ```
 
 4. **Configurar variables de entorno**
@@ -1213,7 +1218,9 @@ inventario-calidad-django/
 │   └── wsgi.py / asgi.py
 ├── servicio_tecnico/      # App principal de servicio técnico
 │   ├── models.py          # ~23 modelos
-│   ├── views.py           # Vistas principales
+│   ├── views.py           # Fachada de reexports (NO monolito)
+│   ├── views_*.py         # Vistas por dominio (detalle_orden, órdenes, RHITSO, …)
+│   ├── services/          # Lógica compartida (historial, multimedia, context, …)
 │   ├── plotly_visualizations.py  # ~4,607 líneas - Dashboards Plotly
 │   ├── sicser_client.py / sicser_import.py  # Integración SICSER
 │   ├── chat_seguimiento_helpers.py          # Chat IA público
@@ -1223,7 +1230,7 @@ inventario-calidad-django/
 │   └── templates/         # Templates del módulo
 ├── scorecard/             # App de control de calidad
 ├── inventario/            # App de inventario base
-├── almacen/               # App de gestión de almacén central (utils/, tasks.py, tests/)
+├── almacen/               # Almacén: views.py fachada + views_*.py + utils/ + tasks + tests
 ├── notificaciones/        # App de notificaciones internas (Celery + Web Push dual)
 ├── templates/             # Templates globales (base.html)
 ├── static/
@@ -1247,7 +1254,8 @@ inventario-calidad-django/
 ├── ml_models/             # Modelos ML entrenados (.pkl)
 ├── logs/                  # Logs de aplicación
 ├── manage.py
-├── requirements.txt
+├── requirements.txt       # Lista “humana” de dependencias (intención)
+├── requirements.lock      # Versiones pinneadas (instalación reproducible)
 ├── package.json           # Dependencias Node (TypeScript)
 └── tsconfig.json          # Configuración TypeScript
 ```
@@ -1355,9 +1363,9 @@ Este sistema integra las mejores prácticas de:
 
 ## 📈 Estado del Proyecto
 
-**Versión Actual**: 5.2 (Julio 2026)  
-**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery/IA/Video/PWA dual/SICSER)  
-**Última Actualización**: Julio 10, 2026
+**Versión Actual**: 5.2 (Agosto 2026)  
+**Estado**: ✅ Producción (5 apps de negocio + ML/Analytics/Multi-País/Celery/IA/Video/PWA dual/SICSER)  
+**Última Actualización**: Agosto 3, 2026
 
 ### Módulos Completados
 
