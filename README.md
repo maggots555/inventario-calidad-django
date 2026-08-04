@@ -1,6 +1,6 @@
 # 🏥 Sistema Integrado de Gestión Técnica y Control de Calidad
 
-<!-- Badges -->
+<!-- Badges: núcleo del stack (decoración GitHub; la verdad está en requirements.txt / package.json) -->
 <p align="center">
   <img src="https://img.shields.io/badge/Django-5.2.14-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 5.2.14">
   <img src="https://img.shields.io/badge/Python-3.12.3-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12.3">
@@ -8,6 +8,7 @@
   <img src="https://img.shields.io/badge/Bootstrap-5.3.2-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white" alt="Bootstrap 5.3.2">
 </p>
 
+<!-- Analytics, ML y cola de tareas -->
 <p align="center">
   <img src="https://img.shields.io/badge/Plotly-6.3+-3F4F75?style=for-the-badge&logo=plotly&logoColor=white" alt="Plotly">
   <img src="https://img.shields.io/badge/Pandas-2.3+-150458?style=for-the-badge&logo=pandas&logoColor=white" alt="Pandas">
@@ -17,11 +18,22 @@
   <img src="https://img.shields.io/badge/django--redis-5.4+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="django-redis">
 </p>
 
+<!-- Infraestructura y herramientas clave que SIGMA no puede vivir sin -->
+<p align="center">
+  <img src="https://img.shields.io/badge/Redis-7+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/FFmpeg-video-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" alt="FFmpeg">
+  <img src="https://img.shields.io/badge/ReportLab-4.4+-E74C3C?style=for-the-badge&logo=adobeacrobatreader&logoColor=white" alt="ReportLab">
+  <img src="https://img.shields.io/badge/Pillow-12.2-8B5CF6?style=for-the-badge&logo=python&logoColor=white" alt="Pillow">
+  <img src="https://img.shields.io/badge/Web_Push-pywebpush-FF6B35?style=for-the-badge&logo=firebase&logoColor=white" alt="Web Push pywebpush">
+  <img src="https://img.shields.io/badge/pnpm-11.3-F69220?style=for-the-badge&logo=pnpm&logoColor=white" alt="pnpm">
+</p>
+
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/SIGMA-v1.0.0-blue?style=for-the-badge" alt="Versión del producto SIGMA v1.0.0">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Modules-6-orange?style=for-the-badge" alt="Modules">
+  <img src="https://img.shields.io/badge/Modules-5-orange?style=for-the-badge" alt="Modules: 5 apps de negocio">
 </p>
 
 ---
