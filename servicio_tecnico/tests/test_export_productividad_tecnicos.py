@@ -124,6 +124,14 @@ class ProductividadTecnicosServiceTest(TestCase):
         )
         return orden
 
+    def _folio_cliente(self, orden: OrdenServicio) -> str:
+        """Atajo: orden_cliente del detalle (lo que muestra el Excel)."""
+        return orden.detalle_equipo.orden_cliente
+
+    def _service_tag(self, orden: OrdenServicio) -> str:
+        """Atajo: número de serie = Service Tag."""
+        return orden.detalle_equipo.numero_serie
+
     def test_finalizada_con_cot_aceptada_cuenta_reparacion(self):
         """Feliz: finalizada + cotización aceptada → entra en reparaciones."""
         orden = self._crear_orden(estado='finalizado')
@@ -137,13 +145,15 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
         )
+        folio = self._folio_cliente(orden)
         folios = [f['folio'] for f in filas]
-        self.assertIn(orden.numero_orden_interno, folios)
-        fila = next(f for f in filas if f['folio'] == orden.numero_orden_interno)
+        self.assertIn(folio, folios)
+        fila = next(f for f in filas if f['folio'] == folio)
         self.assertTrue(fila['cot_aceptada'])
+        self.assertEqual(fila['service_tag'], self._service_tag(orden))
 
     def test_finalizada_solo_vm_cuenta_reparacion_y_vm(self):
-        """Feliz: finalizada solo con VM → reparación + hoja VM."""
+        """Feliz: finalizada solo con VM → reparación + hoja VM + desglose resumen."""
         orden = self._crear_orden(estado='entregado')
         VentaMostrador.objects.create(
             orden=orden,
@@ -151,6 +161,8 @@ class ProductividadTecnicosServiceTest(TestCase):
             costo_paquete=Decimal('100.00'),
             incluye_limpieza=True,
             costo_limpieza=Decimal('50.00'),
+            incluye_reinstalacion_so=True,
+            costo_reinstalacion=Decimal('80.00'),
         )
 
         reparaciones = obtener_reparaciones_productivas(
@@ -161,15 +173,23 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
         )
-        self.assertTrue(
-            any(f['folio'] == orden.numero_orden_interno for f in reparaciones),
-        )
-        self.assertTrue(
-            any(f['folio'] == orden.numero_orden_interno for f in ventas),
-        )
-        vm_fila = next(f for f in ventas if f['folio'] == orden.numero_orden_interno)
+        folio = self._folio_cliente(orden)
+        self.assertTrue(any(f['folio'] == folio for f in reparaciones))
+        self.assertTrue(any(f['folio'] == folio for f in ventas))
+        vm_fila = next(f for f in ventas if f['folio'] == folio)
         self.assertTrue(vm_fila['incluye_limpieza'])
         self.assertEqual(vm_fila['paquete'], 'plata')
+        self.assertEqual(vm_fila['service_tag'], self._service_tag(orden))
+
+        # Resumen: el técnico debe reflejar limpieza, reinstalación y paquete plata.
+        resumen = agregar_resumen_por_tecnico(reparaciones, ventas, [])
+        self.assertEqual(len(resumen), 1)
+        self.assertEqual(resumen[0]['vm_limpieza'], 1)
+        self.assertEqual(resumen[0]['vm_reinstalacion'], 1)
+        self.assertEqual(resumen[0]['vm_respaldo'], 0)
+        self.assertEqual(resumen[0]['vm_cambio_pieza'], 0)
+        self.assertEqual(resumen[0]['vm_paquete_plata'], 1)
+        self.assertEqual(resumen[0]['vm_paquete_premium'], 0)
 
     def test_finalizada_sin_cot_ni_vm_no_cuenta_reparacion(self):
         """Borde: finalizada sin cot aceptada ni VM → no es reparación productiva."""
@@ -186,7 +206,7 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_fin=self.fecha_fin,
         )
         self.assertFalse(
-            any(f['folio'] == orden.numero_orden_interno for f in filas),
+            any(f['folio'] == self._folio_cliente(orden) for f in filas),
         )
 
     def test_en_reparacion_con_cot_aceptada_no_cuenta(self):
@@ -206,7 +226,7 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_fin=self.fecha_fin,
         )
         self.assertFalse(
-            any(f['folio'] == orden.numero_orden_interno for f in filas),
+            any(f['folio'] == self._folio_cliente(orden) for f in filas),
         )
 
     def test_diagnostico_con_texto_aparece(self):
@@ -222,12 +242,12 @@ class ProductividadTecnicosServiceTest(TestCase):
             fecha_inicio=self.fecha_inicio,
             fecha_fin=self.fecha_fin,
         )
-        self.assertTrue(
-            any(f['folio'] == orden.numero_orden_interno for f in filas),
-        )
-        fila = next(f for f in filas if f['folio'] == orden.numero_orden_interno)
+        folio = self._folio_cliente(orden)
+        self.assertTrue(any(f['folio'] == folio for f in filas))
+        fila = next(f for f in filas if f['folio'] == folio)
         self.assertGreater(fila['longitud_texto'], 10)
         self.assertIn('board', fila['extracto'].lower())
+        self.assertEqual(fila['service_tag'], self._service_tag(orden))
 
     def test_workbook_tiene_cuatro_hojas(self):
         """Workbook con datos tiene exactamente las 4 hojas del plan."""

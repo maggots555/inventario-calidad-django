@@ -41,6 +41,32 @@ HOJAS_EXCEL = (
 _PAQUETES_MAP = dict(PAQUETES_CHOICES)
 
 
+def _datos_cliente_equipo(orden: OrdenServicio) -> tuple[str, str]:
+    """
+    Obtiene orden_cliente y Service Tag (número de serie) del detalle.
+
+    Args:
+        orden: OrdenServicio (idealmente con select_related detalle_equipo).
+
+    Returns:
+        Tupla (orden_cliente, service_tag). Si no hay detalle, strings vacíos.
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES: en el Excel de negocio se usa el folio
+    # que ve el cliente (orden_cliente), no el ORD-interno del sistema.
+    # Service Tag = numero_serie del equipo.
+    # getattr NO evita DoesNotExist en OneToOne inverso de Django.
+    from django.core.exceptions import ObjectDoesNotExist
+
+    try:
+        detalle = orden.detalle_equipo
+    except ObjectDoesNotExist:
+        return '', ''
+    return (
+        (detalle.orden_cliente or '').strip(),
+        (detalle.numero_serie or '').strip(),
+    )
+
+
 def _normalizar_fecha_inicio(fecha: date | datetime | str | None) -> datetime | None:
     """
     Convierte el filtro de inicio a datetime aware (inicio del día).
@@ -243,9 +269,12 @@ def obtener_reparaciones_productivas(
                 folio_vm = ''
 
         tecnico = orden.tecnico_asignado_actual
+        orden_cliente, service_tag = _datos_cliente_equipo(orden)
         filas.append({
             'orden_id': orden.pk,
-            'folio': orden.numero_orden_interno,
+            # folio = orden del cliente (no el número interno ORD-…)
+            'folio': orden_cliente,
+            'service_tag': service_tag,
             'tecnico_id': tecnico.pk if tecnico else None,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
             'sucursal': orden.sucursal.nombre if orden.sucursal else '',
@@ -287,7 +316,12 @@ def obtener_ventas_mostrador_productivas(
             gama=gama,
         )
         .filter(venta_mostrador__isnull=False)
-        .select_related('venta_mostrador', 'tecnico_asignado_actual', 'sucursal')
+        .select_related(
+            'venta_mostrador',
+            'tecnico_asignado_actual',
+            'sucursal',
+            'detalle_equipo',
+        )
         .prefetch_related(
             Prefetch(
                 'venta_mostrador__piezas_vendidas',
@@ -311,9 +345,11 @@ def obtener_ventas_mostrador_productivas(
         ) if piezas else ''
 
         tecnico = orden.tecnico_asignado_actual
+        orden_cliente, service_tag = _datos_cliente_equipo(orden)
         filas.append({
             'orden_id': orden.pk,
-            'folio': orden.numero_orden_interno,
+            'folio': orden_cliente,
+            'service_tag': service_tag,
             'folio_vm': vm.folio_venta,
             'tecnico_id': tecnico.pk if tecnico else None,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
@@ -418,9 +454,11 @@ def obtener_diagnosticos_realizados(
 
         tecnico = orden.tecnico_asignado_actual
         extracto = texto if len(texto) <= 200 else texto[:197] + '...'
+        orden_cliente, service_tag = _datos_cliente_equipo(orden)
         filas.append({
             'orden_id': orden.pk,
-            'folio': orden.numero_orden_interno,
+            'folio': orden_cliente,
+            'service_tag': service_tag,
             'tecnico_id': tecnico.pk if tecnico else None,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
             'sucursal': orden.sucursal.nombre if orden.sucursal else '',
@@ -439,6 +477,9 @@ def agregar_resumen_por_tecnico(
     """
     Une las tres métricas en una fila por técnico.
 
+    Incluye desglose de servicios de venta mostrador (limpieza, reinstalación,
+    respaldo, cambio de pieza, kit) y paquetes (premium/oro/plata).
+
     Args:
         reparaciones: salida de obtener_reparaciones_productivas.
         ventas: salida de obtener_ventas_mostrador_productivas.
@@ -453,6 +494,8 @@ def agregar_resumen_por_tecnico(
     def _bucket(tecnico_id: Any, tecnico: str, sucursal: str) -> dict[str, Any]:
         clave = tecnico_id if tecnico_id is not None else f'nombre:{tecnico}'
         if clave not in por_tecnico:
+            # EXPLICACIÓN PARA PRINCIPIANTES: cada técnico arranca en 0;
+            # luego sumamos reparaciones, VM, diagnósticos y cada servicio VM.
             por_tecnico[clave] = {
                 'tecnico_id': tecnico_id,
                 'tecnico': tecnico,
@@ -462,6 +505,15 @@ def agregar_resumen_por_tecnico(
                 'diagnosticos': 0,
                 'valor_cot_aceptada': Decimal('0.00'),
                 'ingreso_vm': Decimal('0.00'),
+                # Desglose VM — cuántas veces vendió cada servicio/paquete
+                'vm_limpieza': 0,
+                'vm_reinstalacion': 0,
+                'vm_respaldo': 0,
+                'vm_cambio_pieza': 0,
+                'vm_kit': 0,
+                'vm_paquete_premium': 0,
+                'vm_paquete_oro': 0,
+                'vm_paquete_plata': 0,
             }
         if sucursal:
             por_tecnico[clave]['sucursales'].add(sucursal)
@@ -476,6 +528,27 @@ def agregar_resumen_por_tecnico(
         b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
         b['ventas_mostrador'] += 1
         b['ingreso_vm'] += fila.get('total_vm') or Decimal('0.00')
+
+        # Contar cada servicio activo en esa VM (una venta puede tener varios).
+        if fila.get('incluye_limpieza'):
+            b['vm_limpieza'] += 1
+        if fila.get('incluye_reinstalacion'):
+            b['vm_reinstalacion'] += 1
+        if fila.get('incluye_respaldo'):
+            b['vm_respaldo'] += 1
+        if fila.get('incluye_cambio_pieza'):
+            b['vm_cambio_pieza'] += 1
+        if fila.get('incluye_kit'):
+            b['vm_kit'] += 1
+
+        # Paquetes (solo premium/oro/plata; "ninguno" no suma).
+        paquete = fila.get('paquete') or 'ninguno'
+        if paquete == 'premium':
+            b['vm_paquete_premium'] += 1
+        elif paquete == 'oro':
+            b['vm_paquete_oro'] += 1
+        elif paquete == 'plata':
+            b['vm_paquete_plata'] += 1
 
     for fila in diagnosticos:
         b = _bucket(fila['tecnico_id'], fila['tecnico'], fila.get('sucursal', ''))
@@ -493,6 +566,14 @@ def agregar_resumen_por_tecnico(
             'diagnosticos': b['diagnosticos'],
             'valor_cot_aceptada': b['valor_cot_aceptada'],
             'ingreso_vm': b['ingreso_vm'],
+            'vm_limpieza': b['vm_limpieza'],
+            'vm_reinstalacion': b['vm_reinstalacion'],
+            'vm_respaldo': b['vm_respaldo'],
+            'vm_cambio_pieza': b['vm_cambio_pieza'],
+            'vm_kit': b['vm_kit'],
+            'vm_paquete_premium': b['vm_paquete_premium'],
+            'vm_paquete_oro': b['vm_paquete_oro'],
+            'vm_paquete_plata': b['vm_paquete_plata'],
         })
 
     resultado.sort(key=lambda x: x['tecnico'].lower())
@@ -609,18 +690,25 @@ def generar_workbook_productividad_tecnicos(
     # ------------------------------------------------------------------
     # HOJA 1: Resumen por técnico
     # ------------------------------------------------------------------
+    # Columnas amplias: métricas base + desglose de servicios/paquetes VM.
+    num_cols_resumen = 15
+    ultima_col = get_column_letter(num_cols_resumen)
+
     ws1 = wb.create_sheet(HOJAS_EXCEL[0])
-    ws1.merge_cells('A1:G1')
+    ws1.merge_cells(f'A1:{ultima_col}1')
     ws1['A1'] = 'PRODUCTIVIDAD TÉCNICOS — RESUMEN'
     ws1['A1'].font = estilos['title_font']
     ws1['A1'].fill = estilos['title_fill']
     ws1['A1'].alignment = estilos['title_align']
-    ws1.merge_cells('A2:G2')
+    ws1.merge_cells(f'A2:{ultima_col}2')
     ws1['A2'] = filtros_texto
     ws1['A2'].font = estilos['subtitle_font']
     ws1['A2'].alignment = Alignment(horizontal='center')
-    ws1.merge_cells('A3:G3')
-    ws1['A3'] = f'Generado: {generado}'
+    ws1.merge_cells(f'A3:{ultima_col}3')
+    ws1['A3'] = (
+        f'Generado: {generado} | '
+        'Columnas VM = cuántas ventas incluyeron cada servicio/paquete'
+    )
     ws1['A3'].font = estilos['subtitle_font']
     ws1['A3'].alignment = Alignment(horizontal='center')
 
@@ -632,21 +720,50 @@ def generar_workbook_productividad_tecnicos(
         'Diagnósticos',
         'Valor cotización aceptada',
         'Ingreso VM',
+        'Limpieza y mant.',
+        'Reinstalación SO',
+        'Respaldo info',
+        'Cambio de pieza',
+        'Kit limpieza',
+        'Paquete Premium',
+        'Paquete Oro',
+        'Paquete Plata',
     ]
     _aplicar_header(ws1, 5, headers1, estilos)
     fila = 6
     for row in resumen:
-        ws1.cell(row=fila, column=1, value=row['tecnico']).border = estilos['border']
-        ws1.cell(row=fila, column=2, value=row['sucursales']).border = estilos['border']
-        ws1.cell(row=fila, column=3, value=row['reparaciones']).border = estilos['border']
-        ws1.cell(row=fila, column=4, value=row['ventas_mostrador']).border = estilos['border']
-        ws1.cell(row=fila, column=5, value=row['diagnosticos']).border = estilos['border']
+        # Columnas 1–5: identidad y conteos principales
+        valores_base = [
+            row['tecnico'],
+            row['sucursales'],
+            row['reparaciones'],
+            row['ventas_mostrador'],
+            row['diagnosticos'],
+        ]
+        for col, val in enumerate(valores_base, 1):
+            ws1.cell(row=fila, column=col, value=val).border = estilos['border']
+
+        # Columnas 6–7: montos
         c_val = ws1.cell(row=fila, column=6, value=float(row['valor_cot_aceptada']))
         c_val.number_format = estilos['number_fmt']
         c_val.border = estilos['border']
         c_vm = ws1.cell(row=fila, column=7, value=float(row['ingreso_vm']))
         c_vm.number_format = estilos['number_fmt']
         c_vm.border = estilos['border']
+
+        # Columnas 8–15: desglose servicios y paquetes VM
+        desglose_vm = [
+            row['vm_limpieza'],
+            row['vm_reinstalacion'],
+            row['vm_respaldo'],
+            row['vm_cambio_pieza'],
+            row['vm_kit'],
+            row['vm_paquete_premium'],
+            row['vm_paquete_oro'],
+            row['vm_paquete_plata'],
+        ]
+        for col, val in enumerate(desglose_vm, 8):
+            ws1.cell(row=fila, column=col, value=val).border = estilos['border']
         fila += 1
     _auto_ajustar(ws1)
 
@@ -654,17 +771,18 @@ def generar_workbook_productividad_tecnicos(
     # HOJA 2: Detalle reparaciones
     # ------------------------------------------------------------------
     ws2 = wb.create_sheet(HOJAS_EXCEL[1])
-    ws2.merge_cells('A1:I1')
+    ws2.merge_cells('A1:J1')
     ws2['A1'] = 'DETALLE REPARACIONES PRODUCTIVAS'
     ws2['A1'].font = estilos['title_font']
     ws2['A1'].fill = estilos['title_fill']
     ws2['A1'].alignment = estilos['title_align']
-    ws2.merge_cells('A2:I2')
+    ws2.merge_cells('A2:J2')
     ws2['A2'] = filtros_texto
     ws2['A2'].font = estilos['subtitle_font']
 
     headers2 = [
-        'Folio orden',
+        'Orden cliente',
+        'Service Tag',
         'Técnico',
         'Sucursal',
         'Estado',
@@ -679,6 +797,7 @@ def generar_workbook_productividad_tecnicos(
     for row in reparaciones:
         vals = [
             row['folio'],
+            row['service_tag'],
             row['tecnico'],
             row['sucursal'],
             row['estado'],
@@ -691,7 +810,7 @@ def generar_workbook_productividad_tecnicos(
         for col, val in enumerate(vals, 1):
             cell = ws2.cell(row=fila, column=col, value=val)
             cell.border = estilos['border']
-            if col == 8:
+            if col == 9:
                 cell.number_format = estilos['number_fmt']
         fila += 1
     _auto_ajustar(ws2)
@@ -700,17 +819,18 @@ def generar_workbook_productividad_tecnicos(
     # HOJA 3: Detalle ventas mostrador
     # ------------------------------------------------------------------
     ws3 = wb.create_sheet(HOJAS_EXCEL[2])
-    ws3.merge_cells('A1:O1')
+    ws3.merge_cells('A1:P1')
     ws3['A1'] = 'DETALLE VENTAS MOSTRADOR'
     ws3['A1'].font = estilos['title_font']
     ws3['A1'].fill = estilos['title_fill']
     ws3['A1'].alignment = estilos['title_align']
-    ws3.merge_cells('A2:O2')
+    ws3.merge_cells('A2:P2')
     ws3['A2'] = filtros_texto
     ws3['A2'].font = estilos['subtitle_font']
 
     headers3 = [
-        'Folio orden',
+        'Orden cliente',
+        'Service Tag',
         'Folio VM',
         'Técnico',
         'Paquete',
@@ -731,6 +851,7 @@ def generar_workbook_productividad_tecnicos(
     for row in ventas:
         vals = [
             row['folio'],
+            row['service_tag'],
             row['folio_vm'],
             row['tecnico'],
             row['paquete_nombre'],
@@ -749,7 +870,8 @@ def generar_workbook_productividad_tecnicos(
         for col, val in enumerate(vals, 1):
             cell = ws3.cell(row=fila, column=col, value=val)
             cell.border = estilos['border']
-            if col in (5, 7, 9, 11, 15):
+            # Costos: paquete(6), limpieza(8), reinst(10), respaldo(12), total(16)
+            if col in (6, 8, 10, 12, 16):
                 cell.number_format = estilos['number_fmt']
         fila += 1
     _auto_ajustar(ws3)
@@ -758,19 +880,20 @@ def generar_workbook_productividad_tecnicos(
     # HOJA 4: Detalle diagnósticos
     # ------------------------------------------------------------------
     ws4 = wb.create_sheet(HOJAS_EXCEL[3])
-    ws4.merge_cells('A1:F1')
+    ws4.merge_cells('A1:G1')
     ws4['A1'] = 'DETALLE DIAGNÓSTICOS'
     ws4['A1'].font = estilos['title_font']
     ws4['A1'].fill = estilos['title_fill']
     ws4['A1'].alignment = estilos['title_align']
-    ws4.merge_cells('A2:F2')
+    ws4.merge_cells('A2:G2')
     ws4['A2'] = (
         f'{filtros_texto} | Fecha: fin diagnóstico o, si falta, fecha de ingreso'
     )
     ws4['A2'].font = estilos['subtitle_font']
 
     headers4 = [
-        'Folio orden',
+        'Orden cliente',
+        'Service Tag',
         'Técnico',
         'Sucursal',
         'Fecha diagnóstico',
@@ -782,6 +905,7 @@ def generar_workbook_productividad_tecnicos(
     for row in diagnosticos:
         vals = [
             row['folio'],
+            row['service_tag'],
             row['tecnico'],
             row['sucursal'],
             _fmt_fecha(row['fecha_diagnostico']),
