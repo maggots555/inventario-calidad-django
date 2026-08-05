@@ -276,6 +276,22 @@ PRINCIPIOS DE DISEÑO (consistentes con el resto del módulo):
     filter: brightness(0.80);
 }
 
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   Cuando el JS deshabilita el botón tras el primer clic (anti doble envío),
+   este estilo deja claro visualmente que ya no se puede volver a pulsar. */
+.btn-form-submit:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+[data-bs-theme="dark"] .btn-form-submit:disabled {
+    opacity: 0.55;
+}
+
 /* ============================================================
    10. LÍNEA IZQUIERDA CONECTORA — efecto "timeline" entre tarjetas
        (pseudo-elemento en el wrapper de formulario)

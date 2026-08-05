@@ -405,12 +405,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.setSelectionRange(this.value.length, this.value.length);
             }
         });
-        
+
         // Cuando el usuario presiona una tecla, verificar si intenta borrar el prefijo
         ordenClienteInput.addEventListener('keydown', function(e) {
             const cursorPos = this.selectionStart;
             const value = this.value;
-            
+
             // Si está al inicio y presiona Backspace o Delete, prevenir borrar el prefijo
             if ((e.key === 'Backspace' && cursorPos <= 4 && value.startsWith('OOW-')) ||
                 (e.key === 'Backspace' && cursorPos <= 3 && value.startsWith('FL-')) ||
@@ -419,6 +419,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 // No prevenir, permitir borrar para que el usuario pueda escribir otro prefijo
                 // Este es el comportamiento que solicitaste
             }
+        });
+    }
+
+    // ========================================================================
+    // PROTECCIÓN CONTRA DOBLE CLIC / DOBLE ENVÍO
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Si el usuario hace clic dos veces muy rápido en "Crear Orden", el navegador
+    // puede enviar el formulario DOS veces antes de que la página cambie.
+    // Django crearía entonces DOS órdenes distintas (ORD-AAAA-0001 y ORD-AAAA-0002).
+    // Solución: bandera "enviando" + deshabilitar el botón en el primer submit.
+    // Si llega un segundo submit mientras enviando=true, lo cancelamos.
+    // ========================================================================
+    const formNuevaOrden = document.getElementById('formNuevaOrden');
+    const btnSubmitOrden = formNuevaOrden
+        ? formNuevaOrden.querySelector('.btn-form-submit')
+        : null;
+    // Bandera en memoria: true = ya se está enviando (bloquear más envíos)
+    let enviandoOrden = false;
+
+    if (formNuevaOrden && btnSubmitOrden) {
+        formNuevaOrden.addEventListener('submit', function(e) {
+            // Paso 1: si ya enviamos, cancelar este segundo intento
+            if (enviandoOrden) {
+                e.preventDefault();
+                return;
+            }
+            // Paso 2: marcar como enviando ANTES de deshabilitar el botón
+            // (así dos clics casi simultáneos no pasan ambos)
+            enviandoOrden = true;
+            // Paso 3: deshabilitar el botón para que no se pueda volver a hacer clic
+            btnSubmitOrden.disabled = true;
+            // Paso 4: feedback visual — el usuario ve que algo está pasando
+            btnSubmitOrden.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creando orden…';
         });
     }
 });

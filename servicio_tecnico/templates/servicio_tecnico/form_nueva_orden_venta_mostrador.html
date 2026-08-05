@@ -416,6 +416,35 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ========================================================================
+    // PROTECCIÓN CONTRA DOBLE CLIC / DOBLE ENVÍO
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Igual que en el formulario de orden normal: un doble clic rápido puede
+    // crear DOS ventas mostrador. Usamos una bandera + botón deshabilitado.
+    // ========================================================================
+    const formVentaMostrador = document.getElementById('formNuevaOrdenVentaMostrador');
+    const btnSubmitVM = formVentaMostrador
+        ? formVentaMostrador.querySelector('.btn-form-submit')
+        : null;
+    let enviandoVentaMostrador = false;
+
+    if (formVentaMostrador && btnSubmitVM) {
+        formVentaMostrador.addEventListener('submit', function(e) {
+            // Paso 1: segundo envío → cancelar
+            if (enviandoVentaMostrador) {
+                e.preventDefault();
+                return;
+            }
+            // Paso 2: marcar bandera para bloquear clics siguientes
+            enviandoVentaMostrador = true;
+            // Paso 3: deshabilitar el botón
+            btnSubmitVM.disabled = true;
+            // Paso 4: texto de carga para que el usuario sepa que se está creando
+            btnSubmitVM.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creando venta…';
+        });
+    }
 });
 </script>
 {% endblock %}
