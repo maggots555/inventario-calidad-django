@@ -8,17 +8,237 @@
  * - Texto negro sobre fondo oscuro (ilegible) en "Agregar Componente"
  * - Verde claro con texto claro (ilegible) en filas ADICIONAL / aplicadas
  *
- * Aquí usamos clases propias + sección [data-bs-theme="dark"].
+ * Rediseño Ago 2026: layout split-view (como cotización cliente).
+ * Acento success/verde clínico para distinguir del modal navy de cotización.
+ *
+ * Organización:
+ * 1. Layout split + tipografía de sección
+ * 2. Cards de plantilla de correo
+ * 3. CC compacto + preview PDF
+ * 4. Tabla componentes / dropdown / piezas detectadas (legado)
+ * 5. MODO OSCURO — Overrides [data-bs-theme="dark"]
  */
 
 /* ============================================================
-   ESTILOS BASE (modo claro — default)
+   1. LAYOUT SPLIT + TIPOGRAFÍA
    ============================================================ */
 
-/* Dropdown "Agregar Componente": el color viene de .dropdown-item (base.css).
-   Solo aseguramos scroll y ancho cómodo. */
+/* Altura mínima tipo “estación de trabajo” (como cotización) */
+.diag-modal-split {
+    min-height: 480px;
+}
+
+.diag-modal-folio-hint {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+}
+
+/* Etiquetas de sección: compactas, mayúsculas suaves */
+.diag-section-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-600, #64748b);
+    margin-bottom: 0.35rem;
+}
+
+.diag-section-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.35;
+}
+
+/* Vista previa del asunto bajo el folio */
+.diag-asunto-preview {
+    background-color: var(--gray-50, #f8fafc);
+    border-left: 3px solid #22c55e;
+    border-radius: 0 6px 6px 0;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+}
+
+.diag-asunto-label {
+    color: var(--gray-500, #94a3b8);
+    font-size: 0.72rem;
+    margin-right: 0.35rem;
+}
+
+/* ============================================================
+   2. CARDS DE PLANTILLA DE CORREO
+   Tres opciones en grid; :has(input:checked) marca la activa
+   sin tocar TypeScript (los radios siguen con sus IDs).
+   ============================================================ */
+
+.diag-plantilla-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .diag-plantilla-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.diag-plantilla-card {
+    cursor: pointer;
+    border: 2px solid var(--gray-200, #e2e8f0);
+    border-radius: 8px;
+    padding: 0.65rem 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    text-align: center;
+    min-width: 0;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    /* Touch ≥44px en altura mínima */
+    min-height: 44px;
+}
+
+.diag-plantilla-card:hover {
+    border-color: #22c55e;
+    background-color: rgba(34, 197, 94, 0.05);
+}
+
+/* Radio visible pero discreto (accesible; no lo ocultamos del todo) */
+.diag-plantilla-card > .form-check-input {
+    margin: 0 0 0.15rem 0;
+    float: none;
+}
+
+.diag-plantilla-icon {
+    font-size: 1.1rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1;
+}
+
+.diag-plantilla-titulo {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-700, #334155);
+    line-height: 1.2;
+    overflow-wrap: break-word;
+}
+
+.diag-plantilla-desc {
+    font-size: 0.65rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.2;
+}
+
+/* Estado activo vía :has() — sin clase .activo en TS */
+.diag-plantilla-card:has(input:checked) {
+    border-color: #16a34a;
+    background-color: rgba(34, 197, 94, 0.12);
+}
+
+.diag-plantilla-card:has(input:checked) .diag-plantilla-titulo {
+    color: #15803d;
+}
+
+.diag-plantilla-card:has(input:checked) .diag-plantilla-icon {
+    color: #16a34a;
+}
+
+/* Fallback legado (si queda markup viejo en cache) */
+.diag-toggle-plantilla {
+    background-color: var(--gray-50, #f8fafc);
+    border-color: var(--border-color, #e2e8f0) !important;
+}
+
+.diag-toggle-plantilla .form-check {
+    min-height: 1.5rem;
+}
+
+.diag-toggle-plantilla .form-check .form-check-input {
+    margin-top: 0.35em;
+}
+
+.diag-toggle-plantilla .form-check-label {
+    cursor: pointer;
+}
+
+/* ============================================================
+   3. CC COMPACTO + PREVIEW + IMÁGENES
+   ============================================================ */
+
+.diag-cc-scroll {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+    padding: 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+.diag-cc-grupo-titulo {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-500, #94a3b8);
+    margin-bottom: 0.35rem;
+}
+
+.diag-cc-item {
+    padding: 0.45rem 0.55rem !important;
+    background-color: var(--white, #fff);
+}
+
+.diag-cc-item:hover {
+    background-color: rgba(34, 197, 94, 0.04);
+}
+
+.diag-cc-avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border: 2px solid #22c55e;
+}
+
+/* Contenedor del iframe de preview (más bajo que los 500px previos) */
+.diag-preview-frame {
+    height: 320px;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+.diag-preview-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* Miniaturas de imágenes más densas */
+.diag-img-thumb .card-img-top {
+    height: 88px;
+    object-fit: cover;
+}
+
+.diag-img-thumb .checkbox-imagen-diag {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Tabla de componentes: scroll si crece mucho */
+.diag-tabla-componentes-wrap {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+}
+
+/* Dropdown "Agregar Componente": scroll y ancho cómodo */
 #dropdownComponentesAdicionales {
     min-width: 260px;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 #dropdownComponentesAdicionales .dropdown-item {
@@ -31,8 +251,7 @@
     color: #0f172a;
 }
 
-/* Fila de componente adicional en la tabla del checklist.
-   Mismo layout que filas fijas; solo un acento sutil a la izquierda. */
+/* Fila de componente adicional en la tabla del checklist */
 #tablaComponentesDiagnostico tr.fila-componente-adicional > * {
     --bs-table-bg: transparent;
     --bs-table-color: inherit;
@@ -45,20 +264,127 @@
     background-color: rgba(34, 197, 94, 0.06);
 }
 
-/* Input DPN dinámico: mismo ancho que los fijos */
 #tablaComponentesDiagnostico .input-dpn-dinamico {
     width: 100%;
     min-width: 0;
 }
 
-/* Botón eliminar junto al nombre: compacto, no deforma la fila */
 #tablaComponentesDiagnostico .btn-eliminar-componente-adic {
     padding: 0.15rem 0.4rem;
     line-height: 1.2;
     flex-shrink: 0;
 }
 
-/* Piezas detectadas: estados propios (pendiente / conflicto / aplicada) */
+/* ============================================================
+   4. PIEZAS DETECTADAS — layout denso (1 línea por pieza)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   El TS genera filas con clases diag-pieza-*. Aquí controlamos
+   altura, truncate y scroll para que el panel no “coma” la columna.
+   ============================================================ */
+
+/* Panel completo: altura tope + scroll interno */
+#panelPiezasDetectadas .card-header {
+    padding: 0.35rem 0.6rem !important;
+}
+
+#panelPiezasDetectadas .card-header .fw-bold,
+#panelPiezasDetectadas .card-header .small {
+    font-size: 0.75rem;
+}
+
+#contenedorPiezasDetectadas {
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.diag-piezas-lista {
+    font-size: 0.75rem;
+}
+
+/* Fila: flex en una línea, padding mínimo */
+.diag-pieza-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    padding: 0.3rem 0.5rem !important;
+    min-height: 0;
+}
+
+.diag-pieza-info {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0; /* permite truncar hijos flex */
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+/* Descripción: ellipsis; el title= del TS muestra el texto completo */
+.diag-pieza-desc {
+    font-weight: 600;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 9.5rem;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.diag-pieza-dpn {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #2563eb;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.diag-pieza-badge-conf {
+    font-size: 0.65rem;
+    padding: 0.15em 0.35em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.diag-pieza-badge-mini {
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 0.12em 0.35em;
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.diag-pieza-acciones {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.diag-pieza-btn-aplicar {
+    padding: 0.15rem 0.4rem;
+    line-height: 1.2;
+    min-width: 28px;
+    min-height: 28px;
+}
+
+.diag-pieza-select,
+#contenedorPiezasDetectadas .select-asignar-componente {
+    max-width: 110px !important;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.35rem;
+    min-height: 28px;
+}
+
+/* Estados de color (legado + densificado) */
 #contenedorPiezasDetectadas .pieza-detectada-pendiente {
     background-color: #f8fafc;
     color: #1e293b;
@@ -77,17 +403,122 @@
     border-color: #86efac;
 }
 
-/* Flash al rellenar DPN automáticamente */
+/* Tabla de componentes: tipografía un poco más densa */
+.diag-tabla-componentes-wrap #tablaComponentesDiagnostico {
+    font-size: 0.78rem;
+}
+
+.diag-tabla-componentes-wrap #tablaComponentesDiagnostico th,
+.diag-tabla-componentes-wrap #tablaComponentesDiagnostico td {
+    padding: 0.28rem 0.4rem;
+    vertical-align: middle;
+}
+
 .input-dpn-flash {
     transition: background-color 0.5s ease;
     background-color: #dcfce7 !important;
 }
 
 /* ============================================================
-   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   5. MODO OSCURO — Overrides para [data-bs-theme="dark"]
    ============================================================ */
 
-/* Dropdown: texto claro sobre fondo oscuro (antes forzaban #000 en JS) */
+[data-bs-theme="dark"] .diag-section-label {
+    color: var(--text-secondary, #94a3b8);
+}
+
+[data-bs-theme="dark"] .diag-section-hint {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .diag-asunto-preview {
+    background-color: var(--card-bg, #1e293b);
+    border-left-color: #22c55e;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .diag-modal-col-izq.border-end {
+    border-color: var(--border-color, #334155) !important;
+}
+
+[data-bs-theme="dark"] .diag-plantilla-card {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .diag-plantilla-card:hover {
+    border-color: #22c55e;
+    background-color: rgba(34, 197, 94, 0.1);
+}
+
+[data-bs-theme="dark"] .diag-plantilla-titulo {
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .diag-plantilla-desc,
+[data-bs-theme="dark"] .diag-plantilla-icon {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .diag-plantilla-card:has(input:checked) {
+    border-color: #22c55e;
+    background-color: rgba(34, 197, 94, 0.18);
+}
+
+[data-bs-theme="dark"] .diag-plantilla-card:has(input:checked) .diag-plantilla-titulo {
+    color: #86efac;
+}
+
+[data-bs-theme="dark"] .diag-plantilla-card:has(input:checked) .diag-plantilla-icon {
+    color: #4ade80;
+}
+
+[data-bs-theme="dark"] .diag-toggle-plantilla {
+    background-color: var(--card-bg, #1e293b) !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .diag-toggle-plantilla .form-text {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] #avisoPlantillaCorreo {
+    background-color: rgba(13, 115, 119, 0.2);
+    border-color: #0d7377;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .diag-cc-scroll {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .diag-cc-item {
+    background-color: #0f172a !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .diag-cc-item:hover {
+    background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+[data-bs-theme="dark"] .diag-preview-frame {
+    background-color: #0f172a;
+    border-color: var(--border-color, #334155) !important;
+}
+
+[data-bs-theme="dark"] .diag-tabla-componentes-wrap {
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .diag-img-thumb {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+/* Dropdown: texto claro sobre fondo oscuro */
 [data-bs-theme="dark"] #dropdownComponentesAdicionales {
     background-color: #1e293b;
     border-color: #334155;
@@ -113,7 +544,6 @@
     border-color: #334155;
 }
 
-/* Fila ADICIONAL: mismo fondo de tabla + borde izquierdo verde (sin bloque verde) */
 [data-bs-theme="dark"] #tablaComponentesDiagnostico tr.fila-componente-adicional > * {
     --bs-table-bg: transparent;
     --bs-table-color: #e2e8f0;
@@ -145,7 +575,6 @@
     color: #fecaca;
 }
 
-/* Piezas detectadas en oscuro */
 [data-bs-theme="dark"] #contenedorPiezasDetectadas .list-group-item {
     background-color: #1e293b;
     color: #e2e8f0;
@@ -172,49 +601,22 @@
 
 [data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-aplicada .fw-semibold,
 [data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-conflicto .fw-semibold,
-[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-pendiente .fw-semibold {
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .pieza-detectada-pendiente .fw-semibold,
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .diag-pieza-desc {
     color: #e2e8f0;
 }
 
-/* Flash DPN en oscuro */
+[data-bs-theme="dark"] .diag-pieza-dpn {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .diag-pieza-badge-mini.bg-light {
+    background-color: #334155 !important;
+    color: #e2e8f0 !important;
+    border-color: #475569 !important;
+}
+
 [data-bs-theme="dark"] .input-dpn-flash {
     background-color: rgba(34, 197, 94, 0.25) !important;
-    color: #e2e8f0;
-}
-
-/* Selector de plantilla del correo (3 radios mutuamente excluyentes).
-   EXPLICACIÓN PARA PRINCIPIANTES:
-   El marco (.diag-toggle-plantilla) agrupa las opciones; cada radio es un
-   form-check de Bootstrap. Solo puede haber una plantilla activa a la vez. */
-.diag-toggle-plantilla {
-    background-color: var(--gray-50, #f8fafc);
-    border-color: var(--border-color, #e2e8f0) !important;
-}
-
-.diag-toggle-plantilla .form-check {
-    min-height: 1.5rem;
-}
-
-.diag-toggle-plantilla .form-check .form-check-input {
-    margin-top: 0.35em;
-}
-
-.diag-toggle-plantilla .form-check-label {
-    cursor: pointer;
-}
-
-[data-bs-theme="dark"] .diag-toggle-plantilla {
-    background-color: var(--card-bg, #1e293b) !important;
-    border-color: var(--border-color, #334155) !important;
-    color: var(--text-primary, #e2e8f0);
-}
-
-[data-bs-theme="dark"] .diag-toggle-plantilla .form-text {
-    color: #94a3b8 !important;
-}
-
-[data-bs-theme="dark"] #avisoPlantillaCorreo {
-    background-color: rgba(13, 115, 119, 0.2);
-    border-color: #0d7377;
     color: #e2e8f0;
 }

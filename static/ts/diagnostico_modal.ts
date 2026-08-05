@@ -2119,7 +2119,9 @@ function initDiagnosticoModal(): void {
         const btnAplicar = filaUI.querySelector('.btn-aplicar-pieza') as HTMLButtonElement | null;
         if (btnAplicar) {
             btnAplicar.disabled = true;
-            btnAplicar.innerHTML = '<i class="bi bi-check-lg"></i> Aplicado';
+            // Icono solo (layout denso); title explica el estado
+            btnAplicar.innerHTML = '<i class="bi bi-check-lg"></i>';
+            btnAplicar.title = 'Aplicado';
             btnAplicar.classList.remove('btn-outline-success', 'btn-outline-primary');
             btnAplicar.classList.add('btn-success');
         }
@@ -2132,18 +2134,16 @@ function initDiagnosticoModal(): void {
     }
     
     /**
-     * Construye la UI del panel de piezas detectadas.
-     * Cada pieza se muestra como una fila con:
-     * - Badge de confianza (verde = alta, amarillo = sin match)
-     * - Descripción de la pieza y número de parte
-     * - Botón "Aplicar" o dropdown para asignación manual
-     * 
+     * Construye la UI del panel de piezas detectadas (layout denso, 1 línea).
+     *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Cuando dos o más piezas apuntan al mismo componente (por ejemplo,
-     * "PALMREST CON TECLADO" y "TOUCHPAD" ambas matchean a "Teclado"),
-     * solo la primera obtiene el botón "Aplicar" directo. Las demás
-     * muestran un dropdown con la sugerencia preseleccionada para que
-     * el agente pueda reasignarlas a otro componente manualmente.
+     * En el modal split la columna izquierda es angosta. Antes cada pieza
+     * usaba flex-wrap + tipografía grande y saltaba a 2–3 líneas.
+     * Ahora: una sola fila compacta [✓] desc… DPN Nec → COMP [Aplicar].
+     * El texto completo queda en title= (tooltip al pasar el mouse).
+     *
+     * Cuando dos piezas apuntan al mismo componenteDb, solo la primera
+     * tiene "Aplicar" directo; las demás usan dropdown de reasignación.
      */
     function renderizarPiezasDetectadas(piezas: PiezaDetectada[]): void {
         if (!contenedorPiezas || !panelPiezasDetectadas) return;
@@ -2153,12 +2153,10 @@ function initDiagnosticoModal(): void {
         
         if (piezas.length === 0) {
             contenedorPiezas.innerHTML = `
-                <div class="alert alert-info mb-0">
+                <div class="alert alert-info mb-0 py-2 px-2 small">
                     <i class="bi bi-info-circle"></i>
-                    <strong>No se detectaron piezas ni servicios</strong> en el texto del diagnóstico.
-                    <br><small class="text-muted">Asegúrate de que el diagnóstico contenga frases como 
-                    "SE ANEXAN NÚMEROS DE PARTE" seguidas de las piezas con sus códigos, 
-                    o menciones de servicios como "MANTENIMIENTO" o "PAQUETE PLATA".</small>
+                    <strong>Sin piezas ni servicios</strong> en el diagnóstico.
+                    <span class="text-muted">Busca frases como "SE ANEXAN NÚMEROS DE PARTE" o "MANTENIMIENTO".</span>
                 </div>
             `;
             panelPiezasDetectadas.style.display = 'block';
@@ -2174,7 +2172,7 @@ function initDiagnosticoModal(): void {
         
         // Construir lista de piezas
         const lista = document.createElement('div');
-        lista.className = 'list-group list-group-flush';
+        lista.className = 'list-group list-group-flush diag-piezas-lista';
         
         let piezasConMatchUnico = 0;
         
@@ -2192,9 +2190,10 @@ function initDiagnosticoModal(): void {
             
             const fila = document.createElement('div');
             // Clases propias (no list-group-item-light/warning: en dark mode pierden contraste)
+            // diag-pieza-fila: layout denso sin wrap (CSS en diagnostico_modal.css)
             fila.className = necesitaDropdown
-                ? 'list-group-item pieza-detectada-conflicto d-flex align-items-center justify-content-between py-2'
-                : 'list-group-item pieza-detectada-pendiente d-flex align-items-center justify-content-between py-2';
+                ? 'list-group-item pieza-detectada-conflicto diag-pieza-fila'
+                : 'list-group-item pieza-detectada-pendiente diag-pieza-fila';
             fila.id = `pieza-detectada-${index}`;
             
             // Marcar filas duplicadas con data-attribute para que "Aplicar todas" las salte
@@ -2202,84 +2201,80 @@ function initDiagnosticoModal(): void {
                 fila.setAttribute('data-duplicado', 'true');
             }
             
-            // Lado izquierdo: badge + info de la pieza
+            // Lado izquierdo: badge + info (sin flex-wrap → una línea)
             const infoDiv = document.createElement('div');
-            infoDiv.className = 'd-flex align-items-center flex-wrap gap-2';
+            infoDiv.className = 'diag-pieza-info';
             
-            // Badge de confianza
+            // Badge de confianza (solo icono; title explica)
             const badge = document.createElement('span');
+            badge.className = 'badge diag-pieza-badge-conf';
             if (esComponenteDuplicado) {
-                // Componente duplicado — badge naranja con icono de conflicto
-                badge.className = 'badge bg-warning text-dark';
+                badge.classList.add('bg-warning', 'text-dark');
                 badge.innerHTML = '<i class="bi bi-diagram-2-fill"></i>';
                 badge.title = `Conflicto: otra pieza ya usa "${pieza.componenteDb}" — asigna manualmente`;
             } else if (pieza.componenteDb && pieza.confianza === 'alta') {
-                badge.className = 'badge bg-success';
+                badge.classList.add('bg-success');
                 badge.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
                 badge.title = 'Coincidencia alta';
             } else if (pieza.componenteDb && pieza.confianza === 'media') {
-                badge.className = 'badge bg-info';
+                badge.classList.add('bg-info');
                 badge.innerHTML = '<i class="bi bi-question-circle-fill"></i>';
                 badge.title = 'Coincidencia media';
             } else {
-                badge.className = 'badge bg-warning text-dark';
+                badge.classList.add('bg-warning', 'text-dark');
                 badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i>';
                 badge.title = 'Sin coincidencia automática';
             }
             infoDiv.appendChild(badge);
             
-            // Descripción de la pieza
+            // Descripción truncada (texto completo en title)
             const descSpan = document.createElement('span');
-            descSpan.className = 'fw-semibold';
+            descSpan.className = 'diag-pieza-desc';
             descSpan.textContent = pieza.descripcionPieza;
+            descSpan.title = pieza.descripcionPieza;
             infoDiv.appendChild(descSpan);
             
-            // Flecha separadora
-            const arrow = document.createElement('i');
-            arrow.className = 'bi bi-arrow-right text-muted';
-            infoDiv.appendChild(arrow);
-            
             // EXPLICACIÓN PARA PRINCIPIANTES:
-            // Si la pieza tiene número de parte, lo mostramos en un <code> destacado.
-            // Si NO tiene (servicios como "Mantenimiento" o paquetes como "Paquete Plata"),
-            // mostramos un badge de "Servicio" en lugar del número de parte.
+            // DPN en tipografía pequeña (antes fs-6 ocupaba demasiado).
+            // Servicios sin DPN → badge corto "Svc".
             if (pieza.numeroParte) {
-                // Número de parte (destacado)
                 const codeSpan = document.createElement('code');
-                codeSpan.className = 'fs-6 fw-bold text-primary';
+                codeSpan.className = 'diag-pieza-dpn';
                 codeSpan.textContent = pieza.numeroParte;
+                codeSpan.title = `DPN: ${pieza.numeroParte}`;
                 infoDiv.appendChild(codeSpan);
             } else {
-                // Sin DPN — mostrar badge de servicio/paquete
                 const servicioBadge = document.createElement('span');
-                servicioBadge.className = 'badge bg-info bg-opacity-75 text-dark';
-                servicioBadge.innerHTML = '<i class="bi bi-wrench me-1"></i>Servicio';
-                servicioBadge.title = 'Este componente no requiere número de parte';
+                servicioBadge.className = 'badge diag-pieza-badge-mini bg-info bg-opacity-75 text-dark';
+                servicioBadge.innerHTML = '<i class="bi bi-wrench"></i> Svc';
+                servicioBadge.title = 'Servicio / paquete (sin número de parte)';
                 infoDiv.appendChild(servicioBadge);
             }
             
-            // Badge de tipo: Necesaria (verde) u Opcional (amarillo)
+            // Badge corto Nec / Opc (title con etiqueta completa)
             const badgeTipoDetectada = document.createElement('span');
             if (pieza.es_necesaria) {
-                badgeTipoDetectada.className = 'badge bg-success bg-opacity-75';
-                badgeTipoDetectada.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Necesaria';
-                badgeTipoDetectada.title = 'Pieza necesaria / prioritaria';
+                badgeTipoDetectada.className = 'badge diag-pieza-badge-mini bg-success bg-opacity-75';
+                badgeTipoDetectada.textContent = 'Nec';
+                badgeTipoDetectada.title = 'Necesaria / prioritaria';
             } else {
-                badgeTipoDetectada.className = 'badge bg-warning text-dark';
-                badgeTipoDetectada.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Opcional';
-                badgeTipoDetectada.title = 'Pieza opcional / secundaria';
+                badgeTipoDetectada.className = 'badge diag-pieza-badge-mini bg-warning text-dark';
+                badgeTipoDetectada.textContent = 'Opc';
+                badgeTipoDetectada.title = 'Opcional / secundaria';
             }
             infoDiv.appendChild(badgeTipoDetectada);
             
-            // Si hay match, mostrar a cuál componente apunta
+            // Match de componente (badge chico)
             if (pieza.componenteDb) {
                 const matchSpan = document.createElement('span');
                 if (esComponenteDuplicado) {
-                    matchSpan.className = 'badge bg-warning bg-opacity-25 text-dark border border-warning';
-                    matchSpan.innerHTML = `<i class="bi bi-diagram-2"></i> ${pieza.componenteDb} <small>(duplicado)</small>`;
+                    matchSpan.className = 'badge diag-pieza-badge-mini bg-warning bg-opacity-25 text-dark border border-warning';
+                    matchSpan.innerHTML = `<i class="bi bi-diagram-2"></i> ${pieza.componenteDb}`;
+                    matchSpan.title = `${pieza.componenteDb} (duplicado — reasigna)`;
                 } else {
-                    matchSpan.className = 'badge bg-light text-dark border';
+                    matchSpan.className = 'badge diag-pieza-badge-mini bg-light text-dark border';
                     matchSpan.innerHTML = `<i class="bi bi-link-45deg"></i> ${pieza.componenteDb}`;
+                    matchSpan.title = `Coincide con: ${pieza.componenteDb}`;
                 }
                 infoDiv.appendChild(matchSpan);
                 
@@ -2291,16 +2286,16 @@ function initDiagnosticoModal(): void {
             
             fila.appendChild(infoDiv);
             
-            // Lado derecho: acciones
+            // Lado derecho: acciones (flex-shrink: 0 para que no se aplasten)
             const accionesDiv = document.createElement('div');
-            accionesDiv.className = 'd-flex align-items-center gap-2';
+            accionesDiv.className = 'diag-pieza-acciones';
             
             if (!necesitaDropdown) {
-                // Tiene match único — botón "Aplicar" directo
+                // Tiene match único — botón compacto "Aplicar"
                 const btnAplicar = document.createElement('button');
                 btnAplicar.type = 'button';
-                btnAplicar.className = 'btn btn-sm btn-outline-success btn-aplicar-pieza';
-                btnAplicar.innerHTML = '<i class="bi bi-check2-square"></i> Aplicar';
+                btnAplicar.className = 'btn btn-sm btn-outline-success btn-aplicar-pieza diag-pieza-btn-aplicar';
+                btnAplicar.innerHTML = '<i class="bi bi-check2-square"></i>';
                 btnAplicar.title = pieza.numeroParte
                     ? `Aplicar ${pieza.numeroParte} a ${pieza.componenteDb}`
                     : `Aplicar ${pieza.componenteDb}`;
@@ -2309,12 +2304,13 @@ function initDiagnosticoModal(): void {
             } else {
                 // Sin match O componente duplicado — dropdown para asignar manualmente
                 const selectComponente = crearDropdownComponentes(pieza.componenteDb);
+                selectComponente.classList.add('diag-pieza-select');
                 accionesDiv.appendChild(selectComponente);
                 
                 // Botón aplicar (se habilita al seleccionar componente)
                 const btnAplicarManual = document.createElement('button');
                 btnAplicarManual.type = 'button';
-                btnAplicarManual.className = 'btn btn-sm btn-outline-primary btn-aplicar-pieza';
+                btnAplicarManual.className = 'btn btn-sm btn-outline-primary btn-aplicar-pieza diag-pieza-btn-aplicar';
                 btnAplicarManual.innerHTML = '<i class="bi bi-check2-square"></i>';
                 btnAplicarManual.title = 'Aplicar a componente seleccionado';
                 btnAplicarManual.disabled = !selectComponente.value;
@@ -2344,10 +2340,11 @@ function initDiagnosticoModal(): void {
         
         contenedorPiezas.appendChild(lista);
         
-        // Mostrar/ocultar botón "Aplicar todas" (solo para matches únicos)
+        // Mostrar/ocultar botón "Aplicar todas" (texto corto en header angosto)
         if (btnAplicarTodas) {
             btnAplicarTodas.style.display = piezasConMatchUnico > 0 ? 'inline-flex' : 'none';
-            btnAplicarTodas.innerHTML = `<i class="bi bi-check-all"></i> Aplicar todas las coincidencias (${piezasConMatchUnico})`;
+            btnAplicarTodas.innerHTML = `<i class="bi bi-check-all"></i> Todas (${piezasConMatchUnico})`;
+            btnAplicarTodas.title = `Aplicar todas las coincidencias (${piezasConMatchUnico})`;
         }
         
         // Mostrar el panel
@@ -2583,7 +2580,9 @@ function initDiagnosticoModal(): void {
             
             const fullUrl = `${baseUrl}?${params.toString()}`;
             
-            // Mostrar loading
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // El botón del modal rediseñado dice solo «Actualizar» (más corto
+            // en la columna derecha). Mantenemos el mismo texto al restaurar.
             btnRefrescarPreview.disabled = true;
             btnRefrescarPreview.innerHTML = '<i class="bi bi-hourglass-split"></i> Generando...';
             
@@ -2592,14 +2591,14 @@ function initDiagnosticoModal(): void {
             // Restaurar botón cuando carga
             iframePreview.onload = () => {
                 btnRefrescarPreview.disabled = false;
-                btnRefrescarPreview.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar Vista Previa';
+                btnRefrescarPreview.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar';
             };
             
             // Timeout de seguridad
             setTimeout(() => {
                 if (btnRefrescarPreview.disabled) {
                     btnRefrescarPreview.disabled = false;
-                    btnRefrescarPreview.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar Vista Previa';
+                    btnRefrescarPreview.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar';
                 }
             }, 15000);
         });
