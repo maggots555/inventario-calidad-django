@@ -602,7 +602,7 @@
    fondos .bg-info / .bg-success. Forzamos blanco para buen contraste.
    En warning (amarillo) el texto oscuro sí se lee mejor. */
 .estado-badge.bg-success {
-    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    background: linear-gradient(135deg, #1e6b45, #248f5a) !important;
     color: #fff !important;
 }
 
@@ -6401,6 +6401,17 @@ thead.sticky-top {
         font-size: 1.75em;
     }
 
+    /* Badge de estado más compacto: textos largos (EN DIAGNÓSTICO, etc.) caben mejor */
+    .info-status-strip .estado-badge {
+        font-size: 0.72rem;
+        padding: 0.35rem 0.65rem;
+        letter-spacing: 0.3px;
+        max-width: 100%;
+        white-space: normal;
+        line-height: 1.25;
+        text-align: center;
+    }
+
     .info-group__grid {
         grid-template-columns: 1fr;
     }
@@ -6452,8 +6463,9 @@ thead.sticky-top {
    ============================================================ */
 
 .estado-badge.bg-success {
-    background-color: #27ae60 !important;
-    background-image: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    /* Verde sobrio (menos brillante) para Finalizado / Entregado */
+    background-color: #1e6b45 !important;
+    background-image: linear-gradient(135deg, #1e6b45, #248f5a) !important;
     color: #fff !important;
 }
 

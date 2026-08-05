@@ -54,37 +54,39 @@ COLORES_ESTADO_RHITSO = {
 # =============================================================================
 
 COLORES_ESTADO_ORDEN = {
-    # === FASE 1: INGRESO Y DIAGNÓSTICO ===
-    'espera': '#6c757d',                              # Gris - En espera de procesamiento
-    'recepcion': '#0d6efd',                           # Azul - Recibiendo equipo
-    'diagnostico': '#ffc107',                         # Amarillo - En proceso de diagnóstico
-    'equipo_diagnosticado': '#17a2b8',                # Cian - Diagnóstico completado
-    'diagnostico_enviado_cliente': '#0d6efd',        # Azul - Información enviada
-    
-    # === FASE 2: COTIZACIÓN Y APROBACIÓN ===
-    'cotizacion_enviada_proveedor': '#0d6efd',       # Azul - Enviado a proveedor
-    'cotizacion_recibida_proveedor': '#ffc107',      # Amarillo - Esperando respuesta del proveedor
-    'cotizacion': '#ffc107',                          # Amarillo - Esperando aprobación cliente
-    'cliente_acepta_cotizacion': '#198754',           # Verde - Cliente aprobó
-    'rechazada': '#dc3545',                           # Rojo - Cotización rechazada
-    
-    # === FASE 3: GESTIÓN DE PIEZAS Y COMPONENTES ===
-    'partes_solicitadas_proveedor': '#0d6efd',       # Azul - Piezas pedidas
-    'esperando_piezas': '#fd7e14',                    # Naranja - Esperando llegada de piezas
-    'piezas_recibidas': '#198754',                    # Verde - Piezas llegaron
-    'wpb_pieza_incorrecta': '#dc3545',                # Rojo - Pieza incorrecta
-    'doa_pieza_danada': '#dc3545',                    # Rojo - Pieza dañada (Dead On Arrival)
-    'pnc_parte_no_disponible': '#ffc107',             # Amarillo - Parte no disponible
-    
-    # === FASE 4: REPARACIÓN Y ENTREGA ===
-    'reparacion': '#6610f2',                          # Púrpura - En reparación
-    'control_calidad': '#0d6efd',                     # Azul - Verificando calidad
-    'finalizado': '#198754',                          # Verde - Listo para entregar
-    'entregado': '#198754',                           # Verde - Entregado exitosamente
-    'cancelado': '#6c757d',                           # Gris - Orden cancelada
-    
-    # Color por defecto para estados no definidos
-    'default': '#6c757d',                             # Gris - Estado desconocido
+    # Alineado con color_estado_orden (badge): casi todo azul SIGMA;
+    # excepciones warning/danger/success como en el filtro Bootstrap.
+    # === FASE 0 / 1 ===
+    'almacen': '#1f6391',
+    'espera': '#1f6391',
+    'recepcion': '#1f6391',
+    'diagnostico': '#1f6391',
+    'equipo_diagnosticado': '#1f6391',
+    'diagnostico_enviado_cliente': '#1f6391',
+
+    # === FASE 2 ===
+    'cotizacion_enviada_proveedor': '#1f6391',
+    'cotizacion_recibida_proveedor': '#1f6391',
+    'cotizacion': '#f39c12',                 # Esperando aprobación cliente
+    'cliente_acepta_cotizacion': '#1f6391',
+    'rechazada': '#c0392b',                  # Cotización rechazada
+
+    # === FASE 3 ===
+    'partes_solicitadas_proveedor': '#1f6391',
+    'esperando_piezas': '#f39c12',           # Esperando llegada de piezas
+    'piezas_recibidas': '#1f6391',
+    'wpb_pieza_incorrecta': '#c0392b',       # WPB
+    'doa_pieza_danada': '#c0392b',           # DOA
+    'pnc_parte_no_disponible': '#f39c12',    # PNC
+
+    # === FASE 4 ===
+    'reparacion': '#1f6391',
+    'control_calidad': '#1f6391',
+    'finalizado': '#1e6b45',                 # Verde sobrio (success)
+    'entregado': '#1e6b45',
+    'cancelado': '#1f6391',
+
+    'default': '#1f6391',
 }
 
 
@@ -307,12 +309,12 @@ def color_estado_orden(codigo_estado):
     ================================
     Este filtro mapea cada estado posible de una orden de servicio a un color.
     
-    Estados del workflow:
-    ✅ Colores verdes: Estados finales exitosos (entregado, finalizado, cliente_acepta_cotizacion)
-    ⚠️ Colores amarillos/naranjas: Estados de espera o transición
-    🔵 Colores azules: Estados de información y control
-    🔴 Colores rojos: Estados problemáticos (rechazada, piezas dañadas)
-    ⚫ Colores grises: Estados iniciales, cancelado, desconocido
+    Estados del workflow (Ago 2026):
+    🔵 Azul SIGMA (primary): la mayoría de estados del flujo
+    ⚠️ Amarillo (warning): esperando aprobación cliente, esperando piezas, PNC
+    🔴 Rojo (danger): cotización rechazada, WPB, DOA
+    ✅ Verde sobrio (success): finalizado, entregado
+    ⚫ Fallback: primary (azul SIGMA)
     
     Args:
         codigo_estado (str): Código del estado (ej: 'reparacion', 'cotizacion', 'entregado')
@@ -340,38 +342,45 @@ def color_estado_orden(codigo_estado):
     
     # Retornar clases Bootstrap en lugar de códigos hex para este filtro
     # Esto hace que sea más fácil de usar en templates de Bootstrap
+    #
+    # EXPLICACIÓN PARA PRINCIPIANTES (Ago 2026):
+    # Por defecto casi todos los estados usan primary (azul SIGMA).
+    # Solo unos pocos conservan warning / danger / success para alertar:
+    # WPB, DOA, PNC, cotización rechazada, esperando aprobación cliente,
+    # esperando piezas, finalizado y entregado.
     colores_bootstrap = {
-        # === FASE 1: INGRESO Y DIAGNÓSTICO ===
-        'espera': 'secondary',               # Gris
-        'recepcion': 'primary',              # Azul
-        'diagnostico': 'warning',            # Amarillo
-        'equipo_diagnosticado': 'info',      # Cian
-        'diagnostico_enviado_cliente': 'primary',  # Azul
-        
-        # === FASE 2: COTIZACIÓN Y APROBACIÓN ===
-        'cotizacion_enviada_proveedor': 'primary',  # Azul
-        'cotizacion_recibida_proveedor': 'warning', # Amarillo
-        'cotizacion': 'warning',             # Amarillo
-        'cliente_acepta_cotizacion': 'success',    # Verde
-        'rechazada': 'danger',               # Rojo
-        
-        # === FASE 3: GESTIÓN DE PIEZAS Y COMPONENTES ===
-        'partes_solicitadas_proveedor': 'primary',  # Azul
-        'esperando_piezas': 'warning',      # Amarillo/Naranja
-        'piezas_recibidas': 'success',      # Verde
-        'wpb_pieza_incorrecta': 'danger',   # Rojo
-        'doa_pieza_danada': 'danger',       # Rojo
-        'pnc_parte_no_disponible': 'warning',  # Amarillo
-        
+        # === FASE 0 / 1: INGRESO Y DIAGNÓSTICO → azul SIGMA ===
+        'almacen': 'primary',
+        'espera': 'primary',
+        'recepcion': 'primary',
+        'diagnostico': 'primary',
+        'equipo_diagnosticado': 'primary',
+        'diagnostico_enviado_cliente': 'primary',
+
+        # === FASE 2: COTIZACIÓN ===
+        'cotizacion_enviada_proveedor': 'primary',
+        'cotizacion_recibida_proveedor': 'primary',
+        'cotizacion': 'warning',              # Esperando aprobación cliente
+        'cliente_acepta_cotizacion': 'primary',
+        'rechazada': 'danger',                # Cotización rechazada
+
+        # === FASE 3: PIEZAS ===
+        'partes_solicitadas_proveedor': 'primary',
+        'esperando_piezas': 'warning',        # Esperando llegada de piezas
+        'piezas_recibidas': 'primary',
+        'wpb_pieza_incorrecta': 'danger',     # WPB
+        'doa_pieza_danada': 'danger',         # DOA
+        'pnc_parte_no_disponible': 'warning', # PNC
+
         # === FASE 4: REPARACIÓN Y ENTREGA ===
-        'reparacion': 'primary',             # Púrpura (usamos primary en Bootstrap 5)
-        'control_calidad': 'primary',        # Azul
-        'finalizado': 'success',             # Verde
-        'entregado': 'success',              # Verde
-        'cancelado': 'secondary',            # Gris
+        'reparacion': 'primary',
+        'control_calidad': 'primary',
+        'finalizado': 'success',              # Finalizado
+        'entregado': 'success',               # Entregado al cliente
+        'cancelado': 'primary',
     }
-    
-    return colores_bootstrap.get(estado_clean, 'secondary')
+
+    return colores_bootstrap.get(estado_clean, 'primary')
 
 
 # =============================================================================
