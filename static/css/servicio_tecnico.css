@@ -6541,3 +6541,252 @@ thead.sticky-top {
     color: #cbd5e1 !important;
     border: 1px solid #334155;
 }
+
+/* ============================================================
+   CONFIGURACIÓN ADICIONAL — pulido ligero del panel derecho
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Es un formulario: no lo convertimos en dossier. Solo botones
+   más chicos, menos inline styles y tipografía coherente.
+   ============================================================ */
+
+.config-adicional-panel {
+    padding: 1rem 1.15rem 1.15rem;
+}
+
+.config-adicional-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--gray-500, #6b7280);
+}
+
+.config-btn-voz {
+    min-width: 44px;
+    min-height: 38px;
+    padding: 0 10px;
+}
+
+#btnMejorarDiagIA {
+    min-height: 38px;
+}
+
+#vozDiagnosticoIndicador,
+.config-hint-voz {
+    display: none;
+    font-size: 0.78rem;
+}
+
+.config-hint-ia {
+    font-size: 0.75rem;
+}
+
+/* Barra Enviar + Guardar: 2 columnas desde md, apilados en móvil */
+.config-acciones {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+@media (min-width: 576px) {
+    .config-acciones {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+}
+
+.config-acciones .btn {
+    min-height: 38px;
+    font-weight: 600;
+}
+
+/* Verde sobrio (mismo tono del badge success) */
+.config-btn-enviar.btn-success {
+    background-color: #1e6b45 !important;
+    border-color: #1e6b45 !important;
+    color: #fff !important;
+}
+
+.config-btn-enviar.btn-success:hover:not(:disabled) {
+    background-color: #185a3a !important;
+    border-color: #185a3a !important;
+}
+
+.config-btn-enviar.btn-success:disabled {
+    opacity: 0.65;
+}
+
+.config-btn-guardar.btn-primary {
+    background-color: var(--st-primary, #1f6391) !important;
+    border-color: var(--st-primary, #1f6391) !important;
+}
+
+/* Títulos y cajas de fechas sin estilos inline */
+.config-fechas-titulo {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.config-fechas-titulo--diag {
+    color: var(--st-primary, #1f6391);
+}
+
+.config-fechas-titulo--repa {
+    color: #c2410c;
+}
+
+.config-fechas-caja--diag {
+    border-left: 4px solid var(--st-primary, #1f6391) !important;
+}
+
+.config-fechas-caja--repa {
+    border-left: 4px solid #c2410c !important;
+}
+
+.config-fechas-duracion {
+    font-size: 0.85rem;
+}
+
+/* Botón Mejorar Diag. (antes vivía en <style> de detalle_orden.html) */
+.btn-outline-purple {
+    color: #1e4a6e;
+    border-color: #1e4a6e;
+    border-width: 1.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: all 0.18s ease;
+    border-radius: 6px;
+}
+
+.btn-outline-purple:hover:not(:disabled) {
+    background-color: #1e4a6e;
+    border-color: #1e4a6e;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(30, 74, 110, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-outline-purple:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-outline-purple:disabled {
+    color: #adb5bd;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+[data-bs-theme="dark"] .config-adicional-label {
+    color: var(--gray-500, #d1d5db);
+}
+
+[data-bs-theme="dark"] .config-fechas-titulo--diag {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .config-fechas-titulo--repa {
+    color: #fb923c;
+}
+
+[data-bs-theme="dark"] .config-fechas-caja--diag {
+    border-left-color: #60a5fa !important;
+}
+
+[data-bs-theme="dark"] .config-fechas-caja--repa {
+    border-left-color: #fb923c !important;
+}
+
+[data-bs-theme="dark"] .config-btn-enviar.btn-success {
+    background-color: #14532d !important;
+    border-color: #166534 !important;
+    color: #86efac !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-purple {
+    color: #93c5fd;
+    border-color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .btn-outline-purple:hover:not(:disabled) {
+    background-color: #1e4a6e;
+    border-color: #1e4a6e;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(30, 74, 110, 0.35);
+}
+
+[data-bs-theme="dark"] .btn-outline-purple:disabled {
+    color: #4b5563;
+    border-color: #374151;
+}
+
+/* ============================================================
+   Banner global: cambios sin guardar (Configuración Adicional)
+   ============================================================ */
+
+.config-dirty-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.5rem;
+    border: 1px solid #f0c14b;
+    background: #fff8e6;
+    color: #7a5a00;
+    font-size: 0.85rem;
+    line-height: 1.35;
+}
+
+.config-dirty-banner > .bi {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    color: #c9920a;
+    font-size: 1rem;
+}
+
+.config-dirty-banner__texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.config-dirty-banner__texto strong {
+    font-weight: 700;
+}
+
+.config-dirty-banner__texto span {
+    font-size: 0.78rem;
+    opacity: 0.9;
+}
+
+/* Cuando Bootstrap pone d-none, gana display:none */
+.config-dirty-banner.d-none {
+    display: none !important;
+}
+
+.config-btn-guardar--dirty {
+    box-shadow: 0 0 0 2px rgba(201, 146, 10, 0.45);
+    animation: config-guardar-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes config-guardar-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(201, 146, 10, 0.35); }
+    50% { box-shadow: 0 0 0 3px rgba(201, 146, 10, 0.55); }
+}
+
+[data-bs-theme="dark"] .config-dirty-banner {
+    background: rgba(120, 80, 0, 0.25);
+    border-color: #a16207;
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .config-dirty-banner > .bi {
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .config-btn-guardar--dirty {
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);
+}

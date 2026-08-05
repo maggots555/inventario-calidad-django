@@ -1318,61 +1318,89 @@
     // FEEDBACK VISUAL AL GUARDAR FECHAS DE DIAGNÓSTICO Y REPARACIÓN
     // ============================================================================
     /**
-     * Agrega animación de guardado exitoso a las secciones de fechas.
+     * Feedback al guardar + indicador GLOBAL de cambios sin guardar.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * - Cuando el formulario de configuración se guarda exitosamente
-     * - Agregamos una animación "pulse" a las secciones de fechas
-     * - Esto da feedback visual inmediato al usuario
-     * - La animación dura 600ms y luego se remueve automáticamente
+     * Antes, cada cambio de fecha pegaba un badge "Cambio pendiente" en el label
+     * y se acumulaban. Ahora comparamos un snapshot inicial de TODOS los campos
+     * del panel (falla, diagnóstico, fechas) y mostramos UN solo banner.
      */
     document.addEventListener('DOMContentLoaded', function () {
         const formConfiguracion = _el('formConfiguracion');
-        if (formConfiguracion) {
-            formConfiguracion.addEventListener('submit', function (e) {
-                // Guardar referencia a las secciones de fechas
-                const seccionesFechas = _qsa('.fechas-seccion');
-                // Agregar clase de guardado después de enviar el formulario
-                // Nota: La animación solo se ve si la página no recarga inmediatamente
-                seccionesFechas.forEach(seccion => {
-                    // Esperar un momento para que el formulario se procese
-                    setTimeout(() => {
-                        seccion.classList.add('guardado-exitoso');
-                        // Remover la clase después de la animación (600ms)
-                        setTimeout(() => {
-                            seccion.classList.remove('guardado-exitoso');
-                        }, 600);
-                    }, 100);
-                });
+        if (!formConfiguracion) {
+            return;
+        }
+        const panel = formConfiguracion.closest('.config-adicional-panel');
+        const banner = document.getElementById('configCambiosPendientes');
+        const btnGuardar = formConfiguracion.querySelector('.config-btn-guardar');
+        // Campos editables del formulario (ignoramos CSRF y form_type ocultos)
+        const campos = Array.from(formConfiguracion.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'));
+        /** Snapshot nombre → valor al cargar (o tras guardar en esta sesión). */
+        let snapshot = {};
+        function valorCampo(campo) {
+            var _a;
+            if (campo instanceof HTMLInputElement && (campo.type === 'checkbox' || campo.type === 'radio')) {
+                return campo.checked ? '1' : '0';
+            }
+            return ((_a = campo.value) !== null && _a !== void 0 ? _a : '').trim();
+        }
+        function tomarSnapshot() {
+            snapshot = {};
+            campos.forEach((campo) => {
+                const clave = campo.name || campo.id;
+                if (clave) {
+                    snapshot[clave] = valorCampo(campo);
+                }
             });
         }
-        // Efecto visual al cambiar fechas
-        const inputsFechas = _qsa('input[name="fecha_inicio_diagnostico"], ' +
-            'input[name="fecha_fin_diagnostico"], ' +
-            'input[name="fecha_inicio_reparacion"], ' +
-            'input[name="fecha_fin_reparacion"]');
-        inputsFechas.forEach(input => {
-            // Agregar efecto de "cambio pendiente"
-            input.addEventListener('change', function () {
-                const seccion = this.closest('.fechas-seccion');
-                if (seccion) {
-                    // Agregar borde pulsante para indicar cambio pendiente
-                    seccion.style.borderLeft = '4px solid #ffc107';
-                    seccion.style.paddingLeft = '8px';
-                    seccion.style.transition = 'all 0.3s ease';
-                    // Tooltip o mensaje visual
-                    const label = this.previousElementSibling;
-                    if (label && label.tagName === 'LABEL') {
-                        const textoOriginal = label.innerHTML;
-                        label.innerHTML = textoOriginal + ' <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Cambio pendiente</span>';
-                        // Limpiar el badge al hacer submit
-                        formConfiguracion.addEventListener('submit', function () {
-                            label.innerHTML = textoOriginal;
-                            seccion.style.borderLeft = '';
-                            seccion.style.paddingLeft = '';
-                        }, { once: true });
-                    }
+        function hayCambiosPendientes() {
+            return campos.some((campo) => {
+                var _a;
+                const clave = campo.name || campo.id;
+                if (!clave) {
+                    return false;
                 }
+                return valorCampo(campo) !== ((_a = snapshot[clave]) !== null && _a !== void 0 ? _a : '');
+            });
+        }
+        function actualizarUIDirty() {
+            const dirty = hayCambiosPendientes();
+            if (banner) {
+                banner.classList.toggle('d-none', !dirty);
+            }
+            if (btnGuardar) {
+                btnGuardar.classList.toggle('config-btn-guardar--dirty', dirty);
+            }
+            if (panel) {
+                panel.classList.toggle('config-adicional-panel--dirty', dirty);
+            }
+        }
+        tomarSnapshot();
+        actualizarUIDirty();
+        campos.forEach((campo) => {
+            campo.addEventListener('input', actualizarUIDirty);
+            campo.addEventListener('change', actualizarUIDirty);
+        });
+        formConfiguracion.addEventListener('submit', function () {
+            // Ocultar aviso al enviar; la página suele recargar tras guardar OK.
+            if (banner) {
+                banner.classList.add('d-none');
+            }
+            if (btnGuardar) {
+                btnGuardar.classList.remove('config-btn-guardar--dirty');
+            }
+            if (panel) {
+                panel.classList.remove('config-adicional-panel--dirty');
+            }
+            // Animación breve en secciones de fechas (si la página no recarga al instante)
+            const seccionesFechas = _qsa('.fechas-seccion');
+            seccionesFechas.forEach((seccion) => {
+                setTimeout(() => {
+                    seccion.classList.add('guardado-exitoso');
+                    setTimeout(() => {
+                        seccion.classList.remove('guardado-exitoso');
+                    }, 600);
+                }, 100);
             });
         });
     });
