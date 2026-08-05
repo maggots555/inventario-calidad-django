@@ -2230,8 +2230,10 @@ form:has(#btnSubirImagenes:disabled) textarea {
 }
 
 .badge.bg-info {
-    background-color: #0dcaf0 !important;
-    color: #000 !important;
+    /* Antes: #0dcaf0 + texto negro (cian Bootstrap ilegible y pisaba el diseño).
+       Alineado con base.css: teal oscuro + texto blanco. */
+    background-color: var(--info-color, #0e7490) !important;
+    color: #ffffff !important;
 }
 
 .badge.bg-secondary {
@@ -6437,4 +6439,93 @@ thead.sticky-top {
 
 [data-bs-theme="dark"] .info-field__link {
     color: #93c5fd;
+}
+
+/* ============================================================
+   ESTADO-BADGE — fuente de verdad (al final del archivo)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Más arriba hay otras reglas (.badge.bg-info, dark mode, duplicados)
+   que pueden pelear por el color de fondo. Al declarar aquí al FINAL,
+   estas ganan la cascada dentro de servicio_tecnico.css.
+   Usamos background-color + background-image por separado para que un
+   `background-color: … !important` suelto no borre el degradado.
+   ============================================================ */
+
+.estado-badge.bg-success {
+    background-color: #27ae60 !important;
+    background-image: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    color: #fff !important;
+}
+
+.estado-badge.bg-warning {
+    background-color: #f39c12 !important;
+    background-image: linear-gradient(135deg, #f39c12, #f1c40f) !important;
+    color: #1f2937 !important;
+}
+
+.estado-badge.bg-danger {
+    background-color: #e74c3c !important;
+    background-image: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+    color: #fff !important;
+}
+
+.estado-badge.bg-info {
+    background-color: #2980b9 !important;
+    background-image: linear-gradient(135deg, #3498db, #2980b9) !important;
+    color: #fff !important;
+}
+
+.estado-badge.bg-primary {
+    background-color: #1f6391 !important;
+    background-image: linear-gradient(135deg, #1f6391, #2980b9) !important;
+    color: #fff !important;
+}
+
+.estado-badge.bg-secondary {
+    background-color: #6b7280 !important;
+    background-image: linear-gradient(135deg, #6b7280, #4b5563) !important;
+    color: #fff !important;
+}
+
+/* Dark mode: va DESPUÉS del bloque claro para sí poder pisarlo solo en oscuro */
+[data-bs-theme="dark"] .estado-badge.bg-success {
+    background-color: #14532d !important;
+    background-image: linear-gradient(135deg, #14532d, #166534) !important;
+    color: #86efac !important;
+    border: 1px solid #166534;
+}
+
+[data-bs-theme="dark"] .estado-badge.bg-warning {
+    background-color: #3b2100 !important;
+    background-image: linear-gradient(135deg, #3b2100, #451a00) !important;
+    color: #fde68a !important;
+    border: 1px solid #78350f;
+}
+
+[data-bs-theme="dark"] .estado-badge.bg-danger {
+    background-color: #450a0a !important;
+    background-image: linear-gradient(135deg, #450a0a, #7f1d1d) !important;
+    color: #fca5a5 !important;
+    border: 1px solid #7f1d1d;
+}
+
+[data-bs-theme="dark"] .estado-badge.bg-info {
+    background-color: #0e3a4a !important;
+    background-image: linear-gradient(135deg, #0c2a3a, #0e3a4a) !important;
+    color: #7dd3fc !important;
+    border: 1px solid #0e4a6a;
+}
+
+[data-bs-theme="dark"] .estado-badge.bg-primary {
+    background-color: #1e3a5c !important;
+    background-image: linear-gradient(135deg, #1e3a5c, #1e40af) !important;
+    color: #93c5fd !important;
+    border: 1px solid #1e40af;
+}
+
+[data-bs-theme="dark"] .estado-badge.bg-secondary {
+    background-color: #1e293b !important;
+    background-image: linear-gradient(135deg, #1e293b, #334155) !important;
+    color: #cbd5e1 !important;
+    border: 1px solid #334155;
 }
