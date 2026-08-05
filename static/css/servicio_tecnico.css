@@ -6622,6 +6622,23 @@ thead.sticky-top {
     border-color: var(--st-primary, #1f6391) !important;
 }
 
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * En dark mode --st-primary pasa a #60a5fa (muy claro, pensado para texto/iconos).
+ * En un botón sólido ese azul “brilla” demasiado; usamos un azul más profundo.
+ */
+[data-bs-theme="dark"] .config-btn-guardar.btn-primary {
+    background-color: #1e4a6e !important;
+    border-color: #2a5f8a !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .config-btn-guardar.btn-primary:hover:not(:disabled) {
+    background-color: #256089 !important;
+    border-color: #3b7aad !important;
+    color: #f8fafc !important;
+}
+
 /* Títulos y cajas de fechas sin estilos inline */
 .config-fechas-titulo {
     font-weight: 600;
@@ -6788,5 +6805,7 @@ thead.sticky-top {
 }
 
 [data-bs-theme="dark"] .config-btn-guardar--dirty {
-    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45);
+    /* Anillo más suave: sin pulso agresivo en oscuro */
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28);
+    animation: none;
 }
