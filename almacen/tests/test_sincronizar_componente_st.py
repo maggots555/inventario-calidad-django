@@ -440,6 +440,8 @@ class GenerarPiezasVentaMostradorComponenteTest(SimpleTestCase):
 
         vm = MagicMock()
         mock_vm_cls.objects.get_or_create.return_value = (vm, True)
+        # Anti-duplicado: no hay PiezaVentaMostrador previa para la línea
+        mock_pieza_vm_cls.objects.filter.return_value.exists.return_value = False
 
         SolicitudCotizacion.generar_piezas_venta_mostrador(solicitud)
 
@@ -451,6 +453,7 @@ class GenerarPiezasVentaMostradorComponenteTest(SimpleTestCase):
         mock_pieza_vm_cls.objects.create.assert_called_once()
         kwargs_create = mock_pieza_vm_cls.objects.create.call_args.kwargs
         self.assertEqual(kwargs_create['componente'], componente_mock)
+        self.assertEqual(kwargs_create['linea_cotizacion'], linea)
 
     @patch('servicio_tecnico.models.PiezaVentaMostrador')
     @patch('servicio_tecnico.models.VentaMostrador')
@@ -498,6 +501,7 @@ class GenerarPiezasVentaMostradorComponenteTest(SimpleTestCase):
         solicitud.lineas.filter.return_value = qs_pendientes
 
         mock_vm_cls.objects.get_or_create.return_value = (MagicMock(), True)
+        mock_pieza_vm_cls.objects.filter.return_value.exists.return_value = False
 
         SolicitudCotizacion.generar_piezas_venta_mostrador(solicitud)
 
@@ -508,3 +512,4 @@ class GenerarPiezasVentaMostradorComponenteTest(SimpleTestCase):
         )
         kwargs_create = mock_pieza_vm_cls.objects.create.call_args.kwargs
         self.assertEqual(kwargs_create['componente'].nombre, NOMBRE_COMPONENTE_EQUIPO_REACONDICIONADO)
+        self.assertEqual(kwargs_create['linea_cotizacion'], linea)

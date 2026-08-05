@@ -4041,6 +4041,12 @@ class SolicitudCotizacion(models.Model):
         - Solo procesa líneas con estado_cliente='aprobada'.
         - generar_compras() las marca 'compra_generada' después; este método debe
           llamarse ANTES de generar_compras() en la vista.
+        - Si la línea ya tiene PiezaVentaMostrador (OneToOne linea_cotizacion),
+          se omite (idempotente).
+
+        Trazabilidad (Ago 2026):
+        Cada PiezaVentaMostrador guarda ``linea_cotizacion`` para que el sync
+        de recepción pueda cerrar SeguimientoPieza (Compra → Línea → Pieza VM).
 
         Returns:
             int: Número de PiezaVentaMostrador creadas (0 si no aplica o no hay líneas)
@@ -4075,6 +4081,10 @@ class SolicitudCotizacion(models.Model):
         IVA_FACTOR = Decimal('1.16')
 
         for linea in lineas_a_procesar:
+            # Anti-duplicado: OneToOne línea ↔ PiezaVentaMostrador
+            if PiezaVentaMostrador.objects.filter(linea_cotizacion=linea).exists():
+                continue
+
             nombre_producto = linea.producto.nombre if linea.producto else 'Pieza sin nombre'
             descripcion_extra = linea.descripcion_pieza or ''
             if descripcion_extra:
@@ -4128,8 +4138,11 @@ class SolicitudCotizacion(models.Model):
                     self.numero_solicitud,
                 )
 
+            # Paso clave: guardar FK a la línea para que el sync de recepción
+            # pueda cerrar SeguimientoPieza (Compra → Línea → Pieza VM).
             PiezaVentaMostrador.objects.create(
                 venta_mostrador=vm,
+                linea_cotizacion=linea,
                 componente=componente,
                 descripcion_pieza=descripcion_completa,
                 cantidad=linea.cantidad,

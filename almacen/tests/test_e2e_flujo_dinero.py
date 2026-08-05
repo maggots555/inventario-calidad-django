@@ -142,6 +142,11 @@ class E2eFlujoDineroAlmacenStTest(BaseIntegracionCotizacionMixin, TestCase):
         seguimiento = SeguimientoPieza.objects.filter(
             cotizacion=orden.cotizacion,
         ).first()
+        self.assertEqual(
+            seguimiento.orden_id,
+            orden.pk,
+            msg='SeguimientoPieza debe anclarse a la orden',
+        )
         self.assertIn(pieza, seguimiento.piezas.all())
 
     def test_sin_orden_bloquear_compras_luego_vincular_y_generar(self) -> None:

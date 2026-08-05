@@ -666,6 +666,7 @@ class PiezaCotizadaAdmin(admin.ModelAdmin):
 class SeguimientoPiezaAdmin(admin.ModelAdmin):
     list_display = (
         'proveedor',
+        'orden',
         'cotizacion',
         'fecha_pedido',
         'fecha_entrega_estimada',
@@ -677,6 +678,7 @@ class SeguimientoPiezaAdmin(admin.ModelAdmin):
     search_fields = (
         'proveedor',
         'numero_pedido',
+        'orden__numero_orden_interno',
         'cotizacion__orden__numero_orden_interno',
         'descripcion_piezas',
     )

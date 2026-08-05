@@ -974,36 +974,38 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
     
     # Construir QuerySet base con relaciones optimizadas
     queryset = SeguimientoPieza.objects.select_related(
-        'cotizacion__orden__sucursal',
-        'cotizacion__orden__detalle_equipo',
-        'cotizacion__orden__responsable_seguimiento'
+        'orden__sucursal',
+        'orden__detalle_equipo',
+        'orden__responsable_seguimiento',
+        'cotizacion',
     ).prefetch_related(
-        'piezas'
+        'piezas',
+        'piezas_venta_mostrador',
     )
-    
+
     # Aplicar filtros
     if fecha_inicio:
         queryset = queryset.filter(fecha_pedido__gte=fecha_inicio)
-    
+
     if fecha_fin:
         queryset = queryset.filter(fecha_pedido__lte=fecha_fin)
-    
+
     if sucursal_id:
-        queryset = queryset.filter(cotizacion__orden__sucursal_id=sucursal_id)
-    
+        queryset = queryset.filter(orden__sucursal_id=sucursal_id)
+
     if proveedor:
         queryset = queryset.filter(proveedor__icontains=proveedor)
-    
+
     if estado:
         queryset = queryset.filter(estado=estado)
-    
+
     # Convertir a lista de diccionarios
     data = []
     hoy = timezone.now().date()
-    
+
     for seg in queryset:
-        orden = seg.cotizacion.orden
-        detalle = orden.detalle_equipo
+        orden = seg.orden
+        detalle = getattr(orden, 'detalle_equipo', None)
         
         # Calcular métricas
         # CORREGIDO: dias_desde_pedido debe considerar fecha_entrega_real si existe
@@ -1049,16 +1051,22 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
         else:
             prioridad = 'normal'
         
-        # Obtener lista de piezas vinculadas
-        piezas_vinculadas = list(seg.piezas.all().values_list('componente__nombre', flat=True))
-        piezas_str = ', '.join(piezas_vinculadas) if piezas_vinculadas else seg.descripcion_piezas
-        
+        # Obtener lista de piezas vinculadas (OOW + VM)
+        piezas_vinculadas = list(
+            seg.piezas.all().values_list('componente__nombre', flat=True)
+        )
+        piezas_vm = list(
+            seg.piezas_venta_mostrador.all().values_list('descripcion_pieza', flat=True)
+        )
+        piezas_todas = [p for p in (piezas_vinculadas + piezas_vm) if p]
+        piezas_str = ', '.join(piezas_todas) if piezas_todas else seg.descripcion_piezas
+
         data.append({
             'id': seg.id,
             'orden_numero': orden.numero_orden_interno,
             'orden_id': orden.id,
-            'orden_cliente': detalle.orden_cliente,
-            'service_tag': detalle.numero_serie,
+            'orden_cliente': detalle.orden_cliente if detalle else '',
+            'service_tag': detalle.numero_serie if detalle else '',
             'proveedor': seg.proveedor,
             'estado': seg.estado,
             'estado_display': seg.get_estado_display(),
@@ -1071,8 +1079,8 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
             'dias_hasta_entrega': dias_hasta_entrega,
             'esta_retrasado': esta_retrasado,
             'prioridad': prioridad,
-            'sucursal': orden.sucursal.nombre,
-            'sucursal_id': orden.sucursal.id,
+            'sucursal': orden.sucursal.nombre if orden.sucursal_id else '',
+            'sucursal_id': orden.sucursal_id,
             'responsable': orden.responsable_seguimiento.nombre_completo if orden.responsable_seguimiento else 'Sin asignar',
             'descripcion_piezas': piezas_str,
             'numero_pedido': seg.numero_pedido,

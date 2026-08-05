@@ -100,13 +100,12 @@ def enviar_notificacion_pieza_recibida(orden, seguimiento):
         # =================================================================
         # CONSULTAR PIEZAS PENDIENTES DE OTROS PROVEEDORES
         # =================================================================
-        # NUEVA FUNCIONALIDAD (Octubre 2025):
-        # Consultar TODOS los seguimientos de la misma cotización
+        # Consultar TODOS los seguimientos de la misma ORDEN
         # y filtrar solo los que NO estén recibidos (estados pendientes)
         from django.utils import timezone
-        
-        cotizacion = seguimiento.cotizacion
-        seguimientos_pendientes = cotizacion.seguimientos_piezas.exclude(
+
+        # Pendientes de la MISMA orden (cubre OOW y FL sin Cotizacion)
+        seguimientos_pendientes = orden.seguimientos_piezas.exclude(
             estado__in=['recibido', 'incorrecto', 'danado']
         ).exclude(
             id=seguimiento.id  # Excluir el seguimiento actual (que acaba de ser recibido)
@@ -135,10 +134,16 @@ def enviar_notificacion_pieza_recibida(orden, seguimiento):
                 # Obtener estado legible
                 estado_display = seg_pendiente.get_estado_display()
                 
-                # Obtener piezas vinculadas a este seguimiento
+                # Obtener piezas vinculadas (OOW y/o Venta Mostrador)
                 piezas_vinculadas = seg_pendiente.piezas.all()
-                if piezas_vinculadas.exists():
-                    descripcion_piezas = ", ".join([f"{p.componente.nombre} × {p.cantidad}" for p in piezas_vinculadas])
+                piezas_vm = seg_pendiente.piezas_venta_mostrador.all()
+                if piezas_vinculadas.exists() or piezas_vm.exists():
+                    partes = []
+                    for p in piezas_vinculadas:
+                        partes.append(f"{p.componente.nombre} × {p.cantidad}")
+                    for p in piezas_vm:
+                        partes.append(f"{p.descripcion_pieza} × {p.cantidad}")
+                    descripcion_piezas = ", ".join(partes)
                 else:
                     descripcion_piezas = seg_pendiente.descripcion_piezas
                 

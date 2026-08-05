@@ -607,14 +607,21 @@
                 _el('fecha_entrega_real').value = seg.fecha_entrega_real;
                 _el('estado').value = seg.estado;
                 _el('notas_seguimiento').value = seg.notas_seguimiento;
-                // Cargar piezas seleccionadas (checkboxes)
-                // Primero, desmarcar todas las piezas
+                // Cargar piezas seleccionadas (checkboxes OOW + VM)
                 _qsa('input[name="piezas"]').forEach(checkbox => {
                     checkbox.checked = false;
                 });
-                // Luego, marcar solo las piezas que pertenecen a este seguimiento
-                seg.piezas.forEach((piezaId) => {
+                _qsa('input[name="piezas_venta_mostrador"]').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                (seg.piezas || []).forEach((piezaId) => {
                     const checkbox = _qs(`input[name="piezas"][value="${piezaId}"]`);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
+                (seg.piezas_venta_mostrador || []).forEach((piezaId) => {
+                    const checkbox = _qs(`input[name="piezas_venta_mostrador"][value="${piezaId}"]`);
                     if (checkbox) {
                         checkbox.checked = true;
                     }

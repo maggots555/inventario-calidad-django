@@ -358,8 +358,9 @@ def handle_gestionar_cotizacion(request, orden, empleado_actual):
                             for pieza in piezas_grupo
                         ])
 
-                        # Crear el seguimiento
+                        # Crear el seguimiento (orden = ancla; cotizacion = OOW)
                         seguimiento = SeguimientoPieza.objects.create(
+                            orden=orden,
                             cotizacion=cotizacion_actualizada,
                             proveedor=proveedor,
                             descripcion_piezas=descripcion_piezas,

@@ -315,6 +315,11 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        {# Seguimiento de piezas en FL (sin Cotizacion ST) #}
+                        {% if es_orden_directa %}
+                            {% include 'servicio_tecnico/partials/detalle_orden/_seccion_seguimiento_piezas.html' %}
+                        {% endif %}
                         
                         <!-- ⛔ BOTÓN DE CONVERSIÓN ELIMINADO (Oct 2025) -->
                         <!-- Venta mostrador ahora es complemento opcional, no requiere conversión -->

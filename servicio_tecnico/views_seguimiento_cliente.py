@@ -183,10 +183,13 @@ def seguimiento_orden_cliente(request, token):
         ]
         _IDX_NORMAL = {c: i for i, (c, _) in enumerate(_PASOS_NORMALES)}
         try:
-            for s in orden.cotizacion.seguimientos_piezas.prefetch_related(
-                'piezas__componente'
+            for s in orden.seguimientos_piezas.prefetch_related(
+                'piezas__componente',
+                'piezas_venta_mostrador',
             ).order_by('fecha_pedido'):
-                nombres = [p.componente.nombre for p in s.piezas.all()]
+                nombres_oow = [p.componente.nombre for p in s.piezas.all() if p.componente_id]
+                nombres_vm = [p.descripcion_pieza for p in s.piezas_venta_mostrador.all()]
+                nombres = nombres_oow + nombres_vm
                 estado_actual = s.estado
 
                 # Construir timeline visual (lista de pasos con tipo para CSS)
@@ -1120,7 +1123,7 @@ def chat_seguimiento_cliente(request, token):
     piezas_texto = ""
     from .models import SeguimientoPieza
     seguimientos_piezas_qs = SeguimientoPieza.objects.filter(
-        cotizacion__orden=orden
+        orden=orden
     ).order_by('fecha_pedido')
     if seguimientos_piezas_qs.exists():
         piezas_lineas = []
@@ -1143,13 +1146,14 @@ def chat_seguimiento_cliente(request, token):
                 getattr(seg, 'estado', ''), getattr(seg, 'estado', 'Desconocido')
             )
             desc_seg = getattr(seg, 'descripcion_piezas', '') or ''
-            # Intentar obtener nombres de las piezas vinculadas al seguimiento
+            # Nombres desde piezas OOW y/o Venta Mostrador
             piezas_vinculadas = seg.piezas.all()
-            if piezas_vinculadas.exists():
-                nombres = ', '.join(
+            piezas_vm = seg.piezas_venta_mostrador.all()
+            if piezas_vinculadas.exists() or piezas_vm.exists():
+                nombres_list = [
                     p.componente.nombre for p in piezas_vinculadas if p.componente_id
-                )
-                etiqueta = nombres or desc_seg or 'Piezas'
+                ] + [p.descripcion_pieza for p in piezas_vm]
+                etiqueta = ', '.join(nombres_list) or desc_seg or 'Piezas'
             else:
                 etiqueta = desc_seg or 'Piezas'
             # Agregar fechas estimada / real si están disponibles

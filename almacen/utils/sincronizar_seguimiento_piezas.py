@@ -10,8 +10,11 @@ Ciclo completo piezas Almacén ↔ Servicio Técnico:
 2. Recibir compra → marca SeguimientoPieza como «Recibido» con la fecha de
    llegada, y si ya no quedan pendientes pasa la orden a «Piezas Recibidas».
 
-Se reutiliza el mismo criterio que al aceptar cotización en ST: agrupar por
-proveedor y enlazar las PiezaCotizada ya sincronizadas desde LineaCotizacion.
+Soporta dos familias de piezas (Ago 2026):
+- Reparación OOW → PiezaCotizada (vía linea.pieza_cotizada_origen).
+- FL / reacondicionado → PiezaVentaMostrador (vía linea.pieza_venta_mostrador).
+
+El ancla del seguimiento es siempre la OrdenServicio; Cotizacion es opcional.
 """
 
 from __future__ import annotations
@@ -19,17 +22,22 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from almacen.models import CompraProducto, LineaCotizacion, SolicitudCotizacion
 
 logger = logging.getLogger('almacen')
 
-# Estados desde los que sí avanzamos a esperando_piezas (no pisar reparacion, etc.)
-ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS = (
+# Estados OOW desde los que sí avanzamos a esperando_piezas
+ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS_OOW = (
     'cotizacion',
     'cliente_acepta_cotizacion',
+)
+
+# FL nace en «almacen»; desde ahí sí avanzamos al pedir piezas
+ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS_FL = (
+    'almacen',
 )
 
 ESTADO_ST_ESPERANDO_PIEZAS = 'esperando_piezas'
@@ -66,58 +74,12 @@ def sincronizar_seguimiento_piezas_al_generar_compras(
         resultado['motivo_omitido'] = 'sin_orden'
         return resultado
 
-    # FL- / Venta Mostrador: las piezas van a PiezaVentaMostrador, no a este tracking
-    if getattr(orden, 'tipo_servicio', None) == 'venta_mostrador':
-        resultado['motivo_omitido'] = 'venta_mostrador'
-        return resultado
+    # Cotizacion ST solo existe en OOW; en FL queda None (válido)
+    cotizacion = _obtener_cotizacion_st(orden)
 
-    # Cotización ST requerida para SeguimientoPieza
-    try:
-        cotizacion = orden.cotizacion
-    except Exception:
-        resultado['motivo_omitido'] = 'sin_cotizacion_st'
-        logger.warning(
-            f"[SYNC_SEGUIMIENTO] Orden {orden.numero_orden_interno} sin Cotizacion ST "
-            f"(solicitud {solicitud.numero_solicitud})."
-        )
-        return resultado
-
-    lineas_elegibles = _obtener_lineas_elegibles(solicitud, lineas)
-    if not lineas_elegibles:
-        resultado['motivo_omitido'] = 'sin_piezas_reparacion'
-        return resultado
-
-    # Agrupar PiezaCotizada por nombre de proveedor (mismo patrón que ST)
-    piezas_por_proveedor: Dict[str, List] = defaultdict(list)
-    dias_por_proveedor: Dict[str, int] = defaultdict(lambda: DIAS_ENTREGA_DEFAULT)
-
-    for linea in lineas_elegibles:
-        pieza = linea.pieza_cotizada_origen
-        # Anti-duplicado: si la pieza ya está en algún seguimiento, no la repetimos
-        if pieza.seguimientos.exists():
-            continue
-
-        proveedor_nombre = _nombre_proveedor(linea, pieza)
-        if not proveedor_nombre:
-            logger.warning(
-                f"[SYNC_SEGUIMIENTO] Línea {linea.pk} sin proveedor; se omite del seguimiento."
-            )
-            continue
-
-        piezas_por_proveedor[proveedor_nombre].append(pieza)
-        dias_eta = _dias_entrega_linea(linea)
-        if dias_eta > dias_por_proveedor[proveedor_nombre]:
-            dias_por_proveedor[proveedor_nombre] = dias_eta
-
-    if not piezas_por_proveedor:
-        # Piezas elegibles ya tenían seguimiento: igual avanzar estado si aplica
-        if cotizacion.seguimientos_piezas.exists():
-            resultado['estado_actualizado'] = _pasar_orden_a_esperando_piezas(
-                orden=orden,
-                solicitud=solicitud,
-            )
-        else:
-            resultado['motivo_omitido'] = 'piezas_sin_proveedor_o_ya_seguidas'
+    lineas_oow, lineas_vm = _obtener_lineas_elegibles_por_familia(solicitud, lineas)
+    if not lineas_oow and not lineas_vm:
+        resultado['motivo_omitido'] = 'sin_piezas_trackeables'
         return resultado
 
     from servicio_tecnico.models import SeguimientoPieza
@@ -125,21 +87,21 @@ def sincronizar_seguimiento_piezas_al_generar_compras(
     hoy = date.today()
     seguimientos_creados = 0
 
-    for proveedor_nombre, piezas_grupo in piezas_por_proveedor.items():
+    # --- Rama OOW (PiezaCotizada) ---
+    grupos_oow = _agrupar_piezas_oow_por_proveedor(lineas_oow)
+    for proveedor_nombre, (piezas_grupo, dias_eta) in grupos_oow.items():
         descripcion = '\n'.join([
             f"• {pieza.componente.nombre} × {pieza.cantidad}"
             + (f" (${pieza.costo_total})" if getattr(pieza, 'costo_total', None) else '')
             for pieza in piezas_grupo
         ])
-        dias_eta = dias_por_proveedor[proveedor_nombre]
-
         seguimiento = SeguimientoPieza.objects.create(
+            orden=orden,
             cotizacion=cotizacion,
             proveedor=proveedor_nombre,
             descripcion_piezas=descripcion,
             fecha_pedido=hoy,
             fecha_entrega_estimada=hoy + timedelta(days=dias_eta),
-            # Al generar la compra en Almacén el pedido ya está en camino
             estado='transito',
             notas_seguimiento=(
                 f'Seguimiento creado automáticamente al generar compras desde Almacén '
@@ -149,9 +111,42 @@ def sincronizar_seguimiento_piezas_al_generar_compras(
         seguimiento.piezas.set(piezas_grupo)
         seguimientos_creados += 1
 
+    # --- Rama VM (PiezaVentaMostrador: FL o reacondicionado) ---
+    grupos_vm = _agrupar_piezas_vm_por_proveedor(lineas_vm)
+    for proveedor_nombre, (piezas_grupo, dias_eta) in grupos_vm.items():
+        descripcion = '\n'.join([
+            f"• {pieza.descripcion_pieza} × {pieza.cantidad}"
+            for pieza in piezas_grupo
+        ])
+        seguimiento = SeguimientoPieza.objects.create(
+            orden=orden,
+            cotizacion=cotizacion,  # None en FL puro; presente en OOW+reac
+            proveedor=proveedor_nombre,
+            descripcion_piezas=descripcion,
+            fecha_pedido=hoy,
+            fecha_entrega_estimada=hoy + timedelta(days=dias_eta),
+            estado='transito',
+            notas_seguimiento=(
+                f'Seguimiento VM creado automáticamente al generar compras desde Almacén '
+                f'(solicitud {solicitud.numero_solicitud}). Estado inicial: En Tránsito.'
+            ),
+        )
+        seguimiento.piezas_venta_mostrador.set(piezas_grupo)
+        seguimientos_creados += 1
+
     resultado['seguimientos_creados'] = seguimientos_creados
 
-    # Con piezas pedidas, la orden debe quedar en «Esperando Llegada de Piezas»
+    # Si no creamos nada nuevo pero ya hay seguimientos, igual intentar avanzar estado
+    if seguimientos_creados == 0:
+        if orden.seguimientos_piezas.exists():
+            resultado['estado_actualizado'] = _pasar_orden_a_esperando_piezas(
+                orden=orden,
+                solicitud=solicitud,
+            )
+        else:
+            resultado['motivo_omitido'] = 'piezas_sin_proveedor_o_ya_seguidas'
+        return resultado
+
     resultado['estado_actualizado'] = _pasar_orden_a_esperando_piezas(
         orden=orden,
         solicitud=solicitud,
@@ -165,36 +160,130 @@ def sincronizar_seguimiento_piezas_al_generar_compras(
     return resultado
 
 
-def _obtener_lineas_elegibles(
+def _obtener_cotizacion_st(orden):
+    """Devuelve Cotizacion ST si existe; None en FL."""
+    try:
+        return orden.cotizacion
+    except Exception:
+        return None
+
+
+def _obtener_lineas_elegibles_por_familia(
     solicitud: 'SolicitudCotizacion',
     lineas: Optional[Iterable['LineaCotizacion']],
-) -> List['LineaCotizacion']:
+) -> Tuple[List['LineaCotizacion'], List['LineaCotizacion']]:
     """
-    Filtra líneas de reparación OOW con PiezaCotizada vinculada.
+    Separa líneas trackeables en OOW (PiezaCotizada) y VM (PiezaVentaMostrador).
 
-    Excluye reacondicionado (van a Venta Mostrador) y líneas sin sync ST.
+    Returns:
+        (lineas_oow, lineas_vm)
     """
     if lineas is None:
         qs = solicitud.lineas.filter(
             estado_cliente='compra_generada',
-            es_linea_reacondicionado=False,
-            pieza_cotizada_origen__isnull=False,
         ).select_related(
             'pieza_cotizada_origen',
             'pieza_cotizada_origen__componente',
+            'pieza_venta_mostrador',
             'proveedor',
             'producto',
         )
-        return list(qs)
+        candidatas = list(qs)
+    else:
+        candidatas = list(lineas)
 
-    elegibles: List['LineaCotizacion'] = []
+    lineas_oow: List['LineaCotizacion'] = []
+    lineas_vm: List['LineaCotizacion'] = []
+
+    for linea in candidatas:
+        # OOW reparación: tiene PiezaCotizada y no es reacondicionado
+        if (
+            not getattr(linea, 'es_linea_reacondicionado', False)
+            and getattr(linea, 'pieza_cotizada_origen_id', None)
+        ):
+            lineas_oow.append(linea)
+            continue
+
+        # FL / reac: tiene PiezaVentaMostrador enlazada
+        pieza_vm = _pieza_vm_de_linea(linea)
+        if pieza_vm is not None:
+            lineas_vm.append(linea)
+
+    return lineas_oow, lineas_vm
+
+
+def _pieza_vm_de_linea(linea: 'LineaCotizacion'):
+    """PiezaVentaMostrador OneToOne desde la línea, o None."""
+    try:
+        return linea.pieza_venta_mostrador
+    except Exception:
+        return None
+
+
+def _agrupar_piezas_oow_por_proveedor(
+    lineas: List['LineaCotizacion'],
+) -> Dict[str, Tuple[List, int]]:
+    """Agrupa PiezaCotizada por proveedor; omite ya seguidas o sin proveedor."""
+    piezas_por_proveedor: Dict[str, List] = defaultdict(list)
+    dias_por_proveedor: Dict[str, int] = defaultdict(lambda: DIAS_ENTREGA_DEFAULT)
+
     for linea in lineas:
-        if getattr(linea, 'es_linea_reacondicionado', False):
+        pieza = linea.pieza_cotizada_origen
+        if pieza is None:
             continue
-        if not getattr(linea, 'pieza_cotizada_origen_id', None):
+        # Anti-duplicado
+        if pieza.seguimientos.exists():
             continue
-        elegibles.append(linea)
-    return elegibles
+
+        proveedor_nombre = _nombre_proveedor(linea, pieza)
+        if not proveedor_nombre:
+            logger.warning(
+                f"[SYNC_SEGUIMIENTO] Línea OOW {linea.pk} sin proveedor; se omite."
+            )
+            continue
+
+        piezas_por_proveedor[proveedor_nombre].append(pieza)
+        dias_eta = _dias_entrega_linea(linea)
+        if dias_eta > dias_por_proveedor[proveedor_nombre]:
+            dias_por_proveedor[proveedor_nombre] = dias_eta
+
+    return {
+        prov: (piezas, dias_por_proveedor[prov])
+        for prov, piezas in piezas_por_proveedor.items()
+    }
+
+
+def _agrupar_piezas_vm_por_proveedor(
+    lineas: List['LineaCotizacion'],
+) -> Dict[str, Tuple[List, int]]:
+    """Agrupa PiezaVentaMostrador por proveedor; omite ya seguidas o sin proveedor."""
+    piezas_por_proveedor: Dict[str, List] = defaultdict(list)
+    dias_por_proveedor: Dict[str, int] = defaultdict(lambda: DIAS_ENTREGA_DEFAULT)
+
+    for linea in lineas:
+        pieza = _pieza_vm_de_linea(linea)
+        if pieza is None:
+            continue
+        # Anti-duplicado
+        if pieza.seguimientos.exists():
+            continue
+
+        proveedor_nombre = _nombre_proveedor(linea, pieza)
+        if not proveedor_nombre:
+            logger.warning(
+                f"[SYNC_SEGUIMIENTO] Línea VM {linea.pk} sin proveedor; se omite."
+            )
+            continue
+
+        piezas_por_proveedor[proveedor_nombre].append(pieza)
+        dias_eta = _dias_entrega_linea(linea)
+        if dias_eta > dias_por_proveedor[proveedor_nombre]:
+            dias_por_proveedor[proveedor_nombre] = dias_eta
+
+    return {
+        prov: (piezas, dias_por_proveedor[prov])
+        for prov, piezas in piezas_por_proveedor.items()
+    }
 
 
 def _nombre_proveedor(linea: 'LineaCotizacion', pieza) -> str:
@@ -216,9 +305,19 @@ def _dias_entrega_linea(linea: 'LineaCotizacion') -> int:
     return max(dias_int, 1)
 
 
+def _estados_permitidos_antes_de_esperar(orden) -> tuple:
+    """Estados desde los que se puede pasar a esperando_piezas según tipo de orden."""
+    if getattr(orden, 'tipo_servicio', None) == 'venta_mostrador':
+        return ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS_FL
+    return ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS_OOW
+
+
 def _pasar_orden_a_esperando_piezas(orden, solicitud: 'SolicitudCotizacion') -> bool:
     """
-    Cambia OrdenServicio a esperando_piezas si aún está en fase de cotización/aceptación.
+    Cambia OrdenServicio a esperando_piezas si el estado actual lo permite.
+
+    OOW: desde cotizacion / cliente_acepta_cotizacion.
+    FL: desde almacen (estado natal al crear orden FL).
 
     Returns:
         bool: True si se cambió el estado.
@@ -226,7 +325,8 @@ def _pasar_orden_a_esperando_piezas(orden, solicitud: 'SolicitudCotizacion') -> 
     if orden.estado == ESTADO_ST_ESPERANDO_PIEZAS:
         return False
 
-    if orden.estado not in ESTADOS_ST_ANTES_DE_ESPERAR_PIEZAS:
+    permitidos = _estados_permitidos_antes_de_esperar(orden)
+    if orden.estado not in permitidos:
         logger.info(
             f"[SYNC_SEGUIMIENTO] Orden {orden.numero_orden_interno} en estado "
             f"'{orden.estado}'; no se cambia a esperando_piezas "
@@ -274,12 +374,11 @@ def sincronizar_seguimiento_piezas_al_recibir_compra(
     Al recibir una compra en Almacén, actualiza SeguimientoPieza y la orden ST.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Un SeguimientoPieza puede agrupar varias PiezaCotizada del mismo proveedor.
-    Solo se marca como «Recibido» cuando TODAS esas piezas ya tienen su
-    CompraProducto en estado «recibida». Si después todos los seguimientos de
-    la cotización están recibidos, la orden pasa a «Piezas Recibidas».
-    Opcionalmente reutiliza ``_enviar_notificacion_pieza_recibida`` de ST
-    para avisar al técnico por correo (igual que al marcar recibido a mano).
+    Un SeguimientoPieza puede agrupar varias piezas del mismo proveedor
+    (PiezaCotizada y/o PiezaVentaMostrador). Solo se marca como «Recibido»
+    cuando TODAS esas piezas ya tienen su CompraProducto en estado «recibida».
+    Si después todos los seguimientos de la ORDEN están recibidos, la orden
+    pasa a «Piezas Recibidas».
 
     Args:
         compra: CompraProducto recién marcada como recibida (con fecha_recepcion).
@@ -303,7 +402,7 @@ def sincronizar_seguimiento_piezas_al_recibir_compra(
         resultado['motivo_omitido'] = 'compra_no_recibida'
         return resultado
 
-    # Cadena: Compra → LineaCotizacion → PiezaCotizada
+    # Cadena: Compra → LineaCotizacion → PiezaCotizada | PiezaVentaMostrador
     linea = None
     try:
         linea = compra.linea_cotizacion_origen
@@ -314,9 +413,11 @@ def sincronizar_seguimiento_piezas_al_recibir_compra(
         resultado['motivo_omitido'] = 'sin_linea_cotizacion'
         return resultado
 
-    pieza = getattr(linea, 'pieza_cotizada_origen', None)
-    if pieza is None:
-        resultado['motivo_omitido'] = 'sin_pieza_cotizada'
+    pieza_oow = getattr(linea, 'pieza_cotizada_origen', None)
+    pieza_vm = _pieza_vm_de_linea(linea)
+
+    if pieza_oow is None and pieza_vm is None:
+        resultado['motivo_omitido'] = 'sin_pieza_st'
         return resultado
 
     orden = None
@@ -330,19 +431,46 @@ def sincronizar_seguimiento_piezas_al_recibir_compra(
         resultado['motivo_omitido'] = 'sin_orden'
         return resultado
 
-    if getattr(orden, 'tipo_servicio', None) == 'venta_mostrador':
-        resultado['motivo_omitido'] = 'venta_mostrador'
-        return resultado
-
-    # Seguimientos pendientes que incluyen esta pieza
-    seguimientos_pendientes = list(
-        pieza.seguimientos.filter(estado__in=ESTADOS_PIEZA_PENDIENTES)
-        .prefetch_related(
-            'piezas',
-            'piezas__linea_cotizacion_almacen',
-            'piezas__linea_cotizacion_almacen__compra_generada',
+    # Buscar seguimientos pendientes que incluyen esta pieza (OOW o VM)
+    seguimientos_pendientes = []
+    if pieza_oow is not None:
+        seguimientos_pendientes.extend(
+            list(
+                pieza_oow.seguimientos.filter(estado__in=ESTADOS_PIEZA_PENDIENTES)
+                .prefetch_related(
+                    'piezas',
+                    'piezas__linea_cotizacion_almacen',
+                    'piezas__linea_cotizacion_almacen__compra_generada',
+                    'piezas_venta_mostrador',
+                    'piezas_venta_mostrador__linea_cotizacion',
+                    'piezas_venta_mostrador__linea_cotizacion__compra_generada',
+                )
+            )
         )
-    )
+    if pieza_vm is not None:
+        seguimientos_pendientes.extend(
+            list(
+                pieza_vm.seguimientos.filter(estado__in=ESTADOS_PIEZA_PENDIENTES)
+                .prefetch_related(
+                    'piezas',
+                    'piezas__linea_cotizacion_almacen',
+                    'piezas__linea_cotizacion_almacen__compra_generada',
+                    'piezas_venta_mostrador',
+                    'piezas_venta_mostrador__linea_cotizacion',
+                    'piezas_venta_mostrador__linea_cotizacion__compra_generada',
+                )
+            )
+        )
+
+    # Deduplicar por pk (por si una pieza estuviera en ambos caminos)
+    vistos = set()
+    unicos = []
+    for seg in seguimientos_pendientes:
+        if seg.pk in vistos:
+            continue
+        vistos.add(seg.pk)
+        unicos.append(seg)
+    seguimientos_pendientes = unicos
 
     if not seguimientos_pendientes:
         resultado['motivo_omitido'] = 'sin_seguimientos_pendientes'
@@ -380,7 +508,6 @@ def sincronizar_seguimiento_piezas_al_recibir_compra(
         ])
         actualizados += 1
 
-        # Notificar al técnico con la misma función que usa ST al marcar recibido
         if notificar_tecnico:
             email_ok = _notificar_tecnico_pieza_recibida(
                 orden=orden,
@@ -422,7 +549,6 @@ def _notificar_tecnico_pieza_recibida(orden, seguimiento) -> bool:
     Returns:
         bool: True si el email se envió correctamente.
     """
-    # Import diferido: historial + notificación de pieza (Fase 6: ya no desde views)
     from servicio_tecnico.services.historial import registrar_historial
     from servicio_tecnico.services.notificaciones_piezas import (
         enviar_notificacion_pieza_recibida as _enviar_notificacion_pieza_recibida,
@@ -480,7 +606,7 @@ def _notificar_tecnico_pieza_recibida(orden, seguimiento) -> bool:
     return False
 
 
-def _pieza_tiene_compra_recibida(pieza) -> bool:
+def _pieza_oow_tiene_compra_recibida(pieza) -> bool:
     """True si la PiezaCotizada tiene LineaCotizacion con CompraProducto recibida."""
     try:
         linea = pieza.linea_cotizacion_almacen
@@ -494,21 +620,38 @@ def _pieza_tiene_compra_recibida(pieza) -> bool:
     return compra.estado == 'recibida'
 
 
+def _pieza_vm_tiene_compra_recibida(pieza) -> bool:
+    """True si la PiezaVentaMostrador tiene LineaCotizacion con CompraProducto recibida."""
+    linea = getattr(pieza, 'linea_cotizacion', None)
+    if linea is None:
+        # Pieza VM manual (sin compra Almacén): no cierra por sync automático
+        return False
+    compra = getattr(linea, 'compra_generada', None)
+    if compra is None:
+        return False
+    return compra.estado == 'recibida'
+
+
 def _todas_piezas_del_seguimiento_recibidas_en_almacen(seguimiento) -> bool:
     """
-    True si todas las PiezaCotizada del seguimiento ya tienen compra recibida.
+    True si todas las piezas del seguimiento (OOW y/o VM) ya tienen compra recibida.
 
     Sin piezas M2M no se cierra automáticamente (evita falsos positivos).
     """
-    piezas = list(seguimiento.piezas.all())
-    if not piezas:
+    piezas_oow = list(seguimiento.piezas.all())
+    piezas_vm = list(seguimiento.piezas_venta_mostrador.all())
+    if not piezas_oow and not piezas_vm:
         return False
-    return all(_pieza_tiene_compra_recibida(pieza) for pieza in piezas)
+
+    oow_ok = all(_pieza_oow_tiene_compra_recibida(p) for p in piezas_oow) if piezas_oow else True
+    vm_ok = all(_pieza_vm_tiene_compra_recibida(p) for p in piezas_vm) if piezas_vm else True
+    return oow_ok and vm_ok
 
 
 def _fecha_recepcion_mas_reciente(seguimiento) -> Optional[date]:
-    """Fecha de recepción más reciente entre las compras del seguimiento."""
+    """Fecha de recepción más reciente entre las compras OOW y VM del seguimiento."""
     fechas: List[date] = []
+
     for pieza in seguimiento.piezas.all():
         try:
             linea = pieza.linea_cotizacion_almacen
@@ -521,6 +664,17 @@ def _fecha_recepcion_mas_reciente(seguimiento) -> Optional[date]:
             continue
         if compra.fecha_recepcion:
             fechas.append(compra.fecha_recepcion)
+
+    for pieza in seguimiento.piezas_venta_mostrador.all():
+        linea = getattr(pieza, 'linea_cotizacion', None)
+        if linea is None:
+            continue
+        compra = getattr(linea, 'compra_generada', None)
+        if compra is None or compra.estado != 'recibida':
+            continue
+        if compra.fecha_recepcion:
+            fechas.append(compra.fecha_recepcion)
+
     return max(fechas) if fechas else None
 
 
@@ -528,6 +682,8 @@ def _pasar_orden_a_piezas_recibidas_si_aplica(orden, solicitud=None) -> bool:
     """
     Si la orden está en esperando_piezas y todos los seguimientos ya llegaron,
     pasa a piezas_recibidas.
+
+    Usa ``orden.seguimientos_piezas`` (no cotizacion) para cubrir FL y OOW mixto.
 
     Returns:
         bool: True si se cambió el estado.
@@ -544,12 +700,7 @@ def _pasar_orden_a_piezas_recibidas_si_aplica(orden, solicitud=None) -> bool:
         )
         return False
 
-    try:
-        cotizacion = orden.cotizacion
-    except Exception:
-        return False
-
-    seguimientos = list(cotizacion.seguimientos_piezas.all())
+    seguimientos = list(orden.seguimientos_piezas.all())
     if not seguimientos:
         return False
 

@@ -62,8 +62,8 @@ def build_detalle_orden_context(request, orden):
     # EXPLICACIÓN: en services/ NO usar from .forms (sería services.forms).
     from servicio_tecnico.forms import PiezaCotizadaForm, SeguimientoPiezaForm
     form_pieza = PiezaCotizadaForm()
-    # MODIFICADO: Pasar la cotización al formulario de seguimiento
-    form_seguimiento = SeguimientoPiezaForm(cotizacion=cotizacion) if cotizacion else SeguimientoPiezaForm()
+    # Formulario de seguimiento: anclado a la orden (cubre FL sin Cotizacion)
+    form_seguimiento = SeguimientoPiezaForm(orden=orden, cotizacion=cotizacion)
 
     # ========================================================================
     # OBTENER HISTORIAL Y COMENTARIOS
@@ -174,16 +174,14 @@ def build_detalle_orden_context(request, orden):
         piezas_cotizadas = cotizacion.piezas_cotizadas.select_related(
             'componente'
         ).order_by('orden_prioridad', 'fecha_creacion')
-
-        # Obtener seguimientos de piezas (pedidos a proveedores)
-        seguimientos_piezas = cotizacion.seguimientos_piezas.all().order_by(
-            '-fecha_pedido'
-        )
     else:
         # Sin cotización: formulario para guardar MO en la orden (no crea Cotizacion)
         form_guardar_mano_obra = GuardarManoObraForm(instance=orden)
         # Mantener alias legado por si algún template aún lo referencia
         form_crear_cotizacion = form_guardar_mano_obra
+
+    # Seguimientos: siempre por ORDEN (OOW con cotización y FL sin ella)
+    seguimientos_piezas = orden.seguimientos_piezas.all().order_by('-fecha_pedido')
     # ========================================================================
     # CALCULAR SEGUIMIENTOS CON RETRASO
     # ========================================================================

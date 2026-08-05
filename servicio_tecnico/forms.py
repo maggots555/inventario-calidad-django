@@ -2022,29 +2022,30 @@ class PiezaCotizadaForm(forms.ModelForm):
 class SeguimientoPiezaForm(forms.ModelForm):
     """
     Formulario para agregar o actualizar seguimiento de pedidos a proveedores.
-    
+
     EXPLICACIÓN PARA PRINCIPIANTES:
     Este formulario gestiona el tracking de pedidos de piezas a proveedores.
     Permite registrar: quién provee, cuándo se pidió, cuándo llega, estado actual.
-    
-    NUEVA FUNCIONALIDAD:
-    Ahora permite seleccionar las piezas específicas que se están rastreando.
-    Solo muestra piezas que fueron aceptadas por el cliente.
-    
+
+    Puede enlazar:
+    - PiezaCotizada (reparación OOW aceptada por el cliente).
+    - PiezaVentaMostrador (FL / reacondicionado).
+
     CAMPOS OBLIGATORIOS:
     - Proveedor (siempre)
     - Descripción de piezas (siempre)
     - Fecha de pedido (siempre)
     - Fecha estimada de entrega (siempre)
-    
+
     NOTIFICACIÓN AUTOMÁTICA:
     Cuando el estado cambia a "recibido", se envía un email al técnico asignado.
     """
-    
+
     class Meta:
         model = SeguimientoPieza
         fields = [
-            'piezas',  # NUEVO: Selección de piezas específicas
+            'piezas',
+            'piezas_venta_mostrador',
             'proveedor',
             'descripcion_piezas',
             'numero_pedido',
@@ -2054,9 +2055,12 @@ class SeguimientoPiezaForm(forms.ModelForm):
             'estado',
             'notas_seguimiento',
         ]
-        
+
         widgets = {
             'piezas': forms.CheckboxSelectMultiple(attrs={
+                'class': 'form-check-input',
+            }),
+            'piezas_venta_mostrador': forms.CheckboxSelectMultiple(attrs={
                 'class': 'form-check-input',
             }),
             'proveedor': forms.Select(attrs={
@@ -2097,9 +2101,10 @@ class SeguimientoPiezaForm(forms.ModelForm):
                 'placeholder': 'Notas adicionales sobre el seguimiento (opcional)',
             }),
         }
-        
+
         labels = {
-            'piezas': 'Piezas a Rastrear',
+            'piezas': 'Piezas de cotización (OOW)',
+            'piezas_venta_mostrador': 'Piezas de Venta Mostrador (FL / reac)',
             'proveedor': 'Proveedor',
             'descripcion_piezas': 'Descripción de Piezas',
             'numero_pedido': 'Número de Pedido / Tracking',
@@ -2109,9 +2114,10 @@ class SeguimientoPiezaForm(forms.ModelForm):
             'estado': 'Estado del Pedido',
             'notas_seguimiento': 'Notas de Seguimiento',
         }
-        
+
         help_texts = {
-            'piezas': 'Selecciona las piezas específicas que se están pidiendo a este proveedor',
+            'piezas': 'Piezas de reparación aceptadas por el cliente',
+            'piezas_venta_mostrador': 'Piezas FL o reacondicionado asociadas a esta orden',
             'proveedor': 'Nombre del proveedor donde se pidió',
             'descripcion_piezas': 'Lista de piezas incluidas en este pedido',
             'numero_pedido': 'Número de orden o tracking del proveedor (opcional)',
@@ -2119,20 +2125,26 @@ class SeguimientoPiezaForm(forms.ModelForm):
             'fecha_entrega_real': 'Fecha en que realmente llegó (dejar vacío si aún no llega)',
             'estado': 'Estado actual del pedido',
         }
-    
+
     def __init__(self, *args, **kwargs):
         """
-        EXPLICACIÓN:
-        Personalización del formulario.
-        Filtra las piezas para mostrar SOLO las que fueron aceptadas por el cliente.
-        
-        ACTUALIZACIÓN NOVIEMBRE 2025:
-        Configurar dropdown de proveedores predefinidos con lista de PROVEEDORES_CHOICES.
+        Filtra piezas seleccionables según la orden (y cotización si existe).
+
+        Args (vía kwargs):
+            orden: OrdenServicio (preferido; permite FL sin Cotizacion).
+            cotizacion: Cotizacion ST opcional (legado OOW).
         """
         cotizacion = kwargs.pop('cotizacion', None)
+        orden = kwargs.pop('orden', None)
         super().__init__(*args, **kwargs)
-        
-        # ✨ NUEVO: Configurar campo proveedor con lista predefinida (Noviembre 2025)
+
+        # Resolver orden si solo pasó cotización
+        if orden is None and cotizacion is not None:
+            orden = cotizacion.orden
+        # Si es edición, heredar orden del instance
+        if orden is None and self.instance and self.instance.pk:
+            orden = self.instance.orden
+
         self.fields['proveedor'].widget = forms.Select(
             choices=PROVEEDORES_CHOICES,
             attrs={
@@ -2140,59 +2152,77 @@ class SeguimientoPiezaForm(forms.ModelForm):
                 'required': True,
             }
         )
-        
-        # NUEVO: Filtrar solo piezas aceptadas por el cliente
+
+        # Piezas OOW aceptadas
+        if cotizacion is None and orden is not None:
+            try:
+                cotizacion = orden.cotizacion
+            except Exception:
+                cotizacion = None
+
         if cotizacion:
             piezas_aceptadas = cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=True)
             self.fields['piezas'].queryset = piezas_aceptadas
-            self.fields['piezas'].label_from_instance = lambda obj: f"{obj.componente.nombre} × {obj.cantidad} (${obj.costo_total})"
+            self.fields['piezas'].label_from_instance = (
+                lambda obj: f"{obj.componente.nombre} × {obj.cantidad} (${obj.costo_total})"
+            )
         else:
-            # Si no hay cotización, no mostrar ninguna pieza
             self.fields['piezas'].queryset = PiezaCotizada.objects.none()
-        
-        # Configurar fechas mínimas
+
+        # Piezas VM de la orden
+        if orden is not None:
+            try:
+                vm = orden.venta_mostrador
+                qs_vm = vm.piezas_vendidas.all()
+            except Exception:
+                qs_vm = PiezaVentaMostrador.objects.none()
+            self.fields['piezas_venta_mostrador'].queryset = qs_vm
+            self.fields['piezas_venta_mostrador'].label_from_instance = (
+                lambda obj: f"{obj.descripcion_pieza} × {obj.cantidad}"
+            )
+        else:
+            self.fields['piezas_venta_mostrador'].queryset = PiezaVentaMostrador.objects.none()
+
+        # Ocultar checkboxes vacíos para no ensuciar el modal
+        if not self.fields['piezas'].queryset.exists():
+            self.fields['piezas'].widget = forms.HiddenInput()
+        if not self.fields['piezas_venta_mostrador'].queryset.exists():
+            self.fields['piezas_venta_mostrador'].widget = forms.HiddenInput()
+
         from datetime import date
         self.fields['fecha_pedido'].widget.attrs['max'] = date.today().isoformat()
         self.fields['fecha_entrega_estimada'].widget.attrs['min'] = date.today().isoformat()
-        
-        # Si es edición y el estado es "recibido" (incluye recibido, incorrecto, danado),
-        # hacer obligatoria la fecha real ya que la pieza llegó físicamente
+
         from config.constants import ESTADOS_PIEZA_RECIBIDOS
         if self.instance and self.instance.pk and self.instance.estado in ESTADOS_PIEZA_RECIBIDOS:
             self.fields['fecha_entrega_real'].required = True
-    
+
     def clean(self):
-        """
-        EXPLICACIÓN:
-        Validaciones personalizadas.
-        """
+        """Validaciones de fechas y estado recibido."""
         cleaned_data = super().clean()
         fecha_pedido = cleaned_data.get('fecha_pedido')
         fecha_estimada = cleaned_data.get('fecha_entrega_estimada')
         fecha_real = cleaned_data.get('fecha_entrega_real')
         estado = cleaned_data.get('estado')
-        
-        # Validar que fecha estimada sea posterior a fecha de pedido
+
         if fecha_pedido and fecha_estimada:
             if fecha_estimada < fecha_pedido:
                 raise ValidationError({
                     'fecha_entrega_estimada': '❌ La fecha estimada no puede ser anterior a la fecha de pedido'
                 })
-        
-        # Si el estado es "recibido" (incluye recibido, incorrecto, danado), la fecha real es obligatoria
+
         from config.constants import ESTADOS_PIEZA_RECIBIDOS
         if estado in ESTADOS_PIEZA_RECIBIDOS and not fecha_real:
             raise ValidationError({
                 'fecha_entrega_real': '❌ Debes indicar la fecha real de entrega si la pieza fue recibida (correcta, incorrecta o dañada)'
             })
-        
-        # Si hay fecha real, validar que sea posterior al pedido
+
         if fecha_pedido and fecha_real:
             if fecha_real < fecha_pedido:
                 raise ValidationError({
                     'fecha_entrega_real': '❌ La fecha real de entrega no puede ser anterior a la fecha de pedido'
                 })
-        
+
         return cleaned_data
 
 

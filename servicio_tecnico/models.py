@@ -1601,28 +1601,61 @@ class PiezaCotizada(models.Model):
 
 class SeguimientoPieza(models.Model):
     """
-    Seguimiento de pedidos de piezas a proveedores.
-    Permite rastrear múltiples pedidos por cotización.
-    
-    NUEVA FUNCIONALIDAD:
-    Ahora puede vincularse a piezas específicas que fueron aceptadas por el cliente.
-    Esto permite un seguimiento más preciso de qué piezas se están esperando.
+    Seguimiento de pedidos de piezas a proveedores (reparación OOW y Venta Mostrador).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Antes este modelo solo vivía colgado de Cotizacion (órdenes OOW con diagnóstico).
+    Las órdenes FL / piezas de Venta Mostrador no tenían ancla de tracking, así que
+    Almacén recibía la compra pero ST no veía «¿ya llegó la pieza?».
+
+    Diseño actual (Ago 2026):
+    - ``orden`` es el ancla obligatoria (siempre hay orden ST).
+    - ``cotizacion`` es opcional: se llena en OOW; queda NULL en FL.
+    - ``piezas`` (PiezaCotizada) = reparación OOW.
+    - ``piezas_venta_mostrador`` = FL y reacondicionado cotizado desde Almacén.
     """
-    
-    # RELACIÓN CON COTIZACIÓN
+
+    # Ancla primaria: siempre hay OrdenServicio (OOW o FL)
+    orden = models.ForeignKey(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='seguimientos_piezas',
+        help_text=(
+            "Orden de servicio a la que pertenece este seguimiento "
+            "(obligatoria; sirve para FL sin Cotizacion ST)."
+        ),
+    )
+
+    # Relación opcional con cotización ST (solo OOW / diagnóstico)
     cotizacion = models.ForeignKey(
         Cotizacion,
         on_delete=models.CASCADE,
         related_name='seguimientos_piezas',
-        help_text="Cotización a la que pertenece este seguimiento"
+        null=True,
+        blank=True,
+        help_text=(
+            "Cotización ST asociada (nullable). En órdenes FL / venta mostrador "
+            "queda vacío porque no se crea Cotizacion."
+        ),
     )
-    
-    # NUEVO: RELACIÓN CON PIEZAS ESPECÍFICAS
+
+    # Piezas de reparación OOW (aceptadas por el cliente)
     piezas = models.ManyToManyField(
         'PiezaCotizada',
         blank=True,
         related_name='seguimientos',
-        help_text="Piezas específicas que se están rastreando en este pedido"
+        help_text="Piezas cotizadas (OOW) que se están rastreando en este pedido",
+    )
+
+    # Piezas de Venta Mostrador (FL o reacondicionado)
+    piezas_venta_mostrador = models.ManyToManyField(
+        'PiezaVentaMostrador',
+        blank=True,
+        related_name='seguimientos',
+        help_text=(
+            "Piezas de Venta Mostrador (FL / reacondicionado) rastreadas en este pedido"
+        ),
     )
     
     # INFORMACIÓN DEL PEDIDO
@@ -1671,34 +1704,68 @@ class SeguimientoPieza(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
     
+    def save(self, *args, **kwargs):
+        """
+        Asegura que ``orden`` quede siempre poblada.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Si alguien crea el seguimiento solo con cotizacion (código legado OOW),
+        rellenamos orden desde cotizacion.orden para no romper el ancla nueva.
+        """
+        # Paso 1: si falta orden pero hay cotización, heredar la orden de la cotización
+        if self.orden_id is None and self.cotizacion_id is not None:
+            self.orden_id = self.cotizacion.orden_id
+        super().save(*args, **kwargs)
+
     @property
     def dias_desde_pedido(self):
         """Calcula los días desde que se hizo el pedido"""
         if self.fecha_entrega_real:
             return (self.fecha_entrega_real - self.fecha_pedido).days
         return (timezone.now().date() - self.fecha_pedido).days
-    
+
     @property
     def esta_retrasado(self):
         """Determina si el pedido está retrasado"""
         if not self.fecha_entrega_real and timezone.now().date() > self.fecha_entrega_estimada:
             return True
         return False
-    
+
     @property
     def dias_retraso(self):
         """Calcula los días de retraso"""
         if self.esta_retrasado:
             return (timezone.now().date() - self.fecha_entrega_estimada).days
         return 0
-    
+
+    @property
+    def numero_orden_display(self):
+        """
+        Folio interno de la orden para UI/logs.
+
+        Preferimos ``orden``; si un registro legado fallara el backfill,
+        caemos a cotizacion.orden.
+        """
+        if self.orden_id:
+            return self.orden.numero_orden_interno
+        if self.cotizacion_id:
+            return self.cotizacion.orden.numero_orden_interno
+        return 'sin-orden'
+
     def __str__(self):
-        return f"{self.proveedor} - {self.get_estado_display()} ({self.cotizacion.orden.numero_orden_interno})"
-    
+        return (
+            f"{self.proveedor} - {self.get_estado_display()} "
+            f"({self.numero_orden_display})"
+        )
+
     class Meta:
         ordering = ['-fecha_creacion']
         verbose_name = "Seguimiento de Pieza"
         verbose_name_plural = "Seguimientos de Piezas"
+        indexes = [
+            models.Index(fields=['orden', 'estado']),
+            models.Index(fields=['-fecha_pedido']),
+        ]
 
 
 # ============================================================================
@@ -1912,16 +1979,20 @@ class VentaMostrador(models.Model):
 
 class PiezaVentaMostrador(models.Model):
     """
-    Piezas vendidas directamente en mostrador sin diagnóstico previo.
-    Versión simplificada sin tracking de instalación.
-    
-    Este modelo registra piezas individuales vendidas además de los paquetes,
-    como memorias RAM, discos duros, cables, accesorios, etc.
-    
-    Nota: Los paquetes (premium/oro/plata) NO se desglosan aquí, se manejan
-    como un concepto único en VentaMostrador.paquete
+    Piezas vendidas en mostrador (FL o reacondicionado) asociadas a VentaMostrador.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Además del precio/descripción, ahora puede enlazarse a la ``LineaCotizacion``
+    de Almacén que la originó. Esa FK cierra la cadena:
+
+        CompraProducto ↔ LineaCotizacion ↔ PiezaVentaMostrador ↔ SeguimientoPieza
+
+    Así, cuando Almacén recibe la compra, ST puede marcar el seguimiento como
+    «recibido». Las piezas creadas a mano en ST (sin cotización Almacén) dejan
+    ``linea_cotizacion`` en NULL y no entran al sync automático de compras.
     """
-    
+
     # RELACIÓN CON VENTA MOSTRADOR
     venta_mostrador = models.ForeignKey(
         VentaMostrador,
@@ -1929,7 +2000,20 @@ class PiezaVentaMostrador(models.Model):
         related_name='piezas_vendidas',
         help_text="Venta mostrador a la que pertenece esta pieza"
     )
-    
+
+    # Trazabilidad hacia Almacén (opcional: solo si nació de una cotización)
+    linea_cotizacion = models.OneToOneField(
+        'almacen.LineaCotizacion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pieza_venta_mostrador',
+        help_text=(
+            "Línea de cotización Almacén que originó esta pieza (NULL si se "
+            "agregó manualmente en ST)."
+        ),
+    )
+
     # IDENTIFICACIÓN DE LA PIEZA
     # Puede ser del catálogo ScoreCard o descripción libre
     componente = models.ForeignKey(
@@ -1943,7 +2027,7 @@ class PiezaVentaMostrador(models.Model):
         max_length=200,
         help_text="Descripción de la pieza (ej: RAM 8GB DDR4 Kingston, Cable HDMI 2m)"
     )
-    
+
     # CANTIDADES Y PRECIOS
     cantidad = models.PositiveIntegerField(
         default=1,
@@ -1956,7 +2040,7 @@ class PiezaVentaMostrador(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text="Precio unitario de venta (IVA incluido)"
     )
-    
+
     # CONTROL Y NOTAS
     fecha_venta = models.DateTimeField(
         default=timezone.now,

@@ -53,8 +53,11 @@ def obtener_seguimiento_pieza(request, seguimiento_id):
                 'fecha_entrega_real': seguimiento.fecha_entrega_real.isoformat() if seguimiento.fecha_entrega_real else '',
                 'estado': seguimiento.estado,
                 'notas_seguimiento': seguimiento.notas_seguimiento or '',
-                # Piezas relacionadas (IDs)
-                'piezas': list(seguimiento.piezas.values_list('id', flat=True))
+                # Piezas relacionadas (IDs) — OOW y Venta Mostrador
+                'piezas': list(seguimiento.piezas.values_list('id', flat=True)),
+                'piezas_venta_mostrador': list(
+                    seguimiento.piezas_venta_mostrador.values_list('id', flat=True)
+                ),
             }
         }
         
@@ -83,30 +86,25 @@ def agregar_seguimiento_pieza(request, orden_id):
     
     try:
         orden = get_object_or_404(OrdenServicio, id=orden_id)
-        
-        # Verificar que existe cotización
-        if not hasattr(orden, 'cotizacion'):
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Esta orden no tiene cotización asociada'
-            }, status=400)
-        
-        cotizacion = orden.cotizacion
-        
-        # Procesar formulario
-        form = SeguimientoPiezaForm(request.POST, cotizacion=cotizacion)
-        
+
+        # Cotizacion ST es opcional (FL no la tiene); el ancla es la orden
+        try:
+            cotizacion = orden.cotizacion
+        except Exception:
+            cotizacion = None
+
+        # Procesar formulario (piezas OOW y/o VM según la orden)
+        form = SeguimientoPiezaForm(request.POST, orden=orden, cotizacion=cotizacion)
+
         if form.is_valid():
             seguimiento = form.save(commit=False)
+            seguimiento.orden = orden
             seguimiento.cotizacion = cotizacion
             seguimiento.save()
-            form.save_m2m()  # Guardar relaciones ManyToMany (piezas)
-            
-            # ===================================================================
-            # NUEVA FUNCIONALIDAD: Cambiar estado automáticamente si es el primer seguimiento
-            # ===================================================================
-            # Contar cuántos seguimientos tiene esta cotización (incluyendo el recién agregado)
-            total_seguimientos = cotizacion.seguimientos_piezas.count()
+            form.save_m2m()  # Guardar relaciones ManyToMany (piezas OOW + VM)
+
+            # Primer seguimiento de la ORDEN → esperando_piezas
+            total_seguimientos = orden.seguimientos_piezas.count()
             
             if total_seguimientos == 1:
                 # Es el PRIMER seguimiento → Cambiar estado a "esperando_piezas"
@@ -173,11 +171,16 @@ def editar_seguimiento_pieza(request, seguimiento_id):
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
         estado_anterior = seguimiento.estado
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # Procesar formulario
-        form = SeguimientoPiezaForm(request.POST, instance=seguimiento, cotizacion=cotizacion)
+        form = SeguimientoPiezaForm(
+            request.POST,
+            instance=seguimiento,
+            orden=orden,
+            cotizacion=cotizacion,
+        )
         
         if form.is_valid():
             seguimiento_actualizado = form.save()
@@ -235,8 +238,8 @@ def eliminar_seguimiento_pieza(request, seguimiento_id):
     
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         proveedor_nombre = seguimiento.proveedor
         
         # Eliminar
@@ -279,8 +282,8 @@ def marcar_pieza_recibida(request, seguimiento_id):
     
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # Obtener fecha de entrega real del POST
         fecha_entrega_real_str = request.POST.get('fecha_entrega_real')
@@ -409,8 +412,8 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
     try:
         # Obtener el seguimiento
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # =================================================================
         # VALIDACIÓN: Solo se puede reenviar si está marcado como recibido
@@ -528,8 +531,8 @@ def marcar_pieza_incorrecta(request, seguimiento_id):
     
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # =================================================================
         # VALIDACIÓN: Solo se puede marcar si está recibido
@@ -600,8 +603,8 @@ def marcar_pieza_danada(request, seguimiento_id):
     
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # =================================================================
         # VALIDACIÓN: Solo se puede marcar si está recibido
@@ -669,8 +672,8 @@ def cambiar_estado_seguimiento(request, seguimiento_id):
     
     try:
         seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        orden = seguimiento.orden
         cotizacion = seguimiento.cotizacion
-        orden = cotizacion.orden
         
         # Obtener empleado actual
         try:
@@ -801,8 +804,21 @@ def _render_seguimiento_card(seguimiento):
                 {f'<small><strong>Entrega Real:</strong> {seguimiento.fecha_entrega_real.strftime("%d/%m/%Y")}</small><br>' if seguimiento.fecha_entrega_real else ''}
             </p>
             
-            <!-- NUEVO: Piezas Vinculadas -->
-            {'<div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;"><small class="text-primary fw-bold"><i class="bi bi-box-seam"></i> Piezas Vinculadas:</small><ul class="list-unstyled mb-0 mt-1">' + ''.join([f'<li class="small text-muted"><i class="bi bi-check2"></i> {pieza.componente.nombre} × {pieza.cantidad}</li>' for pieza in seguimiento.piezas.all()]) + '</ul></div>' if seguimiento.piezas.exists() else ''}
+            <!-- Piezas Vinculadas (OOW y/o Venta Mostrador) -->
+            {('' if not (seguimiento.piezas.exists() or seguimiento.piezas_venta_mostrador.exists()) else
+              '<div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;">'
+              '<small class="text-primary fw-bold"><i class="bi bi-box-seam"></i> Piezas Vinculadas:</small>'
+              '<ul class="list-unstyled mb-0 mt-1">'
+              + ''.join([
+                    f'<li class="small text-muted"><i class="bi bi-check2"></i> {pieza.componente.nombre} × {pieza.cantidad}</li>'
+                    for pieza in seguimiento.piezas.all()
+                ])
+              + ''.join([
+                    f'<li class="small text-muted"><i class="bi bi-shop"></i> {pieza.descripcion_pieza} × {pieza.cantidad}</li>'
+                    for pieza in seguimiento.piezas_venta_mostrador.all()
+                ])
+              + '</ul></div>'
+            )}
             
             {f'<div class="alert alert-danger alert-sm mb-2"><strong>⚠️ RETRASO:</strong> {retraso_dias} días</div>' if hay_retraso else ''}
             

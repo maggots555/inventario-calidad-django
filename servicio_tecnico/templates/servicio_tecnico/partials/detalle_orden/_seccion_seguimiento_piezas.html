@@ -1,0 +1,216 @@
+{% comment %}
+  Partial de detalle_orden — _seccion_seguimiento_piezas.html
+  Seguimiento de pedidos a proveedores (OOW vía cotización y FL vía Venta Mostrador).
+  Se incluye desde _seccion_cotizacion.html y/o _seccion_venta_mostrador.html.
+{% endcomment %}
+                        <!-- Seguimiento de Proveedores -->
+                        {% if seguimientos_piezas %}
+                            <div class="card">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="mb-0">
+                                            <i class="bi bi-truck"></i> Seguimiento de Pedidos a Proveedores
+                                            <span class="badge bg-secondary">{{ seguimientos_piezas.count }}</span>
+                                        </h6>
+                                        {% if seguimientos_retrasados_count > 0 %}
+                                            <span class="badge badge-retraso-global">
+                                                ⚠️ {{ seguimientos_retrasados_count }} Pedido{{ seguimientos_retrasados_count|pluralize }} con Retraso
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Seguimiento
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3" id="contenedorSeguimientos">
+                                        {% for seguimiento in seguimientos_piezas %}
+                                            <div class="col-md-6">
+                                                <div class="card h-100 border-start border-4 seguimiento-card
+                                                    {% if seguimiento.estado == 'recibido' %}border-success
+                                                    {% elif seguimiento.estado == 'incorrecto' %}border-danger
+                                                    {% elif seguimiento.estado == 'danado' %}border-danger
+                                                    {% elif seguimiento.estado == 'retrasado' %}border-danger
+                                                    {% elif seguimiento.estado == 'transito' %}border-info
+                                                    {% elif seguimiento.estado == 'confirmado' %}border-primary
+                                                    {% elif seguimiento.estado == 'pedido' %}border-secondary
+                                                    {% else %}border-secondary{% endif %}" 
+                                                    data-seguimiento-id="{{ seguimiento.id }}">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <h6 class="card-title mb-0">
+                                                                <i class="bi bi-building"></i> {{ seguimiento.proveedor }}
+                                                            </h6>
+                                                            <span class="badge 
+                                                                {% if seguimiento.estado == 'recibido' %}bg-success
+                                                                {% elif seguimiento.estado == 'incorrecto' %}bg-danger
+                                                                {% elif seguimiento.estado == 'danado' %}bg-warning text-dark
+                                                                {% elif seguimiento.estado == 'retrasado' %}bg-danger
+                                                                {% elif seguimiento.estado == 'transito' %}bg-info
+                                                                {% elif seguimiento.estado == 'confirmado' %}bg-primary
+                                                                {% elif seguimiento.estado == 'pedido' %}bg-secondary
+                                                                {% else %}bg-warning text-dark{% endif %}">
+                                                                {{ seguimiento.get_estado_display }}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <p class="card-text small mb-2">
+                                                            <strong>Pedido:</strong> {{ seguimiento.numero_pedido|default:"Sin número" }}<br>
+                                                            <strong>Piezas:</strong> {{ seguimiento.descripcion_piezas|truncatewords:10 }}
+                                                        </p>
+                                                        
+                                                        <!-- Piezas vinculadas OOW -->
+                                                        {% if seguimiento.piezas.exists %}
+                                                            <div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;">
+                                                                <small class="text-primary fw-bold">
+                                                                    <i class="bi bi-box-seam"></i> Piezas Vinculadas:
+                                                                </small>
+                                                                <ul class="list-unstyled mb-0 mt-1">
+                                                                    {% for pieza in seguimiento.piezas.all %}
+                                                                        <li class="small text-muted">
+                                                                            <i class="bi bi-check2"></i> {{ pieza.componente.nombre }} × {{ pieza.cantidad }}
+                                                                        </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
+                                                        <!-- Piezas vinculadas Venta Mostrador (FL / reac) -->
+                                                        {% if seguimiento.piezas_venta_mostrador.exists %}
+                                                            <div class="mt-2 p-2" style="background-color: rgba(25, 135, 84, 0.05); border-left: 3px solid #198754; border-radius: 4px;">
+                                                                <small class="text-success fw-bold">
+                                                                    <i class="bi bi-shop"></i> Piezas Venta Mostrador:
+                                                                </small>
+                                                                <ul class="list-unstyled mb-0 mt-1">
+                                                                    {% for pieza in seguimiento.piezas_venta_mostrador.all %}
+                                                                        <li class="small text-muted">
+                                                                            <i class="bi bi-check2"></i> {{ pieza.descripcion_pieza }} × {{ pieza.cantidad }}
+                                                                        </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
+                                                        
+                                                        <div class="small">
+                                                            <div class="row">
+                                                                <div class="col-6">
+                                                                    <strong>Pedido:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_pedido|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <strong>Estimado:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_entrega_estimada|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            </div>
+                                                            {% if seguimiento.fecha_entrega_real %}
+                                                                <div class="mt-2">
+                                                                    <strong>Entregado:</strong> <small>{{ seguimiento.fecha_entrega_real|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            {% elif seguimiento.esta_retrasado %}
+                                                                <div class="alert alert-danger p-2 mt-2 mb-0">
+                                                                    <small><i class="bi bi-exclamation-triangle"></i> <strong>⚠️ RETRASO: {{ seguimiento.dias_retraso }} día{{ seguimiento.dias_retraso|pluralize }}</strong></small>
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        
+                                                        {% if seguimiento.notas_seguimiento %}
+                                                            <div class="mt-2 pt-2 border-top">
+                                                                <small class="text-muted">
+                                                                    <i class="bi bi-sticky"></i> {{ seguimiento.notas_seguimiento|truncatewords:20 }}
+                                                                </small>
+                                                            </div>
+                                                        {% endif %}
+                                                        
+                                                        <!-- Botones de acción -->
+                                                        <div class="mt-3">
+                                                            <!-- Fila 1: Cambio rápido de estado -->
+                                                            {% if seguimiento.estado not in 'recibido,incorrecto,danado' %}
+                                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                    {% if seguimiento.estado == 'pedido' %}
+                                                                        <button type="button" class="btn btn-info" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'confirmado')" 
+                                                                                title="Confirmar pedido">
+                                                                            ✅ Confirmar
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado' %}
+                                                                        <button type="button" class="btn btn-warning" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'transito')" 
+                                                                                title="Marcar en tránsito">
+                                                                            � En Tránsito
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado,transito' %}
+                                                                        <button type="button" class="btn btn-danger" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'retrasado')" 
+                                                                                title="Marcar como retrasado">
+                                                                            ⚠️ Retrasado
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    <button type="button" class="btn btn-success" 
+                                                                            onclick="marcarRecibido({{ seguimiento.id }})" 
+                                                                            title="Marcar como recibido">
+                                                                        📬 Recibido
+                                                                    </button>
+                                                                </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Fila 2: Reportar problemas con pieza recibida (NUEVO Nov 2025) -->
+                                                            {% if seguimiento.estado == 'recibido' %}
+                                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                    <button type="button" class="btn btn-outline-danger" 
+                                                                            onclick="marcarIncorrecto({{ seguimiento.id }})" 
+                                                                            title="La pieza recibida es incorrecta">
+                                                                        ❌ Pieza Incorrecta
+                                                                    </button>
+                                                                    <button type="button" class="btn btn-outline-warning" 
+                                                                            onclick="marcarDanado({{ seguimiento.id }})" 
+                                                                            title="La pieza recibida está dañada o no funciona">
+                                                                        ⚠️ Pieza Dañada
+                                                                    </button>
+                                                                </div>
+                                                            {% endif %}
+                                                            
+                                                            <!-- Fila 3: Editar, Eliminar y Reenviar -->
+                                                            <div class="btn-group btn-group-sm w-100" role="group">
+                                                                <button type="button" class="btn btn-outline-primary" 
+                                                                        onclick="editarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Editar">
+                                                                    📝 Editar
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-danger" 
+                                                                        onclick="eliminarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Eliminar">
+                                                                    🗑️ Eliminar
+                                                                </button>
+                                                                {% if seguimiento.estado == 'recibido' %}
+                                                                    <button type="button" class="btn btn-outline-info" 
+                                                                            onclick="reenviarNotificacion({{ seguimiento.id }})" 
+                                                                            title="Reenviar notificación al técnico">
+                                                                        � Reenviar
+                                                                    </button>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card">
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-truck" style="font-size: 3rem;"></i><br>
+                                        No hay seguimientos de proveedores aún
+                                    </p>
+                                    <button type="button" class="btn btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primer Seguimiento
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
