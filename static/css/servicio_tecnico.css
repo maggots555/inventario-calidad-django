@@ -6199,9 +6199,11 @@ thead.sticky-top {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 1.25rem 2rem;
-    padding-bottom: 1.25rem;
+    /* flex-start + margin-left:auto en la métrica evita huecos raros
+       cuando el contenedor crece (space-between los separaba demasiado). */
+    justify-content: flex-start;
+    gap: 0.75rem 1.5rem;
+    padding-bottom: 1rem;
     margin-bottom: 0.25rem;
     border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
@@ -6211,7 +6213,7 @@ thead.sticky-top {
     flex-direction: column;
     gap: 0.5rem;
     min-width: 0;
-    flex: 1 1 12rem;
+    flex: 1 1 10rem;
 }
 
 .info-status-strip__badges {
@@ -6254,6 +6256,7 @@ thead.sticky-top {
     align-items: flex-end;
     text-align: right;
     flex: 0 0 auto;
+    margin-left: auto; /* empuja la métrica a la derecha sin space-between */
 }
 
 .info-metric-dias__numero {
@@ -6368,20 +6371,32 @@ thead.sticky-top {
     text-decoration: underline;
 }
 
-/* Responsive: una columna en móvil; métrica alineada a la izquierda */
+/* Responsive: en móvil estado y días siguen en la MISMA fila
+   (así no queda un hueco vertical enorme entre ambos). */
 @media (max-width: 767.98px) {
     .info-principal-dossier {
         padding: 1rem 1.1rem 1.25rem;
     }
 
     .info-status-strip {
-        flex-direction: column;
-        gap: 1rem;
+        flex-wrap: nowrap;
+        gap: 0.5rem 0.75rem;
+        padding-bottom: 0.85rem;
+        align-content: flex-start;
+    }
+
+    .info-status-strip__estado {
+        flex: 1 1 auto;
     }
 
     .info-metric-dias {
-        align-items: flex-start;
-        text-align: left;
+        align-items: flex-end;
+        text-align: right;
+        margin-left: 0.5rem;
+    }
+
+    .info-metric-dias__numero {
+        font-size: 1.75em;
     }
 
     .info-group__grid {
