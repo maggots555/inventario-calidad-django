@@ -343,20 +343,42 @@
     padding: 0;
 }
 
-.diag-pieza-badge-conf {
-    font-size: 0.65rem;
-    padding: 0.15em 0.35em;
+/*
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  En servicio_tecnico.css existe:
+    .badge.bg-success, .badge.bg-danger, .badge.bg-warning {
+      font-size: 0.85rem; padding: 0.4rem 0.6rem;
+    }
+  Esa regla tiene 2 clases (.badge + .bg-success) y PISA a un solo
+  .diag-pieza-badge-*. Por eso el check y "Nec" seguían grandes.
+  Usamos #contenedorPiezasDetectadas .badge.… (ID + 2 clases) para ganar.
+*/
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-conf,
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-mini {
+    font-size: 0.6rem !important;
+    font-weight: 600;
+    padding: 0.1em 0.35em !important;
+    line-height: 1.15 !important;
+    white-space: nowrap;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    vertical-align: middle;
+}
+
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-conf {
+    /* Solo icono: cuadrado compacto */
+    padding: 0.12em 0.28em !important;
+}
+
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-conf i,
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-mini i {
+    font-size: 0.58rem;
     line-height: 1;
 }
 
-.diag-pieza-badge-mini {
-    font-size: 0.62rem;
-    font-weight: 600;
-    padding: 0.12em 0.35em;
-    line-height: 1.2;
-    white-space: nowrap;
-    flex-shrink: 0;
+#contenedorPiezasDetectadas .badge.diag-pieza-badge-mini {
     max-width: 7rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -403,15 +425,63 @@
     border-color: #86efac;
 }
 
-/* Tabla de componentes: tipografía un poco más densa */
+/* Tabla de componentes: tipografía y celdas densas */
 .diag-tabla-componentes-wrap #tablaComponentesDiagnostico {
     font-size: 0.78rem;
 }
 
 .diag-tabla-componentes-wrap #tablaComponentesDiagnostico th,
 .diag-tabla-componentes-wrap #tablaComponentesDiagnostico td {
-    padding: 0.28rem 0.4rem;
+    padding: 0.22rem 0.35rem;
     vertical-align: middle;
+}
+
+/* Inputs DPN: altura baja (no se ven como textarea) */
+#tablaComponentesDiagnostico .input-dpn,
+#tablaComponentesDiagnostico .input-dpn-dinamico {
+    font-size: 0.72rem;
+    padding: 0.15rem 0.4rem;
+    min-height: 26px;
+    height: 26px;
+    line-height: 1.2;
+}
+
+/* Badge Nec/Opc en columna Tipo — gana a .badge.bg-success global */
+#tablaComponentesDiagnostico .badge.diag-badge-tipo,
+#tablaComponentesDiagnostico .badge.badge-tipo-pieza,
+#tablaComponentesDiagnostico .badge.badge-tipo-dinamico {
+    font-size: 0.6rem !important;
+    font-weight: 600;
+    padding: 0.12em 0.38em !important;
+    line-height: 1.15 !important;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+#tablaComponentesDiagnostico .badge.diag-badge-tipo i,
+#tablaComponentesDiagnostico .badge.badge-tipo-pieza i,
+#tablaComponentesDiagnostico .badge.badge-tipo-dinamico i {
+    font-size: 0.58rem;
+    line-height: 1;
+}
+
+/* Badge "Adic" en filas adicionales */
+#tablaComponentesDiagnostico .badge.diag-badge-adic {
+    font-size: 0.55rem !important;
+    font-weight: 600;
+    padding: 0.08em 0.3em !important;
+    vertical-align: middle;
+    line-height: 1.1 !important;
+}
+
+#tablaComponentesDiagnostico .btn-eliminar-componente-adic {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.65rem;
+    line-height: 1;
+    min-width: 22px;
+    min-height: 22px;
 }
 
 .input-dpn-flash {
@@ -610,7 +680,7 @@
     color: #93c5fd;
 }
 
-[data-bs-theme="dark"] .diag-pieza-badge-mini.bg-light {
+[data-bs-theme="dark"] #contenedorPiezasDetectadas .badge.diag-pieza-badge-mini.bg-light {
     background-color: #334155 !important;
     color: #e2e8f0 !important;
     border-color: #475569 !important;

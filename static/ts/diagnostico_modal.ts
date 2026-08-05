@@ -1237,6 +1237,10 @@ function initDiagnosticoModal(): void {
     
     /**
      * Actualiza el aspecto visual de un badge de tipo según su estado.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * En la tabla densa del modal split usamos "Nec" / "Opc" (cortos).
+     * El title= conserva "Necesaria" / "Opcional" al pasar el mouse.
+     * data-es-necesaria sigue siendo true/false para el JSON de envío.
      */
     function actualizarBadgeTipo(badge: HTMLSpanElement, esNecesaria: boolean): void {
         if (esNecesaria) {
@@ -1244,15 +1248,17 @@ function initDiagnosticoModal(): void {
                 .replace(/bg-warning/g, '')
                 .replace(/text-dark/g, '')
                 .replace(/bg-success/g, '');
-            badge.classList.add('bg-success');
-            badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Necesaria';
+            badge.classList.add('bg-success', 'diag-badge-tipo');
+            badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Nec';
+            badge.title = 'Necesaria — clic para cambiar a Opcional';
         } else {
             badge.className = badge.className
                 .replace(/bg-success/g, '')
                 .replace(/bg-warning/g, '')
                 .replace(/text-dark/g, '');
-            badge.classList.add('bg-warning', 'text-dark');
-            badge.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Opcional';
+            badge.classList.add('bg-warning', 'text-dark', 'diag-badge-tipo');
+            badge.innerHTML = '<i class="bi bi-dash-circle"></i> Opc';
+            badge.title = 'Opcional — clic para cambiar a Necesaria';
         }
     }
     
@@ -1282,7 +1288,7 @@ function initDiagnosticoModal(): void {
         
         if (checkbox.checked) {
             inputDpn.disabled = false;
-            inputDpn.placeholder = 'Ej: DPN: 0XPJWG';
+            inputDpn.placeholder = 'DPN';
             // Estilo visual: fila activa
             const fila = checkbox.closest('tr');
             if (fila) {
@@ -1304,7 +1310,7 @@ function initDiagnosticoModal(): void {
         } else {
             inputDpn.disabled = true;
             inputDpn.value = '';
-            inputDpn.placeholder = 'Selecciona el componente primero';
+            inputDpn.placeholder = 'Selecciona…';
             // Estilo visual: fila inactiva
             const fila = checkbox.closest('tr');
             if (fila) {
@@ -1586,15 +1592,16 @@ function initDiagnosticoModal(): void {
         });
         tdCheck.appendChild(checkbox);
         
-        // 2) Celda nombre + badge ADICIONAL + botón eliminar (compacto, no rompe el DPN)
+        // 2) Celda nombre + badge ADICIONAL compacto + botón eliminar
         const tdNombre = document.createElement('td');
         tdNombre.className = 'align-middle fw-semibold';
         const wrapNombre = document.createElement('div');
-        wrapNombre.className = 'd-flex align-items-center gap-2 flex-wrap';
+        wrapNombre.className = 'd-flex align-items-center gap-1 flex-nowrap';
         const label = document.createElement('label');
         label.htmlFor = idUnico;
-        label.className = 'mb-0 cursor-pointer';
-        label.innerHTML = `${nombreComponente} <span class="badge bg-success ms-1">ADICIONAL</span>`;
+        label.className = 'mb-0 cursor-pointer small';
+        // Badge corto "Adic" (title explica); no hincha la fila
+        label.innerHTML = `${nombreComponente} <span class="badge bg-success diag-badge-adic" title="Componente adicional">Adic</span>`;
         wrapNombre.appendChild(label);
 
         const btnEliminar = document.createElement('button');
@@ -1607,14 +1614,14 @@ function initDiagnosticoModal(): void {
         wrapNombre.appendChild(btnEliminar);
         tdNombre.appendChild(wrapNombre);
         
-        // 3) Celda DPN — solo el input a ancho completo (como las filas fijas)
+        // 3) Celda DPN — input denso (misma altura que filas fijas)
         const tdDpn = document.createElement('td');
         tdDpn.className = 'align-middle';
         const inputDpn = document.createElement('input');
         inputDpn.type = 'text';
         inputDpn.className = 'form-control form-control-sm input-dpn-dinamico';
         inputDpn.setAttribute('data-componente-db', nombreComponente);
-        inputDpn.placeholder = 'Ej: DPN: 0XPJWG';
+        inputDpn.placeholder = 'DPN';
         tdDpn.appendChild(inputDpn);
         
         // 4) Celda Tipo (badge Necesaria/Opcional) — misma columna que las filas fijas
