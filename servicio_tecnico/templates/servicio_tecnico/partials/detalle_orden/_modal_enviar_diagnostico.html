@@ -8,6 +8,7 @@
   Derecha = destinatario / CC / mensaje / preview PDF.
   Todos los IDs y names se conservan para diagnostico_modal.ts.
 {% endcomment %}
+{% load scorecard_filters %}
 <!-- MODAL: ENVIAR DIAGNÓSTICO AL CLIENTE -->
 <div class="modal fade" id="modalEnviarDiagnostico" tabindex="-1" aria-labelledby="modalEnviarDiagnosticoLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -405,54 +406,20 @@
                                 {% endif %}
                             </div>
 
-                            <!-- SECCIÓN 3: CON COPIA A (lista compacta con scroll) -->
+                            <!--
+                              SECCIÓN 3: CON COPIA A — solo empleados internos.
+                              EXPLICACIÓN PARA PRINCIPIANTES:
+                              Antes también había checkbox del técnico asignado
+                              (name=copia_tecnico). Se quitó a pedido: el CC del
+                              diagnóstico solo ofrece staff. El backend sigue
+                              aceptando copia_tecnico vacío sin problema.
+                            -->
                             <div class="mb-3">
                                 <div class="diag-section-label mb-2">
-                                    <i class="bi bi-people-fill me-1"></i>Con copia a (opcional)
+                                    <i class="bi bi-people-fill me-1"></i>Con copia a empleados (opcional)
                                 </div>
 
                                 <div class="diag-cc-scroll" id="diagCcListaScroll">
-                                    <!-- Técnico asignado -->
-                                    <div class="diag-cc-grupo-titulo">
-                                        <i class="bi bi-tools text-success"></i> Técnico
-                                    </div>
-                                    {% if orden.tecnico_asignado_actual and orden.tecnico_asignado_actual.email %}
-                                    <label class="destinatario-card diag-cc-item border rounded d-block mb-1 cursor-pointer" for="diag_tecnico_asignado">
-                                        <div class="d-flex align-items-center">
-                                            <input class="form-check-input me-2 flex-shrink-0"
-                                                   type="checkbox" name="copia_tecnico"
-                                                   value="{{ orden.tecnico_asignado_actual.email }}"
-                                                   id="diag_tecnico_asignado">
-
-                                            {% if orden.tecnico_asignado_actual.foto_perfil %}
-                                                <img src="{{ orden.tecnico_asignado_actual.foto_perfil.url }}"
-                                                     alt="{{ orden.tecnico_asignado_actual.nombre_completo }}"
-                                                     class="rounded-circle me-2 flex-shrink-0 diag-cc-avatar">
-                                            {% else %}
-                                                <i class="bi bi-person-badge-fill text-success me-2 flex-shrink-0"></i>
-                                            {% endif %}
-
-                                            <div class="flex-grow-1" style="min-width: 0;">
-                                                <div class="fw-semibold text-truncate small">
-                                                    {{ orden.tecnico_asignado_actual.nombre_completo }}
-                                                </div>
-                                                <small class="text-muted text-truncate d-block">
-                                                    <span class="badge bg-success me-1">TÉCNICO</span>
-                                                    {{ orden.tecnico_asignado_actual.email }}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </label>
-                                    {% else %}
-                                    <div class="alert alert-info py-1 px-2 mb-2 small">
-                                        <i class="bi bi-info-circle"></i> Sin técnico asignado o sin email.
-                                    </div>
-                                    {% endif %}
-
-                                    <!-- Empleados internos -->
-                                    <div class="diag-cc-grupo-titulo mt-2">
-                                        <i class="bi bi-people-fill text-info"></i> Empleados
-                                    </div>
                                     {% if empleados_copia_imagenes %}
                                         {% for empleado in empleados_copia_imagenes %}
                                         <label class="destinatario-card diag-cc-item border rounded d-block mb-1 cursor-pointer {% if empleado.id == request.user.empleado.id %}border-primary border-2{% endif %}"
@@ -501,7 +468,12 @@
                                                         {% endif %}
                                                     </div>
                                                     <small class="text-muted text-truncate d-block">
-                                                        <span class="badge bg-secondary me-1">{{ empleado.area }}</span>
+                                                        {# Mismos colores de área que lista_empleados (filtro color_area) #}
+                                                        <span class="badge diag-badge-area me-1"
+                                                              style="background-color: {{ empleado.area|color_area }};
+                                                                     color: {{ empleado.area|color_area|text_color_for_bg }};">
+                                                            {{ empleado.area }}
+                                                        </span>
                                                         {{ empleado.email }}
                                                     </small>
                                                 </div>
@@ -543,7 +515,11 @@
                                                     </span>
                                                 </div>
                                                 <small class="text-muted text-truncate d-block">
-                                                    <span class="badge bg-secondary me-1">{{ request.user.empleado.area }}</span>
+                                                    <span class="badge diag-badge-area me-1"
+                                                          style="background-color: {{ request.user.empleado.area|color_area }};
+                                                                 color: {{ request.user.empleado.area|color_area|text_color_for_bg }};">
+                                                        {{ request.user.empleado.area }}
+                                                    </span>
                                                     {{ request.user.empleado.email }}
                                                 </small>
                                             </div>

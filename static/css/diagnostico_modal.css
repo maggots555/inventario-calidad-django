@@ -202,6 +202,19 @@
     border: 2px solid #22c55e;
 }
 
+/*
+  Badge de área en CC: colores vía filtro color_area (inline style).
+  EXPLICACIÓN: misma paleta que lista_empleados / scorecard.
+  Solo tipografía compacta aquí; el color NO va en CSS.
+*/
+.diag-badge-area {
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.12em 0.4em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
 /* Contenedor del iframe de preview (más bajo que los 500px previos) */
 .diag-preview-frame {
     height: 320px;
