@@ -2,7 +2,13 @@
   Partial de detalle_orden — _seccion_info_config.html
   Extraído en Fase A (solo markup). Mismo context e IDs que el monolito.
   NO editar IDs/data-*/nombres de forms: el JS/TS dependen de ellos.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Los partials incluidos con {% include %} NO heredan los {% load %} del
+  template padre. Por eso aquí cargamos rhitso_filters de nuevo: sin esto,
+  el filtro color_estado_orden falla con "Invalid filter".
 {% endcomment %}
+{% load rhitso_filters %}
     <!-- ============================================================ -->
     <!-- SECCIÓN 1: INFORMACIÓN PRINCIPAL (Solo Lectura) -->
     <!-- ============================================================ -->
@@ -10,6 +16,14 @@
     <div class="row">
         <!-- Panel Principal Izquierdo (7 columnas) -->
         <div class="col-lg-7">
+            <!-- EXPLICACIÓN PARA PRINCIPIANTES:
+               Card de solo lectura rediseñada como "dossier técnico":
+               1) Franja de estado (lo más importante)
+               2) Bloque Equipo
+               3) Bloque Cliente
+               4) Bloque Operación
+               El botón "Editar" abre el mismo modal (#modalEditarInfoEquipo);
+               no cambiamos IDs porque el TypeScript depende de ellos. -->
             <div class="card section-card">
                 <div class="section-header d-flex justify-content-between align-items-center">
                     <div>
@@ -20,216 +34,183 @@
                         <i class="bi bi-pencil-square"></i> Editar información
                     </button>
                 </div>
-                <div class="card-body" style="font-size: 110%;">
-                    <div class="row">
-                        <!-- Estado y Días en Servicio -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Estado Actual</label>
-                            <div>
-                                <span class="estado-badge bg-{{ orden.estado|yesno:'success,warning,danger' }}">
+                <div class="card-body info-principal-dossier">
+
+                    {# --- Franja superior: estado + días + chips de servicios --- #}
+                    <div class="info-status-strip">
+                        <div class="info-status-strip__estado">
+                            <span class="info-field__label">Estado actual</span>
+                            <div class="info-status-strip__badges">
+                                {# color_estado_orden mapea cada estado real (no yesno, que siempre pintaba verde) #}
+                                <span class="estado-badge bg-{{ orden.estado|color_estado_orden }}">
                                     {{ orden.get_estado_display }}
                                 </span>
                                 {% if orden.esta_retrasada %}
-                                <span class="badge bg-danger ms-2">
+                                <span class="badge bg-danger">
                                     <i class="bi bi-exclamation-triangle"></i> Retrasada
                                 </span>
                                 {% endif %}
                             </div>
-                            
-                            <!-- ✅ NUEVO: Indicadores de complementos activos (Oct 2025) -->
-                            <div class="mt-2">
+                            <div class="info-status-strip__chips">
                                 {% if tiene_cotizacion %}
-                                    <span class="badge bg-primary me-1" title="Tiene cotización de reparación" data-bs-toggle="tooltip">
-                                        <i class="bi bi-clipboard-check"></i> Cotización
-                                    </span>
+                                    <span class="info-chip" title="Tiene cotización de reparación" data-bs-toggle="tooltip">Cotización</span>
                                 {% endif %}
-                                
                                 {% if tiene_venta_mostrador %}
-                                    <span class="badge bg-warning text-dark me-1" title="Tiene venta mostrador" data-bs-toggle="tooltip">
-                                        <i class="bi bi-cart-check"></i> Venta Mostrador
-                                    </span>
+                                    <span class="info-chip" title="Tiene venta mostrador" data-bs-toggle="tooltip">Venta mostrador</span>
                                 {% endif %}
-                                
                                 {% if not tiene_cotizacion and not tiene_venta_mostrador %}
-                                    <span class="badge bg-secondary me-1" title="Sin complementos registrados" data-bs-toggle="tooltip">
-                                        <i class="bi bi-dash-circle"></i> Sin servicios
-                                    </span>
+                                    <span class="info-chip info-chip--muted" title="Sin complementos registrados" data-bs-toggle="tooltip">Sin servicios</span>
                                 {% endif %}
                             </div>
                         </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">
-                                Días Hábiles en Servicio
-                                <i class="bi bi-info-circle-fill text-info ms-1" 
-                                   data-bs-toggle="tooltip" 
+                        <div class="info-metric-dias">
+                            <span class="info-field__label">
+                                Días hábiles en servicio
+                                <i class="bi bi-info-circle ms-1"
+                                   data-bs-toggle="tooltip"
                                    title="Solo cuenta días laborables (lunes a viernes), excluyendo fines de semana"></i>
-                            </label>
-                            <div class="dias-servicio">
-                                <strong style="font-size: 1.2rem; color: #0d6efd;">
-                                    <i class="bi bi-calendar-week"></i> {{ dias_habiles_en_servicio }} días hábiles
-                                </strong>
-                                <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                                    ({{ dias_en_servicio }} días naturales)
-                                </small>
-                            </div>
-                        </div>
-                        
-                        <!-- Información del Equipo -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Tipo de Equipo</label>
-                            <p class="mb-0"><strong>{{ detalle.get_tipo_equipo_display|upper }}</strong></p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Marca y Modelo</label>
-                            <p class="mb-0"><strong>{{ detalle.marca }} {{ detalle.modelo }}</strong></p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Número de Serie (Service Tag)</label>
-                            <p class="mb-0"><code>{{ detalle.numero_serie }}</code></p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Orden del Cliente</label>
-                            <p class="mb-0"><code>{{ detalle.orden_cliente|default:"N/A" }}</code></p>
-                            {% if orden.es_fuera_garantia %}
-                                <span class="badge bg-warning text-dark" style="font-size: 0.7em;" title="Orden fuera de garantía (prefijo OOW- o FL-)">
-                                    <i class="bi bi-exclamation-triangle-fill"></i> Fuera de Garantía
-                                </span>
-                            {% else %}
-                                <span class="badge bg-success" style="font-size: 0.7em;" title="Orden dentro de garantía">
-                                    <i class="bi bi-shield-check"></i> En Garantía
-                                </span>
-                            {% endif %}
-                        </div>
-                        
-                        <!-- ✅ NUEVO: Email del Cliente (Noviembre 2025) -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">
-                                <i class="bi bi-envelope-fill text-primary"></i> Email del Cliente
-                            </label>
-                            <p class="mb-0">
-                                {% if detalle.email_cliente %}
-                                    {% if detalle.email_cliente != 'cliente@ejemplo.com' %}
-                                        <a href="mailto:{{ detalle.email_cliente }}" class="text-decoration-none" title="Enviar email">
-                                            <i class="bi bi-envelope"></i> {{ detalle.email_cliente }}
-                                        </a>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark" title="Email pendiente de actualizar">
-                                            <i class="bi bi-exclamation-triangle"></i> {{ detalle.email_cliente }}
-                                        </span>
-                                        <small class="text-muted d-block mt-1">
-                                            <i class="bi bi-info-circle"></i> Email por defecto - Actualizar con email real
-                                        </small>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-x-circle"></i> Sin email registrado
-                                    </span>
-                                {% endif %}
-                            </p>
-                        </div>
-                        
-                        <!-- ✅ NUEVO: Datos adicionales del cliente (Junio 2026) -->
-                        {% if detalle.nombre_cliente or detalle.rfc_cliente or detalle.telefono_cliente or detalle.direccion_cliente %}
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">
-                                <i class="bi bi-person-vcard-fill text-info"></i> Datos del Cliente
-                            </label>
-                            <p class="mb-0">
-                                {% if detalle.nombre_cliente %}
-                                    <i class="bi bi-person"></i> {{ detalle.nombre_cliente }}<br>
-                                {% endif %}
-                                {% if detalle.rfc_cliente %}
-                                    <i class="bi bi-card-checklist"></i> RFC: <code>{{ detalle.rfc_cliente }}</code><br>
-                                {% endif %}
-                                {% if detalle.telefono_cliente %}
-                                    <i class="bi bi-telephone"></i> 
-                                    <a href="tel:{{ detalle.telefono_cliente }}" class="text-decoration-none">{{ detalle.telefono_cliente }}</a><br>
-                                {% endif %}
-                                {% if detalle.direccion_cliente %}
-                                    <i class="bi bi-geo-alt"></i> {{ detalle.direccion_cliente }}
-                                {% endif %}
-                            </p>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Gama y Accesorios -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Gama del Equipo</label>
-                            <p class="mb-0">
-                                <span class="badge bg-{% if detalle.gama == 'alta' %}success{% elif detalle.gama == 'media' %}warning{% else %}secondary{% endif %}">
-                                    {{ detalle.get_gama_display }}
-                                </span>
-                            </p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Accesorios</label>
-                            <p class="mb-0">
-                                {% if detalle.tiene_cargador %}
-                                    <i class="bi bi-check-circle text-success"></i> Incluye cargador
-                                    {% if detalle.numero_serie_cargador %}
-                                        <br><small class="text-muted">S/N: {{ detalle.numero_serie_cargador }}</small>
-                                    {% endif %}
-                                {% else %}
-                                    <i class="bi bi-x-circle text-danger"></i> Sin cargador
-                                {% endif %}
-                            </p>
-                        </div>
-                        
-                        <!-- Ubicación y Responsables -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Sucursal</label>
-                            <p class="mb-0">
-                                <i class="bi bi-building"></i> {{ orden.sucursal.nombre }}
-                            </p>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Técnico Asignado</label>
-                            <p class="mb-0"><i class="bi bi-person-badge"></i> <code>{{ orden.tecnico_asignado_actual.nombre_completo }}</code></p>
-                        </div>
-                        
-                        <div class="col-md-12 mb-3">
-                            <label class="form-label text-muted small">Responsable de Seguimiento</label>
-                            <p class="mb-0"><i class="bi bi-person-check"></i> <code>{{ orden.responsable_seguimiento.nombre_completo }}</code></p>
-                        </div>
-                        
-                        <!-- Equipo Enciende -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">¿El equipo enciende?</label>
-                            <p class="mb-0">
-                                {% if detalle.equipo_enciende %}
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-power"></i> SÍ ENCIENDE
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-power"></i> NO ENCIENDE
-                                    </span>
-                                {% endif %}
-                            </p>
-                        </div>
-                        
-                        <!-- MIS: Mail-In Service -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Tipo de Ingreso</label>
-                            <p class="mb-0">
-                                {% if detalle.es_mis %}
-                                    <span class="badge bg-primary">
-                                        <i class="bi bi-box-seam"></i> MIS - PAQUETERÍA
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-secondary">
-                                        <i class="bi bi-shop"></i> PRESENCIAL
-                                    </span>
-                                {% endif %}
-                            </p>
+                            </span>
+                            <span class="info-metric-dias__numero">{{ dias_habiles_en_servicio }}</span>
+                            <span class="info-metric-dias__unidad">días hábiles</span>
+                            <span class="info-metric-dias__secundario">{{ dias_en_servicio }} días naturales</span>
                         </div>
                     </div>
+
+                    {# --- Bloque Equipo --- #}
+                    <section class="info-group">
+                        <h3 class="info-group__title">
+                            <i class="bi bi-laptop" aria-hidden="true"></i> Equipo
+                        </h3>
+                        <div class="info-group__grid">
+                            <div class="info-field">
+                                <span class="info-field__label">Tipo de equipo</span>
+                                <span class="info-field__value">{{ detalle.get_tipo_equipo_display|upper }}</span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Marca y modelo</span>
+                                <span class="info-field__value">{{ detalle.marca }} {{ detalle.modelo }}</span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Número de serie</span>
+                                <span class="info-field__value info-field__value--mono">{{ detalle.numero_serie }}</span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Orden del cliente</span>
+                                <span class="info-field__value info-field__value--mono">{{ detalle.orden_cliente|default:"N/A" }}</span>
+                                {% if orden.es_fuera_garantia %}
+                                    <span class="badge bg-warning text-dark info-field__badge" title="Orden fuera de garantía (prefijo OOW- o FL-)">Fuera de garantía</span>
+                                {% else %}
+                                    <span class="badge bg-success info-field__badge" title="Orden dentro de garantía">En garantía</span>
+                                {% endif %}
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Gama</span>
+                                <span class="info-field__value">{{ detalle.get_gama_display }}</span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Accesorios</span>
+                                <span class="info-field__value">
+                                    {% if detalle.tiene_cargador %}
+                                        Incluye cargador
+                                        {% if detalle.numero_serie_cargador %}
+                                            <span class="info-field__hint">S/N: {{ detalle.numero_serie_cargador }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        Sin cargador
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">¿El equipo enciende?</span>
+                                <span class="info-field__value">
+                                    {% if detalle.equipo_enciende %}
+                                        Sí enciende
+                                    {% else %}
+                                        {# Solo alerta crítica usa badge rojo #}
+                                        <span class="badge bg-danger">No enciende</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Tipo de ingreso</span>
+                                <span class="info-field__value">
+                                    {% if detalle.es_mis %}MIS — Paquetería{% else %}Presencial{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {# --- Bloque Cliente --- #}
+                    <section class="info-group">
+                        <h3 class="info-group__title">
+                            <i class="bi bi-person-vcard" aria-hidden="true"></i> Cliente
+                        </h3>
+                        <div class="info-group__grid">
+                            {% if detalle.nombre_cliente %}
+                            <div class="info-field">
+                                <span class="info-field__label">Nombre</span>
+                                <span class="info-field__value">{{ detalle.nombre_cliente }}</span>
+                            </div>
+                            {% endif %}
+                            <div class="info-field">
+                                <span class="info-field__label">Email</span>
+                                <span class="info-field__value">
+                                    {% if detalle.email_cliente %}
+                                        {% if detalle.email_cliente != 'cliente@ejemplo.com' %}
+                                            <a href="mailto:{{ detalle.email_cliente }}" class="info-field__link" title="Enviar email">{{ detalle.email_cliente }}</a>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">{{ detalle.email_cliente }}</span>
+                                            <span class="info-field__hint">Email por defecto — actualizar con uno real</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-danger">Sin email registrado</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if detalle.telefono_cliente %}
+                            <div class="info-field">
+                                <span class="info-field__label">Teléfono</span>
+                                <span class="info-field__value">
+                                    <a href="tel:{{ detalle.telefono_cliente }}" class="info-field__link">{{ detalle.telefono_cliente }}</a>
+                                </span>
+                            </div>
+                            {% endif %}
+                            {% if detalle.rfc_cliente %}
+                            <div class="info-field">
+                                <span class="info-field__label">RFC</span>
+                                <span class="info-field__value info-field__value--mono">{{ detalle.rfc_cliente }}</span>
+                            </div>
+                            {% endif %}
+                            {% if detalle.direccion_cliente %}
+                            <div class="info-field info-field--full">
+                                <span class="info-field__label">Dirección</span>
+                                <span class="info-field__value">{{ detalle.direccion_cliente }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </section>
+
+                    {# --- Bloque Operación --- #}
+                    <section class="info-group">
+                        <h3 class="info-group__title">
+                            <i class="bi bi-building" aria-hidden="true"></i> Operación
+                        </h3>
+                        <div class="info-group__grid">
+                            <div class="info-field">
+                                <span class="info-field__label">Sucursal</span>
+                                <span class="info-field__value">{{ orden.sucursal.nombre }}</span>
+                            </div>
+                            <div class="info-field">
+                                <span class="info-field__label">Técnico asignado</span>
+                                <span class="info-field__value">{{ orden.tecnico_asignado_actual.nombre_completo }}</span>
+                            </div>
+                            <div class="info-field info-field--full">
+                                <span class="info-field__label">Responsable de seguimiento</span>
+                                <span class="info-field__value">{{ orden.responsable_seguimiento.nombre_completo }}</span>
+                            </div>
+                        </div>
+                    </section>
+
                 </div>
             </div>
         </div>
