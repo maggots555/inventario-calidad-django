@@ -86,26 +86,34 @@ def _buscar_por_nombre_en_bd(nombre_canonico: str) -> ComponenteEquipo | None:
     return ComponenteEquipo.objects.filter(nombre__iexact=nombre_canonico, activo=True).first()
 
 
-def _buscar_por_substring_componente(texto: str) -> ComponenteEquipo | None:
+def _buscar_por_substring_componente(texto: str) -> tuple[ComponenteEquipo | None, int]:
     """
     Si el nombre de un ComponenteEquipo aparece dentro del texto del producto, lo devuelve.
+
+    Returns:
+        tuple: (componente o None, longitud del nombre normalizado que coincidió).
     """
     for nombre_norm, nombre_bd in _nombres_componentes_ordenados():
         if nombre_norm and nombre_norm in texto:
             componente = _buscar_por_nombre_en_bd(nombre_bd)
             if componente:
-                return componente
-    return None
+                return componente, len(nombre_norm)
+    return None, 0
 
 
-def _buscar_por_keywords(texto: str) -> ComponenteEquipo | None:
-    """Empareja palabras clave del catálogo de almacén con ComponenteEquipo."""
+def _buscar_por_keywords(texto: str) -> tuple[ComponenteEquipo | None, int]:
+    """
+    Empareja palabras clave del catálogo de almacén con ComponenteEquipo.
+
+    Returns:
+        tuple: (componente o None, longitud de la keyword que coincidió).
+    """
     for keyword_norm, nombre_componente in _keywords_ordenadas():
         if keyword_norm and keyword_norm in texto:
             componente = _buscar_por_nombre_en_bd(nombre_componente)
             if componente:
-                return componente
-    return None
+                return componente, len(keyword_norm)
+    return None, 0
 
 
 def obtener_componente_equipo_reacondicionado() -> ComponenteEquipo | None:
@@ -134,6 +142,16 @@ def resolver_componente_desde_producto(
     """
     Normaliza un producto de almacén al ComponenteEquipo correspondiente.
 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Evalúa dos pistas: (1) si el nombre del componente ST aparece en el producto
+    y (2) el mapa de keywords. Gana la coincidencia MÁS LARGA. Así
+    «CABLE AC PARA CARGADOR» no cae en «Cargador» solo porque la palabra
+    CARGADOR está al final: la keyword «CABLE AC PARA CARGADOR» es más larga.
+
+    Si empatan en longitud, se prefiere el nombre canónico del componente
+    (substring), p. ej. «PALMREST» → Palmrest y no Teclado.
+
     Args:
         nombre_producto: ProductoAlmacen.nombre (fuente principal).
         descripcion_pieza: LineaCotizacion.descripcion_pieza (respaldo).
@@ -149,15 +167,16 @@ def resolver_componente_desde_producto(
     if not texto:
         return None
 
-    # 1) Nombre canónico del componente como substring en el producto
-    componente = _buscar_por_substring_componente(texto)
-    if componente:
-        return componente
+    # Paso 1 y 2: substring + keywords; gana la señal más específica (más larga)
+    por_nombre, len_nombre = _buscar_por_substring_componente(texto)
+    por_keyword, len_keyword = _buscar_por_keywords(texto)
 
-    # 2) Mapa de palabras clave (BATERÍA → Batería, CARGADOR → Cargador, etc.)
-    componente = _buscar_por_keywords(texto)
-    if componente:
-        return componente
+    if len_keyword > len_nombre:
+        return por_keyword
+    if por_nombre is not None:
+        return por_nombre
+    if por_keyword is not None:
+        return por_keyword
 
     logger.debug(
         "Sin ComponenteEquipo para producto='%s' descripcion='%s'",

@@ -22,12 +22,36 @@ class ResolverComponenteDesdeProductoTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Catálogo mínimo de ComponenteEquipo para las pruebas."""
+        # EXPLICACIÓN: incluye componentes reales del catálogo Almacén→ST
+        # que antes fallaban (BEZEL, BOTTOM BASE, BRACKET, USB, SOLUCION).
         nombres = [
             'Batería',
             'Cargador',
             'Pantalla',
             'RAM',
             'Motherboard',
+            'Bisel LCD',
+            'Top Cover',
+            'Bottom Cover/Case',
+            'HDD/SSD Bracket',
+            'Disco Duro / SSD',
+            'Memoria USB',
+            'Paquete Oro',
+            'Paquete Plata',
+            'Paquete Premium',
+            'Stylus',
+            'Unidad optica',
+            'Cable de AC',
+            'Kit de Limpieza',
+            'Pasta termica/Metal liquido',
+            'Disipador de calor',
+            'Limpieza y mantenimiento',
+            'LCD Assembly',
+            'Audifonos',
+            'Backpack Laptop',
+            'Convertidor de video',
+            'Hub USB',
+            'Tapete antiestatico',
             NOMBRE_COMPONENTE_EQUIPO_REACONDICIONADO,
         ]
         for nombre in nombres:
@@ -81,6 +105,163 @@ class ResolverComponenteDesdeProductoTest(TestCase):
         )
         self.assertIsNotNone(componente)
         self.assertEqual(componente.nombre, 'Motherboard')
+
+    def test_bezel_solo_a_bisel_lcd(self):
+        """Producto P0026 BEZEL → Bisel LCD (antes no coincidía)."""
+        componente = resolver_componente_desde_producto('BEZEL')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Bisel LCD')
+
+    def test_bezel_protector_a_bisel_lcd(self):
+        """Producto P00261 BEZEL PROTECTOR → Bisel LCD (substring BEZEL)."""
+        componente = resolver_componente_desde_producto('BEZEL PROTECTOR')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Bisel LCD')
+
+    def test_top_cover_lcd_cover(self):
+        """Producto P0025 TOP COVER / LCD COVER → Top Cover (control)."""
+        componente = resolver_componente_desde_producto('TOP COVER / LCD COVER')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Top Cover')
+
+    def test_bottom_base_a_bottom_cover(self):
+        """Producto P0027 BOTTOM BASE / BASE COVER / LOWER CASE."""
+        componente = resolver_componente_desde_producto(
+            'BOTTOM BASE / BASE COVER / LOWER CASE'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Bottom Cover/Case')
+
+    def test_bracket_ssd_no_es_disco_duro(self):
+        """Producto P1037 BRACKET SSD → HDD/SSD Bracket (no Disco Duro)."""
+        componente = resolver_componente_desde_producto('BRACKET SSD')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'HDD/SSD Bracket')
+
+    def test_usb_32gb_a_memoria_usb(self):
+        """Producto P0048 USB 32GB → Memoria USB."""
+        componente = resolver_componente_desde_producto('USB 32GB')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Memoria USB')
+
+    def test_usb_kingston_a_memoria_usb(self):
+        """Producto P0075 USB KINGSTON 128 GB → Memoria USB."""
+        componente = resolver_componente_desde_producto('USB KINGSTON 128 GB')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Memoria USB')
+
+    def test_solucion_oro_a_paquete_oro(self):
+        """Producto PQ0101 SOLUCION ORO → Paquete Oro."""
+        componente = resolver_componente_desde_producto('SOLUCION ORO')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Paquete Oro')
+
+    def test_lapiz_optico_a_stylus(self):
+        """Producto P0113 LAPIZ OPTICO → Stylus."""
+        componente = resolver_componente_desde_producto('LAPIZ OPTICO')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Stylus')
+
+    def test_unidad_optica_dvd(self):
+        """Producto P0038 UNIDAD ÓPTICA / UNIDAD DE DVD → Unidad optica."""
+        componente = resolver_componente_desde_producto(
+            'UNIDAD ÓPTICA / UNIDAD DE DVD'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Unidad optica')
+
+    def test_cable_ac_para_cargador(self):
+        """Producto P0120 CABLE AC PARA CARGADOR → Cable de AC (no Cargador)."""
+        componente = resolver_componente_desde_producto('CABLE AC PARA CARGADOR')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Cable de AC')
+
+    def test_cargador_sigue_siendo_cargador(self):
+        """Control: un cargador real no debe ir a Cable de AC."""
+        componente = resolver_componente_desde_producto(
+            'CARGADOR / ADAPTADOR 65 W DELL PLUG CHICO'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Cargador')
+
+    def test_kit_de_limpieza(self):
+        """Producto P0186 KIT DE LIMPIEZA → Kit de Limpieza."""
+        componente = resolver_componente_desde_producto('KIT DE LIMPIEZA')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Kit de Limpieza')
+
+    def test_limpieza_y_mantenimiento_servicio(self):
+        """Servicio LIMPIEZA Y MANTENIMIENTO sigue en Limpieza y mantenimiento."""
+        componente = resolver_componente_desde_producto('LIMPIEZA Y MANTENIMIENTO')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Limpieza y mantenimiento')
+
+    def test_pasta_termica(self):
+        """Producto P0190 PASTA TERMICA → Pasta termica/Metal liquido."""
+        componente = resolver_componente_desde_producto('PASTA TERMICA')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Pasta termica/Metal liquido')
+
+    def test_disipador_sigue_disipador(self):
+        """Control: DISIPADOR DE CALOR no debe ir a pasta térmica."""
+        componente = resolver_componente_desde_producto(
+            'DISIPADOR DE CALOR / HEATSINK'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Disipador de calor')
+
+    def test_lcd_assembly(self):
+        """Producto P0006 LCD ASSEMBLY → LCD Assembly (no Pantalla)."""
+        componente = resolver_componente_desde_producto('LCD ASSEMBLY')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'LCD Assembly')
+
+    def test_lcd_display_sigue_pantalla(self):
+        """Control: LCD / DISPLAY genérico sigue siendo Pantalla."""
+        componente = resolver_componente_desde_producto('LCD / DISPLAY 15.6"')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Pantalla')
+
+    def test_audifonos(self):
+        """Producto P0085 AUDÍFONOS → Audifonos."""
+        componente = resolver_componente_desde_producto('AUDÍFONOS')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Audifonos')
+
+    def test_backpack(self):
+        """Producto P1043 BACKPACK → Backpack Laptop."""
+        componente = resolver_componente_desde_producto('BACKPACK')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Backpack Laptop')
+
+    def test_convertidor_hdmi_a_vga(self):
+        """Producto P0076 CONVERTIDOR HDMI A VGA → Convertidor de video."""
+        componente = resolver_componente_desde_producto('CONVERTIDOR HDMI A VGA')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Convertidor de video')
+
+    def test_hub_type_c(self):
+        """Producto P0118 HUB TYPE C → Hub USB."""
+        componente = resolver_componente_desde_producto('HUB TYPE C')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Hub USB')
+
+    def test_tapete_antiestatico(self):
+        """Producto P0187 TAPETE ANTIESTATICO → Tapete antiestatico."""
+        componente = resolver_componente_desde_producto('TAPETE ANTIESTATICO')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Tapete antiestatico')
+
+    def test_accesorio_sin_mapear_sigue_none(self):
+        """Pendientes sin componente ST siguen sin match."""
+        for nombre in (
+            'FUNDA PARA IPAD / TABLETA',
+            'ESPIRAL PROTECTOR CABLE USB COLORES',
+            '4H MISSION CRITICAL PROSUPPORT PLUS',
+            'LAPTOP',
+        ):
+            with self.subTest(nombre=nombre):
+                self.assertIsNone(resolver_componente_desde_producto(nombre))
 
 
 class SincronizarPiezaStComponenteTest(SimpleTestCase):

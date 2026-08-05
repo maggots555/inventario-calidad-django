@@ -219,6 +219,9 @@ NOMBRE_COMPONENTE_EQUIPO_REACONDICIONADO = 'Equipo reacondicionado'
 
 PALABRAS_CLAVE_COMPONENTE = [
     (['SSD M.2', 'SSD M2', 'M.2 SSD', 'M2 SSD', 'NVME', 'NVME SSD'], 'SSD M.2'),
+    # EXPLICACIÓN: BRACKET debe ir ANTES (keywords más largas) que SSD/HDD genérico,
+    # si no "BRACKET SSD" caería en «Disco Duro / SSD» en lugar de «HDD/SSD Bracket».
+    (['BRACKET SSD', 'HDD/SSD BRACKET', 'SSD BRACKET', 'BRACKET'], 'HDD/SSD Bracket'),
     (['KEYBOARD WITH PALMREST', 'TECLADO CON PALMREST', 'KEYBOARD PALMREST'], 'Keyboard with Palmrest Assy'),
     (['FUENTE DE PODER', 'FUENTE DE ALIMENTACION', 'FUENTE DE ALIMENTACIÓN', 'POWER SUPPLY', 'PSU'], 'Fuente de Poder'),
     (['TARJETA GRAFICA', 'TARJETA GRÁFICA', 'TARJETA DE VIDEO', 'GRAPHICS CARD', 'GPU'], 'Tarjeta Gráfica (GPU)'),
@@ -226,13 +229,58 @@ PALABRAS_CLAVE_COMPONENTE = [
     (['DISCO', 'SSD', 'HDD', 'STORAGE'], 'Disco Duro / SSD'),
     (['TARJETA MADRE', 'MOTHERBOARD', 'MAINBOARD', 'MOBO', 'PLACA MADRE'], 'Motherboard'),
     (['MEMORIA RAM', 'SODIMM', 'SO-DIMM', 'MODULO DE MEMORIA', 'MÓDULO DE MEMORIA'], 'RAM'),
+    # Memorias USB: keywords específicas (NO "USB" solo) para no atrapar cables/hubs
+    (
+        [
+            'USB KINGSTON',
+            'MEMORIA USB',
+            'USB 32GB',
+            'USB 64GB',
+            'USB 128GB',
+            'PENDRIVE',
+            'FLASH DRIVE',
+        ],
+        'Memoria USB',
+    ),
+    # Paquetes de solución del catálogo Almacén (SOLUCION ORO/PLATA/PREMIUM)
+    (['SOLUCION PREMIUM', 'SOLUCIÓN PREMIUM'], 'Paquete Premium'),
+    (['SOLUCION ORO', 'SOLUCIÓN ORO'], 'Paquete Oro'),
+    (['SOLUCION PLATA', 'SOLUCIÓN PLATA'], 'Paquete Plata'),
     (['VENTILADOR', 'COOLER', 'COOLING', 'SISTEMA DE ENFRIAMIENTO'], 'Ventilador / Cooling'),
-    (['DISIPADOR DE CALOR', 'HEATSINK', 'HEAT SINK', 'PASTA TERMICA', 'PASTA TÉRMICA'], 'Disipador de calor'),
+    # Disipador: sin PASTA TERMICA (va al componente Pasta termica/Metal liquido)
+    (['DISIPADOR DE CALOR', 'HEATSINK', 'HEAT SINK'], 'Disipador de calor'),
+    # Pasta térmica del catálogo (P0190) → componente Scorecard «Pasta termica/Metal liquido»
+    (
+        [
+            'PASTA TERMICA',
+            'PASTA TÉRMICA',
+            'METAL LIQUIDO',
+            'METAL LÍQUIDO',
+            'THERMAL PASTE',
+            'THERMAL COMPOUND',
+        ],
+        'Pasta termica/Metal liquido',
+    ),
     (['REFRIGERACION LIQUIDA', 'REFRIGERACIÓN LIQUIDA', 'LIQUID COOLING', 'WATER COOLING'], 'Refrigeración liquida'),
     (['SISTEMA OPERATIVO', 'WINDOWS', 'REINSTALACION', 'REINSTALACIÓN', 'FORMATEO'], 'Sistema Operativo'),
-    (['LIMPIEZA Y MANTENIMIENTO', 'KIT DE LIMPIEZA', 'MANTENIMIENTO'], 'Limpieza y mantenimiento'),
+    # Limpieza y mantenimiento: servicio; KIT DE LIMPIEZA va a «Kit de Limpieza»
+    (['LIMPIEZA Y MANTENIMIENTO', 'MANTENIMIENTO'], 'Limpieza y mantenimiento'),
+    (['KIT DE LIMPIEZA', 'KIT LIMPIEZA', 'CLEANING KIT'], 'Kit de Limpieza'),
+    # Cable AC del cargador (P0120): debe ganar sobre keyword CARGADOR
+    (
+        [
+            'CABLE AC PARA CARGADOR',
+            'CABLE AC',
+            'CABLE DE AC',
+            'AC POWER CORD',
+            'POWER CORD AC',
+        ],
+        'Cable de AC',
+    ),
     (['CARGADOR', 'ADAPTADOR', 'ELIMINADOR', 'AC ADAPTER', 'POWER ADAPTER', 'CHARGER'], 'Cargador'),
     (['BATERÍA', 'BATERIA', 'PILA', 'BATTERY', 'ACUMULADOR'], 'Batería'),
+    # LCD ASSEMBLY (P0006): debe ganar sobre keyword genérica LCD → Pantalla
+    (['LCD ASSEMBLY', 'LCD ASSY', 'ENSAMBLE LCD', 'ENSAMBLE DE LCD'], 'LCD Assembly'),
     (['PANTALLA', 'LCD', 'DISPLAY', 'SCREEN', 'PANEL LCD', 'PANEL LED', 'MONITOR'], 'Pantalla'),
     (['TECLADO USB', 'USB KEYBOARD'], 'Teclado USB'),
     (['TECLADO', 'KEYBOARD', 'PALMREST'], 'Teclado'),
@@ -255,21 +303,91 @@ PALABRAS_CLAVE_COMPONENTE = [
     (['BOTON', 'BOTÓN', 'BUTTON'], 'Botón'),
     (['DC-IN', 'DCIN', 'DC IN', 'JACK DE CARGA', 'POWER JACK', 'CONECTOR DE CARGA'], 'DC-IN cable'),
     (['PILA CMOS', 'CMOS BATTERY', 'BIOS BATTERY', 'COIN CELL'], 'Pila CMOS'),
-    (['BISEL LCD', 'LCD BEZEL', 'BEZEL LCD', 'MARCO LCD'], 'Bisel LCD'),
-    (['BOTTOM COVER', 'BOTTOM CASE', 'TAPA INFERIOR', 'BASE INFERIOR'], 'Bottom Cover/Case'),
+    # BEZEL / BISEL solos: nombres reales del catálogo (P0026, P00261)
+    (['BISEL LCD', 'LCD BEZEL', 'BEZEL LCD', 'MARCO LCD', 'BEZEL', 'BISEL'], 'Bisel LCD'),
+    # BOTTOM BASE / BASE COVER / LOWER CASE: nombre real P0027 en Almacén
+    (
+        [
+            'BOTTOM COVER',
+            'BOTTOM CASE',
+            'BOTTOM BASE',
+            'BASE COVER',
+            'LOWER CASE',
+            'TAPA INFERIOR',
+            'BASE INFERIOR',
+        ],
+        'Bottom Cover/Case',
+    ),
     (['TOP COVER', 'LCD COVER', 'BACK LID', 'TAPA SUPERIOR'], 'Top Cover'),
     (['CUBRE BISAGRAS', 'HINGE COVER', 'TAPA BISAGRAS'], 'Cubre Bisagras'),
     (['CARCASA', 'CHASIS', 'HOUSING', 'CUBIERTA', 'PLASTICOS', 'PLÁSTICOS'], 'Carcasa / Chasis'),
     (['BASE DE COMPUTADORA', 'DESKTOP BASE', 'COMPUTER BASE'], 'Base de computadora'),
     (['BISAGRA', 'BISAGRAS', 'HINGE', 'HINGES', 'CHARNELA'], 'Bisagras'),
     (['BOCINA', 'BOCINAS', 'SPEAKER', 'SPEAKERS', 'ALTAVOZ', 'PARLANTE'], 'Bocinas / Audio'),
+    # Audífonos del catálogo (P0085) — distinto de bocinas internas
+    (['AUDIFONOS', 'AUDÍFONOS', 'AURICULARES', 'HEADPHONES', 'EARPHONES', 'HEADSET'], 'Audifonos'),
+    # Mochila / backpack (P1043) → componente «Backpack Laptop»
+    (['BACKPACK', 'BACK PACK', 'MOCHILA', 'MOCHILA LAPTOP', 'LAPTOP BAG'], 'Backpack Laptop'),
+    # Convertidor de video (P0076): keywords largas antes que CONVERTIDOR genérico → Cable
+    (
+        [
+            'CONVERTIDOR HDMI A VGA',
+            'CONVERTIDOR DE VIDEO',
+            'CONVERTIDOR HDMI',
+            'HDMI A VGA',
+            'HDMI TO VGA',
+            'VIDEO CONVERTER',
+        ],
+        'Convertidor de video',
+    ),
+    # Hub USB (P0118)
+    (['HUB TYPE C', 'HUB USB', 'USB HUB', 'HUB TYPE', 'TYPE C HUB'], 'Hub USB'),
+    # Tapete antiestático (P0187)
+    (
+        [
+            'TAPETE ANTIESTATICO',
+            'TAPETE ANTIESTÁTICO',
+            'ANTISTATIC MAT',
+            'ESD MAT',
+            'TAPETE ESD',
+        ],
+        'Tapete antiestatico',
+    ),
     (['MICROFONO', 'MICRÓFONO', 'MICROPHONE'], 'Micrófono'),
     (['CAMARA', 'CÁMARA', 'WEBCAM', 'WEB CAM'], 'Webcam'),
     (['MOUSE', 'RATON', 'RATÓN'], 'Mouse'),
     (['I/O BOARD', 'IO BOARD', 'PLACA IO'], 'I/O Board'),
+    # Lápiz óptico del catálogo (P0113) → Stylus (componente nuevo en Scorecard)
+    (
+        [
+            'LAPIZ OPTICO',
+            'LÁPIZ ÓPTICO',
+            'LAPIZ ÓPTICO',
+            'LÁPIZ OPTICO',
+            'STYLUS',
+            'ACTIVE PEN',
+            'PEN OPTICO',
+        ],
+        'Stylus',
+    ),
+    # Unidad óptica / DVD (P0038); también ayuda si el nombre del componente varía
+    (
+        [
+            'UNIDAD OPTICA',
+            'UNIDAD ÓPTICA',
+            'UNIDAD DE DVD',
+            'OPTICAL DRIVE',
+            'DVD DRIVE',
+            'LECTOR DVD',
+            'CD-ROM',
+            'DVD-ROM',
+        ],
+        'Unidad optica',
+    ),
     (['CABLE', 'BUS', 'HUB', 'CONVERTIDOR'], 'Cable'),
     (['RAM', 'MEMORIA', 'DIMM'], 'RAM'),
     (['ANTENA', 'ANTENAS', 'ANTENNA'], 'Wireless Antennas'),
+    (['TORNILLO', 'TORNILLOS', 'SCREW', 'SCREWS'], 'Tornillos'),
 ]
 
 # ============================================================================
