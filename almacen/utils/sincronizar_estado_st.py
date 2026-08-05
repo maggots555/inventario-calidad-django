@@ -3,9 +3,10 @@ Sincronización de estado de OrdenServicio (ST) desde cotizaciones de Almacén.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-Cuando Almacén notifica a Front, envía cotización al cliente o recibe respuesta,
-la orden en Servicio Técnico debe reflejar el mismo hito de workflow.
-Estas funciones centralizan ese cambio para no duplicar lógica en views y modelos.
+Cuando Almacén crea una solicitud con orden, notifica a Front, envía cotización
+al cliente o recibe respuesta, la orden en Servicio Técnico debe reflejar el
+mismo hito de workflow. Estas funciones centralizan ese cambio para no
+duplicar lógica en views y modelos.
 """
 
 from __future__ import annotations
@@ -22,8 +23,25 @@ logger = logging.getLogger('almacen')
 # (esperando_piezas, reparacion, etc.).
 ESTADO_ST_ESPERANDO_CLIENTE = 'cotizacion'
 
+# Destino al crear una solicitud de cotización CON orden vinculada
+ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR = 'cotizacion_enviada_proveedor'
+
 # Destino al avisar a Front que la cotización de proveedores ya está lista
 ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR = 'cotizacion_recibida_proveedor'
+
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Al crear la solicitud con orden, solo avanzamos desde fases previas
+# (diagnóstico, recepción, etc.) o desde «rechazada» (re-cotización).
+# Nunca desde cotizacion / esperando_piezas / reparación, etc.
+ESTADOS_ST_PERMITIDOS_PARA_CREAR_SOLICITUD = (
+    'almacen',
+    'espera',
+    'recepcion',
+    'diagnostico',
+    'equipo_diagnosticado',
+    'diagnostico_enviado_cliente',
+    'rechazada',  # Re-cotización tras rechazo: vuelve al hito de envío a proveedor
+)
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Al notificar a Front solo avanzamos desde estados previos al hito
@@ -73,6 +91,91 @@ ETIQUETAS_RESPUESTA_SOLICITUD = {
     'parcialmente_aprobada': 'parcialmente aprobada',
     'totalmente_rechazada': 'totalmente rechazada',
 }
+
+
+def sincronizar_estado_st_al_crear_solicitud(
+    solicitud: 'SolicitudCotizacion',
+    usuario=None,
+) -> bool:
+    """
+    Al crear una SolicitudCotizacion CON orden, pone la orden ST en
+    ``cotizacion_enviada_proveedor``.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el técnico ya tiene una OrdenServicio y crea la solicitud de
+    cotización en Almacén, el primer hito del workflow es «Envío de Cotización
+    al Proveedor». Si la solicitud es modo sin orden (aún no hay ST), o la
+    orden ya avanzó (esperando cliente, piezas, reparación…), no tocamos el
+    estado para no romper el flujo.
+
+    Args:
+        solicitud: SolicitudCotizacion recién creada (con o sin orden_servicio).
+        usuario: User opcional; si tiene empleado, se asocia al historial.
+
+    Returns:
+        bool: True si se cambió el estado; False si no aplica o se omitió.
+    """
+    # Sin orden vinculada (modo sin_orden_activa) no hay nada que actualizar en ST
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    # Ya está en el destino: no duplicar historial
+    if orden.estado == ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR:
+        return False
+
+    # Guardia anti-regresión: no pisar estados posteriores del flujo
+    if orden.estado not in ESTADOS_ST_PERMITIDOS_PARA_CREAR_SOLICITUD:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; crear solicitud NO cambia a "
+            f"'{ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR}' "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return False
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR
+    # OrdenServicio.save() crea HistorialOrden(tipo_evento='cambio_estado')
+    orden.save(update_fields=['estado'])
+
+    # Enriquecer historial con contexto de Almacén (quién creó / número solicitud)
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    etiquetas = dict(ESTADO_ORDEN_CHOICES)
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        ultimo.comentario = (
+            f'Cambio de estado al crear solicitud de cotización en Almacén: '
+            f'{etiquetas.get(estado_anterior, estado_anterior)} → '
+            f'{etiquetas.get(ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR, ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR)} '
+            f'(solicitud {solicitud.numero_solicitud})'
+        )
+        update_fields = ['comentario', 'es_sistema']
+        if empleado is not None:
+            ultimo.usuario = empleado
+            update_fields.append('usuario')
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=update_fields)
+
+    logger.info(
+        f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → {ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR} "
+        f"(crear solicitud, {solicitud.numero_solicitud})"
+    )
+    return True
 
 
 def sincronizar_estado_st_al_notificar_front(

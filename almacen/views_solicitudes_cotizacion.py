@@ -161,6 +161,11 @@ def crear_solicitud_cotizacion(request):
     2. POST: Valida ambos formularios
        - Si válidos: Guarda solicitud, líneas e imágenes, redirige a detalle
        - Si inválidos: Muestra errores
+
+    Efectos secundarios:
+    - Sin orden activa: push/campanita/email a Compras
+    - Con orden vinculada: sync ST → cotizacion_enviada_proveedor
+      (no aplica al vincular/crear FL después; es otro hilo)
     """
     if request.method == 'POST':
         form = SolicitudCotizacionForm(request.POST)
@@ -281,6 +286,32 @@ def crear_solicitud_cotizacion(request):
                     # Si falla la notificación, NO debe impedir que la solicitud
                     # se haya creado correctamente. Solo registramos el error.
                     logger.error(f"[COTIZACION] Error al notificar a Compras: {e}")
+
+            # =================================================================
+            # SYNC ST: con orden vinculada → «Envío de Cotización al Proveedor»
+            # =================================================================
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Si la solicitud nace YA ligada a una OrdenServicio (no es modo
+            # sin_orden_activa), el primer hito en ST es avisar que se pidió
+            # cotización a proveedores. El util tiene guardias anti-regresión
+            # (no pisa reparación, esperando piezas, etc.).
+            # NO se aplica al vincular/crear orden FL después: es otro hilo.
+            elif solicitud.orden_servicio_id:
+                try:
+                    from .utils.sincronizar_estado_st import (
+                        sincronizar_estado_st_al_crear_solicitud,
+                    )
+                    sincronizar_estado_st_al_crear_solicitud(
+                        solicitud,
+                        usuario=request.user,
+                    )
+                except Exception as e:
+                    # Si falla el sync de estado, la solicitud ya existe;
+                    # solo registramos el error para no perder el alta.
+                    logger.error(
+                        f"[COTIZACION] Error al sincronizar estado ST al crear "
+                        f"solicitud {solicitud.numero_solicitud}: {e}"
+                    )
 
             messages.success(
                 request,
