@@ -73,6 +73,12 @@ def construir_items_desde_solicitud(solicitud) -> List[Dict[str, Any]]:
             'es_necesaria': linea.es_necesaria,
             'dias_entrega': linea.tiempo_entrega_estimado,
             'es_servicio': False,
+            # Si ya se personalizó el % al enviar, el motor lo respeta
+            'profit_aplicado': (
+                float(linea.profit_aplicado)
+                if getattr(linea, 'profit_aplicado', None) is not None
+                else None
+            ),
         })
 
     for servicio in solicitud.servicios_adicionales.all():
@@ -130,10 +136,14 @@ def calcular_precios_cliente_solicitud(solicitud) -> Dict[str, Any]:
             continue
         precio_unit = Decimal(str(item.get('precio_unitario_cliente', 0)))
         subtotal = Decimal(str(item.get('subtotal_cliente', 0)))
-        precios_por_linea[int(linea_pk)] = {
+        profit_val = item.get('profit_aplicado')
+        entrada: Dict[str, Decimal] = {
             'precio_unitario_cliente': precio_unit,
             'subtotal_cliente_sin_iva': subtotal,
         }
+        if profit_val is not None:
+            entrada['profit_aplicado'] = Decimal(str(profit_val))
+        precios_por_linea[int(linea_pk)] = entrada
 
     return {
         'tipo_servicio': tipo_servicio,
@@ -172,10 +182,14 @@ def persistir_precios_cliente_solicitud(solicitud) -> bool:
     from almacen.models import LineaCotizacion
 
     for linea_pk, datos in precios_por_linea.items():
-        LineaCotizacion.objects.filter(pk=linea_pk).update(
-            precio_unitario_cliente=datos['precio_unitario_cliente'],
-            subtotal_cliente_sin_iva=datos['subtotal_cliente_sin_iva'],
-        )
+        update_kwargs = {
+            'precio_unitario_cliente': datos['precio_unitario_cliente'],
+            'subtotal_cliente_sin_iva': datos['subtotal_cliente_sin_iva'],
+        }
+        # Conservar el % efectivo usado al cotizar (auditoría / PDF coherente)
+        if 'profit_aplicado' in datos:
+            update_kwargs['profit_aplicado'] = datos['profit_aplicado']
+        LineaCotizacion.objects.filter(pk=linea_pk).update(**update_kwargs)
 
     solicitud.precio_total_sin_iva_cliente = resultado['precio_total_sin_iva_cliente']
     solicitud.precio_total_con_iva_cliente = resultado['precio_total_con_iva_cliente']

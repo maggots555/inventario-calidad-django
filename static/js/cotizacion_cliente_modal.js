@@ -21,23 +21,107 @@
 // Replica la lógica de pdf_cotizacion_cliente.py en TypeScript
 // ============================================================
 /**
- * Calcula el precio al cliente usando el perfil de profit seleccionado.
+ * Calcula el precio al cliente usando profit por pieza (perfil + overrides).
  *
- * Fórmula (espejo exacto del backend Python en pdf_cotizacion_cliente.py):
+ * Fórmula (espejo del backend en profit_por_pieza.py / pdf_cotizacion_cliente.py):
  *
- *   precio_piezas_sin_iva = costoPiezas / (1 - profit%)
- *   precio_sin_iva        = precio_piezas_sin_iva   // sin sumar diagnóstico
- *   precio_con_iva        = precio_sin_iva * 1.16
+ *   por cada pieza: precio_unit = costo / (1 - profit_efectivo)
+ *   profit_efectivo = max(override o perfil, mínimo_por_costo_unitario)
  *
- * El diagnóstico se cobra al ingresar el equipo y NO se diluye ni se
- * descuenta en la cotización de reparación.
  * Los costos fijos y la mano de obra NO inflan el precio al cliente; solo
  * alimentan la ganancia bruta de control interno.
  *
  * @param tipo         - Perfil de servicio ('estandar', 'alta_gama', etc.)
- * @param costoTotal   - Suma de costos internos de piezas (sin servicios adicionales)
- * @param manoObra     - Mano de obra interna (solo auditoría, no precio cliente)
+ * @param lineas       - Piezas activas con costo unitario y cantidad
+ * @param profitPorPk  - Mapa pk → profit fracción elegido en el modal
+ * @param rangos       - Rangos de mínimo por costo unitario
+ * @param manoObra     - Mano de obra interna (solo auditoría)
  * @returns ResultadoCalculo con todos los valores
+ */
+function calcularPrecioClientePorPiezas(tipo, lineas, profitPorPk, rangos, manoObra) {
+    var _a, _b, _c, _d;
+    const cfg = (_b = (_a = window.COTIZACION_CLIENTE_CONFIG) === null || _a === void 0 ? void 0 : _a.profitConfig) === null || _b === void 0 ? void 0 : _b[tipo];
+    const profitPerfil = (_c = cfg === null || cfg === void 0 ? void 0 : cfg.profit_target) !== null && _c !== void 0 ? _c : 0.36;
+    const costosFijos = (_d = cfg === null || cfg === void 0 ? void 0 : cfg.costos_fijos) !== null && _d !== void 0 ? _d : [25, 160];
+    const costosFijosTotal = costosFijos.reduce((a, b) => a + b, 0);
+    let costoTotal = 0;
+    let precioPiezasSinIva = 0;
+    let sumaProfitPonderado = 0;
+    // Paso a paso: cada pieza con su propio margen (mínimo según costo unitario)
+    for (const linea of lineas) {
+        const costoUnit = linea.costo;
+        const cantidad = linea.cantidad;
+        costoTotal += costoUnit * cantidad;
+        const override = profitPorPk[linea.pk];
+        const profit = resolverProfitLineaTs(costoUnit, profitPerfil, override !== undefined ? override : null, rangos);
+        const precioUnit = costoUnit > 0 && profit < 1
+            ? costoUnit / (1 - profit)
+            : costoUnit;
+        const subtotal = Math.round(precioUnit * cantidad * 100) / 100;
+        precioPiezasSinIva += subtotal;
+        sumaProfitPonderado += profit * (costoUnit * cantidad);
+    }
+    precioPiezasSinIva = Math.round(precioPiezasSinIva * 100) / 100;
+    const precioSinIva = precioPiezasSinIva;
+    const precioConIva = precioSinIva * 1.16;
+    // Profit “promedio” ponderado por costo (solo para la fila resumen)
+    const profitPromedio = costoTotal > 0
+        ? sumaProfitPonderado / costoTotal
+        : profitPerfil;
+    const totalCostosExcel = costoTotal + manoObra + costosFijosTotal;
+    const gananciaBrutaDinero = precioPiezasSinIva - totalCostosExcel;
+    const gananciaBrutaPct = precioPiezasSinIva > 0
+        ? gananciaBrutaDinero / precioPiezasSinIva
+        : 0;
+    return {
+        subtotal_costo: costoTotal,
+        precio_piezas_sin_iva: precioPiezasSinIva,
+        precio_sin_iva: precioSinIva,
+        precio_con_iva: precioConIva,
+        diagnostico: 0,
+        precio_menos_diag_iva: precioConIva,
+        costos_fijos_total: costosFijosTotal,
+        porcentaje_profit: profitPromedio,
+        mano_obra: manoObra,
+        ganancia_bruta_dinero: gananciaBrutaDinero,
+        ganancia_bruta_pct: gananciaBrutaPct,
+    };
+}
+/**
+ * Profit mínimo según costo unitario (espejo de obtener_profit_minimo en Python).
+ */
+function obtenerProfitMinimoTs(costoUnitario, rangos) {
+    const costo = Math.max(0, costoUnitario);
+    for (const rango of rangos) {
+        if (rango.costo_max === null) {
+            if (costo >= rango.costo_min)
+                return rango.profit_minimo;
+        }
+        else if (costo >= rango.costo_min && costo < rango.costo_max) {
+            return rango.profit_minimo;
+        }
+    }
+    return 0.20;
+}
+/**
+ * max(override|perfil, mínimo del rango). Espejo de resolver_profit_linea.
+ */
+function resolverProfitLineaTs(costoUnitario, profitPerfil, profitOverride, rangos) {
+    const minimo = obtenerProfitMinimoTs(costoUnitario, rangos);
+    let base = profitOverride !== null && !Number.isNaN(profitOverride)
+        ? profitOverride
+        : profitPerfil;
+    if (base >= 1)
+        base = 0.99;
+    if (base < 0)
+        base = 0;
+    return Math.max(base, minimo);
+}
+/**
+ * Calcula el precio al cliente usando el perfil de profit seleccionado (legacy 1 %).
+ *
+ * Conservada por compatibilidad; la calculadora del modal usa
+ * calcularPrecioClientePorPiezas().
  */
 function calcularPrecioCliente(tipo, costoTotal, manoObra) {
     var _a, _b, _c, _d;
@@ -45,11 +129,9 @@ function calcularPrecioCliente(tipo, costoTotal, manoObra) {
     const profit = (_c = cfg === null || cfg === void 0 ? void 0 : cfg.profit_target) !== null && _c !== void 0 ? _c : 0.36;
     const costosFijos = (_d = cfg === null || cfg === void 0 ? void 0 : cfg.costos_fijos) !== null && _d !== void 0 ? _d : [25, 160];
     const costosFijosTotal = costosFijos.reduce((a, b) => a + b, 0);
-    // Margen SOLO sobre piezas; el diagnóstico ya no se suma al total de reparación
     const precioPiezasSinIva = profit < 1 ? costoTotal / (1 - profit) : costoTotal;
     const precioSinIva = precioPiezasSinIva;
     const precioConIva = precioSinIva * 1.16;
-    // Métricas de control interno (no van al cliente)
     const totalCostosExcel = costoTotal + manoObra + costosFijosTotal;
     const gananciaBrutaDinero = precioPiezasSinIva - totalCostosExcel;
     const gananciaBrutaPct = precioPiezasSinIva > 0
@@ -93,7 +175,7 @@ function esItemCotizable(estado) {
 // Se ejecuta cuando el DOM está listo
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    var _a;
+    var _a, _b, _c, _d, _e;
     // --- Leer la configuración inyectada por Django ---
     const config = window
         .COTIZACION_CLIENTE_CONFIG;
@@ -135,9 +217,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailDetectado = ((_a = config.emailDetectado) !== null && _a !== void 0 ? _a : '').trim();
     // --- Botones de tipo de servicio (visual radials) ---
     const botonesTipo = document.querySelectorAll('.servicio-tipo-btn');
-    // Estado del desglose expandible: false = colapsado, true = expandido.
-    // Se mantiene entre recalculaciones para no perder la posición del usuario.
-    let desgloseAbierto = false;
+    // Desglose abierto por defecto: ahí están los inputs de profit por pieza
+    let desgloseAbierto = true;
+    // Profit personalizado por pieza (pk → fracción 0–1). El perfil es el default.
+    const rangosProfit = (_b = config.rangosProfitMinimo) !== null && _b !== void 0 ? _b : [];
+    const profitPorPieza = {};
+    /**
+     * Reinicia cada pieza al % del perfil (elevado al mínimo del rango).
+     * Se llama al cambiar de Mostrador/Estándar/etc. para no mezclar overrides viejos.
+     */
+    function reiniciarProfitDesdePerfil(tipo) {
+        var _a, _b, _c;
+        const perfil = (_c = (_b = (_a = config.profitConfig) === null || _a === void 0 ? void 0 : _a[tipo]) === null || _b === void 0 ? void 0 : _b.profit_target) !== null && _c !== void 0 ? _c : 0.36;
+        for (const linea of config.lineas) {
+            if (!esItemCotizable(linea.estado_cliente || 'pendiente'))
+                continue;
+            // Si ya había profit guardado en BD y es el primer arranque, lo respetamos
+            // solo cuando el mapa aún está vacío para esa pk (ver inicialización abajo).
+            profitPorPieza[linea.pk] = resolverProfitLineaTs(linea.costo, perfil, null, rangosProfit);
+        }
+    }
+    // Arranque: perfil activo del modal, o profit_aplicado ya persistido
+    {
+        const tipoInicial = (tipoServicioInput === null || tipoServicioInput === void 0 ? void 0 : tipoServicioInput.value) || 'estandar';
+        const perfilInicial = (_e = (_d = (_c = config.profitConfig) === null || _c === void 0 ? void 0 : _c[tipoInicial]) === null || _d === void 0 ? void 0 : _d.profit_target) !== null && _e !== void 0 ? _e : 0.36;
+        for (const linea of config.lineas) {
+            if (!esItemCotizable(linea.estado_cliente || 'pendiente'))
+                continue;
+            if (linea.profit_aplicado !== null && linea.profit_aplicado !== undefined) {
+                profitPorPieza[linea.pk] = resolverProfitLineaTs(linea.costo, perfilInicial, Number(linea.profit_aplicado), rangosProfit);
+            }
+            else {
+                profitPorPieza[linea.pk] = resolverProfitLineaTs(linea.costo, perfilInicial, null, rangosProfit);
+            }
+        }
+    }
+    /** Serializa el mapa de profit para API/preview */
+    function serializarProfitPorPieza() {
+        return JSON.stringify(profitPorPieza);
+    }
     // --------------------------------------------------------
     // FUNCIÓN: Sincronizar tarjeta de email con el input editable
     // Muestra en tiempo real qué correo se enviará al cliente.
@@ -218,6 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const tipo = (_a = btn.dataset['tipo']) !== null && _a !== void 0 ? _a : 'estandar';
             if (tipoServicioInput)
                 tipoServicioInput.value = tipo;
+            // Al cambiar perfil: resetear % de cada pieza al default del nuevo perfil
+            reiniciarProfitDesdePerfil(tipo);
             // Recalcular y mostrar resultado
             actualizarCalculadora();
         });
@@ -245,16 +365,47 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns Cadena HTML con el contenido del panel .calc-desglose-panel
      */
     function renderDesgloseHTML() {
+        var _a, _b, _c;
         const lineasCotizables = config.lineas.filter(l => esItemCotizable(l.estado_cliente || 'pendiente'));
         const lineasExcluidas = config.lineas.filter(l => !esItemCotizable(l.estado_cliente || 'pendiente'));
         const serviciosCotizables = config.servicios.filter(s => esItemCotizable(s.estado_cliente || 'pendiente'));
         const serviciosExcluidos = config.servicios.filter(s => !esItemCotizable(s.estado_cliente || 'pendiente'));
+        const tipoActual = (tipoServicioInput === null || tipoServicioInput === void 0 ? void 0 : tipoServicioInput.value) || 'estandar';
+        const perfilActual = (_c = (_b = (_a = config.profitConfig) === null || _a === void 0 ? void 0 : _a[tipoActual]) === null || _b === void 0 ? void 0 : _b.profit_target) !== null && _c !== void 0 ? _c : 0.36;
+        // Cada pieza: input de % + precio resultante en vivo
         const filasLineas = lineasCotizables.map(l => {
+            var _a;
             const cantTxt = l.cantidad > 1 ? ` <span class="desglose-cant">× ${l.cantidad}</span>` : '';
+            const minimo = obtenerProfitMinimoTs(l.costo, rangosProfit);
+            const profit = resolverProfitLineaTs(l.costo, perfilActual, (_a = profitPorPieza[l.pk]) !== null && _a !== void 0 ? _a : null, rangosProfit);
+            const precioUnit = l.costo > 0 && profit < 1 ? l.costo / (1 - profit) : l.costo;
+            const subtotal = Math.round(precioUnit * l.cantidad * 100) / 100;
+            const pctMostrar = Math.round(profit * 1000) / 10; // 1 decimal
+            const minPct = Math.round(minimo * 100);
             return `
-            <div class="calc-desglose-item">
-                <span class="desglose-nombre">${l.nombre}${cantTxt}</span>
-                <span class="desglose-val">${fmtPeso(l.costo * l.cantidad)}</span>
+            <div class="calc-desglose-item calc-desglose-item-profit" data-linea-pk="${l.pk}">
+                <div class="desglose-profit-fila">
+                    <span class="desglose-nombre">${l.nombre}${cantTxt}</span>
+                    <span class="desglose-val">${fmtPeso(l.costo * l.cantidad)}</span>
+                </div>
+                <div class="desglose-profit-controles">
+                    <label class="desglose-profit-label" for="profitPieza_${l.pk}">
+                        Profit %
+                        <small class="text-muted">(mín. ${minPct}%)</small>
+                    </label>
+                    <input type="number"
+                           class="form-control form-control-sm profit-pieza-input"
+                           id="profitPieza_${l.pk}"
+                           data-linea-pk="${l.pk}"
+                           data-minimo="${minimo}"
+                           min="${minPct}"
+                           max="99"
+                           step="0.5"
+                           value="${pctMostrar}">
+                    <span class="desglose-precio-cliente" title="Precio al cliente sin IVA">
+                        → ${fmtPeso(subtotal)}
+                    </span>
+                </div>
             </div>`;
         }).join('');
         const filasLineasExcluidas = lineasExcluidas.map(l => `
@@ -279,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : '';
         return `
             ${lineasCotizables.length > 0
-            ? `<div class="calc-desglose-grupo-titulo">Piezas en cotización (${lineasCotizables.length})</div>${filasLineas}`
+            ? `<div class="calc-desglose-grupo-titulo">Piezas en cotización (${lineasCotizables.length}) — ajusta el profit por pieza</div>${filasLineas}`
             : '<div class="calc-desglose-vacio">Sin piezas activas para cotizar</div>'}
             ${filasLineasExcluidas}
             ${filasServicios}
@@ -344,8 +495,8 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             return;
         }
-        // Profit solo sobre piezas (sin diluir ni descontar diagnóstico)
-        const res = calcularPrecioCliente(tipo, costoLineas, manoObra);
+        // Profit por pieza (perfil + overrides del modal)
+        const res = calcularPrecioClientePorPiezas(tipo, lineasActivas, profitPorPieza, rangosProfit, manoObra);
         // EXPLICACIÓN: servicios ya vienen con IVA; su parte sin IVA se obtiene ÷ 1.16
         const serviciosSinIva = serviciosConIva > 0 ? serviciosConIva / 1.16 : 0;
         const subtotalSinIvaTotal = res.precio_sin_iva + serviciosSinIva;
@@ -373,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="val">${fmtPeso(res.costos_fijos_total)}</span>
             </div>
             <div class="calc-row">
-                <span class="etq">Profit aplicado (solo sobre costo de piezas)</span>
+                <span class="etq">Profit promedio ponderado (editable por pieza arriba)</span>
                 <span class="val">${fmtPct(res.porcentaje_profit)}</span>
             </div>
             <div class="calc-row">
@@ -403,6 +554,48 @@ document.addEventListener('DOMContentLoaded', () => {
         // Invertir el estado y volver a renderizar la calculadora con el nuevo estado
         desgloseAbierto = !desgloseAbierto;
         actualizarCalculadora();
+    });
+    // --------------------------------------------------------
+    // EVENTO: Cambio de profit % por pieza (inputs del desglose)
+    // --------------------------------------------------------
+    calcBody === null || calcBody === void 0 ? void 0 : calcBody.addEventListener('change', (e) => {
+        var _a;
+        const input = e.target.closest('input.profit-pieza-input');
+        if (!input)
+            return;
+        const pk = Number(input.dataset.lineaPk);
+        const minimo = Number((_a = input.dataset.minimo) !== null && _a !== void 0 ? _a : '0');
+        let pct = parseFloat(input.value);
+        if (Number.isNaN(pct))
+            pct = minimo * 100;
+        // Clampar en UI al mínimo y a 99%
+        const minPct = minimo * 100;
+        if (pct < minPct)
+            pct = minPct;
+        if (pct >= 100)
+            pct = 99;
+        profitPorPieza[pk] = pct / 100;
+        // Mantener desglose abierto al editar
+        desgloseAbierto = true;
+        actualizarCalculadora();
+    });
+    calcBody === null || calcBody === void 0 ? void 0 : calcBody.addEventListener('input', (e) => {
+        var _a;
+        // Feedback inmediato al teclear (sin esperar blur/change)
+        const input = e.target.closest('input.profit-pieza-input');
+        if (!input)
+            return;
+        const pk = Number(input.dataset.lineaPk);
+        const minimo = Number((_a = input.dataset.minimo) !== null && _a !== void 0 ? _a : '0');
+        let pct = parseFloat(input.value);
+        if (Number.isNaN(pct))
+            return;
+        const minPct = minimo * 100;
+        if (pct < minPct)
+            pct = minPct;
+        if (pct >= 100)
+            pct = 99;
+        profitPorPieza[pk] = pct / 100;
     });
     // --------------------------------------------------------
     // EVENTO: Botón "Generar preview" del PDF
@@ -435,13 +628,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const tipo = tipoServicioInput.value || 'estandar';
-        // Construir la URL del preview con parámetros.
-        // mano_de_obra_override=0: la mano de obra ya no entra en la cotización al cliente.
-        // El descuento de diagnóstico ya no existe (reparación se abona completa).
+        // Construir la URL del preview con parámetros + profit por pieza
         const params = new URLSearchParams({
             tipo_servicio: tipo,
             mano_de_obra_override: '0',
+            profit_por_pieza: serializarProfitPorPieza(),
         });
+        const radioAgrupacion = document.querySelector('input[name="modo_agrupacion"]:checked');
+        if (radioAgrupacion === null || radioAgrupacion === void 0 ? void 0 : radioAgrupacion.value) {
+            params.set('modo_agrupacion', radioAgrupacion.value);
+        }
         const url = `${config.urlPreview}?${params.toString()}`;
         // Mostrar spinner en el botón mientras carga
         btnPreviewPDF.disabled = true;
@@ -509,6 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('modo_cotizacion', 'reparacion');
                 formData.append('tipo_servicio', tipoServicioInput.value || 'estandar');
                 formData.append('mano_de_obra_override', '0');
+                formData.append('profit_por_pieza', serializarProfitPorPieza());
                 const radioAgrupacion = document.querySelector('input[name="modo_agrupacion"]:checked');
                 formData.append('modo_agrupacion', (_h = radioAgrupacion === null || radioAgrupacion === void 0 ? void 0 : radioAgrupacion.value) !== null && _h !== void 0 ? _h : 'todo_junto');
             }

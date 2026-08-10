@@ -222,6 +222,49 @@
     border-bottom: none;
 }
 
+/* Pieza con control de profit editable (modal reparación) */
+.calc-desglose-item-profit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding-top: 6px;
+    padding-bottom: 8px;
+}
+
+.desglose-profit-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    width: 100%;
+}
+
+.desglose-profit-controles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-left: 0;
+}
+
+.desglose-profit-label {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    margin: 0;
+    white-space: nowrap;
+}
+
+.profit-pieza-input {
+    width: 5.5rem;
+    max-width: 100%;
+}
+
+.desglose-precio-cliente {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--primary-color, #1f6391);
+    white-space: nowrap;
+}
+
 .desglose-nombre {
     color: var(--gray-600);
     flex: 1;
@@ -634,6 +677,14 @@
 
 [data-bs-theme="dark"] .calc-desglose-item {
     border-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .desglose-precio-cliente {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .desglose-profit-label {
+    color: #94a3b8;
 }
 
 [data-bs-theme="dark"] .desglose-nombre {

@@ -74,6 +74,12 @@ def serializar_linea_cotizacion(linea) -> Dict[str, Any]:
         'dias_entrega': linea.tiempo_entrega_estimado,
         'es_servicio': False,
         'estado_cliente': linea.estado_cliente,
+        # % personalizado al enviar; el motor de profit lo usa si existe
+        'profit_aplicado': (
+            float(linea.profit_aplicado)
+            if getattr(linea, 'profit_aplicado', None) is not None
+            else None
+        ),
     }
 
 

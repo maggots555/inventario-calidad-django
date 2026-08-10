@@ -663,23 +663,31 @@ def enviar_cotizacion_cliente_task(
             }
             info_equipo_reac = datos_equipo_reac or {}
         else:
-            from .utils.pdf_cotizacion_cliente import calcular_precio_cliente
-            total_piezas_costo = sum(
-                float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
-                for item in items
-                if not item.get('es_servicio')
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # El resumen del email DEBE usar el mismo motor que el PDF/modal:
+            # profit por pieza (profit_override / profit_aplicado), NO un solo %
+            # del perfil sobre la suma de costos (eso descuadraba el total).
+            from .utils.pdf_cotizacion_cliente import (
+                TIPO_SERVICIO_NOMBRES,
+                calcular_precios_items_cotizacion,
             )
-            servicios_con_iva = sum(
-                float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
-                for item in items
-                if item.get('es_servicio')
-            )
-            calculo_resumen = calcular_precio_cliente(
-                costo_piezas=total_piezas_costo,
+            calculo_items = calcular_precios_items_cotizacion(
+                items=items or [],
                 tipo_servicio=tipo_servicio,
                 incluir_descuento_diagnostico=False,
-                servicios_con_iva=servicios_con_iva,
+                mano_de_obra_override=mano_de_obra_override,
             )
+            calculo_resumen = {
+                'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(
+                    tipo_servicio, 'Cotización'
+                ),
+                'precio_sin_iva': calculo_items.get('precio_sin_iva', 0),
+                'iva': calculo_items.get('iva', 0),
+                'precio_con_iva': calculo_items.get('precio_con_iva', 0),
+                'precio_menos_diagnostico': None,
+                'diagnostico': 0,
+                'profit_target': None,
+            }
             info_equipo_reac = None
 
         # Construir el nombre del título de la propuesta para el asunto del email

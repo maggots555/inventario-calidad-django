@@ -345,28 +345,49 @@ def calcular_precio_cliente(
     mano_de_obra_override: float = 0,
 ) -> Dict[str, Any]:
     """
-    Calcula los precios al cliente según la matriz de profit de SIC.
+    Resumen de precios al cliente con UN solo % de profit (el del perfil).
 
-    EXPLICACIÓN:
-    El margen se aplica ÚNICAMENTE sobre el costo de piezas físicas.
-    El diagnóstico NO se incluye en la cotización de reparación (se cobra
-    al ingresar el equipo). El parámetro ``incluir_descuento_diagnostico``
-    se conserva por compatibilidad pero siempre se ignora.
-    Los costos fijos y la mano de obra NO inflan el precio; solo alimentan
-    las métricas de ganancia bruta para control interno.
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta función aplica el margen del perfil (Mostrador, Estándar, etc.)
+    sobre la **suma** de costos de piezas:
 
-    Los servicios adicionales (servicios_con_iva) ya traen IVA y profit incluidos
-    al registrarse; se suman al final sin aplicar margen adicional.
+        precio_piezas = Σ(costos) / (1 − profit_del_perfil)
+
+    No conoce overrides por pieza ni ``LineaCotizacion.profit_aplicado``.
+    Si cada pieza tiene un % distinto, el total aquí **no coincidirá** con
+    el modal, el PDF ni el correo de cotización al cliente.
+
+    Cuándo SÍ usarla
+    ----------------
+    - Estimaciones rápidas / métricas internas con un solo perfil.
+    - Tests unitarios de la fórmula “perfil único”.
+    - Casos donde todas las piezas comparten el mismo % y solo tienes el
+      costo total (sin lista de líneas).
+
+    Cuándo NO usarla (usar ``calcular_precios_items_cotizacion``)
+    ------------------------------------------------------------
+    - PDF de reparación, preview del modal, envío Celery / resumen del email.
+    - Persistencia de ``precio_unitario_cliente`` / ``profit_aplicado``.
+    - Cualquier flujo con ``profit_override`` o profit personalizado por pieza.
+
+    El diagnóstico NO entra en la cotización de reparación (se cobra al
+    ingresar el equipo). ``incluir_descuento_diagnostico`` es legacy e ignorado.
+    Costos fijos y mano de obra NO inflan el precio al cliente; solo alimentan
+    la ganancia bruta de auditoría. Los servicios adicionales
+    (``servicios_con_iva``) ya traen IVA/profit al registrarse y se suman
+    al final sin margen extra.
 
     Args:
         costo_piezas                  : Costo interno total de piezas (lista o número).
-        tipo_servicio                 : Clave del tipo ('mostrador', 'estandar', etc.)
-        incluir_descuento_diagnostico : Legacy; ya no aplica descuento de diagnóstico.
+        tipo_servicio                 : Clave del perfil ('mostrador', 'estandar', etc.).
+        incluir_descuento_diagnostico : Legacy; siempre se ignora.
         servicios_con_iva             : Suma de servicios adicionales (IVA incluido).
         mano_de_obra_override         : Mano de obra interna (solo auditoría).
 
     Returns:
-        Dict con precios sin IVA, con IVA y métricas de control.
+        Dict con ``servicio_nombre``, ``precio_sin_iva``, ``iva``,
+        ``precio_con_iva``, ``profit_target`` y métricas de control interno.
     """
     # Paso 1: leer parámetros vigentes (panel o .env) en cada cálculo
     profit_cfg = _profit_config_vigente()
@@ -451,9 +472,8 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     Calcula el precio unitario al cliente para UN solo ítem (aproximación).
 
     EXPLICACIÓN:
-    Aplica solo el factor de margen sobre el costo unitario. El diagnóstico
-    ya no se redistribuye entre líneas. Para cotizaciones completas usar
-    siempre calcular_precios_items_cotizacion().
+    Aplica el margen del perfil (elevado al mínimo por costo unitario).
+    Para cotizaciones completas usar siempre calcular_precios_items_cotizacion().
 
     Args:
         costo_unitario  : Costo interno de la pieza/servicio.
@@ -462,11 +482,38 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     Returns:
         float: Precio al cliente sin IVA (aproximado, sin contexto de cotización).
     """
+    from almacen.utils.profit_por_pieza import (
+        calcular_precio_unitario_con_profit,
+        resolver_profit_linea,
+    )
+
     profit_cfg = _profit_config_vigente()
     if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
-    factor = 1 - profit_cfg[tipo_servicio]['profit_target']
-    return float(costo_unitario) / factor
+    profit = resolver_profit_linea(
+        costo_unitario,
+        profit_cfg[tipo_servicio]['profit_target'],
+    )
+    return float(calcular_precio_unitario_con_profit(costo_unitario, profit))
+
+
+def _profit_override_de_item(item: Dict) -> Optional[float]:
+    """
+    Lee el % de profit personalizado de un ítem (modal o BD).
+
+    Prioridad: profit_override (request) → profit_aplicado (persistido).
+
+    Args:
+        item: Dict de pieza con posibles claves de margen.
+
+    Returns:
+        float o None si debe usarse solo el perfil.
+    """
+    if item.get('profit_override') is not None and item.get('profit_override') != '':
+        return float(item['profit_override'])
+    if item.get('profit_aplicado') is not None and item.get('profit_aplicado') != '':
+        return float(item['profit_aplicado'])
+    return None
 
 
 def calcular_precios_items_cotizacion(
@@ -479,27 +526,36 @@ def calcular_precios_items_cotizacion(
     Calcula precios al cliente por ítem y totales (misma lógica que el PDF).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función centraliza el cálculo de profit usado por el PDF y por la
-    persistencia de precios al aprobar líneas en Almacén.
+    --------------------------------
+    Cada pieza puede tener su propio % de profit (personalizable en el modal).
+    El perfil (Mostrador/Estándar/…) es el punto de partida; el mínimo según
+    costo unitario nunca se viola. Fórmula por pieza:
+        precio_unitario = costo_unitario / (1 - profit_efectivo)
 
-    El margen solo aplica sobre piezas. El diagnóstico NO se reparte entre
-    líneas ni se resta del total: se cobra aparte al ingresar el equipo.
-    Costos fijos y mano de obra son métricas internas que no inflan el precio.
+    Servicios adicionales no llevan profit extra. Costos fijos y mano de obra
+    solo alimentan la ganancia bruta de auditoría (no inflan el precio).
 
     Args:
-        items                         : Lista de dicts con costo_unitario, cantidad, es_servicio, etc.
+        items                         : Dicts con costo_unitario, cantidad, es_servicio;
+                                        opcional profit_override / profit_aplicado.
         tipo_servicio                 : Perfil de profit (mostrador, estandar, etc.).
         incluir_descuento_diagnostico : Legacy; ya no aplica (siempre sin descuento).
         mano_de_obra_override         : Mano de obra sin IVA (solo auditoría interna).
 
     Returns:
-        Dict con items_calculados y totales (precio_sin_iva, precio_con_iva, etc.).
+        Dict con items_calculados (incl. profit_aplicado) y totales.
     """
+    from almacen.utils.profit_por_pieza import (
+        calcular_precio_unitario_con_profit,
+        resolver_profit_linea,
+    )
+
     # Parámetros vigentes del panel (o .env si aún no hay filas en BD)
     profit_cfg = _profit_config_vigente()
     if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
     perfil = profit_cfg[tipo_servicio]
+    profit_perfil = float(perfil['profit_target'])
     mano_obra = float(mano_de_obra_override or 0)
     # Legacy: el parámetro se ignora (ya no hay descuento de diagnóstico)
     _ = incluir_descuento_diagnostico
@@ -512,46 +568,64 @@ def calcular_precios_items_cotizacion(
     precio_sin_iva_piezas = 0.0
     precio_con_iva_piezas = 0.0
     matematica: Dict[str, float] = {}
+    suma_costos_brutos = 0.0
 
     if not solo_servicios:
-        items_brutos: List[Dict] = []
-        suma_costos_brutos = 0.0
-
+        # Paso 1: precio independiente por pieza (profit propio + mínimo)
         for idx, item in enumerate(items):
             if item.get('es_servicio'):
                 continue
             costo_unit = float(item.get('costo_unitario', 0) or 0)
             cantidad = int(item.get('cantidad', 1) or 1)
-            subtotal_bruto = costo_unit * cantidad
-            suma_costos_brutos += subtotal_bruto
-            items_brutos.append({
-                'idx': idx,
-                **item,
-                '_costo_unit_bruto': costo_unit,
-                '_subtotal_bruto': subtotal_bruto,
-                '_cantidad': cantidad,
-            })
+            suma_costos_brutos += costo_unit * cantidad
 
-        # diagnostico=0: no diluir cargo de evaluación en las piezas
+            # Override del modal o % ya guardado en LineaCotizacion
+            override = _profit_override_de_item(item)
+            profit_efectivo = resolver_profit_linea(
+                costo_unit,
+                profit_perfil,
+                profit_override=override,
+            )
+            precio_unit = calcular_precio_unitario_con_profit(costo_unit, profit_efectivo)
+            subtotal = _redondear_2(precio_unit * cantidad)
+
+            item_limpio = {k: v for k, v in item.items() if not k.startswith('_')}
+            items_calculados_map[idx] = {
+                **item_limpio,
+                'precio_unitario_cliente': float(precio_unit),
+                'subtotal_cliente': float(subtotal),
+                'profit_aplicado': float(profit_efectivo),
+            }
+            precio_sin_iva_piezas += float(subtotal)
+
+        precio_sin_iva_piezas = round(precio_sin_iva_piezas, 2)
+        precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
+
+        # Paso 2: métricas de control interno (fijos/MO no inflan precio)
+        # Usamos el profit del perfil solo como referencia de auditoría global;
+        # el precio real ya salió de la suma por pieza.
         matematica = _calcular_matematica_profit(
             suma_costos_brutos=suma_costos_brutos,
-            profit_target=perfil['profit_target'],
+            profit_target=profit_perfil,
             diagnostico=0,
             costos_fijos=perfil['costos_fijos'],
             mano_obra=mano_obra,
         )
-        precio_sin_iva_piezas = matematica['precio_final_sin_iva']
-
-        if suma_costos_brutos > 0:
-            items_calculados_map = _redistribuir_precios_items(
-                items_brutos=items_brutos,
-                precio_final_sin_iva=precio_sin_iva_piezas,
-                factor_redistrib=matematica['factor_redistrib'],
-            )
-
-        # Sin piezas no inventamos línea "Servicio de reparación" por diagnóstico:
-        # ese cargo ya no pertenece a la cotización de reparación.
-        precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
+        # Sustituir precio de piezas por la suma real (puede diferir si hay overrides)
+        matematica = {
+            **matematica,
+            'precio_piezas_sin_iva': precio_sin_iva_piezas,
+            'precio_final_sin_iva': precio_sin_iva_piezas,
+        }
+        # Recalcular ganancia bruta con el total real cobrado
+        costos_fijos_total = float(matematica.get('suma_costos_fijos', 0) or 0)
+        total_costos_excel = suma_costos_brutos + mano_obra + costos_fijos_total
+        ganancia = precio_sin_iva_piezas - total_costos_excel
+        matematica['total_costos_excel'] = round(total_costos_excel, 2)
+        matematica['ganancia_bruta_dinero'] = round(ganancia, 2)
+        matematica['ganancia_bruta_porcentaje'] = (
+            ganancia / precio_sin_iva_piezas if precio_sin_iva_piezas > 0 else 0.0
+        )
 
     suma_servicios_con_iva = 0.0
     suma_servicios_sin_iva = 0.0
@@ -573,6 +647,7 @@ def calcular_precios_items_cotizacion(
             **item_limpio,
             'precio_unitario_cliente': round(precio_unit_sin_iva, 2),
             'subtotal_cliente': round(subtotal_sin_iva, 2),
+            'profit_aplicado': None,
         }
 
     items_calculados: List[Dict] = []

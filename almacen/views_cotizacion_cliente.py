@@ -260,9 +260,23 @@ def api_enviar_cotizacion_cliente(request, pk):
 
         # --- 4. VALIDAR TIPO DE SERVICIO (modo reparación) ---
         from .utils.parametros_cotizador import obtener_profit_config
+        from .utils.profit_por_pieza import (
+            aplicar_profit_overrides_a_items,
+            parsear_profit_overrides,
+            persistir_profit_aplicado_lineas,
+            validar_profit_overrides_contra_lineas,
+        )
         tipos_validos = list(obtener_profit_config().keys())
         if tipo_servicio not in tipos_validos:
             return JsonResponse({'success': False, 'error': f'Tipo de servicio "{tipo_servicio}" no válido.'})
+
+        # Profit personalizado por pieza (JSON {linea_id: 0.36})
+        try:
+            profit_overrides = parsear_profit_overrides(
+                request.POST.get('profit_por_pieza', '')
+            )
+        except ValueError as exc:
+            return JsonResponse({'success': False, 'error': str(exc)})
 
         # --- 5. CAMBIAR ESTADO A 'enviada_cliente' (si aún no lo está) ---
         if solicitud.estado == 'enviada_front':
@@ -299,9 +313,33 @@ def api_enviar_cotizacion_cliente(request, pk):
                 ),
             })
 
+        lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
+        ok_profit, error_profit = validar_profit_overrides_contra_lineas(
+            lineas_cotizables,
+            profit_overrides,
+        )
+        if not ok_profit:
+            return JsonResponse({'success': False, 'error': error_profit})
+
+        # Persistir % efectivo por pieza ANTES de armar el PDF (Celery lo lee)
+        if not solicitud.fecha_precios_cliente:
+            profit_perfil = obtener_profit_config()[tipo_servicio]['profit_target']
+            persistir_profit_aplicado_lineas(
+                lineas_cotizables,
+                profit_perfil,
+                overrides=profit_overrides,
+            )
+            # Releer líneas para que serializar vea profit_aplicado fresco
+            lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
+
         items_piezas_todos = [
-            serializar_linea_cotizacion(l) for l in obtener_lineas_cotizables(solicitud)
+            serializar_linea_cotizacion(l) for l in lineas_cotizables
         ]
+        # Si aún hay overrides en el request, asegurar que el motor los use
+        items_piezas_todos = aplicar_profit_overrides_a_items(
+            items_piezas_todos,
+            profit_overrides,
+        )
         items_servicios = [
             serializar_servicio_cotizacion(s) for s in obtener_servicios_cotizables(solicitud)
         ]
@@ -455,10 +493,39 @@ def preview_pdf_cotizacion(request, pk):
             serializar_linea_cotizacion,
             serializar_servicio_cotizacion,
         )
+        from .utils.profit_por_pieza import (
+            aplicar_profit_overrides_a_items,
+            parsear_profit_overrides,
+            validar_profit_overrides_contra_lineas,
+        )
+
+        # Overrides del modal para que el preview coincida con la calculadora
+        try:
+            profit_overrides = parsear_profit_overrides(
+                request.GET.get('profit_por_pieza', '')
+            )
+        except ValueError as exc:
+            return HttpResponse(str(exc).encode(), content_type='text/plain', status=400)
+
+        lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
+        ok_profit, error_profit = validar_profit_overrides_contra_lineas(
+            lineas_cotizables,
+            profit_overrides,
+        )
+        if not ok_profit:
+            return HttpResponse(
+                error_profit.encode(),
+                content_type='text/plain',
+                status=400,
+            )
 
         items_todos_piezas = [
-            serializar_linea_cotizacion(l) for l in obtener_lineas_cotizables(solicitud)
+            serializar_linea_cotizacion(l) for l in lineas_cotizables
         ]
+        items_todos_piezas = aplicar_profit_overrides_a_items(
+            items_todos_piezas,
+            profit_overrides,
+        )
         items_servicios = [
             serializar_servicio_cotizacion(s) for s in obtener_servicios_cotizables(solicitud)
         ]

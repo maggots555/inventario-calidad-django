@@ -1312,6 +1312,8 @@ window.COTIZACION_CLIENTE_CONFIG = {
     // Los números vienen del .env del servidor (nunca del código fuente),
     // los inyecta Django en tiempo de render. No aparecen en el repositorio.
     profitConfig: {{ profit_config_json|safe }},
+    // Rangos de profit mínimo según costo unitario (misma fuente que el backend)
+    rangosProfitMinimo: {{ rangos_profit_minimo_json|safe }},
     lineas: [
         {% for linea in solicitud.lineas.all %}
         {
@@ -1321,7 +1323,8 @@ window.COTIZACION_CLIENTE_CONFIG = {
             cantidad:   {{ linea.cantidad }},
             costo:      {{ linea.costo_unitario|default:0 }},
             es_necesaria: {{ linea.es_necesaria|yesno:"true,false" }},
-            estado_cliente: "{{ linea.estado_cliente }}"
+            estado_cliente: "{{ linea.estado_cliente }}",
+            profit_aplicado: {% if linea.profit_aplicado is not None %}{{ linea.profit_aplicado }}{% else %}null{% endif %}
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ],

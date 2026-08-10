@@ -23,7 +23,11 @@ from datetime import timedelta
 
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator, FileExtensionValidator
+from django.core.validators import (
+    MinValueValidator,
+    MaxValueValidator,
+    FileExtensionValidator,
+)
 from config.validators import FileSizeValidator
 from django.utils import timezone
 from PIL import Image
@@ -4408,6 +4412,20 @@ class LineaCotizacion(models.Model):
         help_text=(
             'Precio cotizado al cliente por unidad; se congela en la primera '
             'aprobación o rechazo de la solicitud'
+        ),
+    )
+    profit_aplicado = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(0.99)],
+        verbose_name='Profit aplicado (fracción)',
+        help_text=(
+            'Margen efectivo usado al cotizar esta pieza (ej. 0.36 = 36%). '
+            'Parte del perfil de servicio y puede personalizarse por pieza '
+            'respetando el mínimo según costo unitario. Null en servicios '
+            'adicionales y líneas de reacondicionado.'
         ),
     )
     subtotal_cliente_sin_iva = models.DecimalField(
