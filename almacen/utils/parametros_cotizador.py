@@ -154,9 +154,86 @@ def obtener_costeo_reacondicionado_config() -> Dict[str, float]:
     return config
 
 
+def _semilla_rangos_profit_minimo() -> Dict[str, Decimal]:
+    """
+    Valores semilla de los 4 mínimos (fracciones) para sembrar BD.
+
+    Returns:
+        dict con min_0_499, min_500_999, min_1000_1499, min_1500_mas.
+    """
+    from almacen.utils.profit_por_pieza import RANGOS_PROFIT_MINIMO
+
+    # RANGOS_PROFIT_MINIMO está ordenado: 0-500, 500-1000, 1000-1500, 1500+
+    return {
+        'min_0_499': Decimal(str(RANGOS_PROFIT_MINIMO[0]['profit_minimo'])),
+        'min_500_999': Decimal(str(RANGOS_PROFIT_MINIMO[1]['profit_minimo'])),
+        'min_1000_1499': Decimal(str(RANGOS_PROFIT_MINIMO[2]['profit_minimo'])),
+        'min_1500_mas': Decimal(str(RANGOS_PROFIT_MINIMO[3]['profit_minimo'])),
+    }
+
+
+def obtener_rangos_profit_minimo(perfil: str = 'estandar') -> List[Dict]:
+    """
+    Devuelve los tramos de profit mínimo para un perfil (BD + fallback semilla).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cada tipo de cotización (Mostrador, Estándar, …) puede tener % mínimos
+    distintos por costo unitario. Si Gerencia aún no guardó una fila en BD,
+    se usan las constantes semilla de profit_por_pieza.py.
+
+    Args:
+        perfil: Clave del tipo de servicio ('mostrador', 'estandar', …).
+
+    Returns:
+        Lista de dicts {costo_min, costo_max, profit_minimo} lista para el motor.
+    """
+    from almacen.utils.profit_por_pieza import RANGOS_PROFIT_MINIMO
+
+    # Paso 1: semilla (siempre válida)
+    rangos_semilla = [
+        {
+            'costo_min': r['costo_min'],
+            'costo_max': r['costo_max'],
+            'profit_minimo': r['profit_minimo'],
+        }
+        for r in RANGOS_PROFIT_MINIMO
+    ]
+
+    if not perfil:
+        perfil = 'estandar'
+
+    try:
+        from almacen.models import ConfiguracionRangoProfitMinimo
+
+        fila = ConfiguracionRangoProfitMinimo.objects.filter(perfil=perfil).first()
+        if fila is not None:
+            return fila.a_lista_rangos()
+    except Exception as exc:
+        logger.warning(
+            'No se pudo leer ConfiguracionRangoProfitMinimo (uso semilla): %s',
+            exc,
+        )
+
+    return rangos_semilla
+
+
+def obtener_todos_rangos_profit_minimo() -> Dict[str, List[Dict]]:
+    """
+    Mapa perfil → lista de tramos (para inyectar al modal de una sola vez).
+
+    Returns:
+        dict: {'mostrador': [...], 'estandar': [...], ...}
+    """
+    return {
+        perfil: obtener_rangos_profit_minimo(perfil)
+        for perfil in PERFILES_PROFIT
+    }
+
+
 def asegurar_parametros_iniciales(usuario=None) -> bool:
     """
-    Si la BD no tiene parámetros, los siembra desde el .env actual.
+    Si la BD no tiene parámetros, los siembra desde el .env / semilla.
 
     Args:
         usuario: User opcional que queda como actualizado_por.
@@ -165,13 +242,19 @@ def asegurar_parametros_iniciales(usuario=None) -> bool:
         bool: True si se creó al menos una fila nueva; False si ya existían.
 
     Efectos secundarios:
-        Inserta filas en ConfiguracionProfitPerfil y/o ConfiguracionReacondicionado.
+        Inserta filas en ConfiguracionProfitPerfil, ConfiguracionRangoProfitMinimo
+        y/o ConfiguracionReacondicionado.
     """
-    from almacen.models import ConfiguracionProfitPerfil, ConfiguracionReacondicionado
+    from almacen.models import (
+        ConfiguracionProfitPerfil,
+        ConfiguracionRangoProfitMinimo,
+        ConfiguracionReacondicionado,
+    )
 
     creado = False
     env_profit = _cargar_profit_desde_env()
     env_reac = _cargar_reac_desde_env()
+    semilla_rangos = _semilla_rangos_profit_minimo()
 
     with transaction.atomic():
         # Sembrar perfiles con get_or_create (evita carrera si dos gerentes
@@ -191,6 +274,18 @@ def asegurar_parametros_iniciales(usuario=None) -> bool:
             if was_created:
                 creado = True
                 logger.info('Sembrado perfil profit desde .env: %s', perfil)
+
+            # Rangos mínimos: mismos valores semilla en todos los perfiles
+            _rango, rango_creado = ConfiguracionRangoProfitMinimo.objects.get_or_create(
+                perfil=perfil,
+                defaults={
+                    **semilla_rangos,
+                    'actualizado_por': usuario,
+                },
+            )
+            if rango_creado:
+                creado = True
+                logger.info('Sembrados rangos profit mínimo: %s', perfil)
 
         # Singleton REAC: crear solo si no hay ninguna fila
         if not ConfiguracionReacondicionado.objects.exists():
@@ -295,6 +390,46 @@ def guardar_profit_perfiles(
                     'profit_target': Decimal(str(datos['profit_target'])),
                     'costos_fijos': str(datos['costos_fijos']).strip(),
                     'diagnostico': Decimal(str(datos['diagnostico'])),
+                    'actualizado_por': usuario,
+                },
+            )
+
+
+def guardar_rangos_profit_minimo(
+    datos_por_perfil: Dict[str, Dict],
+    usuario=None,
+) -> None:
+    """
+    Guarda los 4 mínimos de profit por perfil desde el panel gerencial.
+
+    Args:
+        datos_por_perfil: {
+            'estandar': {
+                'min_0_499': Decimal|float,
+                'min_500_999': Decimal|float,
+                'min_1000_1499': Decimal|float,
+                'min_1500_mas': Decimal|float,
+            },
+            ...
+        }
+        usuario: User que realiza el cambio (auditoría).
+
+    Efectos secundarios:
+        Crea/actualiza filas ConfiguracionRangoProfitMinimo.
+    """
+    from almacen.models import ConfiguracionRangoProfitMinimo
+
+    with transaction.atomic():
+        for perfil, datos in datos_por_perfil.items():
+            if perfil not in PERFILES_PROFIT:
+                continue
+            ConfiguracionRangoProfitMinimo.objects.update_or_create(
+                perfil=perfil,
+                defaults={
+                    'min_0_499': Decimal(str(datos['min_0_499'])),
+                    'min_500_999': Decimal(str(datos['min_500_999'])),
+                    'min_1000_1499': Decimal(str(datos['min_1000_1499'])),
+                    'min_1500_mas': Decimal(str(datos['min_1500_mas'])),
                     'actualizado_por': usuario,
                 },
             )

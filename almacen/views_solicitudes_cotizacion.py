@@ -730,7 +730,10 @@ def detalle_solicitud_cotizacion(request, pk):
         solicitud_requiere_motivo_rechazo_st,
     )
     import json as _json_motivos
-    from almacen.utils.profit_por_pieza import rangos_profit_minimo_para_frontend
+    from almacen.utils.profit_por_pieza import (
+        rangos_profit_minimo_para_frontend,
+        rangos_profit_minimo_por_perfil_para_frontend,
+    )
 
     mostrar_modal_motivo_rechazo_st = solicitud_requiere_motivo_rechazo_st(solicitud)
     admite_motivo_rechazo_st = orden_admite_cotizacion_st(solicitud.orden_servicio)
@@ -801,9 +804,12 @@ def detalle_solicitud_cotizacion(request, pk):
         # template y leerla desde TypeScript. Los valores vienen del .env
         # (nunca del código fuente), así que no aparecen en el repositorio.
         'profit_config_json': _serializar_profit_config(),
-        # Rangos de margen mínimo por costo unitario (modal reparacion)
+        # Rangos de margen mínimo: semilla (fallback) + mapa por perfil (BD)
         'rangos_profit_minimo_json': _json_motivos.dumps(
             rangos_profit_minimo_para_frontend()
+        ),
+        'rangos_profit_minimo_por_perfil_json': _json_motivos.dumps(
+            rangos_profit_minimo_por_perfil_para_frontend()
         ),
         'costeo_reac_config_json': _serializar_costeo_reacondicionado_config(),
         # Opciones del dropdown "Agregar Servicio Adicional" (precios desde constants.py)

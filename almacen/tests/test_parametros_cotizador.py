@@ -12,11 +12,12 @@ Verificamos que:
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from almacen.models import (
     ConfiguracionProfitPerfil,
+    ConfiguracionRangoProfitMinimo,
     ConfiguracionReacondicionado,
 )
 from almacen.utils.costeo_reacondicionado import calcular_costeo
@@ -25,10 +26,14 @@ from almacen.utils.parametros_cotizador import (
     puede_editar_parametros_cotizador,
     obtener_costeo_reacondicionado_config,
     obtener_profit_config,
+    obtener_rangos_profit_minimo,
+    obtener_todos_rangos_profit_minimo,
     guardar_profit_perfiles,
+    guardar_rangos_profit_minimo,
     guardar_reacondicionado,
 )
 from almacen.utils.pdf_cotizacion_cliente import calcular_precios_items_cotizacion
+from almacen.utils.profit_por_pieza import obtener_profit_minimo
 from inventario.models import Empleado, Sucursal
 
 
@@ -51,13 +56,76 @@ class ParametrosCotizadorGetterTest(TestCase):
         self.assertIn('pct_iva', reac)
 
     def test_asegurar_parametros_siembra_desde_env(self):
-        """La semilla crea 6 perfiles + 1 fila REAC."""
+        """La semilla crea 6 perfiles + 6 rangos mínimos + 1 fila REAC."""
         creado = asegurar_parametros_iniciales()
         self.assertTrue(creado)
         self.assertEqual(ConfiguracionProfitPerfil.objects.count(), 6)
+        self.assertEqual(ConfiguracionRangoProfitMinimo.objects.count(), 6)
         self.assertTrue(ConfiguracionReacondicionado.objects.filter(pk=1).exists())
         # Segunda llamada no duplica
         self.assertFalse(asegurar_parametros_iniciales())
+
+    def test_sin_filas_rangos_usa_semilla(self):
+        """Sin ConfiguracionRangoProfitMinimo, obtener_rangos_profit_minimo cae a semilla."""
+        self.assertEqual(ConfiguracionRangoProfitMinimo.objects.count(), 0)
+        rangos = obtener_rangos_profit_minimo('estandar')
+        self.assertEqual(len(rangos), 4)
+        self.assertEqual(rangos[0]['profit_minimo'], 0.45)
+        self.assertEqual(rangos[3]['profit_minimo'], 0.28)
+
+    def test_override_rangos_por_perfil_no_afecta_otro(self):
+        """
+        Cambiar mínimos de Estándar no altera Mostrador.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Cada tipo de cotización tiene su propia fila. Si Gerencia baja el
+        mínimo de Estándar en piezas baratas a 40%, Mostrador sigue en 45%.
+        """
+        asegurar_parametros_iniciales()
+        guardar_rangos_profit_minimo({
+            'estandar': {
+                'min_0_499': Decimal('0.40'),
+                'min_500_999': Decimal('0.36'),
+                'min_1000_1499': Decimal('0.30'),
+                'min_1500_mas': Decimal('0.28'),
+            },
+        })
+        self.assertEqual(
+            obtener_profit_minimo(100, perfil='estandar'),
+            Decimal('0.40'),
+        )
+        self.assertEqual(
+            obtener_profit_minimo(100, perfil='mostrador'),
+            Decimal('0.45'),
+        )
+        # Motor: pieza barata con Estándar al 40% vs Mostrador elevado a 45%
+        items = [{
+            'descripcion': 'Pieza barata',
+            'cantidad': 1,
+            'costo_unitario': 100.0,
+            'es_servicio': False,
+        }]
+        calc_est = calcular_precios_items_cotizacion(
+            items=items, tipo_servicio='estandar',
+        )
+        calc_mos = calcular_precios_items_cotizacion(
+            items=items, tipo_servicio='mostrador',
+        )
+        self.assertAlmostEqual(
+            calc_est['items_calculados'][0]['profit_aplicado'], 0.40, places=4,
+        )
+        # Mostrador perfil ~42% → se eleva al mínimo 45% del perfil mostrador
+        self.assertAlmostEqual(
+            calc_mos['items_calculados'][0]['profit_aplicado'], 0.45, places=4,
+        )
+
+    def test_mapa_todos_rangos_incluye_seis_perfiles(self):
+        """El modal recibe un mapa completo perfil → 4 tramos."""
+        asegurar_parametros_iniciales()
+        mapa = obtener_todos_rangos_profit_minimo()
+        self.assertEqual(len(mapa), 6)
+        self.assertIn('server', mapa)
+        self.assertEqual(len(mapa['server']), 4)
 
     def test_override_bd_cambia_profit_calculo(self):
         """
@@ -188,6 +256,17 @@ class ParametrosCotizadorGetterTest(TestCase):
         self.assertEqual(nuevo['pct_margen_ganancia_aplicado'], 0.30)
 
 
+@override_settings(
+    # En tests no hay collectstatic: ManifestStaticFilesStorage rompe {% static %}
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
 class ParametrosCotizadorPermisosTest(TestCase):
     """Permisos del panel y helper puede_editar_parametros_cotizador."""
 

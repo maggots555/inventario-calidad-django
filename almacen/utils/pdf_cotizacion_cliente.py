@@ -490,9 +490,11 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     profit_cfg = _profit_config_vigente()
     if tipo_servicio not in profit_cfg:
         tipo_servicio = 'estandar'
+    # perfil= lee los mínimos configurables de ese tipo (BD o semilla)
     profit = resolver_profit_linea(
         costo_unitario,
         profit_cfg[tipo_servicio]['profit_target'],
+        perfil=tipo_servicio,
     )
     return float(calcular_precio_unitario_con_profit(costo_unitario, profit))
 
@@ -545,6 +547,7 @@ def calcular_precios_items_cotizacion(
     Returns:
         Dict con items_calculados (incl. profit_aplicado) y totales.
     """
+    from almacen.utils.parametros_cotizador import obtener_rangos_profit_minimo
     from almacen.utils.profit_por_pieza import (
         calcular_precio_unitario_con_profit,
         resolver_profit_linea,
@@ -556,6 +559,8 @@ def calcular_precios_items_cotizacion(
         tipo_servicio = 'estandar'
     perfil = profit_cfg[tipo_servicio]
     profit_perfil = float(perfil['profit_target'])
+    # Una sola lectura de mínimos del tipo (evita N consultas en el bucle)
+    rangos_minimos = obtener_rangos_profit_minimo(tipo_servicio)
     mano_obra = float(mano_de_obra_override or 0)
     # Legacy: el parámetro se ignora (ya no hay descuento de diagnóstico)
     _ = incluir_descuento_diagnostico
@@ -585,6 +590,7 @@ def calcular_precios_items_cotizacion(
                 costo_unit,
                 profit_perfil,
                 profit_override=override,
+                rangos=rangos_minimos,
             )
             precio_unit = calcular_precio_unitario_con_profit(costo_unit, profit_efectivo)
             subtotal = _redondear_2(precio_unit * cantidad)

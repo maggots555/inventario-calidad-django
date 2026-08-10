@@ -5,13 +5,18 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 Antes el margen era un solo % del perfil (Mostrador, Estándar, etc.) para
 todas las piezas. Ahora cada pieza puede tener su propio %, pero nunca
-debajo del mínimo según su costo unitario.
+debajo del mínimo según su costo unitario Y el tipo de cotización.
 
-Rangos (costo unitario, sin IVA):
-  $0 – $499.99     → mínimo 28%
-  $500 – $999.99   → mínimo 24%
-  $1000 – $1499.99 → mínimo 22%
-  $1500 en adelante → mínimo 20%
+Los tramos de costo son fijos ($0–499, $500–999, $1000–1499, $1500+).
+Los % mínimos por tramo viven en BD (ConfiguracionRangoProfitMinimo) y
+se editan en el panel de parámetros; estas constantes son la SEMILLA /
+fallback si aún no hay filas.
+
+Semilla (todos los perfiles al sembrar):
+  $0 – $499.99     → mínimo 45%
+  $500 – $999.99   → mínimo 36%
+  $1000 – $1499.99 → mínimo 30%
+  $1500 en adelante → mínimo 28%
 
 El perfil sigue siendo el punto de partida; el override del modal (si hay)
 se compara contra ese mínimo y se toma el mayor.
@@ -25,15 +30,14 @@ from typing import Any, Dict, List, Optional, Union, Tuple
 NumberLike = Union[int, float, Decimal, str, None]
 
 # ---------------------------------------------------------------------------
-# Constantes de rangos (fuente única para backend; el modal las recibe vía JSON)
+# Constantes semilla (tramos de costo fijos + % por defecto)
+# El panel / BD pueden sobrescribir los % por perfil.
 # ---------------------------------------------------------------------------
-# Cada tupla: (costo_minimo_incluido, costo_maximo_excluido_o_None, profit_minimo)
-# costo_maximo=None significa "sin tope superior".
 RANGOS_PROFIT_MINIMO: List[Dict[str, Any]] = [
-    {'costo_min': 0, 'costo_max': 500, 'profit_minimo': 0.28},
-    {'costo_min': 500, 'costo_max': 1000, 'profit_minimo': 0.24},
-    {'costo_min': 1000, 'costo_max': 1500, 'profit_minimo': 0.22},
-    {'costo_min': 1500, 'costo_max': None, 'profit_minimo': 0.20},
+    {'costo_min': 0, 'costo_max': 500, 'profit_minimo': 0.45},
+    {'costo_min': 500, 'costo_max': 1000, 'profit_minimo': 0.36},
+    {'costo_min': 1000, 'costo_max': 1500, 'profit_minimo': 0.30},
+    {'costo_min': 1500, 'costo_max': None, 'profit_minimo': 0.28},
 ]
 
 
@@ -53,13 +57,26 @@ def _a_decimal(valor: NumberLike, default: str = '0') -> Decimal:
     return Decimal(str(valor))
 
 
-def rangos_profit_minimo_para_frontend() -> List[Dict[str, Any]]:
+def _resolver_lista_rangos(
+    perfil: Optional[str] = None,
+    rangos: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
     """
-    Serializa los rangos para inyectarlos en COTIZACION_CLIENTE_CONFIG.
+    Elige la lista de tramos: argumento explícito → BD por perfil → semilla.
+
+    Args:
+        perfil : Clave del tipo de servicio (opcional).
+        rangos : Lista ya resuelta (evita reconsultar BD en bucles).
 
     Returns:
-        Lista de dicts con costo_min, costo_max (null si no hay tope) y profit_minimo.
+        Lista de tramos {costo_min, costo_max, profit_minimo}.
     """
+    if rangos is not None:
+        return rangos
+    if perfil:
+        # Import diferido: evita ciclo parametros_cotizador ↔ profit_por_pieza
+        from almacen.utils.parametros_cotizador import obtener_rangos_profit_minimo
+        return obtener_rangos_profit_minimo(perfil)
     return [
         {
             'costo_min': r['costo_min'],
@@ -70,61 +87,104 @@ def rangos_profit_minimo_para_frontend() -> List[Dict[str, Any]]:
     ]
 
 
-def obtener_profit_minimo(costo_unitario: NumberLike) -> Decimal:
+def rangos_profit_minimo_para_frontend(
+    perfil: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
-    Devuelve el profit mínimo (fracción 0–1) según el costo unitario.
+    Serializa los rangos de UN perfil para COTIZACION_CLIENTE_CONFIG.
+
+    Preferir ``rangos_profit_minimo_por_perfil_para_frontend`` en el modal
+    para no recargar al cambiar de tipo de servicio.
+
+    Args:
+        perfil: Clave del perfil; None → semilla global.
+
+    Returns:
+        Lista de dicts con costo_min, costo_max y profit_minimo.
+    """
+    return _resolver_lista_rangos(perfil=perfil)
+
+
+def rangos_profit_minimo_por_perfil_para_frontend() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Mapa completo perfil → rangos para inyectar al modal de una sola vez.
+
+    Returns:
+        dict: {'mostrador': [...], 'estandar': [...], ...}
+    """
+    from almacen.utils.parametros_cotizador import obtener_todos_rangos_profit_minimo
+
+    return obtener_todos_rangos_profit_minimo()
+
+
+def obtener_profit_minimo(
+    costo_unitario: NumberLike,
+    perfil: Optional[str] = None,
+    rangos: Optional[List[Dict[str, Any]]] = None,
+) -> Decimal:
+    """
+    Devuelve el profit mínimo (fracción 0–1) según costo unitario y perfil.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     El rango se decide SOLO por el costo de UNA unidad, no por costo × cantidad.
-    Ejemplo: costo $450 × 3 uds → mínimo 28% (porque 450 está en 0–499).
+    Ejemplo: costo $450 × 3 uds → tramo 0–499 del perfil elegido.
 
     Args:
         costo_unitario: Costo proveedor por unidad (MXN sin IVA).
+        perfil        : Tipo de cotización (lee BD); None → semilla.
+        rangos        : Lista precalculada (opcional, más eficiente en bucles).
 
     Returns:
-        Decimal con el mínimo (ej. Decimal('0.28')).
+        Decimal con el mínimo (ej. Decimal('0.45')).
     """
+    lista = _resolver_lista_rangos(perfil=perfil, rangos=rangos)
     costo = _a_decimal(costo_unitario)
     if costo < 0:
         costo = Decimal('0')
 
     # Recorremos de menor a mayor; el último rango sin tope atrapa $1500+
-    for rango in RANGOS_PROFIT_MINIMO:
+    for rango in lista:
         minimo = _a_decimal(rango['costo_min'])
         maximo = rango['costo_max']
         if maximo is None:
             if costo >= minimo:
                 return _a_decimal(rango['profit_minimo'])
         else:
-            # Intervalo [minimo, maximo): 499.99 → 28%, 500 → 24%
+            # Intervalo [minimo, maximo): 499.99 → tramo bajo, 500 → siguiente
             if costo >= minimo and costo < _a_decimal(maximo):
                 return _a_decimal(rango['profit_minimo'])
 
-    # Defensa: si algo raro pasa, usar el mínimo más bajo (20%)
-    return Decimal('0.20')
+    # Defensa: último tramo de la lista o semilla $1500+
+    if lista:
+        return _a_decimal(lista[-1]['profit_minimo'])
+    return Decimal('0.28')
 
 
 def resolver_profit_linea(
     costo_unitario: NumberLike,
     profit_perfil: NumberLike,
     profit_override: Optional[NumberLike] = None,
+    perfil: Optional[str] = None,
+    rangos: Optional[List[Dict[str, Any]]] = None,
 ) -> Decimal:
     """
     Calcula el profit efectivo de una pieza.
 
     Fórmula de negocio:
         base = override si viene, si no el % del perfil
-        efectivo = max(base, mínimo_por_costo_unitario)
+        efectivo = max(base, mínimo_por_costo_y_tipo)
 
     Args:
         costo_unitario  : Costo proveedor por unidad.
         profit_perfil   : % del perfil elegido (ej. 0.36 estándar).
         profit_override : % que el usuario puso en el modal (opcional).
+        perfil          : Clave del tipo (para leer mínimos de BD).
+        rangos          : Lista precalculada de tramos (opcional).
 
     Returns:
         Decimal del profit efectivo (nunca debajo del mínimo del rango).
     """
-    minimo = obtener_profit_minimo(costo_unitario)
+    minimo = obtener_profit_minimo(costo_unitario, perfil=perfil, rangos=rangos)
     # Si hay override explícito lo usamos; si no, el perfil
     if profit_override is not None and profit_override != '':
         base = _a_decimal(profit_override)
@@ -143,19 +203,23 @@ def resolver_profit_linea(
 def profit_cumple_minimo(
     costo_unitario: NumberLike,
     profit_propuesto: NumberLike,
+    perfil: Optional[str] = None,
+    rangos: Optional[List[Dict[str, Any]]] = None,
 ) -> bool:
     """
-    True si el % propuesto es >= al mínimo del rango del costo unitario.
+    True si el % propuesto es >= al mínimo del rango (costo + perfil).
 
     Args:
         costo_unitario   : Costo por unidad.
         profit_propuesto : Fracción 0–1 que envió el modal/API.
+        perfil           : Tipo de cotización.
+        rangos           : Lista precalculada (opcional).
 
     Returns:
         bool
     """
     propuesto = _a_decimal(profit_propuesto)
-    minimo = obtener_profit_minimo(costo_unitario)
+    minimo = obtener_profit_minimo(costo_unitario, perfil=perfil, rangos=rangos)
     return propuesto >= minimo
 
 
@@ -234,22 +298,26 @@ def parsear_profit_overrides(raw: Any) -> Dict[int, Decimal]:
 def validar_profit_overrides_contra_lineas(
     lineas,
     overrides: Dict[int, Decimal],
+    perfil: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """
-    Rechaza overrides explícitos debajo del mínimo del costo unitario.
+    Rechaza overrides explícitos debajo del mínimo (costo + tipo de cotización).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Si el usuario manda 10% en una pieza de $100 (mínimo 28%), la API
+    Si el usuario manda 10% en una pieza de $100 (mínimo del perfil), la API
     responde error. El perfil por debajo del mínimo sí se eleva solo;
     aquí solo validamos lo que el usuario escribió a mano.
 
     Args:
         lineas    : Iterable de LineaCotizacion (cotizables).
         overrides : Mapa pk → profit propuesto.
+        perfil    : Tipo de servicio elegido en el modal.
 
     Returns:
         (True, '') si todo OK; (False, mensaje) si hay violación.
     """
+    # Una sola lectura de rangos para todo el lote
+    lista_rangos = _resolver_lista_rangos(perfil=perfil)
     lineas_por_pk = {int(l.pk): l for l in lineas}
     for linea_id, profit in overrides.items():
         linea = lineas_por_pk.get(int(linea_id))
@@ -258,7 +326,7 @@ def validar_profit_overrides_contra_lineas(
         if getattr(linea, 'es_linea_reacondicionado', False):
             continue
         costo = linea.costo_unitario or 0
-        minimo = obtener_profit_minimo(costo)
+        minimo = obtener_profit_minimo(costo, rangos=lista_rangos)
         if profit < minimo:
             nombre = (
                 getattr(getattr(linea, 'producto', None), 'nombre', None)
@@ -305,6 +373,7 @@ def persistir_profit_aplicado_lineas(
     lineas,
     tipo_servicio_profit: NumberLike,
     overrides: Optional[Dict[int, Decimal]] = None,
+    perfil: Optional[str] = None,
 ) -> int:
     """
     Guarda LineaCotizacion.profit_aplicado al enviar la cotización.
@@ -313,11 +382,13 @@ def persistir_profit_aplicado_lineas(
         lineas                 : Líneas de pieza cotizables.
         tipo_servicio_profit   : profit_target del perfil (fracción).
         overrides              : Overrides del modal (opcionales).
+        perfil                 : Clave del tipo (para mínimos de BD).
 
     Returns:
         Cantidad de líneas actualizadas.
     """
     overrides = overrides or {}
+    lista_rangos = _resolver_lista_rangos(perfil=perfil)
     actualizadas = 0
     for linea in lineas:
         if getattr(linea, 'es_linea_reacondicionado', False):
@@ -330,6 +401,7 @@ def persistir_profit_aplicado_lineas(
             costo,
             tipo_servicio_profit,
             profit_override=override,
+            rangos=lista_rangos,
         )
         # update() evita disparar señales/save pesados innecesarios
         type(linea).objects.filter(pk=linea.pk).update(profit_aplicado=efectivo)

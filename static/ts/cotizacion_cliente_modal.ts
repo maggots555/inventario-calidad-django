@@ -43,8 +43,16 @@ interface CotizacionClienteConfig {
     asuntoCorreoDefault: string;
     /** Configuración de profit por perfil, inyectada desde .env vía Django */
     profitConfig: Record<string, PerfilProfit>;
-    /** Rangos de profit mínimo por costo unitario (misma fuente que el backend) */
-    rangosProfitMinimo: RangoProfitMinimo[];
+    /**
+     * Rangos mínimos por perfil (mapa completo).
+     * Al cambiar Mostrador↔Estándar el TS usa el set correcto sin roundtrip.
+     */
+    rangosProfitMinimoPorPerfil: Record<string, RangoProfitMinimo[]>;
+    /**
+     * Fallback legacy: un solo set de rangos (semilla).
+     * Se usa solo si falta el mapa por perfil.
+     */
+    rangosProfitMinimo?: RangoProfitMinimo[];
     lineas: LineaItem[];
     servicios: ServicioItem[];
 }
@@ -199,7 +207,8 @@ function obtenerProfitMinimoTs(costoUnitario: number, rangos: RangoProfitMinimo[
             return rango.profit_minimo;
         }
     }
-    return 0.20;
+    // Defensa: mismo fallback que Python (último tramo semilla = 28%)
+    return 0.28;
 }
 
 /**
@@ -342,7 +351,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let desgloseAbierto = true;
 
     // Profit personalizado por pieza (pk → fracción 0–1). El perfil es el default.
-    const rangosProfit = config.rangosProfitMinimo ?? [];
+    /**
+     * Devuelve los tramos de mínimo del tipo de cotización activo.
+     * Preferimos el mapa por perfil; si falta, caemos a la lista legacy.
+     */
+    function rangosDelPerfil(tipo: string): RangoProfitMinimo[] {
+        const mapa = config.rangosProfitMinimoPorPerfil;
+        if (mapa && mapa[tipo] && mapa[tipo].length > 0) {
+            return mapa[tipo];
+        }
+        return config.rangosProfitMinimo ?? [];
+    }
+
     const profitPorPieza: Record<number, number> = {};
 
     /**
@@ -351,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function reiniciarProfitDesdePerfil(tipo: string): void {
         const perfil = config.profitConfig?.[tipo]?.profit_target ?? 0.36;
+        const rangos = rangosDelPerfil(tipo);
         for (const linea of config.lineas) {
             if (!esItemCotizable(linea.estado_cliente || 'pendiente')) continue;
             // Si ya había profit guardado en BD y es el primer arranque, lo respetamos
@@ -359,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 linea.costo,
                 perfil,
                 null,
-                rangosProfit,
+                rangos,
             );
         }
     }
@@ -368,6 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {
         const tipoInicial = tipoServicioInput?.value || 'estandar';
         const perfilInicial = config.profitConfig?.[tipoInicial]?.profit_target ?? 0.36;
+        const rangosIniciales = rangosDelPerfil(tipoInicial);
         for (const linea of config.lineas) {
             if (!esItemCotizable(linea.estado_cliente || 'pendiente')) continue;
             if (linea.profit_aplicado !== null && linea.profit_aplicado !== undefined) {
@@ -375,14 +397,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     linea.costo,
                     perfilInicial,
                     Number(linea.profit_aplicado),
-                    rangosProfit,
+                    rangosIniciales,
                 );
             } else {
                 profitPorPieza[linea.pk] = resolverProfitLineaTs(
                     linea.costo,
                     perfilInicial,
                     null,
-                    rangosProfit,
+                    rangosIniciales,
                 );
             }
         }
@@ -516,16 +538,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const serviciosExcluidos = config.servicios.filter(s => !esItemCotizable(s.estado_cliente || 'pendiente'));
         const tipoActual = tipoServicioInput?.value || 'estandar';
         const perfilActual = config.profitConfig?.[tipoActual]?.profit_target ?? 0.36;
+        const rangosActuales = rangosDelPerfil(tipoActual);
 
         // Cada pieza: input de % + precio resultante en vivo
         const filasLineas = lineasCotizables.map(l => {
             const cantTxt = l.cantidad > 1 ? ` <span class="desglose-cant">× ${l.cantidad}</span>` : '';
-            const minimo = obtenerProfitMinimoTs(l.costo, rangosProfit);
+            const minimo = obtenerProfitMinimoTs(l.costo, rangosActuales);
             const profit = resolverProfitLineaTs(
                 l.costo,
                 perfilActual,
                 profitPorPieza[l.pk] ?? null,
-                rangosProfit,
+                rangosActuales,
             );
             const precioUnit = l.costo > 0 && profit < 1 ? l.costo / (1 - profit) : l.costo;
             const subtotal = Math.round(precioUnit * l.cantidad * 100) / 100;
@@ -659,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tipo,
             lineasActivas,
             profitPorPieza,
-            rangosProfit,
+            rangosDelPerfil(tipo),
             manoObra,
         );
         // EXPLICACIÓN: servicios ya vienen con IVA; su parte sin IVA se obtiene ÷ 1.16

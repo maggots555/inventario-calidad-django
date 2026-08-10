@@ -2699,6 +2699,76 @@ class ParametrosProfitPerfilForm(forms.Form):
         return ','.join(partes_limpias)
 
 
+class ParametrosRangosProfitForm(forms.Form):
+    """
+    Cuatro mínimos de profit por tramo de costo (un perfil de reparación).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Los límites de costo ($0/$500/$1000/$1500) son fijos en código.
+    Aquí Gerencia solo edita el % mínimo de cada tramo, como fracción
+    (0.45 = 45%). El panel usa un form por perfil con prefix
+    ``rango_mostrador``, ``rango_estandar``, etc.
+    """
+
+    min_0_499 = forms.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        min_value=0,
+        max_value=Decimal('0.99'),
+        label='Mínimo $0–$499',
+        help_text='Fracción (ej. 0.45 = 45%). Piezas con costo unitario menor a $500.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+            'max': '0.99',
+        }),
+    )
+    min_500_999 = forms.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        min_value=0,
+        max_value=Decimal('0.99'),
+        label='Mínimo $500–$999',
+        help_text='Fracción. Costo unitario de $500 a $999.99.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+            'max': '0.99',
+        }),
+    )
+    min_1000_1499 = forms.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        min_value=0,
+        max_value=Decimal('0.99'),
+        label='Mínimo $1000–$1499',
+        help_text='Fracción. Costo unitario de $1000 a $1499.99.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+            'max': '0.99',
+        }),
+    )
+    min_1500_mas = forms.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        min_value=0,
+        max_value=Decimal('0.99'),
+        label='Mínimo $1500+',
+        help_text='Fracción. Costo unitario desde $1500 en adelante.',
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0',
+            'max': '0.99',
+        }),
+    )
+
+
 class ParametrosReacondicionadoForm(forms.ModelForm):
     """
     Formulario del singleton de parámetros REAC (reacondicionados).

@@ -80,9 +80,11 @@ class ProfitCotizacionExcelTest(SimpleTestCase):
 
     def test_subtotales_items_cuadran_con_precio_final(self):
         """Σ subtotales de piezas == PRECIO_FINAL_SIN_IVA tras redondeo."""
+        # Ambas piezas en rango $500–$999 (mín. 36%) para que el perfil
+        # estándar 36% aplique sin elevar al piso de piezas baratas.
         items = [
-            {'descripcion': 'Pantalla', 'cantidad': 1, 'costo_unitario': 600.0, 'es_servicio': False},
-            {'descripcion': 'Teclado', 'cantidad': 2, 'costo_unitario': 200.0, 'es_servicio': False},
+            {'descripcion': 'Pantalla', 'cantidad': 1, 'costo_unitario': 500.0, 'es_servicio': False},
+            {'descripcion': 'Teclado', 'cantidad': 1, 'costo_unitario': 500.0, 'es_servicio': False},
         ]
         calculo = calcular_precios_items_cotizacion(
             items=items,
@@ -95,6 +97,7 @@ class ProfitCotizacionExcelTest(SimpleTestCase):
             if not i.get('es_servicio')
         )
         self.assertEqual(suma_subtotales, calculo['precio_sin_iva'])
+        # 1000 / 0.64 = 1562.50 (mismo % en ambas líneas)
         self.assertEqual(calculo['precio_sin_iva'], 1562.50)
         # Desglose cliente: Subtotal $1562.50 + IVA $250 = Total $1812.50
         self.assertEqual(calculo['iva'], 250.0)

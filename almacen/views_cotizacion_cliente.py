@@ -314,9 +314,11 @@ def api_enviar_cotizacion_cliente(request, pk):
             })
 
         lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
+        # Validar mínimos del tipo elegido (Mostrador ≠ Estándar, etc.)
         ok_profit, error_profit = validar_profit_overrides_contra_lineas(
             lineas_cotizables,
             profit_overrides,
+            perfil=tipo_servicio,
         )
         if not ok_profit:
             return JsonResponse({'success': False, 'error': error_profit})
@@ -328,6 +330,7 @@ def api_enviar_cotizacion_cliente(request, pk):
                 lineas_cotizables,
                 profit_perfil,
                 overrides=profit_overrides,
+                perfil=tipo_servicio,
             )
             # Releer líneas para que serializar vea profit_aplicado fresco
             lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
@@ -508,9 +511,11 @@ def preview_pdf_cotizacion(request, pk):
             return HttpResponse(str(exc).encode(), content_type='text/plain', status=400)
 
         lineas_cotizables = list(obtener_lineas_cotizables(solicitud))
+        # Preview: mismos mínimos que el envío según tipo_servicio del GET
         ok_profit, error_profit = validar_profit_overrides_contra_lineas(
             lineas_cotizables,
             profit_overrides,
+            perfil=tipo_servicio,
         )
         if not ok_profit:
             return HttpResponse(

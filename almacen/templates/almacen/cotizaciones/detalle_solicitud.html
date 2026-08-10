@@ -1312,7 +1312,8 @@ window.COTIZACION_CLIENTE_CONFIG = {
     // Los números vienen del .env del servidor (nunca del código fuente),
     // los inyecta Django en tiempo de render. No aparecen en el repositorio.
     profitConfig: {{ profit_config_json|safe }},
-    // Rangos de profit mínimo según costo unitario (misma fuente que el backend)
+    // Rangos de profit mínimo: mapa por perfil (BD) + fallback semilla
+    rangosProfitMinimoPorPerfil: {{ rangos_profit_minimo_por_perfil_json|safe }},
     rangosProfitMinimo: {{ rangos_profit_minimo_json|safe }},
     lineas: [
         {% for linea in solicitud.lineas.all %}

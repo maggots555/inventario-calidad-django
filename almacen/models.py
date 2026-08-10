@@ -6018,6 +6018,126 @@ class ConfiguracionProfitPerfil(models.Model):
         return partes
 
 
+class ConfiguracionRangoProfitMinimo(models.Model):
+    """
+    Mínimos de profit por tramo de costo unitario, configurables por perfil.
+
+    Objetivo de negocio:
+        Permitir a Gerencia definir, para cada tipo de cotización (Mostrador,
+        Estándar, Express, etc.), el % mínimo según el costo de la pieza:
+        $0–499, $500–999, $1000–1499 y $1500+.
+
+    Campos clave:
+        perfil        : Misma clave que ConfiguracionProfitPerfil.
+        min_0_499     : Fracción mínima (ej. 0.45 = 45%).
+        min_500_999   : Fracción mínima del segundo tramo.
+        min_1000_1499 : Fracción mínima del tercer tramo.
+        min_1500_mas  : Fracción mínima desde $1500 en adelante.
+
+    Efectos secundarios:
+        Al guardar desde el panel, modal / PDF / API usan estos mínimos
+        de inmediato. Cotizaciones ya enviadas o congeladas no se recalculan.
+        Si no hay fila en BD, se usan las constantes semilla de profit_por_pieza.
+    """
+
+    # Reutilizamos las mismas claves de perfil que el cotizador de reparación
+    PERFIL_CHOICES = ConfiguracionProfitPerfil.PERFIL_CHOICES
+
+    perfil = models.CharField(
+        max_length=40,
+        choices=PERFIL_CHOICES,
+        unique=True,
+        verbose_name='Perfil de servicio',
+        help_text='Tipo de cotización al que aplican estos mínimos (una fila por perfil).',
+    )
+    min_0_499 = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0), MaxValueValidator(0.99)],
+        verbose_name='Mínimo $0–$499',
+        help_text='Fracción (ej. 0.45 = 45%). Aplica al costo unitario < $500.',
+    )
+    min_500_999 = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0), MaxValueValidator(0.99)],
+        verbose_name='Mínimo $500–$999',
+        help_text='Fracción. Aplica al costo unitario de $500 a $999.99.',
+    )
+    min_1000_1499 = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0), MaxValueValidator(0.99)],
+        verbose_name='Mínimo $1000–$1499',
+        help_text='Fracción. Aplica al costo unitario de $1000 a $1499.99.',
+    )
+    min_1500_mas = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0), MaxValueValidator(0.99)],
+        verbose_name='Mínimo $1500+',
+        help_text='Fracción. Aplica al costo unitario desde $1500 en adelante.',
+    )
+    actualizado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rangos_profit_minimo_actualizados',
+        verbose_name='Actualizado por',
+    )
+    actualizado_en = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última actualización',
+    )
+
+    class Meta:
+        verbose_name = 'Configuración rangos profit mínimo'
+        verbose_name_plural = 'Configuraciones rangos profit mínimo'
+        ordering = ['perfil']
+
+    def __str__(self):
+        """Muestra perfil y los 4 mínimos en porcentaje para admin."""
+        return (
+            f"{self.get_perfil_display()} — "
+            f"{float(self.min_0_499)*100:.0f}/"
+            f"{float(self.min_500_999)*100:.0f}/"
+            f"{float(self.min_1000_1499)*100:.0f}/"
+            f"{float(self.min_1500_mas)*100:.0f}%"
+        )
+
+    def a_lista_rangos(self):
+        """
+        Convierte la fila BD a la lista de tramos que usa el motor.
+
+        Returns:
+            list[dict]: Misma forma que RANGOS_PROFIT_MINIMO (semilla).
+        """
+        # EXPLICACIÓN: el motor y el modal esperan costo_min / costo_max / profit_minimo
+        return [
+            {
+                'costo_min': 0,
+                'costo_max': 500,
+                'profit_minimo': float(self.min_0_499),
+            },
+            {
+                'costo_min': 500,
+                'costo_max': 1000,
+                'profit_minimo': float(self.min_500_999),
+            },
+            {
+                'costo_min': 1000,
+                'costo_max': 1500,
+                'profit_minimo': float(self.min_1000_1499),
+            },
+            {
+                'costo_min': 1500,
+                'costo_max': None,
+                'profit_minimo': float(self.min_1500_mas),
+            },
+        ]
+
+
 class ConfiguracionReacondicionado(models.Model):
     """
     Parámetros de la matriz de costeo de equipos reacondicionados

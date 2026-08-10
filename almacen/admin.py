@@ -37,6 +37,7 @@ from .models import (
     ImagenSolicitudCotizacion,
     LineaServicioAdicional,
     ConfiguracionProfitPerfil,
+    ConfiguracionRangoProfitMinimo,
     ConfiguracionReacondicionado,
 )
 
@@ -1537,6 +1538,29 @@ class ConfiguracionProfitPerfilAdmin(admin.ModelAdmin):
         'profit_target',
         'costos_fijos',
         'diagnostico',
+        'actualizado_por',
+        'actualizado_en',
+    )
+    list_filter = ('perfil',)
+    search_fields = ('perfil',)
+    readonly_fields = ('actualizado_en',)
+    ordering = ('perfil',)
+
+
+@admin.register(ConfiguracionRangoProfitMinimo)
+class ConfiguracionRangoProfitMinimoAdmin(admin.ModelAdmin):
+    """
+    Inspección de mínimos por tramo de costo (por perfil).
+
+    Preferir el panel gerencial; el admin es solo emergencia/auditoría.
+    """
+
+    list_display = (
+        'perfil',
+        'min_0_499',
+        'min_500_999',
+        'min_1000_1499',
+        'min_1500_mas',
         'actualizado_por',
         'actualizado_en',
     )

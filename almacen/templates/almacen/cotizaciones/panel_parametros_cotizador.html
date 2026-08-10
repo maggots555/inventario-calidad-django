@@ -87,7 +87,7 @@
                                     {% endif %}
                                     <div class="form-text">{{ f.costos_fijos.help_text }}</div>
                                 </div>
-                                <div class="mb-0">
+                                <div class="mb-3">
                                     <label class="form-label" for="{{ f.diagnostico.id_for_label }}">
                                         {{ f.diagnostico.label }}
                                     </label>
@@ -98,17 +98,77 @@
                                     <div class="form-text">{{ f.diagnostico.help_text }}</div>
                                 </div>
                                 {% endwith %}
+
+                                {# Mínimos por tramo de costo (editables; límites $ fijos) #}
+                                <hr class="my-3">
+                                <h3 class="h6 text-muted mb-2">
+                                    <i class="bi bi-bar-chart-steps me-1"></i>
+                                    Mínimos por costo unitario
+                                </h3>
+                                <p class="small text-muted mb-3">
+                                    Tramos fijos: $0–499 / $500–999 / $1000–1499 / $1500+.
+                                    Solo se edita el % mínimo (fracción).
+                                </p>
+                                {% with fr=item.form_rangos %}
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="form-label small" for="{{ fr.min_0_499.id_for_label }}">
+                                            {{ fr.min_0_499.label }}
+                                        </label>
+                                        {{ fr.min_0_499 }}
+                                        {% if fr.min_0_499.errors %}
+                                            <div class="invalid-feedback d-block">{{ fr.min_0_499.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small" for="{{ fr.min_500_999.id_for_label }}">
+                                            {{ fr.min_500_999.label }}
+                                        </label>
+                                        {{ fr.min_500_999 }}
+                                        {% if fr.min_500_999.errors %}
+                                            <div class="invalid-feedback d-block">{{ fr.min_500_999.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small" for="{{ fr.min_1000_1499.id_for_label }}">
+                                            {{ fr.min_1000_1499.label }}
+                                        </label>
+                                        {{ fr.min_1000_1499 }}
+                                        {% if fr.min_1000_1499.errors %}
+                                            <div class="invalid-feedback d-block">{{ fr.min_1000_1499.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small" for="{{ fr.min_1500_mas.id_for_label }}">
+                                            {{ fr.min_1500_mas.label }}
+                                        </label>
+                                        {{ fr.min_1500_mas }}
+                                        {% if fr.min_1500_mas.errors %}
+                                            <div class="invalid-feedback d-block">{{ fr.min_1500_mas.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endwith %}
                             </div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-                {% if ultimo_profit %}
+                {% if ultimo_profit or ultimo_rango %}
                 <p class="text-muted small mt-3 mb-0">
                     Última actualización (reparación):
-                    {{ ultimo_profit.actualizado_en|date:"d/m/Y H:i" }}
-                    {% if ultimo_profit.actualizado_por %}
-                        — {{ ultimo_profit.actualizado_por.get_full_name|default:ultimo_profit.actualizado_por.username }}
+                    {% if ultimo_profit %}
+                        {{ ultimo_profit.actualizado_en|date:"d/m/Y H:i" }}
+                        {% if ultimo_profit.actualizado_por %}
+                            — {{ ultimo_profit.actualizado_por.get_full_name|default:ultimo_profit.actualizado_por.username }}
+                        {% endif %}
+                    {% endif %}
+                    {% if ultimo_rango %}
+                        <br>Última actualización (mínimos por costo):
+                        {{ ultimo_rango.actualizado_en|date:"d/m/Y H:i" }}
+                        {% if ultimo_rango.actualizado_por %}
+                            — {{ ultimo_rango.actualizado_por.get_full_name|default:ultimo_rango.actualizado_por.username }}
+                        {% endif %}
                     {% endif %}
                 </p>
                 {% endif %}
