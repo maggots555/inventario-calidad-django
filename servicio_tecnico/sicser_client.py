@@ -50,6 +50,11 @@ SICSER_TOKEN_GARANTIAS = config('SICSER_TOKEN_GARANTIAS', default='')
 # Segundos que se conserva la respuesta en caché para no saturar SICSER al refrescar.
 SICSER_CACHE_TTL = config('SICSER_CACHE_TTL', default=120, cast=int)
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Si SICSER no responde en este tiempo, cortamos la espera y mostramos un aviso
+# amigable en la pantalla (en vez de un error 500 de Django).
+SICSER_HTTP_TIMEOUT = config('SICSER_HTTP_TIMEOUT', default=20, cast=int)
+
 # Mapeo de nombres de país que devuelve la API de garantías → código ISO usado en SIGMA.
 PAIS_SICSER_A_CODIGO: dict[str, str] = {
     'mexico': 'MX',
@@ -372,25 +377,33 @@ def url_formato_garantia(numero_dps: int | str) -> str:
     return f'{SICSER_BASE_URL}/formatoDigital/formulario-garantias.php?{params}'
 
 
-def _http_get_json(url: str, token: str, timeout: int = 20) -> dict[str, Any]:
+def _http_get_json(
+    url: str,
+    token: str,
+    timeout: int | None = None,
+) -> dict[str, Any]:
     """
     Ejecuta GET JSON contra SICSER con autenticación Bearer.
 
     Args:
         url: Endpoint completo.
         token: Bearer token del servicio.
-        timeout: Segundos máximos de espera.
+        timeout: Segundos máximos de espera. Si es None, usa SICSER_HTTP_TIMEOUT.
 
     Returns:
         dict: Respuesta JSON decodificada.
 
     Raises:
-        SicserAPIError: Si falta token, hay error HTTP o JSON inválido.
+        SicserAPIError: Si falta token, hay timeout, error HTTP/red o JSON inválido.
     """
     if not token:
         raise SicserAPIError(
             'Token SICSER no configurado. Agrega la variable correspondiente en el archivo .env'
         )
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # timeout=None → tomamos el valor del .env (SICSER_HTTP_TIMEOUT, default 20).
+    segundos_espera = SICSER_HTTP_TIMEOUT if timeout is None else timeout
 
     request = urllib.request.Request(
         url,
@@ -402,13 +415,31 @@ def _http_get_json(url: str, token: str, timeout: int = 20) -> dict[str, Any]:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=segundos_espera) as response:
             raw = response.read().decode('utf-8')
     except urllib.error.HTTPError as exc:
+        # HTTPError es subclase de URLError: va primero para conservar el código HTTP.
         cuerpo = exc.read().decode('utf-8', errors='replace')[:300]
         raise SicserAPIError(f'SICSER respondió HTTP {exc.code}: {cuerpo}') from exc
+    except TimeoutError as exc:
+        # En Python 3, urlopen puede lanzar TimeoutError “pelado” (no URLError).
+        # Si no lo atrapamos, la vista Consulta SICSER termina en 500.
+        logger.warning(
+            'Timeout al consultar SICSER tras %ss | URL: %s',
+            segundos_espera,
+            url,
+        )
+        raise SicserAPIError(
+            f'SICSER no respondió a tiempo (más de {segundos_espera}s). '
+            'El servidor de ellos puede estar lento o caído; intenta de nuevo en unos minutos.'
+        ) from exc
     except urllib.error.URLError as exc:
+        logger.warning('No se pudo conectar con SICSER | URL: %s | motivo: %s', url, exc.reason)
         raise SicserAPIError(f'No se pudo conectar con SICSER: {exc.reason}') from exc
+    except OSError as exc:
+        # Otros fallos de red/socket (conexión rechazada, reset, etc.).
+        logger.warning('Error de red al consultar SICSER | URL: %s | %s', url, exc)
+        raise SicserAPIError(f'Error de red al consultar SICSER: {exc}') from exc
 
     try:
         payload = json.loads(raw)
