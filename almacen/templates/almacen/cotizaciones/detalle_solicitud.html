@@ -960,37 +960,61 @@ document.addEventListener('DOMContentLoaded', function() {
                             </label>
                             <div class="tipo-servicio-grid" id="tipoServicioContainer">
                                 {# Sin orden activa → Mostrador; con orden → según gama del equipo #}
+                                {# EXPLICACIÓN: el % del badge es sugerencia del perfil, no el profit final por pieza #}
                                 <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
                                     <i class="bi bi-star-fill" style="font-size: 0.9rem; color: #f59e0b;"></i>
                                     <span class="nombre-servicio">Alta Gama</span>
-                                    <span class="profit-badge" data-profit-tipo="alta_gama">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="alta_gama">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                                 <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo != 'ALTA' and gama_equipo != 'BAJA' %}activo{% endif %}" data-tipo="estandar" id="btnEstandar">
                                     <i class="bi bi-laptop" style="font-size: 0.9rem; color: #3b82f6;"></i>
                                     <span class="nombre-servicio">Estándar</span>
-                                    <span class="profit-badge" data-profit-tipo="estandar">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="estandar">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                                 <div class="servicio-tipo-btn {% if solicitud.sin_orden_activa or gama_equipo == 'BAJA' %}activo{% endif %}" data-tipo="mostrador">
                                     <i class="bi bi-phone" style="font-size: 0.9rem; color: #10b981;"></i>
                                     <span class="nombre-servicio">Mostrador</span>
-                                    <span class="profit-badge" data-profit-tipo="mostrador">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="mostrador">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="express">
                                     <i class="bi bi-lightning-charge-fill" style="font-size: 0.9rem; color: #f97316;"></i>
                                     <span class="nombre-servicio">Express</span>
-                                    <span class="profit-badge" data-profit-tipo="express">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="express">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="server">
                                     <i class="bi bi-server" style="font-size: 0.9rem; color: #8b5cf6;"></i>
                                     <span class="nombre-servicio">Server</span>
-                                    <span class="profit-badge" data-profit-tipo="server">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="server">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                                 <div class="servicio-tipo-btn" data-tipo="rep_nivel_componente">
                                     <i class="bi bi-cpu" style="font-size: 0.9rem; color: #0ea5e9;"></i>
                                     <span class="nombre-servicio">Rep. nivel componente</span>
-                                    <span class="profit-badge" data-profit-tipo="rep_nivel_componente">--% profit</span>
+                                    <span class="profit-badge" data-profit-tipo="rep_nivel_componente">
+                                        <span class="profit-badge-pct">--%</span>
+                                        <span class="profit-badge-hint">sugerencia</span>
+                                    </span>
                                 </div>
                             </div>
+                            <p class="form-text tipo-servicio-ayuda mb-0 mt-2">
+                                El % del botón es la <strong>sugerencia</strong> del perfil.
+                                Puedes cambiar el profit de cada pieza en el desglose
+                                (sin bajar del mínimo configurado).
+                            </p>
                             <input type="hidden" id="tipoServicioInput" name="tipo_servicio"
                                    value="{% if solicitud.sin_orden_activa %}mostrador{% elif gama_equipo == 'ALTA' %}alta_gama{% elif gama_equipo == 'BAJA' %}mostrador{% else %}estandar{% endif %}">
                         </div>

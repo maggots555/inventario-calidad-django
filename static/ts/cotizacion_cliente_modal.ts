@@ -313,13 +313,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------
     // Badges de % profit: se actualizan desde profitConfig (panel BD / .env)
     // para no mostrar porcentajes hardcodeados desactualizados.
+    // Solo se rellena el %, la palabra "sugerencia" queda fija en el HTML.
     // --------------------------------------------------------
     document.querySelectorAll<HTMLElement>('.profit-badge[data-profit-tipo]').forEach((badge) => {
         const tipo = badge.dataset.profitTipo;
         if (!tipo) return;
         const target = config.profitConfig?.[tipo]?.profit_target;
         if (typeof target === 'number') {
-            badge.textContent = `${Math.round(target * 100)}% profit`;
+            // EXPLICACIÓN: el badge tiene .profit-badge-pct + .profit-badge-hint
+            const pctEl = badge.querySelector<HTMLElement>('.profit-badge-pct');
+            if (pctEl) {
+                pctEl.textContent = `${Math.round(target * 100)}%`;
+            }
         }
     });
 

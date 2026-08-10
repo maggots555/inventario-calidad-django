@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------
     // Badges de % profit: se actualizan desde profitConfig (panel BD / .env)
     // para no mostrar porcentajes hardcodeados desactualizados.
+    // Solo se rellena el %, la palabra "sugerencia" queda fija en el HTML.
     // --------------------------------------------------------
     document.querySelectorAll('.profit-badge[data-profit-tipo]').forEach((badge) => {
         var _a, _b;
@@ -194,7 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         const target = (_b = (_a = config.profitConfig) === null || _a === void 0 ? void 0 : _a[tipo]) === null || _b === void 0 ? void 0 : _b.profit_target;
         if (typeof target === 'number') {
-            badge.textContent = `${Math.round(target * 100)}% profit`;
+            // EXPLICACIÓN: el badge tiene .profit-badge-pct + .profit-badge-hint
+            const pctEl = badge.querySelector('.profit-badge-pct');
+            if (pctEl) {
+                pctEl.textContent = `${Math.round(target * 100)}%`;
+            }
         }
     });
     // --- Referencias a elementos del DOM ---
