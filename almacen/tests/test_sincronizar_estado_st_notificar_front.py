@@ -25,9 +25,11 @@ from almacen.tests.helpers_integracion_cotizacion import (
 )
 from almacen.utils.sincronizar_estado_st import (
     ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
+    ESTADO_ST_ESPERANDO_CLIENTE,
     ESTADO_ST_PNC,
     TIPO_PLANTILLA_COTIZACION_LISTA,
     TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
+    sincronizar_estado_st_al_enviar_cotizacion_cliente,
     sincronizar_estado_st_al_notificar_front,
 )
 from almacen.views import notificar_front
@@ -190,6 +192,43 @@ class SincronizarEstadoStAlNotificarFrontUtilTest(BaseIntegracionCotizacionMixin
             tipo_plantilla=TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
         )
         self.assertFalse(cambiado)
+
+    def test_desde_pnc_enviar_cotizacion_cliente_pasa_a_esperar(self) -> None:
+        """
+        Tras PNC, enviar cotización alternativa (ej. REAC) → ST a cotizacion.
+
+        EXPLICACIÓN: aunque no hubo piezas, Front ofrece alternativa y
+        queda esperando si el cliente acepta o no.
+        """
+        orden = self._crear_orden_con_detalle(
+            orden_cliente='OOW-SYNC-FRONT-06',
+            estado=ESTADO_ST_PNC,
+        )
+        solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=orden,
+            sin_orden_activa=False,
+            estado='enviada_front',
+        )
+
+        cambiado = sincronizar_estado_st_al_enviar_cotizacion_cliente(
+            solicitud,
+            usuario=self.user,
+        )
+
+        self.assertTrue(cambiado)
+        orden.refresh_from_db()
+        self.assertEqual(orden.estado, ESTADO_ST_ESPERANDO_CLIENTE)
+
+        ultimo = (
+            orden.historial.filter(
+                tipo_evento='cambio_estado',
+                estado_nuevo=ESTADO_ST_ESPERANDO_CLIENTE,
+            )
+            .order_by('-fecha_evento')
+            .first()
+        )
+        self.assertIsNotNone(ultimo)
+        self.assertIn(solicitud.numero_solicitud, ultimo.comentario or '')
 
 
 class NotificarFrontVistaPlantillaTest(BaseIntegracionCotizacionMixin, TestCase):

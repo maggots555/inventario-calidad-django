@@ -80,8 +80,10 @@ ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_FRONT = (
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Al enviar/reenviar la cotización al cliente, SOLO podemos pasar a «cotizacion»
-# desde estados previos (diagnóstico, armado de cotización, etc.) o desde
-# «rechazada» (nueva propuesta). Nunca desde esperando_piezas, reparación, etc.
+# desde estados previos (diagnóstico, armado de cotización, etc.), desde
+# «rechazada» (nueva propuesta) o desde PNC (alternativa reacondicionado /
+# reparación componente cuando no hubo partes). Nunca desde esperando_piezas,
+# reparación, etc.
 ESTADOS_ST_PERMITIDOS_PARA_ESPERAR_CLIENTE = (
     'almacen',
     'espera',
@@ -92,6 +94,7 @@ ESTADOS_ST_PERMITIDOS_PARA_ESPERAR_CLIENTE = (
     'cotizacion_enviada_proveedor',
     'cotizacion_recibida_proveedor',
     'rechazada',  # Reenvío tras rechazo: reinicia espera de aprobación
+    ESTADO_ST_PNC,  # Tras PNC: alternativa (REAC / reparación componente)
 )
 
 # Mapeo: estado de SolicitudCotizacion → estado de OrdenServicio
@@ -344,6 +347,10 @@ def sincronizar_estado_st_al_enviar_cotizacion_cliente(
     realmente se envía el correo. Si la orden YA avanzó (aceptada, esperando
     piezas, reparación…), un reenvío del PDF/correo NO debe retroceder el
     workflow: el correo sí se manda, pero el estado ST se deja igual.
+
+    Caso especial PNC: si Compras avisó partes no disponibles y luego Front
+    envía una alternativa (reacondicionado / reparación componente), la orden
+    SÍ debe pasar de ``pnc_parte_no_disponible`` a ``cotizacion``.
 
     Args:
         solicitud: SolicitudCotizacion (con o sin orden_servicio).
