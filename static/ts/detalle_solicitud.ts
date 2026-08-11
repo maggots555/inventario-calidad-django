@@ -88,8 +88,12 @@ interface NotificarFrontResponse {
         task_id: string;
         destinatario: string;
         solicitud: string;
+        tipo_plantilla?: string;
     };
 }
+
+/** Tipos de plantilla del modal Notificar a Front */
+type TipoPlantillaNotificar = 'cotizacion_lista' | 'partes_no_disponibles';
 
 // ========================================================================
 // CLASE PRINCIPAL
@@ -457,13 +461,32 @@ class DetalleSolicitud {
     // ====================================================================
 
     /**
-     * Configura el modal y envío de notificación a recepción
+     * Configura el modal y envío de notificación a recepción.
+     * Incluye selector de plantilla (cotización lista vs PNC).
      */
     private initNotificarFront(): void {
         const btnEnviar = document.getElementById('btnNotificarFront') as HTMLButtonElement;
         const form = document.getElementById('formNotificarFront') as HTMLFormElement;
 
         if (!btnEnviar || !form) return;
+
+        // EXPLICACIÓN: al cambiar el radio, actualizamos textos del modal
+        const radios = form.querySelectorAll<HTMLInputElement>('input[name="tipo_plantilla"]');
+        radios.forEach((radio) => {
+            radio.addEventListener('change', () => {
+                this.actualizarUiPlantillaNotificar(
+                    (radio.value as TipoPlantillaNotificar) || 'cotizacion_lista'
+                );
+            });
+        });
+
+        // Estado inicial según el radio marcado
+        const seleccionado = form.querySelector<HTMLInputElement>(
+            'input[name="tipo_plantilla"]:checked'
+        );
+        this.actualizarUiPlantillaNotificar(
+            (seleccionado?.value as TipoPlantillaNotificar) || 'cotizacion_lista'
+        );
 
         btnEnviar.addEventListener('click', (e) => {
             e.preventDefault();
@@ -472,7 +495,74 @@ class DetalleSolicitud {
     }
 
     /**
-     * Envía la notificación via AJAX y muestra feedback
+     * Ajusta alertas y títulos del modal según la plantilla elegida.
+     *
+     * @param tipo - cotizacion_lista | partes_no_disponibles
+     */
+    private actualizarUiPlantillaNotificar(tipo: TipoPlantillaNotificar): void {
+        const esPnc = tipo === 'partes_no_disponibles';
+
+        const alertEl = document.getElementById('alertTipoPlantillaNotificar');
+        const tituloAlert = document.getElementById('tituloAlertTipoPlantilla');
+        const textoAlert = document.getElementById('textoAlertTipoPlantilla');
+        const tituloResumen = document.getElementById('tituloResumenNotificar');
+        const ayudaPnc = document.getElementById('ayudaResumenPnc');
+        const labelLista = document.getElementById('labelPlantillaCotizacionLista');
+        const labelPnc = document.getElementById('labelPlantillaPnc');
+        const modalTitle = document.getElementById('notificarFrontModalLabel');
+        const btnEnviar = document.getElementById('btnNotificarFront');
+
+        if (alertEl) {
+            alertEl.classList.toggle('alert-warning', esPnc);
+            alertEl.classList.toggle('border-warning', esPnc);
+            alertEl.classList.toggle('alert-secondary', !esPnc);
+        }
+        if (tituloAlert) {
+            tituloAlert.innerHTML = esPnc
+                ? '<strong>Partes no disponibles (PNC)</strong>'
+                : '<strong>Cotización lista para Front</strong>';
+        }
+        if (textoAlert) {
+            textoAlert.textContent = esPnc
+                ? 'Se enviará el correo avisando que no hay componentes en mercado. '
+                  + 'La orden en ST pasará a «PNC - Parte No Disponible». '
+                  + 'Ofrece alternativas: reparación a nivel componente o equipo reacondicionado.'
+                : 'Se enviará el correo con precios y el estatus de la orden en ST '
+                  + 'pasará a «Se Recibe Cotización de Proveedores».';
+        }
+        if (tituloResumen) {
+            tituloResumen.textContent = esPnc
+                ? 'Piezas no encontradas'
+                : 'Resumen de la Cotización';
+        }
+        if (ayudaPnc) {
+            ayudaPnc.classList.toggle('d-none', !esPnc);
+        }
+        if (labelLista) {
+            labelLista.classList.toggle('border-success', !esPnc);
+            labelLista.classList.toggle('border-2', !esPnc);
+        }
+        if (labelPnc) {
+            labelPnc.classList.toggle('border-warning', esPnc);
+            labelPnc.classList.toggle('border-2', esPnc);
+        }
+        if (modalTitle) {
+            modalTitle.innerHTML = esPnc
+                ? '<i class="bi bi-exclamation-triangle me-2"></i>Notificar PNC a Recepción'
+                : '<i class="bi bi-envelope-paper me-2"></i>Notificar a Recepción';
+        }
+        if (btnEnviar) {
+            btnEnviar.innerHTML = esPnc
+                ? '<i class="bi bi-send-fill"></i> Enviar notificación PNC'
+                : '<i class="bi bi-send-fill"></i> Enviar Notificación';
+            btnEnviar.classList.toggle('btn-warning', esPnc);
+            btnEnviar.classList.toggle('btn-success', !esPnc);
+        }
+    }
+
+    /**
+     * Envía la notificación via AJAX y muestra feedback.
+     * FormData incluye tipo_plantilla (radios del formulario).
      */
     private async enviarNotificacion(form: HTMLFormElement, btn: HTMLButtonElement): Promise<void> {
         // Deshabilitar botón y mostrar loading
@@ -481,6 +571,7 @@ class DetalleSolicitud {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
 
         try {
+            // EXPLICACIÓN: FormData toma csrf, destinatarios, mensaje y tipo_plantilla
             const formData = new FormData(form);
 
             const response = await fetch(this.config.urlNotificarFront, {
@@ -527,28 +618,35 @@ class DetalleSolicitud {
     private mostrarConfirmacion(data: NotificarFrontResponse): void {
         const destinatario = data.data?.destinatario || '';
         const solicitud = data.data?.solicitud || '';
+        const esPnc = data.data?.tipo_plantilla === 'partes_no_disponibles';
+        const titulo = esPnc ? 'Notificación PNC en Proceso' : 'Notificación en Proceso';
+        const detalleCorreo = esPnc
+            ? 'El correo de partes no disponibles (PNC) se está procesando.'
+            : 'El correo con la cotización se está procesando.';
+        const headerClass = esPnc ? 'bg-warning text-dark' : 'bg-success text-white';
+        const iconColor = esPnc ? '#ffc107' : '#198754';
 
         const modalHTML = `
             <div class="modal fade" id="modalConfirmacionNotificacion" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
-                        <div class="modal-header bg-success text-white">
+                        <div class="modal-header ${headerClass}">
                             <h5 class="modal-title">
-                                <i class="bi bi-send-check"></i> Notificación en Proceso
+                                <i class="bi bi-send-check"></i> ${titulo}
                             </h5>
                         </div>
                         <div class="modal-body">
                             <div class="text-center mb-3">
-                                <i class="bi bi-gear" style="font-size: 3rem; color: #198754;"></i>
+                                <i class="bi bi-gear" style="font-size: 3rem; color: ${iconColor};"></i>
                             </div>
                             <p class="text-center fs-5 mb-2">
-                                La notificación se está enviando <strong>en segundo plano</strong>.
+                                ${data.message || 'La notificación se está enviando en segundo plano.'}
                             </p>
                             <div class="alert alert-info mb-0">
                                 <i class="bi bi-info-circle me-1"></i>
                                 <strong>Solicitud:</strong> ${solicitud}<br>
                                 <strong>Destinatario:</strong> ${destinatario}<br><br>
-                                El correo con la cotización se está procesando.
+                                ${detalleCorreo}
                                 Puedes continuar trabajando normalmente.
                             </div>
                         </div>

@@ -716,10 +716,11 @@ def notificar_front(request, pk):
     
     Flujo:
     1. Valida que la solicitud esté en borrador o enviada_front y tenga líneas
-    2. Cambia el estado de la solicitud a 'enviada_front' (si estaba en borrador)
-    3. Sincroniza la orden ST a 'cotizacion_recibida_proveedor' si aplica
-    4. Dispara la tarea Celery para enviar el correo en segundo plano
-    5. Devuelve JsonResponse inmediato
+    2. Lee ``tipo_plantilla`` (cotización lista vs partes no disponibles / PNC)
+    3. Cambia el estado de la solicitud a 'enviada_front' (si estaba en borrador)
+    4. Sincroniza la orden ST según la plantilla (recibida proveedores o PNC)
+    5. Dispara la tarea Celery para enviar el correo en segundo plano
+    6. Devuelve JsonResponse inmediato
     
     Args:
         request: HttpRequest con datos POST del formulario
@@ -729,7 +730,12 @@ def notificar_front(request, pk):
         JsonResponse — el correo se procesa en background via Celery
     """
     from .tasks import notificar_front_cotizacion_task
-    from .utils.sincronizar_estado_st import sincronizar_estado_st_al_notificar_front
+    from .utils.sincronizar_estado_st import (
+        TIPO_PLANTILLA_COTIZACION_LISTA,
+        TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
+        TIPOS_PLANTILLA_NOTIFICAR_FRONT,
+        sincronizar_estado_st_al_notificar_front,
+    )
     
     try:
         solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
@@ -746,6 +752,19 @@ def notificar_front(request, pk):
             return JsonResponse({
                 'success': False,
                 'error': 'La solicitud debe tener al menos una línea para notificar.'
+            }, status=400)
+
+        # EXPLICACIÓN: el modal envía radios; si falta o es inválido, usamos cotización lista
+        tipo_plantilla = (
+            request.POST.get('tipo_plantilla', TIPO_PLANTILLA_COTIZACION_LISTA) or ''
+        ).strip()
+        if tipo_plantilla not in TIPOS_PLANTILLA_NOTIFICAR_FRONT:
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    'Tipo de plantilla inválido. Elige «Cotización lista» '
+                    'o «Partes no disponibles (PNC)».'
+                ),
             }, status=400)
         
         # Obtener destinatarios del formulario (los seleccionados en el modal)
@@ -768,12 +787,12 @@ def notificar_front(request, pk):
             solicitud.enviar_a_front(usuario=request.user)
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Tras avisar a Front, la orden vinculada en ST pasa a
-        # «Se Recibe Cotización de Proveedores» (si aún no avanzó más adelante).
+        # Según la plantilla, la orden ST pasa a «cotización recibida» o a PNC.
         # También se intenta en reenvíos por si la orden se vinculó después.
         sincronizar_estado_st_al_notificar_front(
             solicitud,
             usuario=request.user,
+            tipo_plantilla=tipo_plantilla,
         )
         
         # Disparar tarea Celery
@@ -785,19 +804,30 @@ def notificar_front(request, pk):
             destinatarios=destinatarios,
             mensaje_personalizado=mensaje_personalizado,
             usuario_id=usuario_id,
+            tipo_plantilla=tipo_plantilla,
             db_alias=get_pais_actual()['db_alias'],
         )
+
+        # Mensaje distinto para que Front sepa si es cotización o PNC
+        if tipo_plantilla == TIPO_PLANTILLA_PARTES_NO_DISPONIBLES:
+            mensaje_ok = (
+                f'Notificación PNC (partes no disponibles) en proceso de envío '
+                f'a {len(destinatarios)} destinatario(s).'
+            )
+        else:
+            mensaje_ok = (
+                f'Notificación en proceso de envío a {len(destinatarios)} '
+                f'destinatario(s).'
+            )
         
         return JsonResponse({
             'success': True,
-            'message': (
-                f'Notificación en proceso de envío a {len(destinatarios)} '
-                f'destinatario(s).'
-            ),
+            'message': mensaje_ok,
             'data': {
                 'task_id': tarea.id,
                 'destinatario': ', '.join(destinatarios),
                 'solicitud': solicitud.numero_solicitud,
+                'tipo_plantilla': tipo_plantilla,
             }
         })
         

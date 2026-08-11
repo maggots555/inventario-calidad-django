@@ -38,6 +38,7 @@ def notificar_front_cotizacion_task(
     destinatarios,
     mensaje_personalizado,
     usuario_id=None,
+    tipo_plantilla='cotizacion_lista',
     db_alias='default',
 ):
     """
@@ -47,13 +48,14 @@ def notificar_front_cotizacion_task(
     Esta tarea se ejecuta en segundo plano para no bloquear al usuario.
     Recupera la solicitud de cotización, comprime las imágenes de cada línea
     y envía un correo HTML a los empleados seleccionados para que compartan
-    la cotización con el cliente.
+    la cotización con el cliente (o avisen PNC si no hay partes).
 
     Parámetros:
         solicitud_id            : ID de la SolicitudCotizacion
         destinatarios           : Lista de emails seleccionados por el usuario
         mensaje_personalizado   : Texto opcional del usuario
         usuario_id              : ID del usuario que disparó la acción
+        tipo_plantilla          : ``cotizacion_lista`` o ``partes_no_disponibles``
         db_alias                : Alias de BD del país activo (ej: 'mexico', 'chile').
                                   La señal task_prerun de Celery usa este valor para
                                   configurar el contexto de país en el worker.
@@ -202,12 +204,17 @@ def notificar_front_cotizacion_task(
             'pais_nombre': _pais_email['nombre'],
             'whatsapp_empleado': whatsapp_empleado,
             'nombre_usuario': nombre_usuario,
+            'tipo_plantilla': tipo_plantilla,
         }
 
-        html_content = render_to_string(
-            'almacen/emails/cotizacion_front.html',
-            context
+        # EXPLICACIÓN: plantilla PNC usa otro HTML y asunto (partes no disponibles)
+        es_pnc = tipo_plantilla == 'partes_no_disponibles'
+        template_email = (
+            'almacen/emails/cotizacion_front_pnc.html'
+            if es_pnc
+            else 'almacen/emails/cotizacion_front.html'
         )
+        html_content = render_to_string(template_email, context)
 
         # ===================================================================
         # PASO 4: CREAR Y ENVIAR EL CORREO
@@ -221,7 +228,10 @@ def notificar_front_cotizacion_task(
         else:
             numero_display = solicitud.numero_solicitud
         
-        asunto = f'📋 Nueva Cotización - {numero_display}'
+        if es_pnc:
+            asunto = f'⚠️ PNC - Partes no disponibles - {numero_display}'
+        else:
+            asunto = f'📋 Nueva Cotización - {numero_display}'
 
         email_match = __import__('re').search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL

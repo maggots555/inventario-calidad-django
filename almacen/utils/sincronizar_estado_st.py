@@ -29,6 +29,25 @@ ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR = 'cotizacion_enviada_proveedor'
 # Destino al avisar a Front que la cotización de proveedores ya está lista
 ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR = 'cotizacion_recibida_proveedor'
 
+# Destino al avisar a Front que NO hay partes disponibles en mercado (PNC)
+ESTADO_ST_PNC = 'pnc_parte_no_disponible'
+
+# Tipos de plantilla del modal «Notificar a Front»
+# EXPLICACIÓN: cotizacion_lista = correo normal con precios;
+# partes_no_disponibles = correo PNC + alternativas (reparación componente / REAC).
+TIPO_PLANTILLA_COTIZACION_LISTA = 'cotizacion_lista'
+TIPO_PLANTILLA_PARTES_NO_DISPONIBLES = 'partes_no_disponibles'
+TIPOS_PLANTILLA_NOTIFICAR_FRONT = frozenset({
+    TIPO_PLANTILLA_COTIZACION_LISTA,
+    TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
+})
+
+# Mapeo plantilla → estado ST destino al notificar a Front
+MAPEO_PLANTILLA_A_ESTADO_ST = {
+    TIPO_PLANTILLA_COTIZACION_LISTA: ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
+    TIPO_PLANTILLA_PARTES_NO_DISPONIBLES: ESTADO_ST_PNC,
+}
+
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Al crear la solicitud con orden, solo avanzamos desde fases previas
 # (diagnóstico, recepción, etc.) o desde «rechazada» (re-cotización).
@@ -45,7 +64,8 @@ ESTADOS_ST_PERMITIDOS_PARA_CREAR_SOLICITUD = (
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Al notificar a Front solo avanzamos desde estados previos al hito
-# «Se Recibe Cotización de Proveedores». Nunca desde cotizacion, reparación, etc.
+# «Se Recibe Cotización de Proveedores» o desde PNC (recuperación cuando
+# sí encontraron partes). Nunca desde cotizacion, reparación, etc.
 ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_FRONT = (
     'almacen',
     'espera',
@@ -55,6 +75,7 @@ ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_FRONT = (
     'diagnostico_enviado_cliente',
     'cotizacion_enviada_proveedor',
     'rechazada',  # Re-cotización tras rechazo: vuelve al hito de proveedores
+    ESTADO_ST_PNC,  # Recuperación: partes encontradas tras un PNC previo
 )
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -178,23 +199,58 @@ def sincronizar_estado_st_al_crear_solicitud(
     return True
 
 
+def _listar_piezas_solicitud_para_historial(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Arma un texto corto con las líneas de la solicitud (producto + descripción).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En el flujo PNC necesitamos dejar constancia en el historial de ST de
+    *qué* piezas no se encontraron. Las líneas de Almacén ya son ese listado.
+
+    Args:
+        solicitud: SolicitudCotizacion con líneas precargadas o no.
+
+    Returns:
+        Texto multilínea (puede ser vacío si no hay líneas).
+    """
+    partes: list[str] = []
+    # EXPLICACIÓN: ordenamos por numero_linea para un historial legible
+    for linea in solicitud.lineas.order_by('numero_linea'):
+        nombre = ''
+        if getattr(linea, 'producto_id', None) and linea.producto:
+            nombre = (linea.producto.nombre or '').strip()
+        descripcion = (linea.descripcion_pieza or '').strip()
+        if nombre and descripcion:
+            partes.append(f'- {nombre}: {descripcion}')
+        elif nombre:
+            partes.append(f'- {nombre}')
+        elif descripcion:
+            partes.append(f'- {descripcion}')
+    return '\n'.join(partes)
+
+
 def sincronizar_estado_st_al_notificar_front(
     solicitud: 'SolicitudCotizacion',
     usuario=None,
+    tipo_plantilla: str = TIPO_PLANTILLA_COTIZACION_LISTA,
 ) -> bool:
     """
-    Al notificar a Front desde Almacén, pone la orden ST en ``cotizacion_recibida_proveedor``.
+    Al notificar a Front desde Almacén, actualiza el estado ST según la plantilla.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Cuando Compras termina de cotizar y avisa a recepción («Notificar a Front»),
-    el hito correcto en Servicio Técnico es «Se Recibe Cotización de Proveedores».
+    El modal «Notificar a Front» tiene dos plantillas:
+    - ``cotizacion_lista`` → «Se Recibe Cotización de Proveedores»
+    - ``partes_no_disponibles`` → «PNC - Parte No Disponible»
+
     Si la solicitud no tiene orden vinculada, o la orden ya avanzó (esperando
     cliente, reparación, etc.), no se cambia el estado para no romper el flujo.
+    Desde PNC sí se permite recuperar con la plantilla de cotización lista.
 
     Args:
         solicitud: SolicitudCotizacion (con o sin orden_servicio).
         usuario: User opcional; si tiene empleado, se asocia al historial.
+        tipo_plantilla: ``cotizacion_lista`` o ``partes_no_disponibles``.
 
     Returns:
         bool: True si se cambió el estado; False si no aplica o se omitió a propósito.
@@ -203,8 +259,14 @@ def sincronizar_estado_st_al_notificar_front(
     if not orden:
         return False
 
+    # Normalizar plantilla inválida al default (cotización lista)
+    if tipo_plantilla not in TIPOS_PLANTILLA_NOTIFICAR_FRONT:
+        tipo_plantilla = TIPO_PLANTILLA_COTIZACION_LISTA
+
+    estado_destino = MAPEO_PLANTILLA_A_ESTADO_ST[tipo_plantilla]
+
     # Ya está en el destino: no duplicar historial en reenvíos del correo
-    if orden.estado == ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR:
+    if orden.estado == estado_destino:
         return False
 
     # Guardia anti-regresión: no pisar estados posteriores del flujo
@@ -212,13 +274,13 @@ def sincronizar_estado_st_al_notificar_front(
         logger.info(
             f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
             f"'{orden.estado}'; notificar a Front NO cambia a "
-            f"'{ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR}' "
-            f"(solicitud {solicitud.numero_solicitud})."
+            f"'{estado_destino}' "
+            f"(solicitud {solicitud.numero_solicitud}, plantilla {tipo_plantilla})."
         )
         return False
 
     estado_anterior = orden.estado
-    orden.estado = ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR
+    orden.estado = estado_destino
     # OrdenServicio.save() crea HistorialOrden(tipo_evento='cambio_estado')
     orden.save(update_fields=['estado'])
 
@@ -233,18 +295,26 @@ def sincronizar_estado_st_al_notificar_front(
     ultimo = (
         orden.historial.filter(
             tipo_evento='cambio_estado',
-            estado_nuevo=ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
+            estado_nuevo=estado_destino,
         )
         .order_by('-fecha_evento')
         .first()
     )
     if ultimo:
-        ultimo.comentario = (
+        # EXPLICACIÓN: en PNC añadimos el listado de piezas no encontradas
+        comentario = (
             f'Cambio de estado al notificar a Front desde Almacén: '
             f'{etiquetas.get(estado_anterior, estado_anterior)} → '
-            f'{etiquetas.get(ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR, ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR)} '
-            f'(solicitud {solicitud.numero_solicitud})'
+            f'{etiquetas.get(estado_destino, estado_destino)} '
+            f'(solicitud {solicitud.numero_solicitud}, plantilla {tipo_plantilla})'
         )
+        if tipo_plantilla == TIPO_PLANTILLA_PARTES_NO_DISPONIBLES:
+            listado = _listar_piezas_solicitud_para_historial(solicitud)
+            if listado:
+                comentario += (
+                    f'\nPiezas no disponibles en mercado:\n{listado}'
+                )
+        ultimo.comentario = comentario
         update_fields = ['comentario', 'es_sistema']
         if empleado is not None:
             ultimo.usuario = empleado
@@ -254,8 +324,9 @@ def sincronizar_estado_st_al_notificar_front(
 
     logger.info(
         f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
-        f"{estado_anterior} → {ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR} "
-        f"(notificar a Front, solicitud {solicitud.numero_solicitud})"
+        f"{estado_anterior} → {estado_destino} "
+        f"(notificar a Front, plantilla {tipo_plantilla}, "
+        f"solicitud {solicitud.numero_solicitud})"
     )
     return True
 

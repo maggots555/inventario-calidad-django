@@ -365,6 +365,73 @@ Muestra toda la información y acciones según el estado
             <div class="modal-body" style="padding: 1.5rem;">
                 <form id="formNotificarFront" method="post">
                     {% csrf_token %}
+
+                    <!-- SECCIÓN 0: TIPO DE PLANTILLA -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-text text-warning fs-5 me-2"></i>
+                            <h6 class="mb-0 text-warning fw-bold">Tipo de notificación</h6>
+                        </div>
+
+                        <div class="alert alert-secondary border-2 mb-3" id="alertTipoPlantillaNotificar">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-info-circle-fill fs-4 me-3 flex-shrink-0" id="iconAlertTipoPlantilla"></i>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2" id="tituloAlertTipoPlantilla">
+                                        <strong>Cotización lista para Front</strong>
+                                    </h6>
+                                    <p class="mb-0 small" id="textoAlertTipoPlantilla">
+                                        Se enviará el correo con precios y el estatus de la orden en ST
+                                        pasará a «Se Recibe Cotización de Proveedores».
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="destinatario-card p-3 border rounded bg-light d-block mb-0 cursor-pointer border-success border-2"
+                                       for="plantilla_cotizacion_lista"
+                                       id="labelPlantillaCotizacionLista">
+                                    <div class="d-flex align-items-start">
+                                        <input class="form-check-input me-3 flex-shrink-0 mt-1"
+                                               type="radio"
+                                               name="tipo_plantilla"
+                                               id="plantilla_cotizacion_lista"
+                                               value="cotizacion_lista"
+                                               checked>
+                                        <div>
+                                            <div class="fw-bold">Cotización lista</div>
+                                            <small class="text-muted">
+                                                Partes cotizadas con costos. Front comparte con el cliente.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="destinatario-card p-3 border rounded bg-light d-block mb-0 cursor-pointer"
+                                       for="plantilla_partes_no_disponibles"
+                                       id="labelPlantillaPnc">
+                                    <div class="d-flex align-items-start">
+                                        <input class="form-check-input me-3 flex-shrink-0 mt-1"
+                                               type="radio"
+                                               name="tipo_plantilla"
+                                               id="plantilla_partes_no_disponibles"
+                                               value="partes_no_disponibles">
+                                        <div>
+                                            <div class="fw-bold">Partes no disponibles (PNC)</div>
+                                            <small class="text-muted">
+                                                Componentes no encontrados. Ofrecer alternativas (reparación componente / reacondicionado).
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
                     
                     <!-- SECCIÓN 1: DESTINATARIOS -->
                     <div class="mb-4">
@@ -487,12 +554,17 @@ Muestra toda la información y acciones según el estado
                     
                     <hr class="my-4">
                     
-                    <!-- SECCIÓN 3: RESUMEN DE COTIZACIÓN -->
+                    <!-- SECCIÓN 3: RESUMEN DE COTIZACIÓN / PIEZAS -->
                     <div class="mb-4">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                            <i class="bi bi-list-ul text-primary fs-5 me-2"></i>
-                            <h6 class="mb-0 text-primary fw-bold">Resumen de la Cotización</h6>
+                            <i class="bi bi-list-ul text-primary fs-5 me-2" id="iconResumenNotificar"></i>
+                            <h6 class="mb-0 text-primary fw-bold" id="tituloResumenNotificar">Resumen de la Cotización</h6>
                         </div>
+                        <p class="small text-muted mb-2 d-none" id="ayudaResumenPnc">
+                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                            Estas son las piezas que <strong>no se encontraron</strong> en el mercado.
+                            Los costos pueden aparecer como «Pendiente».
+                        </p>
                         
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered mb-0">

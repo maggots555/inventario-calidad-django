@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNC - Partes no disponibles - S/T: {% if solicitud.orden_servicio %}{{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:"Sin Service Tag" }}{% elif solicitud.service_tag %}{{ solicitud.service_tag }}{% else %}Sin Service Tag{% endif %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #fff8e1 50%, #ffb74d 100%);
+            color: #e65100;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+
+        .alert-pnc {
+            background: #fff3cd;
+            border: 2px solid #ff9800;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0 25px 0;
+        }
+
+        .alert-pnc-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .alert-pnc-text {
+            font-size: 15px;
+            color: #5d4037;
+            line-height: 1.7;
+        }
+
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-title {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #ff9800;
+            padding-bottom: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #e65100;
+            min-width: 140px;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 15px;
+            flex: 1;
+        }
+
+        .info-value.highlight {
+            font-weight: 700;
+            color: #e65100;
+        }
+
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 14px;
+        }
+
+        .lineas-table thead {
+            background-color: #ef6c00;
+            color: white;
+        }
+
+        .lineas-table th {
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .lineas-table th.text-center {
+            text-align: center;
+        }
+
+        .lineas-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+
+        .lineas-table td.text-center {
+            text-align: center;
+        }
+
+        .lineas-table tbody tr:hover {
+            background-color: #fff8e1;
+        }
+
+        .linea-descripcion {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .linea-notas {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .linea-imagen-thumb {
+            display: inline-block;
+            width: 120px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            margin: 4px 6px 4px 0;
+        }
+
+        .badge-no-disp {
+            display: inline-block;
+            background: #ffecb3;
+            color: #e65100;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .message-box {
+            background: linear-gradient(135deg, #e8f4fd 0%, #fff3cd 100%);
+            border-left: 4px solid #ff9800;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .message-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .message-content {
+            font-size: 15px;
+            color: #555;
+            line-height: 1.7;
+            font-style: italic;
+        }
+
+        .alternativas-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .alternativas-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 12px;
+        }
+
+        .alternativas-text {
+            font-size: 14px;
+            color: #37474f;
+            line-height: 1.7;
+        }
+
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .help-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+
+            .content {
+                padding: 20px 15px;
+            }
+
+            .info-row {
+                flex-direction: column;
+            }
+
+            .info-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+
+            .lineas-table {
+                font-size: 12px;
+            }
+
+            .lineas-table th,
+            .lineas-table td {
+                padding: 8px 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">⚠️ PNC — PARTES NO DISPONIBLES</div>
+            <div class="subtitle">
+                S/T: {% if solicitud.orden_servicio %}{{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:"Sin Service Tag" }}{% elif solicitud.service_tag %}{{ solicitud.service_tag }}{% else %}Sin Service Tag{% endif %}
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                Equipo de Recepción,
+            </div>
+
+            <div class="alert-pnc">
+                <div class="alert-pnc-title">Componentes no disponibles para cotización</div>
+                <div class="alert-pnc-text">
+                    Almacén buscó en el mercado las piezas solicitadas y
+                    <strong>no están disponibles para cotizar</strong>
+                    (descontinuadas, sin stock de proveedores o tiempos de importación inviables).
+                    El estatus de la orden en Servicio Técnico debe reflejar
+                    <strong>PNC - Parte No Disponible</strong>.
+                </div>
+            </div>
+
+            <div class="intro-text">
+                A continuación encontrarás el listado de componentes que <strong>no se encontraron</strong>.
+                Usa esta información para hablar con el cliente y ofrecer alternativas.
+            </div>
+
+            {% if info_equipo %}
+            <div class="equipment-info">
+                <div class="info-title">💻 INFORMACIÓN DEL EQUIPO</div>
+
+                {% if solicitud.numero_orden_cliente %}
+                <div class="info-row">
+                    <div class="info-label">🎯 Orden Cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
+                </div>
+                {% endif %}
+
+                <div class="info-row">
+                    <div class="info-label">📦 Equipo:</div>
+                    <div class="info-value">
+                        {{ info_equipo.tipo }} {{ info_equipo.marca }}
+                        {% if info_equipo.modelo %}{{ info_equipo.modelo }}{% endif %}
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">🔢 Service Tag:</div>
+                    <div class="info-value">{{ info_equipo.service_tag|default:"-" }}</div>
+                </div>
+            </div>
+            {% elif solicitud.sin_orden_activa %}
+            <div class="equipment-info">
+                <div class="info-title">👤 DATOS DEL CLIENTE</div>
+
+                <div class="info-row">
+                    <div class="info-label">📛 Cliente:</div>
+                    <div class="info-value">{{ solicitud.nombre_cliente|default:"-" }}</div>
+                </div>
+
+                {% if solicitud.service_tag %}
+                <div class="info-row">
+                    <div class="info-label">🔢 Service Tag:</div>
+                    <div class="info-value">{{ solicitud.service_tag }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Componente no encontrado</th>
+                        <th class="text-center">Cant.</th>
+                        <th class="text-center">Disponibilidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in lineas_con_imagenes %}
+                    <tr>
+                        <td>{{ item.linea.numero_linea }}</td>
+                        <td>
+                            <div class="linea-descripcion">
+                                {{ item.linea.producto.nombre }}
+                            </div>
+                            {% if item.linea.descripcion_pieza %}
+                            <div class="linea-notas">{{ item.linea.descripcion_pieza }}</div>
+                            {% endif %}
+                            {% if item.linea.notas %}
+                            <div class="linea-notas"><em>{{ item.linea.notas }}</em></div>
+                            {% endif %}
+                            {% if item.imagenes %}
+                            <div style="margin-top: 10px;">
+                                {% for img in item.imagenes %}
+                                <img src="cid:{{ img.cid }}" alt="{{ img.descripcion }}" class="linea-imagen-thumb" title="{{ img.descripcion }}">
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ item.linea.cantidad }}</td>
+                        <td class="text-center">
+                            <span class="badge-no-disp">No disponible</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="alternativas-box">
+                <div class="alternativas-title">💡 Alternativas a ofrecer al cliente</div>
+                <div class="alternativas-text">
+                    <strong>1. Reparación a nivel componente:</strong>
+                    evaluar si el fallo se puede corregir sin sustituir la pieza completa
+                    (soldadura, reballing, cambio de IC, etc.).<br><br>
+                    <strong>2. Equipo reacondicionado:</strong>
+                    ofrecer un equipo compatible reacondicionado como alternativa
+                    cuando la refacción original no existe en el mercado.<br><br>
+                    Coordina con Almacén / Técnico si el cliente acepta alguna de estas opciones
+                    para armar una nueva propuesta en el sistema.
+                </div>
+            </div>
+
+            {% if mensaje_personalizado %}
+            <div class="message-box">
+                <div class="message-title">💬 Nota adicional de Compras</div>
+                <div class="message-content">
+                    {{ mensaje_personalizado|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="help-section">
+                <div class="help-title">📌 Instrucciones para Recepción</div>
+                <div class="help-text">
+                    <strong>1.</strong> Informa al cliente que las refacciones listadas no están disponibles para cotizar.<br>
+                    <strong>2.</strong> Ofrece las alternativas (reparación a nivel componente o equipo reacondicionado).<br>
+                    <strong>3.</strong> Si el cliente acepta una alternativa, coordina con Almacén para una nueva cotización.<br>
+                    <strong>4.</strong> No envíes al cliente una cotización de precios de estas piezas: no hay disponibilidad.
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    {% if nombre_usuario %}
+                    Notificación PNC generada por: <strong>{{ nombre_usuario }}</strong>
+                    {% else %}
+                    Notificación PNC generada desde el Sistema de Almacén
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Almacén SIC
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para consultas sobre esta notificación, contacte directamente al área de Almacén.
+                </div>
+            </div>
+
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
