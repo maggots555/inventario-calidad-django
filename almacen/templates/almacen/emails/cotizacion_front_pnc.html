@@ -409,8 +409,15 @@
                     Almacén buscó en el mercado las piezas solicitadas y
                     <strong>no están disponibles para cotizar</strong>
                     (descontinuadas, sin stock de proveedores o tiempos de importación inviables).
-                    El estatus de la orden en Servicio Técnico debe reflejar
-                    <strong>PNC - Parte No Disponible</strong>.
+                    {% if solicitud.orden_servicio %}
+                    Coordina con el cliente las alternativas; el estatus PNC en Servicio Técnico
+                    se actualiza cuando Front use
+                    <strong>«Notificar cliente: sin piezas (PNC)»</strong> en el sistema.
+                    {% else %}
+                    Esta solicitud aún no tiene orden de Servicio Técnico vinculada:
+                    usa este aviso para hablar con el cliente; el estatus ST se actualizará
+                    cuando exista orden y se notifique PNC al cliente desde el sistema.
+                    {% endif %}
                 </div>
             </div>
 

@@ -524,8 +524,9 @@ class DetalleSolicitud {
         }
         if (textoAlert) {
             textoAlert.textContent = esPnc
-                ? 'Se enviará el correo avisando que no hay componentes en mercado. '
-                  + 'La orden en ST pasará a «PNC - Parte No Disponible». '
+                ? 'Se enviará el correo a Front avisando que no hay componentes en mercado. '
+                  + 'Esto NO cambia el estatus en ST; el PNC en ST ocurre al usar '
+                  + '«Notificar cliente: sin piezas (PNC)». '
                   + 'Ofrece alternativas: reparación a nivel componente o equipo reacondicionado.'
                 : 'Se enviará el correo con precios y el estatus de la orden en ST '
                   + 'pasará a «Se Recibe Cotización de Proveedores».';

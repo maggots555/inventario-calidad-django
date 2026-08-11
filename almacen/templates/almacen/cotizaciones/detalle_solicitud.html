@@ -661,8 +661,8 @@ Muestra toda la información y acciones según el estado
     </div>
 </div>
 
-{% if solicitud.estado == 'enviada_front' %}
-<!-- Modal: Notificar al cliente — partes no disponibles (PNC) -->
+{% if mostrar_modal_notificar_cliente_pnc %}
+<!-- Modal: Notificar / reenviar aviso PNC al cliente -->
 <div class="modal fade" id="modalNotificarClientePnc" tabindex="-1"
      aria-labelledby="modalNotificarClientePncLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -670,7 +670,11 @@ Muestra toda la información y acciones según el estado
             <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title" id="modalNotificarClientePncLabel">
                     <i class="bi bi-exclamation-triangle me-2"></i>
+                    {% if mostrar_reenviar_aviso_pnc %}
+                    Reenviar aviso PNC al cliente
+                    {% else %}
                     Notificar al cliente: sin piezas (PNC)
+                    {% endif %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -679,12 +683,20 @@ Muestra toda la información y acciones según el estado
                     {% csrf_token %}
 
                     <div class="alert alert-warning border-warning mb-3">
-                        <strong>¿Qué hace este aviso?</strong>
+                        <strong>{% if mostrar_reenviar_aviso_pnc %}¿Qué hace el reenvío?{% else %}¿Qué hace este aviso?{% endif %}</strong>
                         <ul class="mb-0 small mt-2">
+                            {% if mostrar_reenviar_aviso_pnc %}
+                            <li>Vuelve a enviar el correo PNC al cliente (sin PDF de precios).</li>
+                            <li>No cambia el estado de la solicitud (sigue en <em>Enviada al Cliente</em>).</li>
+                            {% if solicitud.orden_servicio_id %}
+                            <li>Si la orden ya está en PNC, solo deja un comentario en el historial de ST.</li>
+                            {% endif %}
+                            {% else %}
                             <li>Envía un correo al cliente indicando que no hay refacciones disponibles.</li>
                             <li>Pasa la solicitud a <em>Enviada al Cliente</em> para que puedas rechazar las líneas y tipificar el motivo.</li>
                             {% if solicitud.orden_servicio_id %}
                             <li>La orden en Servicio Técnico queda / se pone en <em>PNC - Parte No Disponible</em>.</li>
+                            {% endif %}
                             {% endif %}
                         </ul>
                     </div>
@@ -748,7 +760,12 @@ Muestra toda la información y acciones según el estado
                         class="btn btn-warning"
                         id="btnNotificarClientePnc"
                         {% if not solicitud.lineas.exists %}disabled{% endif %}>
-                    <i class="bi bi-send-fill"></i> Enviar aviso PNC al cliente
+                    <i class="bi bi-send-fill"></i>
+                    {% if mostrar_reenviar_aviso_pnc %}
+                    Reenviar aviso PNC
+                    {% else %}
+                    Enviar aviso PNC al cliente
+                    {% endif %}
                 </button>
             </div>
         </div>
@@ -1859,7 +1876,7 @@ window.COTIZACION_REACONDICIONADO_CONFIG = {
 <script src="{% static 'js/detalle_solicitud.js' %}"></script>
 {# Plantillas de rechazo ST: precarga detalle al elegir motivo en el modal de catálogo #}
 <script src="{% static 'js/plantillas_rechazo.js' %}"></script>
-{% if solicitud.estado == 'enviada_front' %}
+{% if mostrar_modal_notificar_cliente_pnc %}
 <script src="{% static 'js/notificar_cliente_pnc.js' %}"></script>
 {% endif %}
 {% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}

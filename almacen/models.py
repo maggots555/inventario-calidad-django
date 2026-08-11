@@ -2997,6 +2997,20 @@ class SolicitudCotizacion(models.Model):
             'Se puede precargar con los comentarios de piezas y servicios.'
         ),
     )
+
+    # ========== AVISO PNC AL CLIENTE ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Se marca True al notificar al cliente que no hay piezas en el mercado.
+    # Sirve para mostrar «Reenviar aviso PNC» y para bloquear aprobar líneas
+    # hasta que se comparta una cotización/REAC alternativa.
+    aviso_pnc_cliente_enviado = models.BooleanField(
+        default=False,
+        verbose_name='Aviso PNC enviado al cliente',
+        help_text=(
+            'True si se notificó al cliente que no hay piezas disponibles (PNC). '
+            'No implica que se haya enviado una cotización con precios.'
+        ),
+    )
     
     # ========== MODO SIN ORDEN ACTIVA ==========
     sin_orden_activa = models.BooleanField(

@@ -210,6 +210,49 @@ def solicitud_tiene_items_cotizables(solicitud) -> bool:
     )
 
 
+def solicitud_permite_aprobar_lineas(solicitud) -> bool:
+    """
+    True si se pueden aprobar líneas/servicios tras un aviso PNC al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Flujo normal (sin aviso PNC): siempre se puede aprobar.
+    Tras «Notificar cliente PNC»: el cliente aún no tiene precios; no tiene
+    sentido aprobar hasta enviar una cotización / REAC (alternativa).
+    Rechazar y tipificar siguen permitidos aunque esta función sea False.
+
+    Se considera que ya hubo alternativa si:
+    - hay snapshot ``resultado_costeo_reac``, o
+    - hay ``tipo_servicio_cliente`` (se envió cotización con precios), o
+    - la orden ST ya está en ``cotizacion`` (esperando aprobación del cliente).
+
+    Args:
+        solicitud: SolicitudCotizacion.
+
+    Returns:
+        bool: True si la UI/API pueden aprobar.
+    """
+    # Sin aviso PNC → flujo normal
+    if not getattr(solicitud, 'aviso_pnc_cliente_enviado', False):
+        return True
+
+    # Ya hay costeo REAC guardado (propuesta de equipo reacondicionado)
+    if getattr(solicitud, 'resultado_costeo_reac', None):
+        return True
+
+    # Ya se envió cotización con tipo de servicio (precios al cliente)
+    tipo_servicio = (getattr(solicitud, 'tipo_servicio_cliente', '') or '').strip()
+    if tipo_servicio:
+        return True
+
+    # Orden ST en «Esperando Aprobación Cliente» tras envío de cotización
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is not None and getattr(orden, 'estado', '') == 'cotizacion':
+        return True
+
+    return False
+
+
 def puede_mostrar_enviar_cotizacion_cliente(
     solicitud,
     *,

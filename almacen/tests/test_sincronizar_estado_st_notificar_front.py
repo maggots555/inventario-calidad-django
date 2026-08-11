@@ -5,7 +5,8 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 El modal Notificar a Front tiene dos plantillas:
 - cotizacion_lista → ST a cotizacion_recibida_proveedor
-- partes_no_disponibles → ST a pnc_parte_no_disponible
+- partes_no_disponibles → solo correo a Front; NO cambia ST
+  (el PNC en ST lo pone «Notificar cliente: sin piezas»)
 
 También se puede recuperar desde PNC con la plantilla de cotización lista.
 La vista HTTP pasa tipo_plantilla al util y a la tarea Celery (mockeada).
@@ -40,7 +41,7 @@ class SincronizarEstadoStAlNotificarFrontUtilTest(BaseIntegracionCotizacionMixin
     Regla unitaria del util según tipo_plantilla.
 
     Objetivo de negocio:
-        Elegir el hito ST correcto (recibida proveedores vs PNC).
+        Cotización lista avanza ST; plantilla PNC a Front no toca ST.
     """
 
     def setUp(self) -> None:
@@ -70,21 +71,22 @@ class SincronizarEstadoStAlNotificarFrontUtilTest(BaseIntegracionCotizacionMixin
         orden.refresh_from_db()
         self.assertEqual(orden.estado, ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR)
 
-    def test_plantilla_pnc_pasa_a_parte_no_disponible(self) -> None:
+    def test_plantilla_pnc_no_cambia_st(self) -> None:
         """
-        Caso feliz PNC: plantilla partes_no_disponibles → pnc_parte_no_disponible.
+        Plantilla partes_no_disponibles: solo correo; ST no cambia.
 
-        EXPLICACIÓN: el historial debe listar las piezas no encontradas.
+        EXPLICACIÓN: la fuente única de PNC en ST es el botón al cliente.
         """
         orden = self._crear_orden_con_detalle(
             orden_cliente='OOW-SYNC-FRONT-02',
             estado='cotizacion_enviada_proveedor',
         )
-        solicitud, linea = self._crear_solicitud_con_linea(
+        solicitud, _linea = self._crear_solicitud_con_linea(
             orden=orden,
             sin_orden_activa=False,
             estado='borrador',
         )
+        estado_antes = orden.estado
 
         cambiado = sincronizar_estado_st_al_notificar_front(
             solicitud,
@@ -92,23 +94,10 @@ class SincronizarEstadoStAlNotificarFrontUtilTest(BaseIntegracionCotizacionMixin
             tipo_plantilla=TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
         )
 
-        self.assertTrue(cambiado)
+        self.assertFalse(cambiado)
         orden.refresh_from_db()
-        self.assertEqual(orden.estado, ESTADO_ST_PNC)
-
-        ultimo = (
-            orden.historial.filter(
-                tipo_evento='cambio_estado',
-                estado_nuevo=ESTADO_ST_PNC,
-            )
-            .order_by('-fecha_evento')
-            .first()
-        )
-        self.assertIsNotNone(ultimo)
-        comentario = ultimo.comentario or ''
-        self.assertIn('Piezas no disponibles', comentario)
-        self.assertIn(linea.descripcion_pieza, comentario)
-        self.assertIn(TIPO_PLANTILLA_PARTES_NO_DISPONIBLES, comentario)
+        self.assertEqual(orden.estado, estado_antes)
+        self.assertNotEqual(orden.estado, ESTADO_ST_PNC)
 
     def test_sin_orden_no_cambia_nada(self) -> None:
         """Sin orden vinculada: el util retorna False (correo sí puede ir aparte)."""
@@ -249,9 +238,9 @@ class NotificarFrontVistaPlantillaTest(BaseIntegracionCotizacionMixin, TestCase)
         )
 
     @patch('almacen.tasks.notificar_front_cotizacion_task.delay')
-    def test_notificar_pnc_pasa_tipo_plantilla_y_estado_st(self, mock_delay) -> None:
+    def test_notificar_pnc_no_cambia_st_y_pasa_tipo_plantilla(self, mock_delay) -> None:
         """
-        POST con plantilla PNC: ST → pnc, Celery recibe tipo_plantilla.
+        POST con plantilla PNC: ST sin cambio; Celery recibe tipo_plantilla.
         """
         mock_delay.return_value = MagicMock(id='task-pnc-test')
         url = reverse('almacen:notificar_front', args=[self.solicitud.pk])
@@ -273,7 +262,8 @@ class NotificarFrontVistaPlantillaTest(BaseIntegracionCotizacionMixin, TestCase)
         self.assertIn('PNC', payload['message'])
 
         self.orden.refresh_from_db()
-        self.assertEqual(self.orden.estado, ESTADO_ST_PNC)
+        self.assertEqual(self.orden.estado, 'cotizacion_enviada_proveedor')
+        self.assertNotEqual(self.orden.estado, ESTADO_ST_PNC)
 
         self.solicitud.refresh_from_db()
         self.assertEqual(self.solicitud.estado, 'enviada_front')

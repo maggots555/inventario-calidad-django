@@ -3,9 +3,10 @@
  * notificar_cliente_pnc.ts
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Modal «Notificar cliente: sin piezas (PNC)» en enviada_front.
- * Envía el aviso al cliente, pasa la solicitud a enviada_cliente y
- * (si hay orden) sincroniza ST a PNC en el backend.
+ * Modal «Notificar / reenviar aviso PNC al cliente».
+ * Primer aviso (enviada_front): pasa a enviada_cliente, marca el flag
+ * y (si hay orden) sincroniza ST a PNC.
+ * Reenvío (enviada_cliente + flag): solo vuelve a encolar el correo.
  */
 /**
  * Lee la configuración JSON embebida en el template.

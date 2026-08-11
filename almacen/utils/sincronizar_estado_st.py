@@ -33,8 +33,9 @@ ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR = 'cotizacion_recibida_proveedor'
 ESTADO_ST_PNC = 'pnc_parte_no_disponible'
 
 # Tipos de plantilla del modal «Notificar a Front»
-# EXPLICACIÓN: cotizacion_lista = correo normal con precios;
-# partes_no_disponibles = correo PNC + alternativas (reparación componente / REAC).
+# EXPLICACIÓN: cotizacion_lista = correo normal con precios + sync ST a recibida;
+# partes_no_disponibles = correo PNC a Front SIN cambiar ST (el PNC en ST lo
+# pone solo el botón «Notificar cliente: sin piezas»).
 TIPO_PLANTILLA_COTIZACION_LISTA = 'cotizacion_lista'
 TIPO_PLANTILLA_PARTES_NO_DISPONIBLES = 'partes_no_disponibles'
 TIPOS_PLANTILLA_NOTIFICAR_FRONT = frozenset({
@@ -42,10 +43,10 @@ TIPOS_PLANTILLA_NOTIFICAR_FRONT = frozenset({
     TIPO_PLANTILLA_PARTES_NO_DISPONIBLES,
 })
 
-# Mapeo plantilla → estado ST destino al notificar a Front
+# Solo la plantilla de cotización lista cambia ST al notificar a Front.
+# La plantilla PNC quedó obsoleta como destino ST (fuente única = botón cliente).
 MAPEO_PLANTILLA_A_ESTADO_ST = {
     TIPO_PLANTILLA_COTIZACION_LISTA: ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
-    TIPO_PLANTILLA_PARTES_NO_DISPONIBLES: ESTADO_ST_PNC,
 }
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -259,7 +260,8 @@ def sincronizar_estado_st_al_notificar_front(
     --------------------------------
     El modal «Notificar a Front» tiene dos plantillas:
     - ``cotizacion_lista`` → «Se Recibe Cotización de Proveedores»
-    - ``partes_no_disponibles`` → «PNC - Parte No Disponible»
+    - ``partes_no_disponibles`` → solo correo a Front; **NO** cambia ST.
+      El PNC en ST lo pone únicamente «Notificar cliente: sin piezas».
 
     Si la solicitud no tiene orden vinculada, o la orden ya avanzó (esperando
     cliente, reparación, etc.), no se cambia el estado para no romper el flujo.
@@ -280,6 +282,15 @@ def sincronizar_estado_st_al_notificar_front(
     # Normalizar plantilla inválida al default (cotización lista)
     if tipo_plantilla not in TIPOS_PLANTILLA_NOTIFICAR_FRONT:
         tipo_plantilla = TIPO_PLANTILLA_COTIZACION_LISTA
+
+    # EXPLICACIÓN: plantilla PNC a Front ya no toca ST (fuente única = botón cliente)
+    if tipo_plantilla == TIPO_PLANTILLA_PARTES_NO_DISPONIBLES:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+            f"plantilla PNC a Front NO cambia ST "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return False
 
     estado_destino = MAPEO_PLANTILLA_A_ESTADO_ST[tipo_plantilla]
 
@@ -319,19 +330,12 @@ def sincronizar_estado_st_al_notificar_front(
         .first()
     )
     if ultimo:
-        # EXPLICACIÓN: en PNC añadimos el listado de piezas no encontradas
         comentario = (
             f'Cambio de estado al notificar a Front desde Almacén: '
             f'{etiquetas.get(estado_anterior, estado_anterior)} → '
             f'{etiquetas.get(estado_destino, estado_destino)} '
             f'(solicitud {solicitud.numero_solicitud}, plantilla {tipo_plantilla})'
         )
-        if tipo_plantilla == TIPO_PLANTILLA_PARTES_NO_DISPONIBLES:
-            listado = _listar_piezas_solicitud_para_historial(solicitud)
-            if listado:
-                comentario += (
-                    f'\nPiezas no disponibles en mercado:\n{listado}'
-                )
         ultimo.comentario = comentario
         update_fields = ['comentario', 'es_sistema']
         if empleado is not None:
@@ -433,6 +437,51 @@ def sincronizar_estado_st_al_enviar_cotizacion_cliente(
     return True
 
 
+def _registrar_comentario_historial_pnc(
+    orden,
+    solicitud: 'SolicitudCotizacion',
+    usuario=None,
+    *,
+    es_reenvio: bool = False,
+) -> bool:
+    """
+    Crea un HistorialOrden de tipo comentario para aviso PNC al cliente.
+
+    Args:
+        orden: OrdenServicio vinculada.
+        solicitud: SolicitudCotizacion de Almacén.
+        usuario: User opcional (para asociar empleado).
+        es_reenvio: True si ST ya estaba en PNC (reaviso).
+
+    Returns:
+        bool: True si se creó el registro de historial.
+    """
+    from servicio_tecnico.models import HistorialOrden
+
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    prefijo = (
+        'Cliente re-notificado: partes no disponibles (PNC) desde Almacén'
+        if es_reenvio
+        else 'Cliente notificado: partes no disponibles (PNC) desde Almacén'
+    )
+    comentario = f'{prefijo} (solicitud {solicitud.numero_solicitud})'
+    listado = _listar_piezas_solicitud_para_historial(solicitud)
+    if listado:
+        comentario += f'\nPiezas no disponibles en mercado:\n{listado}'
+
+    HistorialOrden.objects.create(
+        orden=orden,
+        tipo_evento='comentario',
+        comentario=comentario,
+        usuario=empleado,
+        es_sistema=True,
+    )
+    return True
+
+
 def sincronizar_estado_st_al_notificar_cliente_pnc(
     solicitud: 'SolicitudCotizacion',
     usuario=None,
@@ -442,24 +491,38 @@ def sincronizar_estado_st_al_notificar_cliente_pnc(
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Distinto de «Enviar Cotización al Cliente» (PDF con precios). Aquí Front
-    solo informa que no hay refacciones. Si hay orden vinculada, el hito ST
-    correcto es ``pnc_parte_no_disponible``. Sin orden, no hay nada que sync.
+    Esta es la **única** fuente de verdad para poner ST en
+    ``pnc_parte_no_disponible``. La plantilla PNC de «Notificar a Front»
+    ya no cambia ST.
+
+    Si la orden ya está en PNC (reenvío del aviso), se registra un comentario
+    en el historial sin volver a cambiar el estado.
 
     Args:
         solicitud: SolicitudCotizacion (con o sin orden_servicio).
         usuario: User opcional; si tiene empleado, se asocia al historial.
 
     Returns:
-        bool: True si se cambió el estado; False si no aplica o ya estaba en PNC.
+        bool: True si se cambió el estado o se registró comentario de reaviso.
     """
     orden = getattr(solicitud, 'orden_servicio', None)
     if not orden:
         return False
 
-    # Ya en PNC: no duplicar historial (el correo al cliente sí se manda aparte)
+    # Ya en PNC: reaviso → solo comentario en historial
     if orden.estado == ESTADO_ST_PNC:
-        return False
+        registrado = _registrar_comentario_historial_pnc(
+            orden,
+            solicitud,
+            usuario=usuario,
+            es_reenvio=True,
+        )
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+            f"ya en PNC; reaviso cliente registrado "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return registrado
 
     if orden.estado not in ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_CLIENTE_PNC:
         logger.info(

@@ -36,6 +36,12 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
         {% if tiene_items_cotizables %}Reenviar Cotización{% else %}Enviar Cotización al Cliente{% endif %}
     </button>
     {% endif %}
+    {% if mostrar_reenviar_aviso_pnc %}
+    {# Solo si esta solicitud ya tuvo aviso PNC al cliente #}
+    <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalNotificarClientePnc">
+        <i class="bi bi-exclamation-triangle me-2"></i>Reenviar aviso PNC
+    </button>
+    {% endif %}
     {% endif %}
 
     {% if solicitud.estado == 'parcialmente_aprobada' and mostrar_enviar_cotizacion_cliente %}

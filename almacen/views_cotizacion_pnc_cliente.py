@@ -7,7 +7,9 @@ Cuando Compras/Front confirma que no hay refacciones en el mercado, pueden
 avisar al cliente final (sin PDF de precios). Eso pasa la solicitud a
 ``enviada_cliente`` para desbloquear rechazo por línea y tipificación.
 
-Con orden ST vinculada, el estado de la orden pasa a PNC.
+Con orden ST vinculada, el estado de la orden pasa a PNC (única fuente de
+PNC en ST). También permite reenviar el aviso si ya se marcó el flag
+``aviso_pnc_cliente_enviado``.
 """
 
 from __future__ import annotations
@@ -34,15 +36,20 @@ _RE_EMAIL = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
 @require_http_methods(['POST'])
 def notificar_cliente_pnc(request, pk):
     """
-    Avisa al cliente que no hay piezas en el mercado y abre el flujo de rechazo.
+    Avisa (o reenvía el aviso) al cliente: no hay piezas en el mercado.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    1. Valida que la solicitud esté en ``enviada_front`` y tenga líneas.
-    2. Exige un email de cliente válido.
-    3. Cambia la solicitud a ``enviada_cliente`` (desbloquea aprobar/rechazar).
-    4. Si hay orden ST, la sincroniza a PNC.
-    5. Encola el correo Celery (plantilla PNC al cliente).
+    Primer aviso (estado ``enviada_front``):
+      1. Valida email y líneas.
+      2. Pasa a ``enviada_cliente`` + marca ``aviso_pnc_cliente_enviado``.
+      3. Si hay orden ST → PNC.
+      4. Encola correo Celery.
+
+    Reenvío (``enviada_cliente`` + flag PNC):
+      - No vuelve a cambiar el estado de la solicitud.
+      - Si ST ya está en PNC, solo deja comentario en historial.
+      - Encola de nuevo el correo.
 
     Args:
         request: HttpRequest POST (email_cliente, mensaje_personalizado, CC).
@@ -61,13 +68,18 @@ def notificar_cliente_pnc(request, pk):
     try:
         solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
 
-        # Solo desde «Enviada a Front» (mismo momento que enviar cotización)
-        if solicitud.estado != 'enviada_front':
+        # Primer aviso desde Front, o reenvío solo si ya hubo aviso PNC
+        es_primer_aviso = solicitud.estado == 'enviada_front'
+        es_reenvio = (
+            solicitud.estado == 'enviada_cliente'
+            and solicitud.aviso_pnc_cliente_enviado
+        )
+        if not es_primer_aviso and not es_reenvio:
             return JsonResponse({
                 'success': False,
                 'error': (
-                    'Solo se puede notificar PNC al cliente cuando la solicitud '
-                    'está en «Enviada a Front».'
+                    'Solo se puede notificar PNC al cliente desde «Enviada a Front», '
+                    'o reenviar el aviso si esa solicitud ya fue notificada con PNC.'
                 ),
             }, status=400)
 
@@ -100,14 +112,19 @@ def notificar_cliente_pnc(request, pk):
             solicitud.email_cliente = email_cliente
             solicitud.save(update_fields=['email_cliente'])
 
-        # Pasar a enviada_cliente para desbloquear respuestas / tipificación
-        if not solicitud.enviar_a_cliente(usuario=request.user):
-            return JsonResponse({
-                'success': False,
-                'error': 'No se pudo cambiar el estado a «Enviada al Cliente».',
-            }, status=400)
+        if es_primer_aviso:
+            # Pasar a enviada_cliente para desbloquear respuestas / tipificación
+            if not solicitud.enviar_a_cliente(usuario=request.user):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No se pudo cambiar el estado a «Enviada al Cliente».',
+                }, status=400)
 
-        # Con orden: ST → PNC (si aplica)
+            # EXPLICACIÓN: el flag habilita reenvío y bloquea aprobar hasta cotización/REAC
+            solicitud.aviso_pnc_cliente_enviado = True
+            solicitud.save(update_fields=['aviso_pnc_cliente_enviado'])
+
+        # Con orden: ST → PNC (o comentario de reaviso si ya estaba en PNC)
         sincronizar_estado_st_al_notificar_cliente_pnc(
             solicitud,
             usuario=request.user,
@@ -123,17 +140,25 @@ def notificar_cliente_pnc(request, pk):
             db_alias=get_pais_actual()['db_alias'],
         )
 
-        return JsonResponse({
-            'success': True,
-            'message': (
+        if es_reenvio:
+            mensaje_ok = (
+                f'Reenvío del aviso PNC en proceso hacia {email_cliente}.'
+            )
+        else:
+            mensaje_ok = (
                 f'Aviso PNC en proceso de envío a {email_cliente}. '
                 f'Ya puedes registrar el rechazo de las líneas.'
-            ),
+            )
+
+        return JsonResponse({
+            'success': True,
+            'message': mensaje_ok,
             'data': {
                 'task_id': tarea.id,
                 'email_cliente': email_cliente,
                 'solicitud': solicitud.numero_solicitud,
                 'estado': solicitud.estado,
+                'es_reenvio': es_reenvio,
             },
         })
 

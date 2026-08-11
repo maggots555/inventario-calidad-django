@@ -714,6 +714,7 @@ def detalle_solicitud_cotizacion(request, pk):
 
     from .utils.cotizacion_items_cliente import (
         puede_mostrar_enviar_cotizacion_cliente,
+        solicitud_permite_aprobar_lineas,
         solicitud_puede_descargar_pdf_final,
         solicitud_tiene_items_cotizables,
     )
@@ -842,6 +843,20 @@ def detalle_solicitud_cotizacion(request, pk):
         solicitud,
         tiene_items_cotizables=context['tiene_items_cotizables'],
     )
+    # EXPLICACIÓN: tras aviso PNC, ocultar botones de aprobar hasta cotización/REAC
+    context['permite_aprobar_lineas'] = solicitud_permite_aprobar_lineas(solicitud)
+    # Modal + botón reenvío solo si ya hubo aviso PNC (o primer aviso en Front)
+    context['mostrar_modal_notificar_cliente_pnc'] = (
+        solicitud.estado == 'enviada_front'
+        or (
+            solicitud.estado == 'enviada_cliente'
+            and solicitud.aviso_pnc_cliente_enviado
+        )
+    )
+    context['mostrar_reenviar_aviso_pnc'] = (
+        solicitud.estado == 'enviada_cliente'
+        and solicitud.aviso_pnc_cliente_enviado
+    )
 
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
 
@@ -965,6 +980,23 @@ def responder_servicio_adicional(request, solicitud_pk, servicio_pk):
     if request.method == 'POST':
         decision = request.POST.get('decision', '')
         motivo = request.POST.get('motivo_rechazo', '')
+
+        # Tras PNC sin cotización/REAC: se puede rechazar, no aprobar
+        if decision == 'aprobar':
+            from almacen.utils.cotizacion_items_cliente import (
+                solicitud_permite_aprobar_lineas,
+            )
+            if not solicitud_permite_aprobar_lineas(solicitud):
+                messages.error(
+                    request,
+                    'Tras el aviso PNC al cliente, primero envía una '
+                    'cotización o propuesta reacondicionado (REAC) antes '
+                    'de aprobar servicios.',
+                )
+                return redirect(
+                    'almacen:detalle_solicitud_cotizacion',
+                    pk=solicitud_pk,
+                )
         
         if decision == 'aprobar':
             if servicio.aprobar():
@@ -1001,6 +1033,17 @@ def aprobar_todos_servicios(request, pk):
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
     if request.method == 'POST':
+        from almacen.utils.cotizacion_items_cliente import (
+            solicitud_permite_aprobar_lineas,
+        )
+        if not solicitud_permite_aprobar_lineas(solicitud):
+            messages.error(
+                request,
+                'Tras el aviso PNC al cliente, primero envía una cotización '
+                'o propuesta reacondicionado (REAC) antes de aprobar servicios.',
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
         servicios_pendientes = solicitud.servicios_adicionales.filter(estado_cliente='pendiente')
         aprobados = 0
         

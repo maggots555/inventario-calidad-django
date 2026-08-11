@@ -354,6 +354,15 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
 
                 <!-- TAB PIEZAS Y SERVICIOS -->
                 <div class="tab-pane fade show active" id="tab-cotizacion" role="tabpanel">
+                    {% if solicitud.aviso_pnc_cliente_enviado and not permite_aprobar_lineas %}
+                    {# EXPLICACIÓN: tras PNC no se aprueba hasta cotización/REAC; sí se puede rechazar #}
+                    <div class="alert alert-warning border-warning mb-3" role="alert">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Aviso PNC enviado al cliente.</strong>
+                        Puedes rechazar líneas y tipificar el motivo.
+                        Para <em>aprobar</em>, primero envía una cotización o propuesta reacondicionado (REAC).
+                    </div>
+                    {% endif %}
                     <div class="detalle-section-card card mb-4">
                         <div class="card-header detalle-header-lineas">
                             <h5><i class="bi bi-list-ul me-2"></i>Líneas de Cotización</h5>
@@ -363,12 +372,14 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                     Costos internos
                                 </label>
                                 {% if solicitud.estado in 'enviada_cliente,parcialmente_aprobada' and solicitud.lineas_pendientes > 0 %}
+                                {% if permite_aprobar_lineas %}
                                 <form method="post" action="{% url 'almacen:aprobar_todas_lineas' solicitud.pk %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('¿Aprobar todas las líneas pendientes?')">
                                         <i class="bi bi-check-all"></i>
                                     </button>
                                 </form>
+                                {% endif %}
                                 <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarTodasModal">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
@@ -451,6 +462,7 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                     </button>
                                                     {% endwith %}
                                                     {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                                    {% if permite_aprobar_lineas %}
                                                     {% if linea.es_linea_reacondicionado and solicitud.resultado_costeo_reac %}
                                                     <button type="button" class="btn btn-sm btn-outline-success" title="Aprobar equipo reacondicionado"
                                                             data-bs-toggle="modal" data-bs-target="#aprobarLineaReacModal"
@@ -463,6 +475,7 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                         <input type="hidden" name="decision" value="aprobar">
                                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Aprobar"><i class="bi bi-check-lg"></i></button>
                                                     </form>
+                                                    {% endif %}
                                                     {% endif %}
                                                     <button type="button" class="btn btn-sm btn-outline-danger" title="Rechazar"
                                                             data-bs-toggle="modal" data-bs-target="#rechazarLineaModal"
@@ -532,6 +545,7 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                     {% endwith %}
                                     <div class="linea-card-acciones">
                                         {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                        {% if permite_aprobar_lineas %}
                                         {% if linea.es_linea_reacondicionado and solicitud.resultado_costeo_reac %}
                                         <button type="button" class="btn btn-sm btn-success"
                                                 data-bs-toggle="modal" data-bs-target="#aprobarLineaReacModal"
@@ -544,6 +558,7 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                             <input type="hidden" name="decision" value="aprobar">
                                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
                                         </form>
+                                        {% endif %}
                                         {% endif %}
                                         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarLineaModal"
                                                 data-linea-pk="{{ linea.pk }}" data-linea-desc="{{ linea.descripcion_pieza }}">
@@ -565,10 +580,12 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                             <h5 class="text-white"><i class="bi bi-wrench-adjustable me-2"></i>Servicios Adicionales</h5>
                             <div class="d-flex flex-wrap gap-2">
                                 {% if solicitud.estado in 'enviada_cliente,parcialmente_aprobada' and solicitud.servicios_pendientes > 0 %}
+                                {% if permite_aprobar_lineas %}
                                 <form method="post" action="{% url 'almacen:aprobar_todos_servicios' solicitud.pk %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-light" onclick="return confirm('¿Aprobar todos los servicios?')"><i class="bi bi-check-all"></i></button>
                                 </form>
+                                {% endif %}
                                 <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#rechazarTodosServiciosModal"><i class="bi bi-x-lg"></i></button>
                                 {% endif %}
                                 {% if solicitud.estado in 'borrador,enviada_front,enviada_cliente' %}
@@ -611,11 +628,13 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                             <td class="text-center col-acciones">
                                                 {% if servicio.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
                                                 <div class="btn-group btn-group-sm">
+                                                    {% if permite_aprobar_lineas %}
                                                     <form method="post" action="{% url 'almacen:responder_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
                                                         {% csrf_token %}
                                                         <input type="hidden" name="decision" value="aprobar">
                                                         <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-lg"></i></button>
                                                     </form>
+                                                    {% endif %}
                                                     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rechazarServicioModal"
                                                             data-servicio-pk="{{ servicio.pk }}" data-servicio-nombre="{{ servicio.get_tipo_servicio_display }}">
                                                         <i class="bi bi-x-lg"></i>
@@ -654,11 +673,13 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                     <span class="badge bg-{{ servicio.get_badge_estado }} badge-compact">{{ servicio.get_estado_cliente_display }}</span>
                                     <div class="linea-card-acciones">
                                         {% if servicio.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                        {% if permite_aprobar_lineas %}
                                         <form method="post" action="{% url 'almacen:responder_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <input type="hidden" name="decision" value="aprobar">
                                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
                                         </form>
+                                        {% endif %}
                                         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarServicioModal"
                                                 data-servicio-pk="{{ servicio.pk }}" data-servicio-nombre="{{ servicio.get_tipo_servicio_display }}">
                                             <i class="bi bi-x-lg"></i>
@@ -764,6 +785,16 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-{% if tiene_items_cotizables %}arrow-clockwise{% else %}send{% endif %} me-1"></i>
         {% if tiene_items_cotizables %}Reenviar{% else %}Enviar Cotización{% endif %}
+    </button>
+    {% if mostrar_reenviar_aviso_pnc %}
+    <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modalNotificarClientePnc"
+            title="Reenviar aviso PNC al cliente">
+        <i class="bi bi-exclamation-triangle"></i>
+    </button>
+    {% endif %}
+    {% elif solicitud.estado == 'enviada_cliente' and mostrar_reenviar_aviso_pnc %}
+    <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalNotificarClientePnc">
+        <i class="bi bi-exclamation-triangle me-1"></i>Reenviar PNC
     </button>
     {% elif solicitud.estado == 'parcialmente_aprobada' and mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
