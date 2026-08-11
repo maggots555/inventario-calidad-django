@@ -713,6 +713,7 @@ def detalle_solicitud_cotizacion(request, pk):
         pass
 
     from .utils.cotizacion_items_cliente import (
+        puede_mostrar_enviar_cotizacion_cliente,
         solicitud_puede_descargar_pdf_final,
         solicitud_tiene_items_cotizables,
     )
@@ -835,6 +836,12 @@ def detalle_solicitud_cotizacion(request, pk):
 
     context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
     context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
+    # EXPLICACIÓN: tras PNC (costos en $0) con orden, igual hay que poder abrir
+    # el modal para mandar alternativa REAC.
+    context['mostrar_enviar_cotizacion_cliente'] = puede_mostrar_enviar_cotizacion_cliente(
+        solicitud,
+        tiene_items_cotizables=context['tiene_items_cotizables'],
+    )
 
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
 

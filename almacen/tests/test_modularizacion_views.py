@@ -18,6 +18,7 @@ from almacen import views as almacen_views
 from almacen import views_catalogo
 from almacen import views_compras
 from almacen import views_cotizacion_cliente
+from almacen import views_cotizacion_pnc_cliente
 from almacen import views_cotizacion_sync_st
 from almacen import views_dashboard_distribucion
 from almacen import views_parametros_cotizador
@@ -436,6 +437,10 @@ class CompatibilidadReexportsFase4Test(SimpleTestCase):
                 views_cotizacion_cliente.notificar_front,
             ),
             (
+                'notificar_cliente_pnc',
+                views_cotizacion_pnc_cliente.notificar_cliente_pnc,
+            ),
+            (
                 'responder_linea_cotizacion',
                 views_cotizacion_cliente.responder_linea_cotizacion,
             ),
@@ -543,6 +548,11 @@ class CompatibilidadReexportsFase4Test(SimpleTestCase):
                 'almacen:api_enviar_cotizacion_cliente',
                 {'pk': 1},
                 views_cotizacion_cliente.api_enviar_cotizacion_cliente,
+            ),
+            (
+                'almacen:notificar_cliente_pnc',
+                {'pk': 1},
+                views_cotizacion_pnc_cliente.notificar_cliente_pnc,
             ),
             (
                 'almacen:preview_pdf_cotizacion',

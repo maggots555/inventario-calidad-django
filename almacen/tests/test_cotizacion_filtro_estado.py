@@ -12,6 +12,7 @@ from almacen.utils.cotizacion_items_cliente import (
     construir_items_cotizacion_final,
     linea_es_aceptada_final,
     linea_es_cotizable,
+    puede_mostrar_enviar_cotizacion_cliente,
     serializar_linea_cotizacion,
     solicitud_pdf_final_es_solo_reacondicionado,
     solicitud_puede_descargar_pdf_final,
@@ -50,7 +51,7 @@ def _servicio_mock(pk=10, estado='pendiente', costo=1160.0):
     )
 
 
-def _solicitud_mock(lineas=None, servicios=None):
+def _solicitud_mock(lineas=None, servicios=None, estado='enviada_cliente', orden_id=None):
     """Mock de SolicitudCotizacion con lineas/servicios filtrables."""
     lineas = lineas or []
     servicios = servicios or []
@@ -95,6 +96,8 @@ def _solicitud_mock(lineas=None, servicios=None):
         return resultado
 
     solicitud = MagicMock()
+    solicitud.estado = estado
+    solicitud.orden_servicio_id = orden_id
     solicitud.lineas.filter.side_effect = lineas_filter
     solicitud.servicios_adicionales.filter.side_effect = servicios_filter
     return solicitud
@@ -139,6 +142,37 @@ class CotizacionFiltroEstadoTest(SimpleTestCase):
         )
         self.assertFalse(solicitud_tiene_items_cotizables(sol))
 
+    def test_mostrar_enviar_cotizacion_tras_pnc_con_orden(self):
+        """
+        Tras PNC: líneas sin costo → no cotizables, pero CON orden sí se muestra
+        el botón (para mandar REAC).
+        """
+        sol = _solicitud_mock(
+            lineas=[_linea_mock(estado='pendiente', costo=0)],
+            estado='enviada_cliente',
+            orden_id=99,
+        )
+        self.assertFalse(solicitud_tiene_items_cotizables(sol))
+        self.assertTrue(
+            puede_mostrar_enviar_cotizacion_cliente(
+                sol,
+                tiene_items_cotizables=False,
+            )
+        )
+
+    def test_ocultar_enviar_cotizacion_tras_pnc_sin_orden(self):
+        """Sin orden y sin costos: no tiene sentido abrir cotización PDF/REAC."""
+        sol = _solicitud_mock(
+            lineas=[_linea_mock(estado='pendiente', costo=0)],
+            estado='enviada_cliente',
+            orden_id=None,
+        )
+        self.assertFalse(
+            puede_mostrar_enviar_cotizacion_cliente(
+                sol,
+                tiene_items_cotizables=False,
+            )
+        )
 
 class CotizacionTotalesFinalTest(SimpleTestCase):
     """Pruebas de suma de precios persistidos (PDF final)."""

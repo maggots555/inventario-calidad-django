@@ -114,6 +114,9 @@ from .views_cotizacion_cliente import (  # noqa: F401
     registrar_motivo_rechazo_st,
     responder_linea_cotizacion,
 )
+from .views_cotizacion_pnc_cliente import (  # noqa: F401
+    notificar_cliente_pnc,
+)
 from .views_cotizacion_sync_st import (  # noqa: F401
     crear_orden_fl_desde_cotizacion,
     generar_compras_solicitud,

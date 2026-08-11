@@ -21,20 +21,24 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-send me-2"></i>Enviar Cotización al Cliente
     </button>
+    <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalNotificarClientePnc">
+        <i class="bi bi-exclamation-triangle me-2"></i>Notificar cliente: sin piezas (PNC)
+    </button>
     {% endif %}
 
     {% if solicitud.estado == 'enviada_cliente' %}
     <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" class="btn btn-outline-primary w-100">
         <i class="bi bi-pencil-square me-2"></i>Editar Líneas
     </a>
-    {% if tiene_items_cotizables %}
+    {% if mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
-        <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Cotización
+        <i class="bi bi-{% if tiene_items_cotizables %}arrow-clockwise{% else %}send{% endif %} me-2"></i>
+        {% if tiene_items_cotizables %}Reenviar Cotización{% else %}Enviar Cotización al Cliente{% endif %}
     </button>
     {% endif %}
     {% endif %}
 
-    {% if solicitud.estado == 'parcialmente_aprobada' and tiene_items_cotizables %}
+    {% if solicitud.estado == 'parcialmente_aprobada' and mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Cotización Pendiente
     </button>

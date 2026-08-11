@@ -97,6 +97,21 @@ ESTADOS_ST_PERMITIDOS_PARA_ESPERAR_CLIENTE = (
     ESTADO_ST_PNC,  # Tras PNC: alternativa (REAC / reparación componente)
 )
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Al avisar al cliente que no hay piezas (PNC), ponemos la orden en PNC
+# desde fases de cotización / proveedores. No desde reparación, etc.
+ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_CLIENTE_PNC = (
+    'almacen',
+    'espera',
+    'recepcion',
+    'diagnostico',
+    'equipo_diagnosticado',
+    'diagnostico_enviado_cliente',
+    'cotizacion_enviada_proveedor',
+    ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
+    'rechazada',
+)
+
 # Mapeo: estado de SolicitudCotizacion → estado de OrdenServicio
 MAPEO_RESPUESTA_SOLICITUD_A_ESTADO_ST = {
     'totalmente_aprobada': 'cliente_acepta_cotizacion',
@@ -418,6 +433,88 @@ def sincronizar_estado_st_al_enviar_cotizacion_cliente(
     return True
 
 
+def sincronizar_estado_st_al_notificar_cliente_pnc(
+    solicitud: 'SolicitudCotizacion',
+    usuario=None,
+) -> bool:
+    """
+    Al avisar al cliente que no hay piezas, pone la orden ST en PNC.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Distinto de «Enviar Cotización al Cliente» (PDF con precios). Aquí Front
+    solo informa que no hay refacciones. Si hay orden vinculada, el hito ST
+    correcto es ``pnc_parte_no_disponible``. Sin orden, no hay nada que sync.
+
+    Args:
+        solicitud: SolicitudCotizacion (con o sin orden_servicio).
+        usuario: User opcional; si tiene empleado, se asocia al historial.
+
+    Returns:
+        bool: True si se cambió el estado; False si no aplica o ya estaba en PNC.
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    # Ya en PNC: no duplicar historial (el correo al cliente sí se manda aparte)
+    if orden.estado == ESTADO_ST_PNC:
+        return False
+
+    if orden.estado not in ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_CLIENTE_PNC:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; notificar cliente PNC NO cambia a "
+            f"'{ESTADO_ST_PNC}' (solicitud {solicitud.numero_solicitud})."
+        )
+        return False
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_PNC
+    orden.save(update_fields=['estado'])
+
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    etiquetas = dict(ESTADO_ORDEN_CHOICES)
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_PNC,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        # EXPLICACIÓN: dejamos constancia de que el cliente fue avisado + piezas
+        comentario = (
+            f'Cliente notificado: partes no disponibles (PNC) desde Almacén: '
+            f'{etiquetas.get(estado_anterior, estado_anterior)} → '
+            f'{etiquetas.get(ESTADO_ST_PNC, ESTADO_ST_PNC)} '
+            f'(solicitud {solicitud.numero_solicitud})'
+        )
+        listado = _listar_piezas_solicitud_para_historial(solicitud)
+        if listado:
+            comentario += f'\nPiezas no disponibles en mercado:\n{listado}'
+        ultimo.comentario = comentario
+        update_fields = ['comentario', 'es_sistema']
+        if empleado is not None:
+            ultimo.usuario = empleado
+            update_fields.append('usuario')
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=update_fields)
+
+    logger.info(
+        f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → {ESTADO_ST_PNC} "
+        f"(notificar cliente PNC, solicitud {solicitud.numero_solicitud})"
+    )
+    return True
+
+
 def sincronizar_estado_st_por_respuesta_cliente(
     solicitud: 'SolicitudCotizacion',
     estado_solicitud: Optional[str] = None,
@@ -428,8 +525,12 @@ def sincronizar_estado_st_por_respuesta_cliente(
     EXPLICACIÓN PARA PRINCIPIANTES:
     Si la solicitud queda totalmente/parcialmente aprobada, la orden pasa a
     «Cliente Acepta Cotización». Si queda totalmente rechazada, pasa a
-    «Cotización Rechazada». Solo actúa cuando la orden está en «Esperando
-    Aprobación Cliente» (cotizacion), para no sobrescribir estados posteriores.
+    «Cotización Rechazada».
+
+    Orígenes permitidos:
+    - Normalmente desde «Esperando Aprobación Cliente» (cotizacion).
+    - Si el destino es «rechazada», también desde PNC (avisaron sin piezas
+      y luego tipificaron el rechazo total).
 
     Args:
         solicitud: SolicitudCotizacion con (o sin) orden_servicio vinculada.
@@ -448,8 +549,12 @@ def sincronizar_estado_st_por_respuesta_cliente(
     if not orden:
         return False
 
-    # Solo avanzar desde «Esperando Aprobación Cliente»
-    if orden.estado != ESTADO_ST_ESPERANDO_CLIENTE:
+    # EXPLICACIÓN: rechazo total también puede venir desde PNC (sin cotización de precios)
+    estados_origen_ok = {ESTADO_ST_ESPERANDO_CLIENTE}
+    if estado_st_destino == 'rechazada':
+        estados_origen_ok.add(ESTADO_ST_PNC)
+
+    if orden.estado not in estados_origen_ok:
         logger.info(
             f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
             f"'{orden.estado}'; no se cambia a '{estado_st_destino}' "
@@ -457,7 +562,7 @@ def sincronizar_estado_st_por_respuesta_cliente(
         )
         return False
 
-    # Ya está en el destino (poco probable desde cotizacion, pero seguro)
+    # Ya está en el destino (poco probable, pero seguro)
     if orden.estado == estado_st_destino:
         return False
 

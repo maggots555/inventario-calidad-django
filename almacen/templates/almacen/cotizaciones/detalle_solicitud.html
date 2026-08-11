@@ -661,6 +661,107 @@ Muestra toda la información y acciones según el estado
     </div>
 </div>
 
+{% if solicitud.estado == 'enviada_front' %}
+<!-- Modal: Notificar al cliente — partes no disponibles (PNC) -->
+<div class="modal fade" id="modalNotificarClientePnc" tabindex="-1"
+     aria-labelledby="modalNotificarClientePncLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalNotificarClientePncLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Notificar al cliente: sin piezas (PNC)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNotificarClientePnc" method="post">
+                    {% csrf_token %}
+
+                    <div class="alert alert-warning border-warning mb-3">
+                        <strong>¿Qué hace este aviso?</strong>
+                        <ul class="mb-0 small mt-2">
+                            <li>Envía un correo al cliente indicando que no hay refacciones disponibles.</li>
+                            <li>Pasa la solicitud a <em>Enviada al Cliente</em> para que puedas rechazar las líneas y tipificar el motivo.</li>
+                            {% if solicitud.orden_servicio_id %}
+                            <li>La orden en Servicio Técnico queda / se pone en <em>PNC - Parte No Disponible</em>.</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email_cliente_pnc" class="form-label fw-semibold">
+                            Email del cliente <span class="text-danger">*</span>
+                        </label>
+                        <input type="email"
+                               class="form-control"
+                               id="email_cliente_pnc"
+                               name="email_cliente"
+                               required
+                               value="{{ email_cliente_modal|default:'' }}"
+                               placeholder="cliente@ejemplo.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mensaje_personalizado_pnc_cliente" class="form-label fw-semibold">
+                            Mensaje personalizado (opcional)
+                        </label>
+                        <textarea class="form-control"
+                                  id="mensaje_personalizado_pnc_cliente"
+                                  name="mensaje_personalizado"
+                                  rows="3"
+                                  placeholder="Nota adicional para el cliente"></textarea>
+                    </div>
+
+                    {% if empleados_copia %}
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Copia (CC) — opcional</label>
+                        <div class="row g-2">
+                            {% for empleado in empleados_copia %}
+                            <div class="col-md-6">
+                                <label class="destinatario-card p-2 border rounded bg-light d-block mb-0 cursor-pointer"
+                                       for="pnc_cli_emp_{{ empleado.id }}">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 flex-shrink-0"
+                                               type="checkbox"
+                                               name="copia_empleados"
+                                               value="{{ empleado.email }}"
+                                               id="pnc_cli_emp_{{ empleado.id }}">
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-bold text-truncate small">{{ empleado.nombre_completo }}</div>
+                                            <small class="text-muted text-truncate d-block">{{ empleado.email }}</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="button"
+                        class="btn btn-warning"
+                        id="btnNotificarClientePnc"
+                        {% if not solicitud.lineas.exists %}disabled{% endif %}>
+                    <i class="bi bi-send-fill"></i> Enviar aviso PNC al cliente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="application/json" id="notificarClientePncConfig">
+{
+    "urlNotificarClientePnc": "{% url 'almacen:notificar_cliente_pnc' solicitud.pk %}",
+    "csrfToken": "{{ csrf_token }}"
+}
+</script>
+{% endif %}
+
 <!-- Modal: Gestionar Imágenes de Línea -->
 <div class="modal fade" id="imagenesModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -1758,6 +1859,9 @@ window.COTIZACION_REACONDICIONADO_CONFIG = {
 <script src="{% static 'js/detalle_solicitud.js' %}"></script>
 {# Plantillas de rechazo ST: precarga detalle al elegir motivo en el modal de catálogo #}
 <script src="{% static 'js/plantillas_rechazo.js' %}"></script>
+{% if solicitud.estado == 'enviada_front' %}
+<script src="{% static 'js/notificar_cliente_pnc.js' %}"></script>
+{% endif %}
 {% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}
 <script src="{% static 'js/cotizacion_reacondicionado_modal.js' %}"></script>
 <script src="{% static 'js/cotizacion_cliente_modal.js' %}"></script>

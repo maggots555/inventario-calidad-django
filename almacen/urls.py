@@ -114,6 +114,11 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:pk>/preview-pdf-cotizacion/', views.preview_pdf_cotizacion, name='preview_pdf_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/pdf-cotizacion-final/', views.descargar_pdf_cotizacion_final, name='descargar_pdf_cotizacion_final'),
     path('solicitudes-cotizacion/<int:pk>/notificar-front/', views.notificar_front, name='notificar_front'),
+    path(
+        'solicitudes-cotizacion/<int:pk>/notificar-cliente-pnc/',
+        views.notificar_cliente_pnc,
+        name='notificar_cliente_pnc',
+    ),
     path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/vincular-orden/', views.vincular_orden_solicitud, name='vincular_orden_solicitud'),
     path('solicitudes-cotizacion/<int:pk>/crear-orden-fl/', views.crear_orden_fl_desde_cotizacion, name='crear_orden_fl_desde_cotizacion'),

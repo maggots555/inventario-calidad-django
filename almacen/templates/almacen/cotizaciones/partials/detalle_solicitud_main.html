@@ -760,11 +760,12 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             title="Primero crea o vincula una orden de servicio">
         <i class="bi bi-cart-plus me-1"></i>Generar Compras
     </button>
-    {% elif solicitud.estado == 'enviada_cliente' and tiene_items_cotizables %}
+    {% elif solicitud.estado == 'enviada_cliente' and mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
-        <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
+        <i class="bi bi-{% if tiene_items_cotizables %}arrow-clockwise{% else %}send{% endif %} me-1"></i>
+        {% if tiene_items_cotizables %}Reenviar{% else %}Enviar Cotización{% endif %}
     </button>
-    {% elif solicitud.estado == 'parcialmente_aprobada' and tiene_items_cotizables %}
+    {% elif solicitud.estado == 'parcialmente_aprobada' and mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
     </button>

@@ -865,3 +865,224 @@ def enviar_cotizacion_cliente_task(
             raise self.retry(exc=e)
         except self.MaxRetriesExceededError:
             return {'success': False, 'mensaje': f'Error tras {self.max_retries} reintentos: {str(e)}'}
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.notificar_cliente_pnc',
+)
+def notificar_cliente_pnc_task(
+    self,
+    solicitud_id,
+    email_cliente,
+    mensaje_personalizado='',
+    copia_empleados=None,
+    usuario_id=None,
+    db_alias='default',
+):
+    """
+    Tarea Celery: envía al cliente el aviso de partes no disponibles (PNC).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No genera PDF de cotización. Solo informa que las refacciones no están
+    disponibles en el mercado y que el centro de servicio dará seguimiento
+    si hay alternativas.
+
+    Args:
+        solicitud_id: ID de SolicitudCotizacion.
+        email_cliente: Destinatario principal (cliente).
+        mensaje_personalizado: Nota opcional de Front/Compras.
+        copia_empleados: Lista de emails en CC (opcional).
+        usuario_id: Quién disparó la acción.
+        db_alias: Alias de BD del país (multi-tenant Celery).
+
+    Returns:
+        dict con success / mensaje.
+    """
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from email.mime.image import MIMEImage
+
+    from config.paises_config import fecha_local_pais, get_pais_actual
+
+    from .models import SolicitudCotizacion
+
+    if copia_empleados is None:
+        copia_empleados = []
+
+    logger.info(
+        f'[PNC-CLIENTE] Iniciando tarea solicitud={solicitud_id} '
+        f'→ {email_cliente}'
+    )
+
+    try:
+        try:
+            solicitud = SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'orden_servicio__detalle_equipo',
+            ).prefetch_related(
+                'lineas__producto',
+            ).get(pk=solicitud_id)
+        except SolicitudCotizacion.DoesNotExist:
+            logger.error(f'[PNC-CLIENTE] Solicitud {solicitud_id} no encontrada.')
+            return {
+                'success': False,
+                'mensaje': f'Solicitud ID {solicitud_id} no encontrada.',
+            }
+
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+
+        nombre_usuario = ''
+        whatsapp_empleado = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                nombre_usuario = usuario.get_full_name() or usuario.username
+                if hasattr(usuario, 'empleado') and usuario.empleado:
+                    numero_local = usuario.empleado.numero_whatsapp
+                    if numero_local:
+                        codigo_tel = _pais_email.get('codigo_telefonico', '')
+                        whatsapp_empleado = f'{codigo_tel}{numero_local}'
+            except User.DoesNotExist:
+                pass
+
+        # Datos de equipo / cliente para el correo
+        info_equipo = None
+        nombre_cliente = (solicitud.nombre_cliente or '').strip()
+        if solicitud.orden_servicio and hasattr(
+            solicitud.orden_servicio, 'detalle_equipo'
+        ):
+            detalle = solicitud.orden_servicio.detalle_equipo
+            info_equipo = {
+                'tipo': detalle.tipo_equipo,
+                'marca': detalle.marca,
+                'modelo': detalle.modelo,
+                'service_tag': detalle.numero_serie,
+            }
+            if not nombre_cliente:
+                nombre_cliente = (detalle.nombre_cliente or '').strip()
+
+        lineas_listado = []
+        for linea in solicitud.lineas.order_by('numero_linea'):
+            lineas_listado.append({
+                'numero': linea.numero_linea,
+                'producto': (
+                    linea.producto.nombre if linea.producto_id else ''
+                ),
+                'descripcion': linea.descripcion_pieza or '',
+                'cantidad': linea.cantidad,
+            })
+
+        context = {
+            'solicitud': solicitud,
+            'lineas_listado': lineas_listado,
+            'info_equipo': info_equipo,
+            'nombre_cliente': nombre_cliente or 'Cliente',
+            'mensaje_personalizado': mensaje_personalizado,
+            'tiene_orden_vinculada': bool(solicitud.orden_servicio_id),
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'whatsapp_empleado': whatsapp_empleado,
+            'nombre_usuario': nombre_usuario,
+        }
+
+        html_content = render_to_string(
+            'almacen/emails/cotizacion_cliente_pnc.html',
+            context,
+        )
+
+        if solicitud.orden_servicio and hasattr(
+            solicitud.orden_servicio, 'detalle_equipo'
+        ):
+            service_tag = solicitud.orden_servicio.detalle_equipo.numero_serie
+            numero_display = (
+                f'S/T: {service_tag}' if service_tag else solicitud.numero_solicitud
+            )
+        elif solicitud.service_tag:
+            numero_display = f'S/T: {solicitud.service_tag}'
+        else:
+            numero_display = solicitud.numero_solicitud
+
+        asunto = f'Aviso: componentes no disponibles - {numero_display}'
+
+        email_match = __import__('re').search(
+            r'<(.+?)>', settings.DEFAULT_FROM_EMAIL
+        )
+        email_solo = (
+            email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        )
+        remitente = f'Sistema de Almacén <{email_solo}>'
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=[e for e in copia_empleados if e and e != email_cliente],
+        )
+        email_msg.content_subtype = 'html'
+
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header(
+                        'Content-Disposition', 'inline', filename='logo_sic.png'
+                    )
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f'[PNC-CLIENTE] Error al adjuntar logo: {e}')
+
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header(
+                            'Content-Disposition',
+                            'inline',
+                            filename=f'{cid_name}.png',
+                        )
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f'[PNC-CLIENTE] Error al adjuntar iconos: {e}')
+
+        email_msg.send(fail_silently=False)
+        logger.info(f'[PNC-CLIENTE] Correo enviado a {email_cliente}')
+
+        return {
+            'success': True,
+            'mensaje': f'Correo PNC enviado a {email_cliente}',
+            'solicitud': numero_display,
+        }
+
+    except Exception as e:
+        logger.error(f'[PNC-CLIENTE] Error en tarea: {e}')
+        logger.error(traceback.format_exc())
+        try:
+            raise self.retry(exc=e)
+        except self.MaxRetriesExceededError:
+            return {
+                'success': False,
+                'mensaje': f'Error tras {self.max_retries} reintentos: {str(e)}',
+            }

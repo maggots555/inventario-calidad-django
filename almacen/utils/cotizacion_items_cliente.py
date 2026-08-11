@@ -210,6 +210,44 @@ def solicitud_tiene_items_cotizables(solicitud) -> bool:
     )
 
 
+def puede_mostrar_enviar_cotizacion_cliente(
+    solicitud,
+    *,
+    tiene_items_cotizables: Optional[bool] = None,
+) -> bool:
+    """
+    True si la UI debe mostrar el botón de enviar/reenviar cotización al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Tras un aviso PNC las piezas suelen tener costo $0, así que
+    ``tiene_items_cotizables`` es False. Con orden vinculada igual hay que
+    poder abrir el modal para mandar una alternativa (reacondicionado).
+
+    Args:
+        solicitud: SolicitudCotizacion.
+        tiene_items_cotizables: Si ya se calculó, se reutiliza; si es None, se calcula.
+
+    Returns:
+        bool: Si el botón debe verse.
+    """
+    estado = getattr(solicitud, 'estado', '')
+    if estado == 'enviada_front':
+        return True
+
+    if tiene_items_cotizables is None:
+        tiene_items_cotizables = solicitud_tiene_items_cotizables(solicitud)
+
+    if estado == 'enviada_cliente':
+        # Con orden: permitir REAC aunque no haya piezas con costo
+        return bool(tiene_items_cotizables or solicitud.orden_servicio_id)
+
+    if estado == 'parcialmente_aprobada':
+        return bool(tiene_items_cotizables)
+
+    return False
+
+
 def solicitud_puede_descargar_pdf_final(solicitud) -> bool:
     """
     True si la solicitud puede generar el PDF final con precios aceptados.
