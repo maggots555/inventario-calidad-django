@@ -1013,7 +1013,9 @@ def notificar_cliente_pnc_task(
         else:
             numero_display = solicitud.numero_solicitud
 
-        asunto = f'Aviso: componentes no disponibles - {numero_display}'
+        # EXPLICACIÓN PARA PRINCIPIANTES: el emoji ⚠️ va en el asunto (no en el HTML)
+        # para que destaque en la bandeja del cliente, igual que el PNC a recepción.
+        asunto = f'⚠️ Aviso: componentes no disponibles - {numero_display}'
 
         email_match = __import__('re').search(
             r'<(.+?)>', settings.DEFAULT_FROM_EMAIL

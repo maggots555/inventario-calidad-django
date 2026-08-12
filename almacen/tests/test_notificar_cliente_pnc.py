@@ -282,6 +282,71 @@ class NotificarClientePncVistaTest(BaseIntegracionCotizacionMixin, TestCase):
         mock_delay.assert_called_once()
 
 
+class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
+    """
+    Task Celery notificar_cliente_pnc_task: asunto con ⚠️ y plantilla.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No usa el broker real. Con .run() ejecutamos la tarea en el test y
+    interceptamos EmailMessage.send para revisar asunto y cuerpo HTML.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='PNC-TASK')
+        self.solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='enviada_cliente',
+        )
+        self.solicitud.nombre_cliente = 'Cliente Prueba PNC'
+        self.solicitud.aviso_pnc_cliente_enviado = True
+        self.solicitud.save(
+            update_fields=['nombre_cliente', 'aviso_pnc_cliente_enviado'],
+        )
+
+    def test_asunto_incluye_emoji_y_cuerpo_carta(self) -> None:
+        """Asunto con ⚠️; HTML con carta SIC MÉXICO y footer de recepción."""
+        from almacen.tasks import notificar_cliente_pnc_task
+
+        capturados = []
+
+        def _fake_send(self_msg, fail_silently=False):
+            # EXPLICACIÓN: capturamos el EmailMessage real sin salir a la red
+            capturados.append(self_msg)
+            return 1
+
+        with patch(
+            'django.core.mail.EmailMessage.send',
+            new=_fake_send,
+        ):
+            resultado = notificar_cliente_pnc_task.run(
+                solicitud_id=self.solicitud.pk,
+                email_cliente='cliente.pnc@test.local',
+                mensaje_personalizado='',
+                copia_empleados=[],
+                usuario_id=self.user.pk,
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        msg = capturados[0]
+
+        # Asunto: emoji de advertencia al inicio (igual patrón PNC recepción)
+        self.assertTrue(
+            msg.subject.startswith('⚠️'),
+            f'El asunto debe empezar con ⚠️; recibió: {msg.subject!r}',
+        )
+        self.assertIn('componentes no disponibles', msg.subject)
+
+        body = msg.body
+        self.assertIn('Componentes no disponibles para cotización', body)
+        self.assertIn('Me dirijo de SIC MÉXICO', body)
+        self.assertIn('correo automático no supervisado', body)
+        self.assertIn('NO RESPONDA', body)
+        self.assertIn('Visítanos y síguenos en nuestras redes sociales', body)
+
+
 class SolicitudPermiteAprobarLineasTest(BaseIntegracionCotizacionMixin, TestCase):
     """Helper: bloqueo de aprobar tras aviso PNC hasta cotización/REAC."""
 

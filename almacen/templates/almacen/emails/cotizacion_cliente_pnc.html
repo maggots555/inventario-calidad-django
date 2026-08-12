@@ -68,6 +68,14 @@
             padding: 3px 7px;
             border-radius: 4px;
         }
+        /* Texto comercial formal debajo del alert (carta PNC al cliente) */
+        .carta-pnc {
+            font-size: 15px;
+            color: #555;
+            margin: 0 0 22px 0;
+            line-height: 1.7;
+            text-align: justify;
+        }
         .seguimiento-box {
             background: #e3f2fd;
             border-left: 4px solid #1976d2;
@@ -88,34 +96,71 @@
             color: #555;
             font-style: italic;
         }
+        /* Footer alineado al de cotizacion_front_pnc.html (PNC a recepción) */
         .footer {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: white;
-            padding: 24px;
+            padding: 30px;
             text-align: center;
-            font-size: 13px;
         }
-        .company { font-size: 16px; font-weight: 700; margin: 14px 0 4px 0; }
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
         .social-links {
             display: flex;
             justify-content: center;
-            gap: 12px;
+            align-items: center;
+            gap: 20px;
             flex-wrap: wrap;
-            margin-top: 12px;
         }
         .social-link {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
+            gap: 8px;
+            padding: 10px 20px;
             background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
+            border-radius: 25px;
             text-decoration: none;
-            color: #fff !important;
-            font-size: 12px;
+            color: #ffffff !important;
+            font-size: 14px;
             font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
         }
-        .timestamp { font-size: 11px; opacity: 0.8; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -145,6 +190,20 @@
                     en este momento (descontinuados, sin stock de proveedores o con
                     tiempos de importación que no permiten continuar el proceso normal).
                 </div>
+            </div>
+
+            {# EXPLICACIÓN: carta formal SIC debajo del alert; se mantiene el listado abajo #}
+            <div class="carta-pnc">
+                Me dirijo de SIC MÉXICO; respecto al equipo de cómputo que dejó con
+                nosotros para revisión, le comento que no podemos hacerle una cotización
+                de reparación debido a que por el momento no hay piezas disponibles para
+                este modelo. En caso de existir respuesta por parte de nuestros proveedores
+                referente a la(s) pieza(s) le estaré haciendo llegar nuestra propuesta
+                indicando tiempo de entrega y precio de las refacciones correspondientes.
+                Pero es muy importante que mientras eso sucede pueda retirar su equipo ya
+                que no contamos con fecha estimada para darle respuesta al respecto; en
+                cuanto su equipo esté disponible para ser retirado una de mis compañeras
+                lo confirmará por éste mismo medio.
             </div>
 
             <div class="intro-text">
@@ -202,31 +261,50 @@
             </p>
         </div>
 
+        {# Footer igual al de cotizacion_front_pnc.html (PNC a recepción) #}
         <div class="footer">
-            <div>
-                ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático.
-                Por favor <strong>no responda</strong> a este mensaje.
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Almacén SIC
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para consultas sobre esta notificación, contacte directamente al área de Almacén.
+                </div>
             </div>
+
             <div class="company">{{ empresa_nombre }}</div>
-            <div>{{ pais_nombre }}</div>
-            <div class="social-links">
-                <a href="https://sicgroup.mx/" class="social-link" target="_blank">
-                    <img src="cid:icon_link" alt="Web" style="width: 16px; height: 16px;"> Sitio Web
-                </a>
-                <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                    <img src="cid:icon_instagram" alt="Instagram" style="width: 16px; height: 16px;"> Instagram
-                </a>
-                <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                    <img src="cid:icon_facebook" alt="Facebook" style="width: 16px; height: 16px;"> Facebook
-                </a>
-                {% if whatsapp_empleado %}
-                <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                    <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 16px; height: 16px;"> WhatsApp
-                </a>
-                {% endif %}
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicgroup.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
+                </div>
             </div>
+
             <div class="timestamp">
-                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
             </div>
         </div>
     </div>
