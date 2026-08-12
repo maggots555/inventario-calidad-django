@@ -192,7 +192,8 @@
                 </div>
             </div>
 
-            {# EXPLICACIÓN: carta formal SIC debajo del alert; se mantiene el listado abajo #}
+            {# EXPLICACIÓN: carta de retiro solo si el equipo ya ingresó (hay orden vinculada) #}
+            {% if tiene_orden_vinculada %}
             <div class="carta-pnc">
                 Me dirijo de SIC MÉXICO; respecto al equipo de cómputo que dejó con
                 nosotros para revisión, le comento que no podemos hacerle una cotización
@@ -205,6 +206,7 @@
                 cuanto su equipo esté disponible para ser retirado una de mis compañeras
                 lo confirmará por éste mismo medio.
             </div>
+            {% endif %}
 
             <div class="intro-text">
                 A continuación el listado de componentes revisados:

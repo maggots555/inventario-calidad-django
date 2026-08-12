@@ -175,3 +175,5 @@ class NotificarFrontAsuntoIdentificadorTest(
         self.assertTrue(asunto.startswith('⚠️'))
         self.assertIn('OOW-PNC-ASUNTO', asunto)
         self.assertNotIn('S/T:', asunto)
+        # Con orden vinculada: sí se muestra la carta de retiro del equipo
+        self.assertIn('Me dirijo de SIC MÉXICO', capturados[0].body)

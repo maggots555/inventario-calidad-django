@@ -305,7 +305,7 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
         )
 
     def test_asunto_incluye_emoji_y_cuerpo_carta(self) -> None:
-        """Asunto con ⚠️; HTML con carta SIC MÉXICO y footer de recepción."""
+        """Asunto con ⚠️; sin orden solo alert naranja (sin carta de retiro)."""
         from almacen.tasks import notificar_cliente_pnc_task
 
         capturados = []
@@ -346,7 +346,8 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
 
         body = msg.body
         self.assertIn('Componentes no disponibles para cotización', body)
-        self.assertIn('Me dirijo de SIC MÉXICO', body)
+        # Sin orden vinculada: no se habla de equipo dejado / retiro
+        self.assertNotIn('Me dirijo de SIC MÉXICO', body)
         self.assertIn('correo automático no supervisado', body)
         self.assertIn('NO RESPONDA', body)
         self.assertIn('responsable de seguimiento', body)
