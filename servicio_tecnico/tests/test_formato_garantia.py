@@ -20,7 +20,16 @@ from PIL import Image
 from inventario.models import Empleado, Sucursal
 from servicio_tecnico import views as st_views
 from servicio_tecnico import views_formato_garantia
-from servicio_tecnico.models import DetalleEquipo, FormatoServicioGarantia, OrdenServicio
+from servicio_tecnico.models import (
+    DetalleEquipo,
+    DanoEsteticoVistaGarantia,
+    FormatoServicioGarantia,
+    OrdenServicio,
+    _resolver_ref_carpeta_orden,
+    dano_estetico_garantia_upload_path,
+    formato_garantia_firma_upload_path,
+    formato_garantia_pdf_upload_path,
+)
 from servicio_tecnico.services.formato_garantia import (
     FormatoGarantiaError,
     aplicar_payload_borrador,
@@ -782,4 +791,87 @@ class FormatoGarantiaEmailTaskTest(TestCase):
                 orden=self.orden,
                 tipo_evento='email',
             ).exists()
+        )
+
+
+class FormatoGarantiaUploadPathTest(TestCase):
+    """
+    Carpetas MEDIA del formato Garantía: orden_cliente con fallback interno.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Misma regla que OOW e ImagenOrden; aquí validamos las 3 rutas upload_to.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Path Garantía',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='tecnico_path_garantia',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Técnico Path Garantía',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tecnico.path.gar@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            es_fuera_garantia=False,
+            tecnico_asignado_actual=self.empleado,
+        )
+        self.detalle = DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='123456789',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude',
+            numero_serie='PATHGAR01',
+            sicser_origen='garantia',
+        )
+        self.formato = FormatoServicioGarantia.objects.create(orden=self.orden)
+
+    def test_helper_prioriza_orden_cliente(self):
+        self.assertEqual(
+            _resolver_ref_carpeta_orden(self.orden),
+            '123456789',
+        )
+
+    def test_rutas_garantia_usan_orden_cliente(self):
+        self.assertEqual(
+            formato_garantia_firma_upload_path(self.formato, 'firma_cliente.png'),
+            'servicio_tecnico/formato_garantia/123456789/firmas/firma_cliente.png',
+        )
+        self.assertEqual(
+            formato_garantia_pdf_upload_path(self.formato, 'FormatoGarantia.pdf'),
+            'servicio_tecnico/formato_garantia/123456789/pdf/FormatoGarantia.pdf',
+        )
+        vista = DanoEsteticoVistaGarantia(
+            formato=self.formato,
+            clave_vista='pantalla',
+        )
+        self.assertEqual(
+            dano_estetico_garantia_upload_path(vista, 'pantalla.png'),
+            'servicio_tecnico/formato_garantia/123456789/danos/pantalla.png',
+        )
+
+    def test_rutas_garantia_fallback_interno(self):
+        self.detalle.orden_cliente = ''
+        self.detalle.save(update_fields=['orden_cliente'])
+        self.orden = OrdenServicio.objects.select_related('detalle_equipo').get(
+            pk=self.orden.pk
+        )
+        self.formato.orden = self.orden
+        interno = self.orden.numero_orden_interno
+        self.assertEqual(
+            formato_garantia_pdf_upload_path(self.formato, 'doc.pdf'),
+            f'servicio_tecnico/formato_garantia/{interno}/pdf/doc.pdf',
         )

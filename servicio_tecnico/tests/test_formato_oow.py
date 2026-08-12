@@ -20,7 +20,16 @@ from PIL import Image
 from inventario.models import Empleado, Sucursal
 from servicio_tecnico import views as st_views
 from servicio_tecnico import views_formato_oow
-from servicio_tecnico.models import DetalleEquipo, FormatoServicioOOW, OrdenServicio
+from servicio_tecnico.models import (
+    DetalleEquipo,
+    DanoEsteticoVista,
+    FormatoServicioOOW,
+    OrdenServicio,
+    _resolver_ref_carpeta_orden,
+    dano_estetico_upload_path,
+    formato_oow_firma_upload_path,
+    formato_oow_pdf_upload_path,
+)
 from servicio_tecnico.services.formato_oow import (
     FormatoOOWError,
     aplicar_payload_borrador,
@@ -869,3 +878,96 @@ class FormatoOowEliminarEvidenciaTest(TestCase):
         )
         self.assertEqual(resp.status_code, 404)
         self.assertTrue(ImagenOrden.objects.filter(pk=img.pk).exists())
+
+
+class FormatoOowUploadPathTest(TestCase):
+    """
+    Carpetas MEDIA del formato OOW: orden_cliente con fallback a interno.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Django llama a upload_to al guardar el FileField. Aquí comprobamos
+    la ruta relativa sin escribir archivos reales en disco.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Path OOW',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='tecnico_path_oow',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Técnico Path OOW',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tecnico.path.oow@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.empleado,
+        )
+        self.detalle = DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-PATH01',
+            tipo_equipo='Laptop',
+            marca='DELL',
+            modelo='Latitude',
+            numero_serie='PATHOOW01',
+        )
+        self.formato = FormatoServicioOOW.objects.create(orden=self.orden)
+
+    def test_helper_prioriza_orden_cliente(self):
+        self.assertEqual(
+            _resolver_ref_carpeta_orden(self.orden),
+            'OOW-PATH01',
+        )
+
+    def test_helper_fallback_numero_interno(self):
+        """Sin folio cliente → carpeta = numero_orden_interno."""
+        self.detalle.orden_cliente = ''
+        self.detalle.save(update_fields=['orden_cliente'])
+        # Recargar para no usar detalle_equipo cacheado en memoria
+        self.orden = OrdenServicio.objects.select_related('detalle_equipo').get(
+            pk=self.orden.pk
+        )
+        self.assertEqual(
+            _resolver_ref_carpeta_orden(self.orden),
+            self.orden.numero_orden_interno,
+        )
+
+    def test_rutas_oow_usan_orden_cliente(self):
+        """Las 3 subcarpetas (firmas/pdf/danos) llevan el folio cliente."""
+        self.assertEqual(
+            formato_oow_firma_upload_path(self.formato, 'firma_cliente.png'),
+            'servicio_tecnico/formato_oow/OOW-PATH01/firmas/firma_cliente.png',
+        )
+        self.assertEqual(
+            formato_oow_pdf_upload_path(self.formato, 'FormatoOOW.pdf'),
+            'servicio_tecnico/formato_oow/OOW-PATH01/pdf/FormatoOOW.pdf',
+        )
+        vista = DanoEsteticoVista(formato=self.formato, clave_vista='pantalla')
+        self.assertEqual(
+            dano_estetico_upload_path(vista, 'pantalla.png'),
+            'servicio_tecnico/formato_oow/OOW-PATH01/danos/pantalla.png',
+        )
+
+    def test_rutas_oow_fallback_interno(self):
+        self.detalle.orden_cliente = '   '
+        self.detalle.save(update_fields=['orden_cliente'])
+        self.orden = OrdenServicio.objects.select_related('detalle_equipo').get(
+            pk=self.orden.pk
+        )
+        self.formato.orden = self.orden
+        interno = self.orden.numero_orden_interno
+        self.assertEqual(
+            formato_oow_firma_upload_path(self.formato, 'firma.png'),
+            f'servicio_tecnico/formato_oow/{interno}/firmas/firma.png',
+        )

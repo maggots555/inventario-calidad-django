@@ -3945,13 +3945,45 @@ class VideoOrden(models.Model):
 # FORMATO DIGITAL OOW — Ingreso fuera de garantía (firma + daños + PDF)
 # ============================================================================
 
+def _resolver_ref_carpeta_orden(orden):
+    """
+    Elige el nombre de carpeta MEDIA para formatos digitales (OOW / Garantía).
+
+    Objetivo de negocio:
+        Misma convención que ImagenOrden: agrupar por folio del cliente
+        (orden_cliente) para que sea fácil encontrar evidencias en disco.
+        Si aún no hay folio cliente, usamos el número interno SIGMA.
+
+    Args:
+        orden: Instancia de OrdenServicio (con o sin detalle_equipo).
+
+    Returns:
+        str: orden_cliente no vacío, o numero_orden_interno como fallback.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+        orden_cliente vive en DetalleEquipo (OneToOne), no en OrdenServicio.
+        Por eso miramos orden.detalle_equipo con cuidado: si no existe o
+        el campo está vacío, caemos al número interno (ORD-AAAA-NNNN).
+    """
+    # Paso 1: intentar leer el folio del cliente vía DetalleEquipo
+    orden_cliente = ''
+    detalle = getattr(orden, 'detalle_equipo', None)
+    if detalle is not None:
+        orden_cliente = (getattr(detalle, 'orden_cliente', None) or '').strip()
+
+    # Paso 2: si no hay folio cliente, fallback al número interno SIGMA
+    if not orden_cliente:
+        return orden.numero_orden_interno
+    return orden_cliente
+
+
 def formato_oow_firma_upload_path(instance, filename):
     """
     Ruta de almacenamiento para firmas del formato OOW.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Agrupamos firmas por número de orden interno para que sea fácil
-    respaldar o borrar evidencias de una sola orden.
+    Agrupamos por orden_cliente (fallback: numero_orden_interno), igual
+    que las fotos de la orden, para respaldar o localizar evidencias.
 
     Args:
         instance: FormatoServicioOOW
@@ -3960,7 +3992,7 @@ def formato_oow_firma_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.orden)
     return f'servicio_tecnico/formato_oow/{orden_ref}/firmas/{filename}'
 
 
@@ -3975,7 +4007,7 @@ def formato_oow_pdf_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.orden)
     return f'servicio_tecnico/formato_oow/{orden_ref}/pdf/{filename}'
 
 
@@ -3990,7 +4022,7 @@ def dano_estetico_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.formato.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.formato.orden)
     return f'servicio_tecnico/formato_oow/{orden_ref}/danos/{filename}'
 
 
@@ -4215,6 +4247,10 @@ def formato_garantia_firma_upload_path(instance, filename):
     """
     Ruta de almacenamiento para firmas del formato Garantía Dell.
 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Misma regla que OOW e ImagenOrden: carpeta = orden_cliente, o
+    numero_orden_interno si el folio cliente aún no existe.
+
     Args:
         instance: FormatoServicioGarantia
         filename: Nombre del archivo (ej. firma_cliente.png)
@@ -4222,7 +4258,7 @@ def formato_garantia_firma_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.orden)
     return f'servicio_tecnico/formato_garantia/{orden_ref}/firmas/{filename}'
 
 
@@ -4237,7 +4273,7 @@ def formato_garantia_pdf_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.orden)
     return f'servicio_tecnico/formato_garantia/{orden_ref}/pdf/{filename}'
 
 
@@ -4252,7 +4288,7 @@ def dano_estetico_garantia_upload_path(instance, filename):
     Returns:
         str: Ruta relativa bajo MEDIA_ROOT
     """
-    orden_ref = instance.formato.orden.numero_orden_interno
+    orden_ref = _resolver_ref_carpeta_orden(instance.formato.orden)
     return f'servicio_tecnico/formato_garantia/{orden_ref}/danos/{filename}'
 
 
