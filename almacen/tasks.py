@@ -235,7 +235,9 @@ def notificar_front_cotizacion_task(
 
         email_match = __import__('re').search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
-        remitente = f"Sistema de Almacén <{email_solo}>"
+        # EXPLICACIÓN PARA PRINCIPIANTES: el nombre que ve el destinatario
+        # en "De:" (no cambia el email real, solo la etiqueta visible).
+        remitente = f"Sistema de Compras <{email_solo}>"
 
         email_msg = EmailMessage(
             subject=asunto,
@@ -423,7 +425,7 @@ def notificar_compras_nueva_cotizacion_task(
         import re
         email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
-        remitente = f"Sistema de Almacén <{email_solo}>"
+        remitente = f"Sistema de Compras <{email_solo}>"
 
         email_msg = EmailMessage(
             subject=asunto,
@@ -1023,7 +1025,7 @@ def notificar_cliente_pnc_task(
         email_solo = (
             email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         )
-        remitente = f'Sistema de Almacén <{email_solo}>'
+        remitente = f'Sistema de Compras <{email_solo}>'
 
         email_msg = EmailMessage(
             subject=asunto,

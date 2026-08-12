@@ -332,6 +332,9 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(len(capturados), 1)
         msg = capturados[0]
 
+        # Remitente: Compras (no Almacén) en correos PNC al cliente
+        self.assertIn('Sistema de Compras', msg.from_email)
+
         # Asunto: emoji de advertencia al inicio (igual patrón PNC recepción)
         self.assertTrue(
             msg.subject.startswith('⚠️'),
@@ -344,6 +347,7 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('Me dirijo de SIC MÉXICO', body)
         self.assertIn('correo automático no supervisado', body)
         self.assertIn('NO RESPONDA', body)
+        self.assertIn('responsable de seguimiento', body)
         self.assertIn('Visítanos y síguenos en nuestras redes sociales', body)
 
 
