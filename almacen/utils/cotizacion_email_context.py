@@ -131,6 +131,37 @@ def _obtener_service_tag_solicitud(solicitud: 'SolicitudCotizacion') -> str:
     return ''
 
 
+def identificador_asunto_solicitud(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Identificador visible en el asunto (subject) de correos de Almacén.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Regla de negocio unificada para todos los asuntos:
+        - Con orden vinculada → número de orden del cliente (ej. OOW-11902)
+        - Sin orden vinculada → Service Tag con prefijo "S/T: "
+        - Si falta el dato → número de solicitud (ej. SOL-2026-0001)
+
+    Args:
+        solicitud: SolicitudCotizacion a identificar.
+
+    Returns:
+        str: Texto listo para concatenar en el subject del correo.
+    """
+    # Con orden: NUNCA usar service tag en el asunto
+    if solicitud.orden_servicio_id or solicitud.orden_servicio:
+        orden_cliente = _obtener_orden_cliente_para_referencia(solicitud)
+        if orden_cliente:
+            return orden_cliente
+        return (solicitud.numero_solicitud or '').strip()
+
+    # Sin orden: Service Tag de la solicitud
+    service_tag = _obtener_service_tag_solicitud(solicitud)
+    if service_tag:
+        return f'S/T: {service_tag}'
+
+    return (solicitud.numero_solicitud or '').strip()
+
+
 def extraer_sufijo_desde_identificador(identificador: str) -> str:
     """
     Normaliza un identificador (orden_cliente o service tag) al sufijo de referencia.
@@ -349,34 +380,24 @@ def construir_asunto_correo_default(
     """
     Arma el asunto sugerido para el modal de envío al cliente.
 
-    Prioridad del identificador:
-        1. numero_orden_cliente de la solicitud
-        2. service_tag (solicitud sin orden vinculada)
-        3. orden_cliente del DetalleEquipo (respaldo)
-        4. numero_serie / Service Tag del equipo (respaldo)
+    Usa la misma regla que los correos enviados:
+        - Con orden vinculada → orden_cliente
+        - Sin orden → S/T: {service_tag}
+        - Fallback → numero_solicitud
 
     Args:
         solicitud: Solicitud de cotización.
-        info_orden: DetalleEquipo vinculado, si existe.
+        info_orden: DetalleEquipo vinculado (compatibilidad API; el identificador
+            se obtiene de la solicitud / orden vinculada vía el helper común).
 
     Returns:
         str: Asunto parcial, ej. 'Cotización SIC — OOW-11902' o solo el prefijo.
     """
-    identificador = ''
+    # EXPLICACIÓN: info_orden se conserva en la firma para no romper llamadas
+    # existentes en detalle_solicitud; la regla vive en identificador_asunto_solicitud.
+    _ = info_orden
 
-    if solicitud.numero_orden_cliente:
-        identificador = solicitud.numero_orden_cliente.strip()
-    elif solicitud.service_tag:
-        identificador = solicitud.service_tag.strip()
-    elif info_orden is not None:
-        orden_cliente = getattr(info_orden, 'orden_cliente', '') or ''
-        if orden_cliente.strip():
-            identificador = orden_cliente.strip()
-        else:
-            numero_serie = getattr(info_orden, 'numero_serie', '') or ''
-            if str(numero_serie).strip():
-                identificador = str(numero_serie).strip()
-
+    identificador = identificador_asunto_solicitud(solicitud)
     if identificador:
         return f'{PREFIJO_ASUNTO_CORREO}{identificador}'
 

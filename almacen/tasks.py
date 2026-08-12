@@ -219,15 +219,11 @@ def notificar_front_cotizacion_task(
         # ===================================================================
         # PASO 4: CREAR Y ENVIAR EL CORREO
         # ===================================================================
-        # Usar Service Tag si está disponible, sino el número de solicitud
-        if solicitud.orden_servicio and hasattr(solicitud.orden_servicio, 'detalle_equipo'):
-            service_tag = solicitud.orden_servicio.detalle_equipo.numero_serie
-            numero_display = f"S/T: {service_tag}" if service_tag else solicitud.numero_solicitud
-        elif solicitud.service_tag:
-            numero_display = f"S/T: {solicitud.service_tag}"
-        else:
-            numero_display = solicitud.numero_solicitud
-        
+        # EXPLICACIÓN: con orden → orden_cliente; sin orden → S/T (helper común)
+        from .utils.cotizacion_email_context import identificador_asunto_solicitud
+
+        numero_display = identificador_asunto_solicitud(solicitud)
+
         if es_pnc:
             asunto = f'⚠️ PNC - Partes no disponibles - {numero_display}'
         else:
@@ -419,8 +415,18 @@ def notificar_compras_nueva_cotizacion_task(
         # ===================================================================
         # PASO 4: CREAR Y ENVIAR EL CORREO
         # ===================================================================
-        service_tag_display = solicitud.service_tag or 'N/A'
-        asunto = f'📋 Nueva Cotización Sin Orden — {solicitud.numero_solicitud} (S/T: {service_tag_display})'
+        # Este flujo es siempre sin orden: identificador = S/T (o N/A)
+        from .utils.cotizacion_email_context import identificador_asunto_solicitud
+
+        identificador = identificador_asunto_solicitud(solicitud)
+        if identificador.startswith('S/T:'):
+            etiqueta_st = identificador
+        else:
+            etiqueta_st = 'S/T: N/A'
+        asunto = (
+            f'📋 Nueva Cotización Sin Orden — '
+            f'{solicitud.numero_solicitud} ({etiqueta_st})'
+        )
 
         import re
         email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
@@ -705,15 +711,13 @@ def enviar_cotizacion_cliente_task(
         # Construir el nombre del título de la propuesta para el asunto del email
         titulo_display = titulo_propuesta or calculo_resumen['servicio_nombre']
 
-        # Asunto base (sin referencia) — se usa para fallback de referencia de pago
-        numero_display = solicitud.numero_solicitud
-        if solicitud.orden_servicio:
-            try:
-                st = solicitud.orden_servicio.detalle_equipo.numero_serie
-                if st:
-                    numero_display = f"S/T: {st}"
-            except Exception:
-                pass
+        # EXPLICACIÓN: con orden → orden_cliente; sin orden → S/T (helper común)
+        from .utils.cotizacion_email_context import (
+            construir_contexto_email_cotizacion,
+            identificador_asunto_solicitud,
+        )
+
+        numero_display = identificador_asunto_solicitud(solicitud)
 
         if asunto_correo and asunto_correo.strip():
             asunto_base = asunto_correo.strip()
@@ -721,7 +725,6 @@ def enviar_cotizacion_cliente_task(
             asunto_base = f'Cotización SIC — {titulo_display} | {numero_display}'
 
         # Variables adicionales según país (referencia de pago, textos México, etc.)
-        from .utils.cotizacion_email_context import construir_contexto_email_cotizacion
         from config.constants import (
             AVISO_DIAGNOSTICO_SOLO_SERVICIOS,
             debe_mostrar_aviso_diagnostico_solo_servicios,
@@ -1003,17 +1006,10 @@ def notificar_cliente_pnc_task(
             context,
         )
 
-        if solicitud.orden_servicio and hasattr(
-            solicitud.orden_servicio, 'detalle_equipo'
-        ):
-            service_tag = solicitud.orden_servicio.detalle_equipo.numero_serie
-            numero_display = (
-                f'S/T: {service_tag}' if service_tag else solicitud.numero_solicitud
-            )
-        elif solicitud.service_tag:
-            numero_display = f'S/T: {solicitud.service_tag}'
-        else:
-            numero_display = solicitud.numero_solicitud
+        # EXPLICACIÓN: con orden → orden_cliente; sin orden → S/T (helper común)
+        from .utils.cotizacion_email_context import identificador_asunto_solicitud
+
+        numero_display = identificador_asunto_solicitud(solicitud)
 
         # EXPLICACIÓN PARA PRINCIPIANTES: el emoji ⚠️ va en el asunto (no en el HTML)
         # para que destaque en la bandeja del cliente, igual que el PNC a recepción.

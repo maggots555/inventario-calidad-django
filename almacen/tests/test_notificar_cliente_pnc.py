@@ -341,6 +341,8 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
             f'El asunto debe empezar con ⚠️; recibió: {msg.subject!r}',
         )
         self.assertIn('componentes no disponibles', msg.subject)
+        # Sin orden vinculada → el asunto debe llevar S/T, no OOW-
+        self.assertIn('S/T:', msg.subject)
 
         body = msg.body
         self.assertIn('Componentes no disponibles para cotización', body)
