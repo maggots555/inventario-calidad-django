@@ -187,11 +187,18 @@
         </div>
 
         <div class="content">
-            <div class="greeting">Equipo involucrado,</div>
+            <div class="greeting">Equipo,</div>
             <div class="intro-text">
+                {# EXPLICACIÓN: si hay técnico en la orden se nombra; si no, texto genérico #}
                 El cliente <strong>rechazó todas</strong> las piezas y/o servicios de esta
-                cotización. Este aviso llega a Compras
-                {% if orden %}, al técnico asignado y al responsable de seguimiento{% endif %}.
+                cotización.
+                {% if orden and orden.tecnico_asignado_actual %}
+                <strong>{{ orden.tecnico_asignado_actual.nombre_completo }}</strong>,
+                {% else %}
+                técnico asignado,
+                {% endif %}
+                por favor pasar el equipo al área correspondiente para dejarlo disponible
+                al usuario para su recolección.
             </div>
 
             <div class="alert-box">
