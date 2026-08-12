@@ -481,7 +481,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                     <form method="post" action="{% url 'almacen:responder_linea_cotizacion' solicitud.pk linea.pk %}" class="d-inline">
                                                         {% csrf_token %}
                                                         <input type="hidden" name="decision" value="aprobar">
-                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Aprobar"><i class="bi bi-check-lg"></i></button>
+                                                        {# EXPLICACIÓN PARA PRINCIPIANTES: confirm() pregunta antes de enviar el form; si Cancelar, return false y no se aprueba. #}
+                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Aprobar"
+                                                                onclick="return confirm('¿Confirmar que el cliente aceptó esta pieza? Esta acción no se puede deshacer desde aquí.');">
+                                                            <i class="bi bi-check-lg"></i>
+                                                        </button>
                                                     </form>
                                                     {% endif %}
                                                     {% endif %}
@@ -572,7 +576,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                         <form method="post" action="{% url 'almacen:responder_linea_cotizacion' solicitud.pk linea.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <input type="hidden" name="decision" value="aprobar">
-                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                                            {# Misma protección anti-clic accidental que en escritorio #}
+                                            <button type="submit" class="btn btn-sm btn-success"
+                                                    onclick="return confirm('¿Confirmar que el cliente aceptó esta pieza? Esta acción no se puede deshacer desde aquí.');">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
                                         </form>
                                         {% endif %}
                                         {% endif %}
@@ -648,7 +656,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                     <form method="post" action="{% url 'almacen:responder_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
                                                         {% csrf_token %}
                                                         <input type="hidden" name="decision" value="aprobar">
-                                                        <button type="submit" class="btn btn-outline-success"><i class="bi bi-check-lg"></i></button>
+                                                        {# EXPLICACIÓN PARA PRINCIPIANTES: igual que piezas — confirm antes de aprobar un servicio irreversible. #}
+                                                        <button type="submit" class="btn btn-outline-success"
+                                                                onclick="return confirm('¿Confirmar que el cliente aceptó este servicio? Esta acción no se puede deshacer desde aquí.');">
+                                                            <i class="bi bi-check-lg"></i>
+                                                        </button>
                                                     </form>
                                                     {% endif %}
                                                     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rechazarServicioModal"
@@ -693,7 +705,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                         <form method="post" action="{% url 'almacen:responder_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <input type="hidden" name="decision" value="aprobar">
-                                            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
+                                            {# Misma confirmación en móvil para servicios adicionales #}
+                                            <button type="submit" class="btn btn-sm btn-success"
+                                                    onclick="return confirm('¿Confirmar que el cliente aceptó este servicio? Esta acción no se puede deshacer desde aquí.');">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
                                         </form>
                                         {% endif %}
                                         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarServicioModal"
