@@ -2998,6 +2998,21 @@ class SolicitudCotizacion(models.Model):
         ),
     )
 
+    # ========== PLANTILLA PNC A FRONT ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Al «Notificar a Front» eliges cotización lista o partes no disponibles (PNC).
+    # Ese valor antes se perdía tras el correo; ahora se guarda aquí para mostrar
+    # el botón «Notificar cliente: sin piezas (PNC)» solo si Front recibió PNC.
+    # Se actualiza en cada notificación/reenvío a Front según la plantilla elegida.
+    plantilla_pnc_front_enviada = models.BooleanField(
+        default=False,
+        verbose_name='Plantilla PNC enviada a Front',
+        help_text=(
+            'True si el último «Notificar a Front» usó la plantilla '
+            'partes no disponibles (PNC). Si fue cotización lista, queda False.'
+        ),
+    )
+
     # ========== AVISO PNC AL CLIENTE ==========
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # Se marca True al notificar al cliente que no hay piezas en el mercado.
@@ -3716,6 +3731,64 @@ class SolicitudCotizacion(models.Model):
         """
         return self.estado == 'enviada_front' and self.total_lineas > 0
     
+    def puede_notificar_cliente_pnc(self) -> bool:
+        """
+        True si se puede enviar el primer aviso PNC al cliente.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Solo cuando la solicitud ya está en Front Y el último «Notificar a Front»
+        usó la plantilla partes no disponibles. Así no aparece el botón (ni
+        funciona la API) tras una cotización normal con precios.
+
+        Returns:
+            bool: Si UI y API permiten el primer aviso PNC al cliente.
+        """
+        return (
+            self.estado == 'enviada_front'
+            and self.plantilla_pnc_front_enviada
+        )
+
+    def puede_reenviar_aviso_pnc(self) -> bool:
+        """
+        True si se puede reenviar el aviso PNC al cliente.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Tras el primer aviso, la solicitud pasa a «enviada_cliente» y se marca
+        ``aviso_pnc_cliente_enviado``. Solo entonces se permite reenviar.
+
+        Returns:
+            bool: Si UI y API permiten reenviar el aviso PNC.
+        """
+        return (
+            self.estado == 'enviada_cliente'
+            and self.aviso_pnc_cliente_enviado
+        )
+
+    def actualizar_plantilla_pnc_front(self, tipo_plantilla: str) -> None:
+        """
+        Guarda si el último «Notificar a Front» usó plantilla PNC.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        El modal envía ``cotizacion_lista`` o ``partes_no_disponibles``.
+        Ese valor se pierde si no lo persistimos: por eso este método
+        actualiza ``plantilla_pnc_front_enviada`` en cada envío/reenvío.
+
+        Args:
+            tipo_plantilla: Valor del radio del modal Notificar a Front.
+
+        Efectos secundarios:
+            Guarda solo el campo ``plantilla_pnc_front_enviada`` en BD.
+        """
+        # EXPLICACIÓN: mismo valor que TIPO_PLANTILLA_PARTES_NO_DISPONIBLES
+        # en almacen.utils.sincronizar_estado_st (evitamos import circular).
+        self.plantilla_pnc_front_enviada = (
+            tipo_plantilla == 'partes_no_disponibles'
+        )
+        self.save(update_fields=['plantilla_pnc_front_enviada'])
+
     def enviar_a_cliente(self, usuario=None):
         """
         Cambia el estado a 'enviada_cliente' para que el cliente pueda aprobar/rechazar.

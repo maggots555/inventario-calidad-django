@@ -845,17 +845,12 @@ def detalle_solicitud_cotizacion(request, pk):
     )
     # EXPLICACIÓN: tras aviso PNC, ocultar botones de aprobar hasta cotización/REAC
     context['permite_aprobar_lineas'] = solicitud_permite_aprobar_lineas(solicitud)
-    # Modal + botón reenvío solo si ya hubo aviso PNC (o primer aviso en Front)
+    # EXPLICACIÓN: misma fuente de verdad que notificar_cliente_pnc (métodos modelo)
+    context['mostrar_notificar_cliente_pnc'] = solicitud.puede_notificar_cliente_pnc()
+    context['mostrar_reenviar_aviso_pnc'] = solicitud.puede_reenviar_aviso_pnc()
     context['mostrar_modal_notificar_cliente_pnc'] = (
-        solicitud.estado == 'enviada_front'
-        or (
-            solicitud.estado == 'enviada_cliente'
-            and solicitud.aviso_pnc_cliente_enviado
-        )
-    )
-    context['mostrar_reenviar_aviso_pnc'] = (
-        solicitud.estado == 'enviada_cliente'
-        and solicitud.aviso_pnc_cliente_enviado
+        context['mostrar_notificar_cliente_pnc']
+        or context['mostrar_reenviar_aviso_pnc']
     )
 
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)

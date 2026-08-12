@@ -267,6 +267,8 @@ class NotificarFrontVistaPlantillaTest(BaseIntegracionCotizacionMixin, TestCase)
 
         self.solicitud.refresh_from_db()
         self.assertEqual(self.solicitud.estado, 'enviada_front')
+        # EXPLICACIÓN: plantilla PNC a Front → flag True (habilita botón PNC cliente)
+        self.assertTrue(self.solicitud.plantilla_pnc_front_enviada)
 
         # Celery debe recibir tipo_plantilla=partes_no_disponibles
         self.assertTrue(mock_delay.called)
@@ -292,8 +294,41 @@ class NotificarFrontVistaPlantillaTest(BaseIntegracionCotizacionMixin, TestCase)
         self.orden.refresh_from_db()
         self.assertEqual(self.orden.estado, ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR)
 
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'enviada_front')
+        # EXPLICACIÓN: cotización lista → flag False (oculta botón PNC al cliente)
+        self.assertFalse(self.solicitud.plantilla_pnc_front_enviada)
+
         kwargs = mock_delay.call_args.kwargs
         self.assertEqual(kwargs.get('tipo_plantilla'), TIPO_PLANTILLA_COTIZACION_LISTA)
+
+    @patch('almacen.tasks.notificar_front_cotizacion_task.delay')
+    def test_reenvio_lista_limpia_flag_pnc_front(self, mock_delay) -> None:
+        """
+        Reenvío con cotización lista: apaga plantilla_pnc_front_enviada.
+
+        EXPLICACIÓN: si antes se mandó PNC a Front y luego se reenvía cotización
+        lista, el botón «Notificar cliente PNC» debe dejar de estar disponible.
+        """
+        mock_delay.return_value = MagicMock(id='task-reenvio-lista')
+        self.solicitud.estado = 'enviada_front'
+        self.solicitud.plantilla_pnc_front_enviada = True
+        self.solicitud.save(
+            update_fields=['estado', 'plantilla_pnc_front_enviada'],
+        )
+
+        url = reverse('almacen:notificar_front', args=[self.solicitud.pk])
+        data = {
+            'tipo_plantilla': TIPO_PLANTILLA_COTIZACION_LISTA,
+            'copia_empleados': [self.empleado.email],
+        }
+        request = request_post(self.factory, self.user, url, data)
+        respuesta = notificar_front(request, self.solicitud.pk)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.solicitud.refresh_from_db()
+        self.assertFalse(self.solicitud.plantilla_pnc_front_enviada)
+        mock_delay.assert_called_once()
 
     @patch('almacen.tasks.notificar_front_cotizacion_task.delay')
     def test_tipo_plantilla_invalido_rechaza(self, mock_delay) -> None:

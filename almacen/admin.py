@@ -1048,6 +1048,17 @@ class SolicitudCotizacionAdmin(admin.ModelAdmin):
         ('Observaciones', {
             'fields': ('observaciones', 'observaciones_cliente')
         }),
+        ('Flags PNC (cotización)', {
+            'fields': (
+                'plantilla_pnc_front_enviada',
+                'aviso_pnc_cliente_enviado',
+            ),
+            'description': (
+                'plantilla_pnc_front_enviada: último Notificar a Front fue PNC. '
+                'aviso_pnc_cliente_enviado: ya se avisó PNC al cliente final.'
+            ),
+            'classes': ('collapse',),
+        }),
         ('Auditoría', {
             'fields': (
                 'creado_por',

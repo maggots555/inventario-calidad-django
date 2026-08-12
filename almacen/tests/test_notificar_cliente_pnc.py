@@ -164,6 +164,9 @@ class NotificarClientePncVistaTest(BaseIntegracionCotizacionMixin, TestCase):
             sin_orden_activa=False,
             estado='enviada_front',
         )
+        # EXPLICACIÓN: el primer aviso PNC al cliente exige plantilla PNC a Front
+        self.solicitud.plantilla_pnc_front_enviada = True
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
 
     @patch('almacen.tasks.notificar_cliente_pnc_task.delay')
     def test_feliz_pasa_a_enviada_cliente_flag_y_pnc(self, mock_delay) -> None:
@@ -258,6 +261,31 @@ class NotificarClientePncVistaTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(self.solicitud.estado, 'enviada_front')
 
     @patch('almacen.tasks.notificar_cliente_pnc_task.delay')
+    def test_sin_plantilla_pnc_front_rechaza(self, mock_delay) -> None:
+        """
+        enviada_front sin plantilla PNC a Front → 400.
+
+        EXPLICACIÓN: si Front recibió cotización lista, no debe poderse
+        avisar PNC al cliente (ni por URL directa).
+        """
+        self.solicitud.plantilla_pnc_front_enviada = False
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
+
+        url = reverse('almacen:notificar_cliente_pnc', args=[self.solicitud.pk])
+        data = {'email_cliente': 'cliente.pnc@test.local'}
+        request = request_post(self.factory, self.user, url, data)
+        respuesta = notificar_cliente_pnc(request, self.solicitud.pk)
+
+        self.assertEqual(respuesta.status_code, 400)
+        payload = json.loads(respuesta.content)
+        self.assertFalse(payload['success'])
+        self.assertIn('plantilla', (payload.get('error') or '').lower())
+        mock_delay.assert_not_called()
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'enviada_front')
+        self.assertFalse(self.solicitud.aviso_pnc_cliente_enviado)
+
+    @patch('almacen.tasks.notificar_cliente_pnc_task.delay')
     def test_sin_orden_solo_cambia_solicitud(self, mock_delay) -> None:
         """Sin orden: igual pasa a enviada_cliente, marca flag y manda correo."""
         mock_delay.return_value = MagicMock(id='task-pnc-sin-orden')
@@ -266,6 +294,8 @@ class NotificarClientePncVistaTest(BaseIntegracionCotizacionMixin, TestCase):
             sin_orden_activa=True,
             estado='enviada_front',
         )
+        solicitud.plantilla_pnc_front_enviada = True
+        solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
         url = reverse('almacen:notificar_cliente_pnc', args=[solicitud.pk])
         data = {'email_cliente': 'consulta@test.local'}
         request = request_post(self.factory, self.user, url, data)
@@ -352,6 +382,137 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('NO RESPONDA', body)
         self.assertIn('responsable de seguimiento', body)
         self.assertIn('Visítanos y síguenos en nuestras redes sociales', body)
+
+
+class DetalleSolicitudFlagsPncTest(BaseIntegracionCotizacionMixin, TestCase):
+    """
+    Context del detalle: botón PNC solo si plantilla_pnc_front_enviada.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    No renderizamos el HTML completo (el template base exige staticfiles
+    con manifest). Interceptamos ``render`` y revisamos las variables de
+    contexto que el template usa para mostrar u ocultar el botón.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='PNC-FLAGS')
+        self.solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='enviada_front',
+        )
+
+    def _context_detalle(self) -> dict:
+        """
+        Ejecuta la vista GET y devuelve el dict de contexto pasado a render.
+
+        Returns:
+            Contexto de la vista detalle_solicitud_cotizacion.
+        """
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.http import HttpResponse
+
+        from almacen.views import detalle_solicitud_cotizacion
+
+        url = reverse(
+            'almacen:detalle_solicitud_cotizacion',
+            args=[self.solicitud.pk],
+        )
+        request = self.factory.get(url)
+        request.user = self.user
+        request.session = SessionStore()
+        request._messages = FallbackStorage(request)
+
+        capturado: dict = {}
+
+        def _fake_render(req, template_name, context=None, *args, **kwargs):
+            # EXPLICACIÓN: guardamos el context y devolvemos HTML vacío
+            capturado['context'] = context or {}
+            return HttpResponse('ok')
+
+        with patch(
+            'almacen.views_solicitudes_cotizacion.render',
+            side_effect=_fake_render,
+        ):
+            respuesta = detalle_solicitud_cotizacion(request, self.solicitud.pk)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('context', capturado)
+        return capturado['context']
+
+    def test_sin_plantilla_pnc_oculta_boton_y_modal(self) -> None:
+        """Cotización lista a Front: flags del botón/modal en False."""
+        self.solicitud.plantilla_pnc_front_enviada = False
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
+
+        context = self._context_detalle()
+        self.assertFalse(context['mostrar_notificar_cliente_pnc'])
+        self.assertFalse(context['mostrar_modal_notificar_cliente_pnc'])
+
+    def test_con_plantilla_pnc_muestra_boton_y_modal(self) -> None:
+        """Plantilla PNC a Front: flags del botón/modal en True."""
+        self.solicitud.plantilla_pnc_front_enviada = True
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
+
+        context = self._context_detalle()
+        self.assertTrue(context['mostrar_notificar_cliente_pnc'])
+        self.assertTrue(context['mostrar_modal_notificar_cliente_pnc'])
+
+
+class SolicitudPuedeNotificarClientePncModelTest(
+    BaseIntegracionCotizacionMixin,
+    TestCase,
+):
+    """
+    Reglas unitarias del modelo: puede_notificar / puede_reenviar / actualizar.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    UI y API deben usar estos métodos; si alguien cambia solo un lado,
+    estos tests fallan y detectan la divergencia.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='PNC-MODEL')
+        self.solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='enviada_front',
+        )
+
+    def test_puede_notificar_exige_plantilla_pnc(self) -> None:
+        """Sin flag Front → False; con flag → True."""
+        self.solicitud.plantilla_pnc_front_enviada = False
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
+        self.assertFalse(self.solicitud.puede_notificar_cliente_pnc())
+
+        self.solicitud.plantilla_pnc_front_enviada = True
+        self.solicitud.save(update_fields=['plantilla_pnc_front_enviada'])
+        self.assertTrue(self.solicitud.puede_notificar_cliente_pnc())
+
+    def test_puede_reenviar_exige_aviso_cliente(self) -> None:
+        """Reenvío solo en enviada_cliente + aviso_pnc_cliente_enviado."""
+        self.assertFalse(self.solicitud.puede_reenviar_aviso_pnc())
+
+        self.solicitud.estado = 'enviada_cliente'
+        self.solicitud.aviso_pnc_cliente_enviado = True
+        self.solicitud.save(
+            update_fields=['estado', 'aviso_pnc_cliente_enviado'],
+        )
+        self.assertTrue(self.solicitud.puede_reenviar_aviso_pnc())
+        self.assertFalse(self.solicitud.puede_notificar_cliente_pnc())
+
+    def test_actualizar_plantilla_pnc_front(self) -> None:
+        """Persiste True/False según tipo_plantilla del modal."""
+        self.solicitud.actualizar_plantilla_pnc_front('partes_no_disponibles')
+        self.solicitud.refresh_from_db()
+        self.assertTrue(self.solicitud.plantilla_pnc_front_enviada)
+
+        self.solicitud.actualizar_plantilla_pnc_front('cotizacion_lista')
+        self.solicitud.refresh_from_db()
+        self.assertFalse(self.solicitud.plantilla_pnc_front_enviada)
 
 
 class SolicitudPermiteAprobarLineasTest(BaseIntegracionCotizacionMixin, TestCase):

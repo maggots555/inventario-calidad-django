@@ -787,7 +787,13 @@ def notificar_front(request, pk):
             solicitud.enviar_a_front(usuario=request.user)
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Según la plantilla, la orden ST pasa a «cotización recibida» o a PNC.
+        # Guardamos si Front recibió plantilla PNC (fuente única en el modelo).
+        # Así el botón y la API usan la misma regla, no solo ocultar en HTML.
+        solicitud.actualizar_plantilla_pnc_front(tipo_plantilla)
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Cotización lista → ST a «cotización recibida». Plantilla PNC a Front
+        # NO cambia ST (el PNC en ST lo pone solo el aviso al cliente).
         # También se intenta en reenvíos por si la orden se vinculó después.
         sincronizar_estado_st_al_notificar_front(
             solicitud,

@@ -8,8 +8,9 @@ avisar al cliente final (sin PDF de precios). Eso pasa la solicitud a
 ``enviada_cliente`` para desbloquear rechazo por línea y tipificación.
 
 Con orden ST vinculada, el estado de la orden pasa a PNC (única fuente de
-PNC en ST). También permite reenviar el aviso si ya se marcó el flag
-``aviso_pnc_cliente_enviado``.
+PNC en ST). El primer aviso exige que Front haya recibido plantilla PNC
+(``plantilla_pnc_front_enviada``). También permite reenviar el aviso si
+ya se marcó ``aviso_pnc_cliente_enviado``.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ def notificar_cliente_pnc(request, pk):
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Primer aviso (estado ``enviada_front``):
+    Primer aviso (``enviada_front`` + ``plantilla_pnc_front_enviada``):
       1. Valida email y líneas.
       2. Pasa a ``enviada_cliente`` + marca ``aviso_pnc_cliente_enviado``.
       3. Si hay orden ST → PNC.
@@ -68,19 +69,30 @@ def notificar_cliente_pnc(request, pk):
     try:
         solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
 
-        # Primer aviso desde Front, o reenvío solo si ya hubo aviso PNC
-        es_primer_aviso = solicitud.estado == 'enviada_front'
-        es_reenvio = (
-            solicitud.estado == 'enviada_cliente'
-            and solicitud.aviso_pnc_cliente_enviado
-        )
+        # Primer aviso / reenvío: misma regla que la UI (métodos del modelo)
+        es_primer_aviso = solicitud.puede_notificar_cliente_pnc()
+        es_reenvio = solicitud.puede_reenviar_aviso_pnc()
         if not es_primer_aviso and not es_reenvio:
+            # Mensaje distinto si está en Front pero sin plantilla PNC
+            if (
+                solicitud.estado == 'enviada_front'
+                and not solicitud.plantilla_pnc_front_enviada
+            ):
+                error_msg = (
+                    'Solo puedes avisar PNC al cliente si Front recibió la '
+                    'plantilla «Partes no disponibles (PNC)». '
+                    'Reenvía la notificación a Front con esa plantilla, '
+                    'o usa «Enviar Cotización al Cliente».'
+                )
+            else:
+                error_msg = (
+                    'Solo se puede notificar PNC al cliente desde «Enviada a Front» '
+                    'con plantilla PNC, o reenviar el aviso si esa solicitud ya '
+                    'fue notificada con PNC.'
+                )
             return JsonResponse({
                 'success': False,
-                'error': (
-                    'Solo se puede notificar PNC al cliente desde «Enviada a Front», '
-                    'o reenviar el aviso si esa solicitud ya fue notificada con PNC.'
-                ),
+                'error': error_msg,
             }, status=400)
 
         if not solicitud.lineas.exists():
