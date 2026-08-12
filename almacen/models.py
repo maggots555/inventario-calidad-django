@@ -3863,6 +3863,9 @@ class SolicitudCotizacion(models.Model):
             return self.estado
         
         # Todas las líneas y servicios tienen respuesta
+        # Guardamos el estado previo para notificar SOLO si realmente cambia
+        # (evita reenviar push/email si se vuelve a llamar el método ya cerrado).
+        estado_previo = self.estado
         self.fecha_respuesta_cliente = timezone.now()
         
         if aprobadas == total:
@@ -3880,6 +3883,32 @@ class SolicitudCotizacion(models.Model):
             sincronizar_estado_st_por_respuesta_cliente,
         )
         sincronizar_estado_st_por_respuesta_cliente(self, estado_solicitud=self.estado)
+
+        # ------------------------------------------------------------------
+        # NOTIFICACIONES al cerrar respuesta del cliente
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # - Aceptación (total/parcial) → Compras (piezas aceptadas / Generar compras)
+        # - Rechazo total → Compras + técnico + responsable de seguimiento
+        # Si falla el aviso, NO debe revertir el cambio de estado ya guardado.
+        # ------------------------------------------------------------------
+        if self.estado != estado_previo:
+            try:
+                from almacen.utils.notificar_respuesta_cotizacion import (
+                    notificar_cotizacion_aceptada,
+                    notificar_cotizacion_rechazada,
+                )
+                if self.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
+                    notificar_cotizacion_aceptada(self)
+                elif self.estado == 'totalmente_rechazada':
+                    notificar_cotizacion_rechazada(self)
+            except Exception as notif_err:
+                import logging
+                logging.getLogger('almacen').error(
+                    '[NOTIF-COTIZ] Error al notificar cierre de %s (%s): %s',
+                    self.numero_solicitud,
+                    self.estado,
+                    notif_err,
+                )
 
         return self.estado
     

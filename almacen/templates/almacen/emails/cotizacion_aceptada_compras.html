@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotización aceptada — {{ solicitud.numero_solicitud }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e8f5e9 50%, #66bb6a 100%);
+            color: #1b5e20;
+            padding: 30px;
+            text-align: center;
+        }
+        .logo-image {
+            max-width: 160px;
+            height: auto;
+            display: block;
+            margin: 0 auto 12px;
+        }
+        .logo { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .subtitle { font-size: 15px; opacity: 0.9; }
+        .badge {
+            display: inline-block;
+            background-color: #2e7d32;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+        .content { padding: 36px 28px; }
+        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
+        .intro-text { font-size: 15px; color: #555; margin-bottom: 22px; }
+        .alert-box {
+            background: #e8f5e9;
+            border-left: 4px solid #2e7d32;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .alert-title { font-size: 15px; font-weight: 700; color: #1b5e20; margin-bottom: 8px; }
+        .alert-text { font-size: 14px; color: #555; }
+        .equipment-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 22px 0;
+            border: 1px solid #e9ecef;
+        }
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #66bb6a;
+            padding-bottom: 8px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; color: #2e7d32; min-width: 140px; font-size: 14px; }
+        .info-value { color: #333; font-size: 14px; flex: 1; }
+        .info-value.highlight { font-weight: 700; color: #1b5e20; }
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 22px 0;
+            font-size: 14px;
+        }
+        .lineas-table thead { background-color: #43a047; color: white; }
+        .lineas-table th, .lineas-table td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .lineas-table th.text-center, .lineas-table td.text-center { text-align: center; }
+        .lineas-table th.text-end, .lineas-table td.text-end { text-align: right; }
+        .linea-descripcion { font-weight: 600; color: #2c3e50; }
+        .linea-notas { font-size: 12px; color: #6c757d; margin-top: 3px; }
+        .cta-box {
+            background: #fff8e1;
+            border-left: 4px solid #f9a825;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 22px 0;
+        }
+        .cta-title { font-size: 15px; font-weight: 700; color: #f57f17; margin-bottom: 8px; }
+        .btn-detalle {
+            display: inline-block;
+            margin-top: 14px;
+            background-color: #2e7d32;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .timestamp { font-size: 12px; opacity: 0.85; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            <div class="logo">COTIZACIÓN ACEPTADA</div>
+            <div class="subtitle">{{ solicitud.numero_solicitud }}</div>
+            {% if es_parcial %}
+            <div class="badge">ACEPTACIÓN PARCIAL</div>
+            {% else %}
+            <div class="badge">ACEPTACIÓN TOTAL</div>
+            {% endif %}
+        </div>
+
+        <div class="content">
+            <div class="greeting">Equipo de Compras,</div>
+            <div class="intro-text">
+                El cliente ha
+                {% if es_parcial %}
+                <strong>aceptado parcialmente</strong>
+                {% else %}
+                <strong>aceptado</strong>
+                {% endif %}
+                la cotización. A continuación las piezas y servicios aprobados
+                para que los solicites al proveedor.
+            </div>
+
+            <div class="alert-box">
+                <div class="alert-title">Siguiente paso</div>
+                <div class="alert-text">
+                    Pide las piezas al proveedor y, cuando ya las hayas solicitado,
+                    usa el botón <strong>«Generar compras»</strong> en el detalle
+                    de la solicitud para actualizar el estatus.
+                </div>
+            </div>
+
+            <div class="equipment-info">
+                <div class="info-title">Datos de la solicitud</div>
+                <div class="info-row">
+                    <div class="info-label">Cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.nombre_cliente|default:"-" }}</div>
+                </div>
+                {% if solicitud.numero_orden_cliente %}
+                <div class="info-row">
+                    <div class="info-label">Orden cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
+                </div>
+                {% endif %}
+                {% if solicitud.service_tag %}
+                <div class="info-row">
+                    <div class="info-label">Service Tag:</div>
+                    <div class="info-value">{{ solicitud.service_tag }}</div>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <div class="info-label">Estado:</div>
+                    <div class="info-value">{{ solicitud.get_estado_display }}</div>
+                </div>
+            </div>
+
+            {% if lineas_aprobadas %}
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Pieza aceptada</th>
+                        <th>Proveedor</th>
+                        <th class="text-center">Cant.</th>
+                        <th class="text-end">Precio cliente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in lineas_aprobadas %}
+                    <tr>
+                        <td>{{ linea.numero_linea }}</td>
+                        <td>
+                            <div class="linea-descripcion">{{ linea.descripcion_pieza }}</div>
+                            {% if linea.producto %}
+                            <div class="linea-notas">{{ linea.producto.nombre }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{% if linea.proveedor %}{{ linea.proveedor.nombre }}{% else %}—{% endif %}</td>
+                        <td class="text-center">{{ linea.cantidad }}</td>
+                        <td class="text-end">
+                            {% if linea.precio_unitario_cliente %}
+                                ${{ linea.precio_unitario_cliente|floatformat:2 }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if servicios_aprobados %}
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Servicio aceptado</th>
+                        <th class="text-end">Costo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servicio in servicios_aprobados %}
+                    <tr>
+                        <td>{{ servicio.numero_linea }}</td>
+                        <td class="linea-descripcion">{{ servicio.get_tipo_servicio_display }}</td>
+                        <td class="text-end">${{ servicio.costo|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if not lineas_aprobadas and not servicios_aprobados %}
+            <p class="intro-text">No se encontraron ítems aprobados en esta solicitud.</p>
+            {% endif %}
+
+            <div class="cta-box">
+                <div class="cta-title">Abrir solicitud en SIGMA</div>
+                <div class="alert-text">
+                    Desde el detalle puedes revisar precios, proveedores y generar las compras.
+                </div>
+                <a class="btn-detalle" href="{{ url_detalle }}">Ver detalle de la solicitud</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div>{{ empresa_nombre }} — {{ pais_nombre }}</div>
+            <div class="timestamp">Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}</div>
+        </div>
+    </div>
+</body>
+</html>

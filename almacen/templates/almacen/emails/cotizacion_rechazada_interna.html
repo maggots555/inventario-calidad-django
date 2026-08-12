@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotización rechazada — {{ solicitud.numero_solicitud }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #ffebee 50%, #ef5350 100%);
+            color: #b71c1c;
+            padding: 30px;
+            text-align: center;
+        }
+        .logo-image {
+            max-width: 160px;
+            height: auto;
+            display: block;
+            margin: 0 auto 12px;
+        }
+        .logo { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .subtitle { font-size: 15px; opacity: 0.9; }
+        .badge {
+            display: inline-block;
+            background-color: #c62828;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+        .content { padding: 36px 28px; }
+        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
+        .intro-text { font-size: 15px; color: #555; margin-bottom: 22px; }
+        .alert-box {
+            background: #ffebee;
+            border-left: 4px solid #c62828;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .alert-title { font-size: 15px; font-weight: 700; color: #b71c1c; margin-bottom: 8px; }
+        .alert-text { font-size: 14px; color: #555; white-space: pre-line; }
+        .equipment-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 22px 0;
+            border: 1px solid #e9ecef;
+        }
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #ef5350;
+            padding-bottom: 8px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; color: #c62828; min-width: 140px; font-size: 14px; }
+        .info-value { color: #333; font-size: 14px; flex: 1; }
+        .info-value.highlight { font-weight: 700; color: #b71c1c; }
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 22px 0;
+            font-size: 14px;
+        }
+        .lineas-table thead { background-color: #e53935; color: white; }
+        .lineas-table th, .lineas-table td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+        .linea-descripcion { font-weight: 600; color: #2c3e50; }
+        .linea-notas { font-size: 12px; color: #6c757d; margin-top: 3px; }
+        .motivo { font-size: 13px; color: #c62828; margin-top: 4px; }
+        .btn-detalle {
+            display: inline-block;
+            margin: 8px 8px 0 0;
+            background-color: #c62828;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .btn-orden {
+            background-color: #455a64;
+        }
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .timestamp { font-size: 12px; opacity: 0.85; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            <div class="logo">COTIZACIÓN RECHAZADA</div>
+            <div class="subtitle">{{ solicitud.numero_solicitud }}</div>
+            <div class="badge">NO GENERAR COMPRAS</div>
+        </div>
+
+        <div class="content">
+            <div class="greeting">Equipo involucrado,</div>
+            <div class="intro-text">
+                El cliente <strong>rechazó todas</strong> las piezas y/o servicios de esta
+                cotización. Este aviso llega a Compras
+                {% if orden %}, al técnico asignado y al responsable de seguimiento{% endif %}.
+            </div>
+
+            <div class="alert-box">
+                <div class="alert-title">Importante</div>
+                <div class="alert-text">
+                    No uses «Generar compras» sobre esta solicitud.
+                    La orden de servicio (si existe) debe reflejar el rechazo del cliente.
+                </div>
+            </div>
+
+            <div class="equipment-info">
+                <div class="info-title">Datos de la solicitud</div>
+                <div class="info-row">
+                    <div class="info-label">Cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.nombre_cliente|default:"-" }}</div>
+                </div>
+                {% if solicitud.numero_orden_cliente %}
+                <div class="info-row">
+                    <div class="info-label">Orden cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
+                </div>
+                {% endif %}
+                {% if solicitud.service_tag %}
+                <div class="info-row">
+                    <div class="info-label">Service Tag:</div>
+                    <div class="info-value">{{ solicitud.service_tag }}</div>
+                </div>
+                {% endif %}
+                {% if orden %}
+                <div class="info-row">
+                    <div class="info-label">Orden ST:</div>
+                    <div class="info-value">{{ orden.numero_orden_interno }}</div>
+                </div>
+                {% if orden.tecnico_asignado_actual %}
+                <div class="info-row">
+                    <div class="info-label">Técnico:</div>
+                    <div class="info-value">{{ orden.tecnico_asignado_actual.nombre_completo }}</div>
+                </div>
+                {% endif %}
+                {% if orden.responsable_seguimiento %}
+                <div class="info-row">
+                    <div class="info-label">Responsable:</div>
+                    <div class="info-value">{{ orden.responsable_seguimiento.nombre_completo }}</div>
+                </div>
+                {% endif %}
+                {% endif %}
+                {% if motivo_catalogo %}
+                <div class="info-row">
+                    <div class="info-label">Motivo catálogo:</div>
+                    <div class="info-value highlight">{{ motivo_catalogo }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if detalle_rechazo %}
+            <div class="alert-box">
+                <div class="alert-title">Detalle de rechazo</div>
+                <div class="alert-text">{{ detalle_rechazo }}</div>
+            </div>
+            {% elif detalle_items %}
+            <div class="alert-box">
+                <div class="alert-title">Motivos por ítem</div>
+                <div class="alert-text">{{ detalle_items }}</div>
+            </div>
+            {% endif %}
+
+            {% if lineas_rechazadas %}
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Pieza rechazada</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in lineas_rechazadas %}
+                    <tr>
+                        <td>{{ linea.numero_linea }}</td>
+                        <td>
+                            <div class="linea-descripcion">{{ linea.descripcion_pieza }}</div>
+                            {% if linea.producto %}
+                            <div class="linea-notas">{{ linea.producto.nombre }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if linea.motivo_rechazo %}
+                            <span class="motivo">{{ linea.motivo_rechazo }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if servicios_rechazados %}
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Servicio rechazado</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for servicio in servicios_rechazados %}
+                    <tr>
+                        <td>{{ servicio.numero_linea }}</td>
+                        <td class="linea-descripcion">{{ servicio.get_tipo_servicio_display }}</td>
+                        <td>
+                            {% if servicio.motivo_rechazo %}
+                            <span class="motivo">{{ servicio.motivo_rechazo }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <div style="margin-top: 18px;">
+                <a class="btn-detalle" href="{{ url_detalle }}">Ver solicitud en Almacén</a>
+                {% if url_orden %}
+                <a class="btn-detalle btn-orden" href="{{ url_orden }}">Ver orden en ST</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="footer">
+            <div>{{ empresa_nombre }} — {{ pais_nombre }}</div>
+            <div class="timestamp">Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}</div>
+        </div>
+    </div>
+</body>
+</html>

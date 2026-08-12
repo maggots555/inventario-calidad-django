@@ -493,6 +493,358 @@ def notificar_compras_nueva_cotizacion_task(
         return {'success': False, 'mensaje': f'Error: {str(e)}'}
 
 
+def _adjuntar_logo_e_iconos_email(email_msg, log_prefix: str) -> None:
+    """
+    Adjunta logo SIC e iconos sociales como CID (inline) a un EmailMessage.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Los correos HTML no pueden usar {% static %}; las imágenes van embebidas
+    con Content-ID (cid:logo_sic) para que el cliente de correo las muestre.
+
+    Args:
+        email_msg: EmailMessage ya creado.
+        log_prefix: Prefijo para mensajes de log (ej. '[COTIZ-ACEPTADA]').
+    """
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    try:
+        logo_path = finders.find('images/logos/logo_sic.png')
+        if logo_path:
+            with open(logo_path, 'rb') as f:
+                logo_mime = MIMEImage(f.read(), _subtype='png')
+                logo_mime.add_header('Content-ID', '<logo_sic>')
+                logo_mime.add_header(
+                    'Content-Disposition', 'inline', filename='logo_sic.png'
+                )
+                email_msg.attach(logo_mime)
+    except Exception as e:
+        logger.warning(f'{log_prefix} Error al adjuntar logo: {e}')
+
+    try:
+        iconos_sociales = {
+            'icon_link': 'images/utilitys/link.png',
+            'icon_instagram': 'images/utilitys/instagram.png',
+            'icon_facebook': 'images/utilitys/facebook.png',
+            'icon_whatsapp': 'images/utilitys/whatsapp.png',
+        }
+        for cid_name, icon_static_path in iconos_sociales.items():
+            icon_path = finders.find(icon_static_path)
+            if icon_path:
+                with open(icon_path, 'rb') as f:
+                    icon_mime = MIMEImage(f.read(), _subtype='png')
+                    icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                    icon_mime.add_header(
+                        'Content-Disposition',
+                        'inline',
+                        filename=f'{cid_name}.png',
+                    )
+                    email_msg.attach(icon_mime)
+    except Exception as e:
+        logger.warning(f'{log_prefix} Error al adjuntar iconos: {e}')
+
+
+def _remitente_sistema_compras() -> str:
+    """Remitente visible «Sistema de Compras <email>» desde DEFAULT_FROM_EMAIL."""
+    import re
+    from django.conf import settings
+
+    email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+    email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+    return f'Sistema de Compras <{email_solo}>'
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.notificar_compras_cotizacion_aceptada'
+)
+def notificar_compras_cotizacion_aceptada_task(
+    self,
+    solicitud_id,
+    db_alias='default',
+):
+    """
+    Email a Compras cuando el cliente acepta la cotización (total o parcial).
+
+    Objetivo de negocio:
+        Que Compras vea las piezas/servicios aceptados y pueda pedirlos al
+        proveedor antes de usar «Generar compras».
+
+    Args:
+        solicitud_id: PK de SolicitudCotizacion.
+        db_alias: Alias de BD del país (Celery multi-tenant).
+
+    Efectos secundarios:
+        Envía un correo HTML a empleados rol=compras con email configurado.
+    """
+    from django.conf import settings
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from .models import SolicitudCotizacion
+    from inventario.models import Empleado
+    from config.paises_config import get_pais_actual, fecha_local_pais
+    from .utils.cotizacion_email_context import identificador_asunto_solicitud
+
+    log_prefix = '[COTIZ-ACEPTADA]'
+    logger.info(f'{log_prefix} Iniciando email aceptación Solicitud ID {solicitud_id}')
+
+    try:
+        try:
+            solicitud = SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'creado_por',
+            ).prefetch_related(
+                'lineas__producto',
+                'lineas__proveedor',
+                'servicios_adicionales',
+            ).get(pk=solicitud_id)
+        except SolicitudCotizacion.DoesNotExist:
+            logger.error(f'{log_prefix} Solicitud ID {solicitud_id} no encontrada.')
+            return {'success': False, 'mensaje': f'Solicitud ID {solicitud_id} no encontrada.'}
+
+        # Solo empleados Compras con correo válido
+        compradores = Empleado.objects.filter(
+            rol='compras',
+            user__is_active=True,
+            email__isnull=False,
+        ).exclude(email='').select_related('user')
+
+        destinatarios = list({emp.email for emp in compradores if emp.email})
+        if not destinatarios:
+            logger.info(f'{log_prefix} Sin destinatarios de email de Compras.')
+            return {'success': True, 'mensaje': 'Sin destinatarios válidos.'}
+
+        lineas_aprobadas = [
+            linea
+            for linea in solicitud.lineas.all()
+            if linea.estado_cliente in ('aprobada', 'compra_generada')
+        ]
+        servicios_aprobados = [
+            srv
+            for srv in solicitud.servicios_adicionales.all()
+            if srv.estado_cliente in ('aprobada', 'compra_generada')
+        ]
+
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        url_relativa = reverse(
+            'almacen:detalle_solicitud_cotizacion',
+            kwargs={'pk': solicitud.pk},
+        )
+        url_detalle = f"{settings.SITE_URL.rstrip('/')}{url_relativa}"
+
+        context = {
+            'solicitud': solicitud,
+            'lineas_aprobadas': lineas_aprobadas,
+            'servicios_aprobados': servicios_aprobados,
+            'es_parcial': solicitud.estado == 'parcialmente_aprobada',
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'url_detalle': url_detalle,
+        }
+
+        html_content = render_to_string(
+            'almacen/emails/cotizacion_aceptada_compras.html',
+            context,
+        )
+
+        identificador = identificador_asunto_solicitud(solicitud)
+        tipo = 'parcial' if context['es_parcial'] else 'total'
+        asunto = (
+            f'Cotización aceptada ({tipo}) — '
+            f'{solicitud.numero_solicitud} ({identificador})'
+        )
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=_remitente_sistema_compras(),
+            to=destinatarios,
+        )
+        email_msg.content_subtype = 'html'
+        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        email_msg.send(fail_silently=False)
+
+        logger.info(
+            f'{log_prefix} Correo enviado a {len(destinatarios)}: '
+            f'{", ".join(destinatarios)}'
+        )
+        return {
+            'success': True,
+            'mensaje': f'Correo aceptación enviado a {len(destinatarios)}',
+            'solicitud': solicitud.numero_solicitud,
+        }
+
+    except Exception as e:
+        logger.error(f'{log_prefix} Error en tarea: {e}')
+        logger.error(traceback.format_exc())
+        return {'success': False, 'mensaje': f'Error: {str(e)}'}
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.notificar_respuesta_cotizacion_rechazada'
+)
+def notificar_respuesta_cotizacion_rechazada_task(
+    self,
+    solicitud_id,
+    db_alias='default',
+):
+    """
+    Email a Compras + técnico + responsable cuando la cotización se rechaza.
+
+    Objetivo de negocio:
+        Informar que no deben generar compras y que el cliente rechazó todo.
+
+    Args:
+        solicitud_id: PK de SolicitudCotizacion.
+        db_alias: Alias de BD del país (Celery multi-tenant).
+
+    Efectos secundarios:
+        Envía un correo HTML a destinatarios con email (deduplicados).
+    """
+    from django.conf import settings
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from .models import SolicitudCotizacion
+    from config.paises_config import get_pais_actual, fecha_local_pais
+    from .utils.cotizacion_email_context import identificador_asunto_solicitud
+    from .utils.notificar_respuesta_cotizacion import obtener_destinatarios_rechazo
+    from .utils.sincronizar_rechazo_cotizacion_st import (
+        armar_detalle_rechazo_desde_items,
+        label_motivo_rechazo,
+    )
+
+    log_prefix = '[COTIZ-RECHAZADA]'
+    logger.info(f'{log_prefix} Iniciando email rechazo Solicitud ID {solicitud_id}')
+
+    try:
+        try:
+            solicitud = SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'orden_servicio__tecnico_asignado_actual',
+                'orden_servicio__tecnico_asignado_actual__user',
+                'orden_servicio__responsable_seguimiento',
+                'orden_servicio__responsable_seguimiento__user',
+                'creado_por',
+            ).prefetch_related(
+                'lineas__producto',
+                'lineas__proveedor',
+                'servicios_adicionales',
+            ).get(pk=solicitud_id)
+        except SolicitudCotizacion.DoesNotExist:
+            logger.error(f'{log_prefix} Solicitud ID {solicitud_id} no encontrada.')
+            return {'success': False, 'mensaje': f'Solicitud ID {solicitud_id} no encontrada.'}
+
+        destinatarios_emp = obtener_destinatarios_rechazo(solicitud)
+        emails = list({
+            (emp.email or '').strip()
+            for emp in destinatarios_emp
+            if (emp.email or '').strip()
+        })
+        if not emails:
+            logger.info(f'{log_prefix} Sin destinatarios de email válidos.')
+            return {'success': True, 'mensaje': 'Sin destinatarios válidos.'}
+
+        lineas_rechazadas = [
+            linea
+            for linea in solicitud.lineas.all()
+            if linea.estado_cliente == 'rechazada'
+        ]
+        servicios_rechazados = [
+            srv
+            for srv in solicitud.servicios_adicionales.all()
+            if srv.estado_cliente == 'rechazada'
+        ]
+
+        motivo_catalogo = ''
+        if solicitud.motivo_rechazo:
+            motivo_catalogo = label_motivo_rechazo(solicitud.motivo_rechazo)
+        detalle_items = armar_detalle_rechazo_desde_items(solicitud)
+
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        url_relativa = reverse(
+            'almacen:detalle_solicitud_cotizacion',
+            kwargs={'pk': solicitud.pk},
+        )
+        url_detalle = f"{settings.SITE_URL.rstrip('/')}{url_relativa}"
+
+        url_orden = ''
+        orden = solicitud.orden_servicio
+        if orden is not None:
+            try:
+                url_orden = (
+                    f"{settings.SITE_URL.rstrip('/')}"
+                    f"{reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': orden.pk})}"
+                )
+            except Exception:
+                url_orden = ''
+
+        context = {
+            'solicitud': solicitud,
+            'lineas_rechazadas': lineas_rechazadas,
+            'servicios_rechazados': servicios_rechazados,
+            'motivo_catalogo': motivo_catalogo,
+            'detalle_items': detalle_items,
+            'detalle_rechazo': (solicitud.detalle_rechazo or '').strip(),
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'url_detalle': url_detalle,
+            'url_orden': url_orden,
+            'orden': orden,
+        }
+
+        html_content = render_to_string(
+            'almacen/emails/cotizacion_rechazada_interna.html',
+            context,
+        )
+
+        identificador = identificador_asunto_solicitud(solicitud)
+        asunto = (
+            f'Cotización rechazada — '
+            f'{solicitud.numero_solicitud} ({identificador})'
+        )
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=_remitente_sistema_compras(),
+            to=emails,
+        )
+        email_msg.content_subtype = 'html'
+        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        email_msg.send(fail_silently=False)
+
+        logger.info(
+            f'{log_prefix} Correo enviado a {len(emails)}: {", ".join(emails)}'
+        )
+        return {
+            'success': True,
+            'mensaje': f'Correo rechazo enviado a {len(emails)}',
+            'solicitud': solicitud.numero_solicitud,
+        }
+
+    except Exception as e:
+        logger.error(f'{log_prefix} Error en tarea: {e}')
+        logger.error(traceback.format_exc())
+        return {'success': False, 'mensaje': f'Error: {str(e)}'}
+
+
 # =============================================================================
 # TAREA: ENVIAR COTIZACIÓN DIRECTAMENTE AL CLIENTE FINAL CON PDF ADJUNTO
 # =============================================================================
