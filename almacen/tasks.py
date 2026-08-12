@@ -657,10 +657,8 @@ def notificar_compras_cotizacion_aceptada_task(
 
         identificador = identificador_asunto_solicitud(solicitud)
         tipo = 'parcial' if context['es_parcial'] else 'total'
-        asunto = (
-            f'Cotización aceptada ({tipo}) — '
-            f'{solicitud.numero_solicitud} ({identificador})'
-        )
+        # EXPLICACIÓN: emoji + identificador (orden_cliente / S/T / SOL), estilo Front/PNC
+        asunto = f'✅ Cotización aceptada ({tipo}) — {identificador}'
 
         email_msg = EmailMessage(
             subject=asunto,
@@ -815,10 +813,8 @@ def notificar_respuesta_cotizacion_rechazada_task(
         )
 
         identificador = identificador_asunto_solicitud(solicitud)
-        asunto = (
-            f'Cotización rechazada — '
-            f'{solicitud.numero_solicitud} ({identificador})'
-        )
+        # EXPLICACIÓN: emoji + identificador (orden_cliente / S/T / SOL), estilo Front/PNC
+        asunto = f'❌ Cotización rechazada — {identificador}'
 
         email_msg = EmailMessage(
             subject=asunto,
