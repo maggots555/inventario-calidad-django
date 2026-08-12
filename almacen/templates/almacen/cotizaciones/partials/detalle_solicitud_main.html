@@ -444,11 +444,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                 </div>
                                             </td>
                                             <td>
+                                                {# EXPLICACIÓN PARA PRINCIPIANTES: aquí solo el badge de estado; el enlace a la compra va en Acciones #}
                                                 <span class="badge bg-{{ linea.get_badge_estado }} badge-compact">
                                                     <i class="bi bi-{{ linea.get_estado_icon }}"></i> {{ linea.get_estado_cliente_display }}
                                                 </span>
                                                 {% if linea.motivo_rechazo %}<br><small class="text-danger" title="{{ linea.motivo_rechazo }}"><i class="bi bi-info-circle"></i></small>{% endif %}
-                                                {% if linea.compra_generada %}<br><a href="{% url 'almacen:detalle_compra' linea.compra_generada.pk %}" class="small"><i class="bi bi-cart"></i> #{{ linea.compra_generada.pk }}</a>{% endif %}
                                             </td>
                                             <td class="text-center col-acciones">
                                                 <div class="d-flex justify-content-center gap-1 flex-wrap">
@@ -461,6 +461,14 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                         <i class="bi bi-images"></i>
                                                     </button>
                                                     {% endwith %}
+                                                    {# Botón visible para abrir el detalle de la CompraProducto vinculada a esta línea #}
+                                                    {% if linea.compra_generada %}
+                                                    <a href="{% url 'almacen:detalle_compra' linea.compra_generada.pk %}"
+                                                       class="btn btn-sm btn-outline-primary"
+                                                       title="Ver compra #{{ linea.compra_generada.pk }}">
+                                                        <i class="bi bi-cart"></i>
+                                                    </a>
+                                                    {% endif %}
                                                     {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
                                                     {% if permite_aprobar_lineas %}
                                                     {% if linea.es_linea_reacondicionado and solicitud.resultado_costeo_reac %}
@@ -543,6 +551,14 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                         <i class="bi bi-images"></i> {{ imagenes_count }}
                                     </button>
                                     {% endwith %}
+                                    {# Mismo acceso a compra que en escritorio: visible en el footer de la tarjeta #}
+                                    {% if linea.compra_generada %}
+                                    <a href="{% url 'almacen:detalle_compra' linea.compra_generada.pk %}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Ver compra #{{ linea.compra_generada.pk }}">
+                                        <i class="bi bi-cart"></i> #{{ linea.compra_generada.pk }}
+                                    </a>
+                                    {% endif %}
                                     <div class="linea-card-acciones">
                                         {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
                                         {% if permite_aprobar_lineas %}
