@@ -26,11 +26,16 @@ from almacen.tests.helpers_integracion_cotizacion import (
 )
 from almacen.utils.notificar_solicitud_baja import (
     armar_destinatarios_email,
+    armar_destinatarios_email_procesada,
     construir_mensaje_notificacion,
+    construir_mensaje_procesada,
+    construir_titulo_procesada,
     notificar_nueva_solicitud_baja,
+    notificar_solicitud_baja_procesada,
+    url_relativa_lista_solicitudes,
     url_relativa_procesar_solicitud,
 )
-from almacen.views import crear_solicitud
+from almacen.views import crear_solicitud, procesar_solicitud
 from inventario.models import Empleado
 
 User = get_user_model()
@@ -317,3 +322,149 @@ class NotificarSolicitudBajaTest(BaseIntegracionCotizacionMixin, TestCase):
             SolicitudBaja.objects.filter(producto=self.producto).exists()
         )
         mock_notificar.assert_called_once()
+
+
+    def _marcar_procesada(self, solicitud, *, aprobada: bool, notas: str) -> SolicitudBaja:
+        """
+        Simula el cierre sin pasar por aprobar() (no toca stock).
+
+        Args:
+            solicitud: SolicitudBaja pendiente.
+            aprobada: True = aprobada, False = rechazada.
+            notas: Texto del agente (motivo si rechaza).
+
+        Returns:
+            La misma solicitud recargada.
+        """
+        solicitud.estado = 'aprobada' if aprobada else 'rechazada'
+        solicitud.agente_almacen = self.empleado_almacen
+        solicitud.observaciones_agente = notas
+        solicitud.save()
+        solicitud.refresh_from_db()
+        return solicitud
+
+    def test_armar_procesada_to_solicitante_cc_compras(self) -> None:
+        """Al cerrar: To = quien pidió; CC = Compras."""
+        solicitud = self._marcar_procesada(
+            self._crear_solicitud_baja(),
+            aprobada=True,
+            notas='entregado',
+        )
+        emails_to, emails_cc = armar_destinatarios_email_procesada(solicitud)
+
+        self.assertEqual(emails_to, [self.empleado.email.lower()])
+        self.assertEqual(emails_cc, ['compras.notif.baja@test.local'])
+
+    def test_armar_procesada_solicitante_sin_email_encola_compras(self) -> None:
+        """Sin email del solicitante: To vacío; CC sigue siendo Compras."""
+        self.empleado.email = ''
+        self.empleado.save(update_fields=['email'])
+        solicitud = self._marcar_procesada(
+            self._crear_solicitud_baja(),
+            aprobada=True,
+            notas='ok',
+        )
+        emails_to, emails_cc = armar_destinatarios_email_procesada(solicitud)
+
+        self.assertEqual(emails_to, [])
+        self.assertEqual(emails_cc, ['compras.notif.baja@test.local'])
+
+    def test_mensaje_rechazo_incluye_motivo_del_agente(self) -> None:
+        """El texto de rechazo lleva el motivo y no dice aprobada."""
+        solicitud = self._marcar_procesada(
+            self._crear_solicitud_baja(),
+            aprobada=False,
+            notas='Sin existencia en sucursal',
+        )
+        titulo = construir_titulo_procesada(solicitud)
+        mensaje = construir_mensaje_procesada(solicitud)
+
+        self.assertIn('rechazada', titulo)
+        self.assertIn('fue rechazada', mensaje)
+        self.assertIn('Sin existencia en sucursal', mensaje)
+        self.assertIn(self.producto.codigo_producto, mensaje)
+
+    @patch('almacen.utils.notificar_solicitud_baja.enviar_push_y_campanita')
+    @patch(
+        'almacen.tasks_solicitud_baja.notificar_solicitud_baja_procesada_task.delay'
+    )
+    def test_notificar_procesada_push_solo_solicitante(
+        self,
+        mock_delay,
+        mock_push_campanita,
+    ) -> None:
+        """Push/campanita al solicitante; Celery se encola; URL = listado."""
+        solicitud = self._marcar_procesada(
+            self._crear_solicitud_baja(),
+            aprobada=True,
+            notas='entregado',
+        )
+        notificar_solicitud_baja_procesada(solicitud)
+
+        mock_push_campanita.assert_called_once()
+        empleados_notif = list(mock_push_campanita.call_args.args[0])
+        self.assertEqual(len(empleados_notif), 1)
+        self.assertEqual(empleados_notif[0].pk, self.empleado.pk)
+        self.assertEqual(
+            mock_push_campanita.call_args.kwargs['url'],
+            url_relativa_lista_solicitudes(),
+        )
+        mock_delay.assert_called_once()
+        self.assertEqual(mock_delay.call_args.args[0], solicitud.pk)
+
+    @patch('almacen.utils.notificar_solicitud_baja.enviar_push_y_campanita')
+    @patch(
+        'almacen.tasks_solicitud_baja.notificar_solicitud_baja_procesada_task.delay'
+    )
+    def test_sin_email_solicitante_igual_encola_si_hay_compras(
+        self,
+        mock_delay,
+        mock_push_campanita,
+    ) -> None:
+        """Solicitante sin correo: el email a Compras igual se encola."""
+        self.empleado.email = ''
+        self.empleado.save(update_fields=['email'])
+        solicitud = self._marcar_procesada(
+            self._crear_solicitud_baja(),
+            aprobada=False,
+            notas='rechazo',
+        )
+        notificar_solicitud_baja_procesada(solicitud)
+
+        mock_push_campanita.assert_called_once()
+        mock_delay.assert_called_once()
+
+    @patch('almacen.utils.notificar_solicitud_baja.enviar_push_y_campanita')
+    @patch(
+        'almacen.tasks_solicitud_baja.notificar_solicitud_baja_procesada_task.delay'
+    )
+    def test_post_procesar_rechazo_dispara_notificacion(
+        self,
+        mock_delay,
+        mock_push_campanita,
+    ) -> None:
+        """POST rechazar: se cierra la baja y se avisa al solicitante."""
+        solicitud = self._crear_solicitud_baja()
+        url = reverse('almacen:procesar_solicitud', kwargs={'pk': solicitud.pk})
+        request = request_post(
+            self.factory,
+            self.user,
+            url,
+            data={
+                'accion': 'rechazar',
+                'observaciones': 'Sin stock en sucursal',
+            },
+        )
+        respuesta = procesar_solicitud(request, solicitud.pk)
+
+        self.assertEqual(respuesta.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'rechazada')
+        mock_push_campanita.assert_called_once()
+        empleados_notif = list(mock_push_campanita.call_args.args[0])
+        self.assertEqual(empleados_notif[0].pk, self.empleado.pk)
+        self.assertIn(
+            'Sin stock en sucursal',
+            mock_push_campanita.call_args.kwargs['mensaje'],
+        )
+        mock_delay.assert_called_once()

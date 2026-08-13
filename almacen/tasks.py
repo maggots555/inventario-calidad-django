@@ -1441,4 +1441,5 @@ def notificar_cliente_pnc_task(
 # registra la tarea de solicitud de baja sin hinchar este archivo.
 from almacen.tasks_solicitud_baja import (  # noqa: E402, F401
     notificar_almacenista_solicitud_baja_task,
+    notificar_solicitud_baja_procesada_task,
 )

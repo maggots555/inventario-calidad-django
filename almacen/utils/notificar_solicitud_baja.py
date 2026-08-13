@@ -14,6 +14,10 @@ Canales (mismo patrón que cotizaciones):
    - Para (To): almacenistas
    - Copia (CC): Compras + el solicitante
 
+Al procesar (aprobar/rechazar):
+1. Push + campanita — solo quien levantó la solicitud
+2. Email To = solicitante; CC = Compras
+
 Si el aviso falla, la solicitud YA quedó guardada. Nunca se revierte.
 """
 
@@ -293,6 +297,201 @@ def _notificar_nueva_solicitud_baja_interno(solicitud: 'SolicitudBaja') -> None:
     )
     logger.info(
         '[NOTIF-BAJA] Solicitud #%s: email encolado (To=%s, CC=%s)',
+        solicitud.pk,
+        len(emails_to),
+        len(emails_cc),
+    )
+
+
+def armar_destinatarios_email_procesada(
+    solicitud: 'SolicitudBaja',
+) -> Tuple[List[str], List[str]]:
+    """
+    To = quien levantó la baja; CC = Compras, sin repetir direcciones.
+
+    EXPLICACIÓN: si el solicitante también es de Compras, su email va
+    solo en To. No se notifica al almacenista que acaba de procesar.
+
+    Args:
+        solicitud: SolicitudBaja ya aprobada o rechazada.
+
+    Returns:
+        tuple: (emails_to, emails_cc) ya normalizados.
+    """
+    emails_to: List[str] = []
+    vistos_to: set[str] = set()
+
+    email_solicitante = _normalizar_email(
+        getattr(solicitud, 'solicitante', None)
+    )
+    if email_solicitante:
+        vistos_to.add(email_solicitante)
+        emails_to.append(email_solicitante)
+
+    emails_cc: List[str] = []
+    vistos_cc: set[str] = set()
+    for comprador in obtener_empleados_compras():
+        email = _normalizar_email(comprador)
+        if not email or email in vistos_to or email in vistos_cc:
+            continue
+        vistos_cc.add(email)
+        emails_cc.append(email)
+
+    return emails_to, emails_cc
+
+
+def url_relativa_lista_solicitudes() -> str:
+    """Ruta relativa al listado de solicitudes de baja (ya procesada)."""
+    return reverse('almacen:lista_solicitudes')
+
+
+def url_absoluta_lista_solicitudes() -> str:
+    """
+    URL absoluta al listado, lista para un href de correo.
+
+    Returns:
+        str: Enlace con subdominio del país (o localhost si DEBUG).
+    """
+    from almacen.utils.cotizacion_email_context import url_base_pais_email
+
+    return f'{url_base_pais_email()}{url_relativa_lista_solicitudes()}'
+
+
+def _es_aprobada(solicitud: 'SolicitudBaja') -> bool:
+    """True si la solicitud quedó aprobada (no rechazada)."""
+    return solicitud.estado == 'aprobada'
+
+
+def construir_titulo_procesada(solicitud: 'SolicitudBaja') -> str:
+    """
+    Título corto de push/campanita al cerrar la baja.
+
+    Args:
+        solicitud: SolicitudBaja ya procesada.
+
+    Returns:
+        str: Ej. 'Solicitud de baja #12 aprobada'
+    """
+    verbo = 'aprobada' if _es_aprobada(solicitud) else 'rechazada'
+    return f'Solicitud de baja #{solicitud.pk} {verbo}'
+
+
+def construir_mensaje_procesada(solicitud: 'SolicitudBaja') -> str:
+    """
+    Cuerpo de push/campanita: resultado, producto, orden y notas del agente.
+
+    Args:
+        solicitud: SolicitudBaja con producto, orden y observaciones_agente.
+
+    Returns:
+        str: Un párrafo corto.
+    """
+    producto = getattr(solicitud, 'producto', None)
+    codigo = getattr(producto, 'codigo_producto', None) or 'N/A'
+    nombre = getattr(producto, 'nombre', None) or 'Producto'
+    agente = getattr(solicitud, 'agente_almacen', None)
+    nombre_agente = getattr(agente, 'nombre_completo', None) or 'Almacén'
+    notas = (solicitud.observaciones_agente or '').strip()
+    if len(notas) > _MAX_MOTIVO_PUSH:
+        notas = notas[: _MAX_MOTIVO_PUSH - 3] + '...'
+
+    if _es_aprobada(solicitud):
+        resultado = 'fue aprobada'
+    else:
+        resultado = 'fue rechazada'
+
+    partes = [
+        f'Tu solicitud de baja de {codigo} — {nombre} {resultado}.',
+        f'Cantidad: {solicitud.cantidad}.',
+        f'Orden: {resumen_orden_vinculada(solicitud)}.',
+        f'Procesó: {nombre_agente}.',
+    ]
+    if notas:
+        etiqueta = 'Motivo' if not _es_aprobada(solicitud) else 'Notas'
+        partes.append(f'{etiqueta}: {notas}')
+    return ' '.join(partes)
+
+
+def notificar_solicitud_baja_procesada(solicitud: 'SolicitudBaja') -> None:
+    """
+    Avisa al solicitante (push/campanita) y encola el correo To/CC.
+
+    Efectos secundarios:
+        - Push + campanita a quien levantó la solicitud (si tiene usuario)
+        - Encola email Celery (To solicitante, CC Compras)
+        - No lanza excepciones al llamador (el procesado ya está guardado)
+
+    Args:
+        solicitud: SolicitudBaja ya aprobada o rechazada.
+    """
+    try:
+        _notificar_solicitud_baja_procesada_interno(solicitud)
+    except Exception:
+        logger.exception(
+            '[NOTIF-BAJA] Error al notificar procesamiento #%s; el estado ya quedó',
+            solicitud.pk,
+        )
+
+
+def _notificar_solicitud_baja_procesada_interno(
+    solicitud: 'SolicitudBaja',
+) -> None:
+    """
+    Cuerpo del aviso al procesar. Separado para loguear el fallo global.
+
+    Args:
+        solicitud: SolicitudBaja ya aprobada o rechazada.
+    """
+    from config.paises_config import get_pais_actual
+    from almacen.tasks_solicitud_baja import (
+        notificar_solicitud_baja_procesada_task,
+    )
+
+    titulo = construir_titulo_procesada(solicitud)
+    mensaje = construir_mensaje_procesada(solicitud)
+    url = url_relativa_lista_solicitudes()
+
+    # Push/campanita solo a quien pidió (no a Compras ni al que procesó).
+    solicitante = getattr(solicitud, 'solicitante', None)
+    user_solicitante = getattr(solicitante, 'user', None) if solicitante else None
+    if solicitante is not None and user_solicitante is not None:
+        if user_solicitante.is_active:
+            enviar_push_y_campanita(
+                [solicitante],
+                titulo=titulo,
+                mensaje=mensaje,
+                url=url,
+            )
+            logger.info(
+                '[NOTIF-BAJA] Solicitud #%s procesada: push/campanita al solicitante',
+                solicitud.pk,
+            )
+        else:
+            logger.info(
+                '[NOTIF-BAJA] Solicitud #%s: solicitante sin usuario activo; sin push',
+                solicitud.pk,
+            )
+    else:
+        logger.info(
+            '[NOTIF-BAJA] Solicitud #%s: sin solicitante/usuario; sin push',
+            solicitud.pk,
+        )
+
+    emails_to, emails_cc = armar_destinatarios_email_procesada(solicitud)
+    if not emails_to and not emails_cc:
+        logger.info(
+            '[NOTIF-BAJA] Solicitud #%s procesada: nadie tiene email; no se encola',
+            solicitud.pk,
+        )
+        return
+
+    db_alias = get_pais_actual()['db_alias']
+    notificar_solicitud_baja_procesada_task.delay(
+        solicitud.pk,
+        db_alias=db_alias,
+    )
+    logger.info(
+        '[NOTIF-BAJA] Solicitud #%s procesada: email encolado (To=%s, CC=%s)',
         solicitud.pk,
         len(emails_to),
         len(emails_cc),

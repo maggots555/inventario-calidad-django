@@ -726,6 +726,7 @@ def procesar_solicitud(request, pk):
         - Aprobar: descuenta stock (SolicitudBaja.aprobar) y, si hay orden
           OOW-/FL-, registra la pieza en Venta Mostrador (util paralelo a cotización).
         - Rechazar: solo cambia estado; no toca stock ni ST.
+        - Aviso al solicitante (push/campanita) y correo To/CC a Compras.
     """
     solicitud = get_object_or_404(
         SolicitudBaja.objects.select_related(
@@ -772,6 +773,19 @@ def procesar_solicitud(request, pk):
             else:
                 solicitud.rechazar(agente, observaciones)
                 messages.warning(request, f'Solicitud #{solicitud.pk} rechazada.')
+
+            # EXPLICACIÓN: To = quien pidió; CC = Compras. El enlace va
+            # al listado (procesar ya no aplica: deja de estar pendiente).
+            try:
+                from almacen.utils.notificar_solicitud_baja import (
+                    notificar_solicitud_baja_procesada,
+                )
+                notificar_solicitud_baja_procesada(solicitud)
+            except Exception:
+                logger.exception(
+                    '[NOTIF-BAJA] Error al notificar procesamiento #%s',
+                    solicitud.pk,
+                )
             
             return redirect('almacen:lista_solicitudes')
     else:

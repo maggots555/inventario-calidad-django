@@ -15,6 +15,7 @@ OOW- o FL- debe aparecer una pieza en Venta Mostrador, pero:
 """
 
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -324,7 +325,10 @@ class SolicitudBajaVentaMostradorTest(BaseIntegracionCotizacionMixin, TestCase):
             1,
         )
 
-    def test_vista_aprobar_registra_pieza_vm(self) -> None:
+    @patch(
+        'almacen.utils.notificar_solicitud_baja.notificar_solicitud_baja_procesada'
+    )
+    def test_vista_aprobar_registra_pieza_vm(self, _mock_notificar) -> None:
         """
         El gancho HTTP de procesar_solicitud crea la pieza al aprobar.
         """

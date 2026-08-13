@@ -188,3 +188,210 @@ def notificar_almacenista_solicitud_baja_task(
                     f'Error tras {self.max_retries} reintentos: {str(e)}'
                 ),
             }
+
+
+def _cargar_solicitud_baja_para_email(solicitud_id, log_prefix: str):
+    """
+    Recupera la SolicitudBaja con FKs de producto, orden y agentes.
+
+    Args:
+        solicitud_id: PK de SolicitudBaja.
+        log_prefix: Prefijo de log si no existe.
+
+    Returns:
+        SolicitudBaja o None si no está en la BD.
+    """
+    from almacen.models import SolicitudBaja
+
+    try:
+        return SolicitudBaja.objects.select_related(
+            'producto',
+            'solicitante',
+            'tecnico_asignado',
+            'agente_almacen',
+            'orden_servicio',
+            'orden_servicio__detalle_equipo',
+            'sucursal_destino',
+        ).get(pk=solicitud_id)
+    except SolicitudBaja.DoesNotExist:
+        logger.error(
+            '%s SolicitudBaja ID %s no encontrada.',
+            log_prefix,
+            solicitud_id,
+        )
+        return None
+
+
+def _folios_orden_solicitud(solicitud):
+    """
+    Folio interno y folio cliente de la orden vinculada.
+
+    Args:
+        solicitud: SolicitudBaja (puede no tener orden).
+
+    Returns:
+        tuple: (folio_interno, folio_cliente, tiene_orden)
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is None:
+        return '', '', False
+    folio_interno = orden.numero_orden_interno or f'#{orden.pk}'
+    detalle = getattr(orden, 'detalle_equipo', None)
+    folio_cliente = ''
+    if detalle is not None:
+        folio_cliente = (detalle.orden_cliente or '').strip()
+    return folio_interno, folio_cliente, True
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.notificar_solicitud_baja_procesada',
+)
+def notificar_solicitud_baja_procesada_task(
+    self,
+    solicitud_id,
+    db_alias='default',
+):
+    """
+    Email al solicitante (To) y Compras (CC) al aprobar o rechazar.
+
+    Args:
+        solicitud_id: PK de SolicitudBaja ya procesada.
+        db_alias: Alias de BD del país (Celery multi-tenant).
+
+    Efectos secundarios:
+        Un correo HTML. No crea push ni campanita.
+
+    Returns:
+        dict: success y mensaje para logs de Celery.
+    """
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+
+    from almacen.tasks import (
+        _adjuntar_logo_e_iconos_email,
+        _remitente_sistema_compras,
+    )
+    from almacen.utils.notificar_solicitud_baja import (
+        armar_destinatarios_email_procesada,
+        url_absoluta_lista_solicitudes,
+    )
+    from config.paises_config import fecha_local_pais, get_pais_actual
+
+    log_prefix = '[NOTIF-BAJA-PROC-EMAIL]'
+    logger.info(
+        '%s Iniciando email procesada SolicitudBaja ID %s',
+        log_prefix,
+        solicitud_id,
+    )
+
+    try:
+        solicitud = _cargar_solicitud_baja_para_email(solicitud_id, log_prefix)
+        if solicitud is None:
+            return {
+                'success': False,
+                'mensaje': f'SolicitudBaja ID {solicitud_id} no encontrada.',
+            }
+
+        emails_to, emails_cc = armar_destinatarios_email_procesada(solicitud)
+        # EXPLICACIÓN: sin To (solicitante sin email) el SMTP falla;
+        # mandamos a CC (Compras) como destinatario principal.
+        if not emails_to and emails_cc:
+            logger.info(
+                '%s Sin To del solicitante; CC pasa a To para que salga el correo',
+                log_prefix,
+            )
+            emails_to = emails_cc
+            emails_cc = []
+
+        if not emails_to:
+            logger.info('%s Sin destinatarios de email válidos.', log_prefix)
+            return {'success': True, 'mensaje': 'Sin destinatarios válidos.'}
+
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        folio_interno, folio_cliente, tiene_orden = _folios_orden_solicitud(
+            solicitud
+        )
+        es_aprobada = solicitud.estado == 'aprobada'
+        agente = getattr(solicitud, 'agente_almacen', None)
+        nombre_agente = (
+            getattr(agente, 'nombre_completo', None) or 'Almacén'
+        )
+        solicitante = getattr(solicitud, 'solicitante', None)
+        nombre_solicitante = (
+            getattr(solicitante, 'nombre_completo', None) or 'No indicado'
+        )
+
+        context = {
+            'solicitud': solicitud,
+            'es_aprobada': es_aprobada,
+            'nombre_solicitante': nombre_solicitante,
+            'nombre_agente': nombre_agente,
+            'folio_interno': folio_interno,
+            'folio_cliente': folio_cliente,
+            'tiene_orden': tiene_orden,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'url_lista': url_absoluta_lista_solicitudes(),
+        }
+
+        html_content = render_to_string(
+            'almacen/emails/solicitud_baja_procesada.html',
+            context,
+        )
+
+        identificador = folio_cliente or folio_interno or f'#{solicitud.pk}'
+        if es_aprobada:
+            asunto = (
+                f'✅ Solicitud de baja #{solicitud.pk} aprobada — {identificador}'
+            )
+        else:
+            asunto = (
+                f'❌ Solicitud de baja #{solicitud.pk} rechazada — {identificador}'
+            )
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=_remitente_sistema_compras(),
+            to=emails_to,
+            cc=emails_cc,
+        )
+        email_msg.content_subtype = 'html'
+        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        email_msg.send(fail_silently=False)
+
+        logger.info(
+            '%s Correo enviado To=%s CC=%s solicitud #%s estado=%s',
+            log_prefix,
+            len(emails_to),
+            len(emails_cc),
+            solicitud.pk,
+            solicitud.estado,
+        )
+        return {
+            'success': True,
+            'mensaje': (
+                f'Correo enviado To={len(emails_to)} CC={len(emails_cc)}'
+            ),
+            'solicitud_id': solicitud.pk,
+        }
+
+    except Exception as e:
+        logger.error('%s Error en tarea: %s', log_prefix, e)
+        logger.error(traceback.format_exc())
+        try:
+            raise self.retry(exc=e)
+        except self.MaxRetriesExceededError:
+            return {
+                'success': False,
+                'mensaje': (
+                    f'Error tras {self.max_retries} reintentos: {str(e)}'
+                ),
+            }

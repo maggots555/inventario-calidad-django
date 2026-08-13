@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if es_aprobada %}Solicitud de baja aprobada{% else %}Solicitud de baja rechazada{% endif %}
+        — #{{ solicitud.pk }}
+    </title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .header {
+            padding: 30px;
+            text-align: center;
+        }
+        .header.ok {
+            background: linear-gradient(180deg, #ffffff 0%, #e8f5e9 50%, #66bb6a 100%);
+            color: #1b5e20;
+        }
+        .header.ko {
+            background: linear-gradient(180deg, #ffffff 0%, #ffebee 50%, #ef5350 100%);
+            color: #b71c1c;
+        }
+        .logo-image {
+            max-width: 160px;
+            height: auto;
+            display: block;
+            margin: 0 auto 12px;
+        }
+        .logo { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .subtitle { font-size: 15px; opacity: 0.9; }
+        .badge {
+            display: inline-block;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+        .badge.ok { background-color: #2e7d32; }
+        .badge.ko { background-color: #c62828; }
+        .content { padding: 36px 28px; }
+        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
+        .intro-text { font-size: 15px; color: #555; margin-bottom: 22px; }
+        .alert-box {
+            border-radius: 8px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .alert-box.ok {
+            background: #e8f5e9;
+            border-left: 4px solid #2e7d32;
+        }
+        .alert-box.ko {
+            background: #ffebee;
+            border-left: 4px solid #c62828;
+        }
+        .alert-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+        .alert-box.ok .alert-title { color: #1b5e20; }
+        .alert-box.ko .alert-title { color: #b71c1c; }
+        .alert-text { font-size: 14px; color: #555; }
+        .equipment-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 22px 0;
+            border: 1px solid #e9ecef;
+        }
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+        }
+        .info-title.ok { border-bottom: 2px solid #66bb6a; }
+        .info-title.ko { border-bottom: 2px solid #ef5350; }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; min-width: 160px; font-size: 14px; }
+        .ok .info-label { color: #2e7d32; }
+        .ko .info-label { color: #c62828; }
+        .info-value { color: #333; font-size: 14px; flex: 1; }
+        .info-value.highlight { font-weight: 700; }
+        .ok .info-value.highlight { color: #1b5e20; }
+        .ko .info-value.highlight { color: #b71c1c; }
+        .cta-box {
+            border-radius: 8px;
+            padding: 18px;
+            margin: 22px 0;
+        }
+        .cta-box.ok {
+            background: #e8f5e9;
+            border-left: 4px solid #2e7d32;
+        }
+        .cta-box.ko {
+            background: #ffebee;
+            border-left: 4px solid #c62828;
+        }
+        .cta-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+        .cta-box.ok .cta-title { color: #1b5e20; }
+        .cta-box.ko .cta-title { color: #b71c1c; }
+        .btn-detalle {
+            display: inline-block;
+            margin-top: 14px;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .btn-detalle.ok { background-color: #2e7d32; }
+        .btn-detalle.ko { background-color: #c62828; }
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .signature-name { font-size: 18px; font-weight: 700; margin-bottom: 5px; }
+        .signature-role { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .signature-area { font-size: 14px; opacity: 0.85; }
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .timestamp { font-size: 12px; opacity: 0.8; margin-top: 15px; }
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        .social-title { font-size: 14px; margin-bottom: 12px; opacity: 0.9; }
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header {% if es_aprobada %}ok{% else %}ko{% endif %}">
+            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            {% if es_aprobada %}
+            <div class="logo">✅ SOLICITUD DE BAJA APROBADA</div>
+            <div class="subtitle">Solicitud #{{ solicitud.pk }}</div>
+            <div class="badge ok">APROBADA</div>
+            {% else %}
+            <div class="logo">❌ SOLICITUD DE BAJA RECHAZADA</div>
+            <div class="subtitle">Solicitud #{{ solicitud.pk }}</div>
+            <div class="badge ko">RECHAZADA</div>
+            {% endif %}
+        </div>
+
+        <div class="content {% if es_aprobada %}ok{% else %}ko{% endif %}">
+            <div class="greeting">Hola {{ nombre_solicitante }},</div>
+            <div class="intro-text">
+                {% if es_aprobada %}
+                Tu solicitud de baja fue <strong>aprobada</strong>. El producto
+                ya salió de inventario (o se marcó para transferencia).
+                {% else %}
+                Tu solicitud de baja fue <strong>rechazada</strong>. Revisa el
+                motivo del agente de almacén más abajo.
+                {% endif %}
+            </div>
+
+            <div class="alert-box {% if es_aprobada %}ok{% else %}ko{% endif %}">
+                {% if es_aprobada %}
+                <div class="alert-title">✅ Resultado</div>
+                <div class="alert-text">
+                    El stock quedó actualizado. Puedes consultar el listado
+                    de solicitudes en SIGMA.
+                </div>
+                {% else %}
+                <div class="alert-title">❌ Resultado</div>
+                <div class="alert-text">
+                    No se descontó stock. Si el producto sigue haciendo falta,
+                    levanta una nueva solicitud o habla con Almacén.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="equipment-info">
+                <div class="info-title {% if es_aprobada %}ok{% else %}ko{% endif %}">
+                    📋 Datos de la solicitud
+                </div>
+                <div class="info-row">
+                    <div class="info-label">📦 Producto:</div>
+                    <div class="info-value highlight">
+                        {{ solicitud.producto.codigo_producto }} — {{ solicitud.producto.nombre }}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">🔢 Cantidad:</div>
+                    <div class="info-value highlight">{{ solicitud.cantidad }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">🏷️ Tipo:</div>
+                    <div class="info-value">{{ solicitud.get_tipo_solicitud_display }}</div>
+                </div>
+                {% if tiene_orden %}
+                <div class="info-row">
+                    <div class="info-label">🔗 Orden interna:</div>
+                    <div class="info-value highlight">{{ folio_interno }}</div>
+                </div>
+                {% if folio_cliente %}
+                <div class="info-row">
+                    <div class="info-label">🧾 Orden cliente:</div>
+                    <div class="info-value highlight">{{ folio_cliente }}</div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="info-row">
+                    <div class="info-label">🔗 Orden vinculada:</div>
+                    <div class="info-value">Sin orden vinculada</div>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <div class="info-label">👤 Procesó:</div>
+                    <div class="info-value">{{ nombre_agente }}</div>
+                </div>
+                {% if solicitud.observaciones_agente %}
+                <div class="info-row">
+                    <div class="info-label">
+                        {% if es_aprobada %}📝 Notas:{% else %}📝 Motivo:{% endif %}
+                    </div>
+                    <div class="info-value highlight">{{ solicitud.observaciones_agente }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="cta-box {% if es_aprobada %}ok{% else %}ko{% endif %}">
+                <div class="cta-title">📌 Ver solicitudes</div>
+                <div class="alert-text">
+                    Este enlace abre el listado de solicitudes de baja en SIGMA.
+                </div>
+                <a class="btn-detalle {% if es_aprobada %}ok{% else %}ko{% endif %}" href="{{ url_lista }}">
+                    ➡️ Ver solicitudes
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Almacén SIC
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para consultas, contacte al área de Almacén.
+                </div>
+            </div>
+
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
