@@ -282,6 +282,34 @@
             line-height: 1.6;
         }
 
+        .cta-box {
+            background: #fff8e1;
+            border-left: 4px solid #ff9800;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 22px 0;
+            text-align: center;
+        }
+
+        .cta-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #e65100;
+            margin-bottom: 8px;
+        }
+
+        .btn-detalle {
+            display: inline-block;
+            margin-top: 14px;
+            background-color: #e65100;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
         .footer {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: white;
@@ -539,6 +567,14 @@
                     <strong>3.</strong> Si el cliente acepta una alternativa, coordina con Almacén para una nueva cotización.<br>
                     <strong>4.</strong> No envíes al cliente una cotización de precios de estas piezas: no hay disponibilidad.
                 </div>
+            </div>
+
+            <div class="cta-box">
+                <div class="cta-title">Abrir solicitud en SIGMA</div>
+                <div class="help-text">
+                    Desde el detalle puedes coordinar alternativas con el cliente y notificar PNC.
+                </div>
+                <a class="btn-detalle" href="{{ url_detalle }}">Abrir solicitud en SIGMA</a>
             </div>
 
             <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">

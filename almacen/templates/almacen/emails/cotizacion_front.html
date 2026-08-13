@@ -301,6 +301,34 @@
             color: #856404;
             line-height: 1.6;
         }
+
+        .cta-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 22px 0;
+            text-align: center;
+        }
+
+        .cta-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1b5e20;
+            margin-bottom: 8px;
+        }
+
+        .btn-detalle {
+            display: inline-block;
+            margin-top: 14px;
+            background-color: #2e7d32;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
         
         .footer {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
@@ -589,6 +617,14 @@
                     Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir de la fecha de envío.
                     Después de ese lapso, los precios pueden variar y será necesario solicitar una recotización.
                 </div>
+            </div>
+            
+            <div class="cta-box">
+                <div class="cta-title">Abrir solicitud en SIGMA</div>
+                <div class="help-text">
+                    Al abrir la orden podrás añadir los servicios adicionales y compartir la cotización al cliente.
+                </div>
+                <a class="btn-detalle" href="{{ url_detalle }}">Abrir solicitud en SIGMA</a>
             </div>
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">

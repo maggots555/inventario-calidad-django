@@ -160,6 +160,7 @@ def notificar_front_cotizacion_task(
         # PASO 3: PREPARAR CONTEXTO Y RENDERIZAR HTML
         # ===================================================================
         from config.paises_config import get_pais_actual, fecha_local_pais
+        from .utils.cotizacion_email_context import url_absoluta_detalle_solicitud
 
         _pais_email = get_pais_actual()
 
@@ -205,6 +206,8 @@ def notificar_front_cotizacion_task(
             'whatsapp_empleado': whatsapp_empleado,
             'nombre_usuario': nombre_usuario,
             'tipo_plantilla': tipo_plantilla,
+            # Enlace absoluto al detalle (subdominio del país; localhost si DEBUG)
+            'url_detalle': url_absoluta_detalle_solicitud(solicitud),
         }
 
         # EXPLICACIÓN: plantilla PNC usa otro HTML y asunto (partes no disponibles)
@@ -397,6 +400,8 @@ def notificar_compras_nueva_cotizacion_task(
 
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
 
+        from .utils.cotizacion_email_context import url_absoluta_detalle_solicitud
+
         context = {
             'solicitud': solicitud,
             'lineas': solicitud.lineas.select_related('producto', 'proveedor').all(),
@@ -405,6 +410,8 @@ def notificar_compras_nueva_cotizacion_task(
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
             'nombre_usuario': nombre_usuario,
+            # Enlace absoluto al detalle (subdominio del país; localhost si DEBUG)
+            'url_detalle': url_absoluta_detalle_solicitud(solicitud),
         }
 
         html_content = render_to_string(
@@ -579,16 +586,17 @@ def notificar_compras_cotizacion_aceptada_task(
     Efectos secundarios:
         Envía un correo HTML a empleados rol=compras con email configurado.
     """
-    from django.conf import settings
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string
-    from django.urls import reverse
     from django.utils import timezone
 
     from .models import SolicitudCotizacion
     from inventario.models import Empleado
     from config.paises_config import get_pais_actual, fecha_local_pais
-    from .utils.cotizacion_email_context import identificador_asunto_solicitud
+    from .utils.cotizacion_email_context import (
+        identificador_asunto_solicitud,
+        url_absoluta_detalle_solicitud,
+    )
 
     log_prefix = '[COTIZ-ACEPTADA]'
     logger.info(f'{log_prefix} Iniciando email aceptación Solicitud ID {solicitud_id}')
@@ -632,11 +640,8 @@ def notificar_compras_cotizacion_aceptada_task(
 
         _pais_email = get_pais_actual()
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
-        url_relativa = reverse(
-            'almacen:detalle_solicitud_cotizacion',
-            kwargs={'pk': solicitud.pk},
-        )
-        url_detalle = f"{settings.SITE_URL.rstrip('/')}{url_relativa}"
+        # EXPLICACIÓN: URL del país (o localhost si DEBUG), no SITE_URL fijo
+        url_detalle = url_absoluta_detalle_solicitud(solicitud)
 
         context = {
             'solicitud': solicitud,
@@ -710,15 +715,17 @@ def notificar_respuesta_cotizacion_rechazada_task(
     Efectos secundarios:
         Envía un correo HTML a destinatarios con email (deduplicados).
     """
-    from django.conf import settings
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string
-    from django.urls import reverse
     from django.utils import timezone
 
     from .models import SolicitudCotizacion
     from config.paises_config import get_pais_actual, fecha_local_pais
-    from .utils.cotizacion_email_context import identificador_asunto_solicitud
+    from .utils.cotizacion_email_context import (
+        identificador_asunto_solicitud,
+        url_absoluta_detalle_orden,
+        url_absoluta_detalle_solicitud,
+    )
     from .utils.notificar_respuesta_cotizacion import obtener_destinatarios_rechazo
     from .utils.sincronizar_rechazo_cotizacion_st import (
         armar_detalle_rechazo_desde_items,
@@ -774,20 +781,14 @@ def notificar_respuesta_cotizacion_rechazada_task(
 
         _pais_email = get_pais_actual()
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
-        url_relativa = reverse(
-            'almacen:detalle_solicitud_cotizacion',
-            kwargs={'pk': solicitud.pk},
-        )
-        url_detalle = f"{settings.SITE_URL.rstrip('/')}{url_relativa}"
+        # EXPLICACIÓN: misma base de país para solicitud y orden ST
+        url_detalle = url_absoluta_detalle_solicitud(solicitud)
 
         url_orden = ''
         orden = solicitud.orden_servicio
         if orden is not None:
             try:
-                url_orden = (
-                    f"{settings.SITE_URL.rstrip('/')}"
-                    f"{reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': orden.pk})}"
-                )
+                url_orden = url_absoluta_detalle_orden(orden)
             except Exception:
                 url_orden = ''
 

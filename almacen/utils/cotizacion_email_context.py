@@ -1,5 +1,5 @@
 """
-Utilidades para armar el contexto del correo de cotización al cliente.
+Utilidades para armar el contexto de correos de cotización (cliente e internos).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 -------------------------------
@@ -11,6 +11,9 @@ Prioridad del sufijo de la referencia:
     - Con orden vinculada  → orden_cliente (ej. OOW-11902 → DROP11902)
     - Sin orden vinculada  → service_tag (ej. PYFHF888A → DROPPYFHF888A)
     - Último fallback      → asunto del correo
+
+Los correos internos (Front ↔ Compras) también usan este módulo para armar
+el enlace absoluto al detalle de la solicitud, con el subdominio del país.
 """
 
 from __future__ import annotations
@@ -20,8 +23,14 @@ import unicodedata
 from datetime import datetime
 from typing import Any, Dict, TYPE_CHECKING
 
+from django.conf import settings
+from django.urls import reverse
+
+from config.paises_config import get_pais_actual
+
 if TYPE_CHECKING:
     from almacen.models import SolicitudCotizacion
+    from servicio_tecnico.models import OrdenServicio
 
 
 # Mapeo de palabras clave en el nombre/código de sucursal → prefijo de referencia.
@@ -160,6 +169,73 @@ def identificador_asunto_solicitud(solicitud: 'SolicitudCotizacion') -> str:
         return f'S/T: {service_tag}'
 
     return (solicitud.numero_solicitud or '').strip()
+
+
+def url_base_pais_email() -> str:
+    """
+    Base absoluta para enlaces en correos internos de Almacén.
+
+    Objetivo de negocio:
+        El botón del correo debe abrir el SIGMA del país correcto
+        (México, Argentina, Chile o Colombia), no un solo dominio fijo.
+
+    Returns:
+        str: URL sin barra final, ej. ``https://argentina.sigmasystem.work``.
+
+    Efectos secundarios:
+        Ninguno. Lee ``get_pais_actual()`` (Celery ya dejó el ``db_alias``)
+        y ``settings.SITE_URL`` / ``DEBUG``.
+    """
+    # Fallback: .env SITE_URL (en local suele ser http://localhost:8000)
+    site_url_fallback = str(
+        getattr(settings, 'SITE_URL', 'http://localhost:8000')
+    ).rstrip('/')
+
+    # EXPLICACIÓN: en tu PC el clic debe abrir el servidor local, no producción.
+    if settings.DEBUG:
+        return site_url_fallback
+
+    # Producción: subdominio del país activo (task_prerun ya configuró el tenant)
+    pais = get_pais_actual() or {}
+    url_base = pais.get('url_base') or site_url_fallback
+    return str(url_base).rstrip('/')
+
+
+def url_absoluta_detalle_solicitud(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    URL absoluta al detalle de una solicitud de cotización.
+
+    Args:
+        solicitud: SolicitudCotizacion (solo se usa su ``pk``).
+
+    Returns:
+        str: Enlace listo para un ``href`` de correo, ej.
+        ``https://mexico.sigmasystem.work/almacen/solicitudes-cotizacion/42/``.
+    """
+    # reverse arma la ruta relativa; url_base_pais_email pone el país o localhost
+    ruta = reverse(
+        'almacen:detalle_solicitud_cotizacion',
+        kwargs={'pk': solicitud.pk},
+    )
+    return f'{url_base_pais_email()}{ruta}'
+
+
+def url_absoluta_detalle_orden(orden: 'OrdenServicio') -> str:
+    """
+    URL absoluta al detalle de una orden de Servicio Técnico.
+
+    Args:
+        orden: OrdenServicio (solo se usa su ``pk``).
+
+    Returns:
+        str: Enlace listo para un ``href`` de correo.
+    """
+    # Misma base de país que el detalle de Almacén (rechazo interno lleva ambos)
+    ruta = reverse(
+        'servicio_tecnico:detalle_orden',
+        kwargs={'orden_id': orden.pk},
+    )
+    return f'{url_base_pais_email()}{ruta}'
 
 
 def extraer_sufijo_desde_identificador(identificador: str) -> str:

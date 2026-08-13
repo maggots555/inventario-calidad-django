@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from almacen.tests.helpers_integracion_cotizacion import BaseIntegracionCotizacionMixin
@@ -23,6 +24,9 @@ from almacen.utils.cotizacion_email_context import (
     construir_asunto_correo_default,
     identificador_asunto_solicitud,
 )
+from inventario.models import Empleado
+
+User = get_user_model()
 
 
 class IdentificadorAsuntoSolicitudTest(BaseIntegracionCotizacionMixin, TestCase):
@@ -138,6 +142,96 @@ class NotificarFrontAsuntoIdentificadorTest(
         asunto = capturados[0].subject
         self.assertIn('OOW-FRONT-09', asunto)
         self.assertNotIn('S/T:', asunto)
+        # El HTML interno debe llevar enlace absoluto al detalle (no una ruta relativa)
+        cuerpo = capturados[0].body
+        ruta_detalle = f'/almacen/solicitudes-cotizacion/{solicitud.pk}/'
+        self.assertIn(ruta_detalle, cuerpo)
+        self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', cuerpo)
+        self.assertIn('Abrir solicitud en SIGMA', cuerpo)
+
+    def test_front_pnc_html_incluye_enlace_detalle(self) -> None:
+        """PNC a Front también incluye el botón absoluto al detalle."""
+        from almacen.tasks import notificar_front_cotizacion_task
+
+        orden = self._crear_orden_con_detalle(orden_cliente='OOW-FRONT-PNC')
+        solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=orden,
+            sin_orden_activa=False,
+            estado='enviada_front',
+        )
+        solicitud.refresh_from_db()
+
+        capturados = []
+
+        def _fake_send(self_msg, fail_silently=False):
+            capturados.append(self_msg)
+            return 1
+
+        with patch('django.core.mail.EmailMessage.send', new=_fake_send):
+            resultado = notificar_front_cotizacion_task.run(
+                solicitud_id=solicitud.pk,
+                destinatarios=[self.empleado.email],
+                mensaje_personalizado='',
+                usuario_id=self.user.pk,
+                tipo_plantilla='partes_no_disponibles',
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        ruta_detalle = f'/almacen/solicitudes-cotizacion/{solicitud.pk}/'
+        self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', capturados[0].body)
+
+    def test_compras_sin_orden_html_incluye_enlace_detalle(self) -> None:
+        """Front → Compras (sin orden): el HTML lleva el enlace absoluto."""
+        from almacen.tasks import notificar_compras_nueva_cotizacion_task
+
+        # Esta tarea solo envía a empleados rol=compras con email
+        user_compras = User.objects.create_user(
+            username='compras_url_email',
+            password='testpass123',
+            email='compras.url@test.local',
+        )
+        Empleado.objects.create(
+            user=user_compras,
+            nombre_completo='Compras URL Email',
+            cargo='Compras',
+            area='COMPRAS',
+            email='compras.url@test.local',
+            sucursal=self.sucursal,
+            rol='compras',
+            activo=True,
+            tiene_acceso_sistema=True,
+            contraseña_configurada=True,
+        )
+
+        solicitud, _linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='borrador',
+        )
+        solicitud.refresh_from_db()
+
+        capturados = []
+
+        def _fake_send(self_msg, fail_silently=False):
+            capturados.append(self_msg)
+            return 1
+
+        with patch('django.core.mail.EmailMessage.send', new=_fake_send):
+            resultado = notificar_compras_nueva_cotizacion_task.run(
+                solicitud_id=solicitud.pk,
+                usuario_id=self.user.pk,
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        cuerpo = capturados[0].body
+        ruta_detalle = f'/almacen/solicitudes-cotizacion/{solicitud.pk}/'
+        self.assertIn(ruta_detalle, cuerpo)
+        self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', cuerpo)
+        self.assertIn('Ver detalle de la solicitud', cuerpo)
 
     def test_pnc_cliente_con_orden_asunto_usa_orden_cliente(self) -> None:
         """PNC al cliente con orden → subject con orden_cliente."""
