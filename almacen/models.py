@@ -1937,6 +1937,10 @@ class SolicitudBaja(models.Model):
     - Transferencia: Mover a otra sucursal
     
     La solicitud puede vincularse a una OrdenServicio si es para reparación.
+
+    Al aprobar tipos servicio_tecnico / venta_mostrador, la vista llama al util
+    ``sincronizar_solicitud_baja_vm`` para registrar la pieza en Venta Mostrador.
+    Eso NO ocurre dentro de aprobar(): el modelo solo descuenta stock.
     """
     
     # ========== TIPO Y PRODUCTO ==========

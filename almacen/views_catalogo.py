@@ -43,6 +43,9 @@ from .models import (
     SolicitudBaja,
     UnidadInventario,
 )
+from .utils.sincronizar_solicitud_baja_vm import (
+    registrar_pieza_vm_desde_solicitud_baja,
+)
 
 
 # ============================================================================
@@ -687,6 +690,15 @@ def procesar_solicitud(request, pk):
     """
     Procesa (aprueba o rechaza) una solicitud de baja.
     Solo para agentes de almacén.
+
+    Args:
+        request: HttpRequest GET (formulario) o POST (acción).
+        pk: ID de la SolicitudBaja en estado pendiente.
+
+    Efectos secundarios:
+        - Aprobar: descuenta stock (SolicitudBaja.aprobar) y, si hay orden
+          OOW-/FL-, registra la pieza en Venta Mostrador (util paralelo a cotización).
+        - Rechazar: solo cambia estado; no toca stock ni ST.
     """
     solicitud = get_object_or_404(
         SolicitudBaja.objects.select_related(
@@ -715,11 +727,21 @@ def procesar_solicitud(request, pk):
                 return redirect('almacen:lista_solicitudes')
             
             if accion == 'aprobar':
+                # Primero sale el stock; después (si aplica) se refleja en ST.
                 solicitud.aprobar(agente, observaciones)
-                messages.success(
-                    request, 
-                    f'Solicitud #{solicitud.pk} aprobada. Stock actualizado.'
-                )
+                pieza_vm = registrar_pieza_vm_desde_solicitud_baja(solicitud)
+                if pieza_vm:
+                    folio_orden = solicitud.orden_servicio.numero_orden_interno
+                    messages.success(
+                        request,
+                        f'Solicitud #{solicitud.pk} aprobada. Stock actualizado. '
+                        f'Pieza registrada en Venta Mostrador de la orden {folio_orden}.'
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'Solicitud #{solicitud.pk} aprobada. Stock actualizado.'
+                    )
             else:
                 solicitud.rechazar(agente, observaciones)
                 messages.warning(request, f'Solicitud #{solicitud.pk} rechazada.')

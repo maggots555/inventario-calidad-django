@@ -271,6 +271,9 @@
                                                     <tr data-pieza-id="{{ pieza.id }}">
                                                         <td>
                                                             <strong>{{ pieza.descripcion_pieza }}</strong>
+                                                            {% if pieza.solicitud_baja_id %}
+                                                                <span class="badge text-bg-secondary ms-1">Stock interno</span>
+                                                            {% endif %}
                                                             {% if pieza.notas %}
                                                                 <br><small class="text-muted">{{ pieza.notas|truncatewords:15 }}</small>
                                                             {% endif %}

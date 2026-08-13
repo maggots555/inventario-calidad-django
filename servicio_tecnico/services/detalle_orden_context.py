@@ -249,7 +249,8 @@ def build_detalle_orden_context(request, orden):
 
         # Obtener todas las piezas vendidas
         piezas_venta_mostrador = venta_mostrador.piezas_vendidas.select_related(
-            'componente'
+            'componente',
+            'solicitud_baja',
         ).order_by('-fecha_venta')
 
     # Preparar formularios (siempre disponibles)

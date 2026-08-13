@@ -1991,6 +1991,10 @@ class PiezaVentaMostrador(models.Model):
     Así, cuando Almacén recibe la compra, ST puede marcar el seguimiento como
     «recibido». Las piezas creadas a mano en ST (sin cotización Almacén) dejan
     ``linea_cotizacion`` en NULL y no entran al sync automático de compras.
+
+    Tercer origen (Ago 2026): stock interno vía ``SolicitudBaja``. Esas piezas
+    guardan ``solicitud_baja`` y también dejan ``linea_cotizacion`` en NULL
+    (no hay compra a proveedor ni seguimiento de tránsito).
     """
 
     # RELACIÓN CON VENTA MOSTRADOR
@@ -2011,6 +2015,19 @@ class PiezaVentaMostrador(models.Model):
         help_text=(
             "Línea de cotización Almacén que originó esta pieza (NULL si se "
             "agregó manualmente en ST)."
+        ),
+    )
+
+    # Trazabilidad hacia SolicitudBaja (stock interno ya existente en almacén)
+    solicitud_baja = models.OneToOneField(
+        'almacen.SolicitudBaja',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pieza_venta_mostrador',
+        help_text=(
+            "Solicitud de baja de almacén que originó esta pieza (NULL si "
+            "nació de cotización o se agregó a mano en ST)."
         ),
     )
 
