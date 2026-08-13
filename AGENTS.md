@@ -96,7 +96,7 @@ python manage.py test servicio_tecnico.tests
 
 **Django:**
 - FBV preferidas; `get_object_or_404`; feedback con `messages`; URLs con nombre (`redirect` / `{% url %}`).
-- Models: docstring, `__str__()`, `Meta` con `verbose_name`.
+- Models: docstring, `__str__()`, `Meta` con `verbose_name`. **No hinchar** `models.py` grandes (ver §4 Fat models).
 - Forms: widgets con clases Bootstrap (`form-control`, etc.).
 - Vistas nuevas (ST y Almacén): módulo `views_*.py` + reexport (ver Modularidad); **no** hinchar `views.py`.
 
@@ -197,6 +197,8 @@ inventario-calidad-django/
 |-------|--------|
 | Vista HTTP (request → response) | `views_<dominio>.py` (ej. `views_cotizacion_cliente.py`) |
 | Helper/regla reutilizable sin HTTP | `services/` (ST) o `utils/` (Almacén) |
+| Campo nuevo / `choices` / `clean()` de integridad | `models.py` (eso es tabla, no cerebro) |
+| Cálculo, workflow, sync, `save()` con side effects | `services/` (ST) o `utils/` (Almacén); el modelo solo fachada si hace falta |
 | Decoradores de permiso/cache | `decorators.py` de la app |
 | Fachada para `urls.py` | `views.py` solo reexports (`# noqa: F401`) |
 
@@ -230,6 +232,46 @@ inventario-calidad-django/
 **detalle_orden (Fases A–C, Ago 2026):** partials en `templates/.../partials/detalle_orden/`; vista delgada en `views_detalle_orden.py` + handlers (`views_detalle_orden_estado|multimedia|cotizacion.py`) + context en `services/detalle_orden_context.py`; JS de página en `static/ts/detalle_orden_*.ts` (config JSON `#detalle-orden-page-config`). Features nuevas van a módulos propios — **también en Almacén**.
 
 Misma idea en TS/CSS: no un único archivo gigante; no hinchar más `detalle_orden.html` con CSS/JS inline.
+
+### Fat models — no hinchar `models.py` grandes (Ago 2026)
+
+**CRITICAL — no agrandar modelos gordos:** está **prohibido** seguir metiendo lógica de negocio en `servicio_tecnico/models.py` (~4500 LOC) y `almacen/models.py` (~6400 LOC). Esos archivos **aún son manejables**; extraer todo de golpe no vale el riesgo (templates + sync Almacén↔ST). Lo que **sí** hay que hacer es **dejar de hincharlos**.
+
+Misma trampa que `views.py`: “solo un método más” en `OrdenServicio` / `SolicitudCotizacion` / `LineaCotizacion` / `CompraProducto` y en meses el archivo deja de ser navegable. Los agentes IA, por default, ponen la función nueva en la clase que ya existe — **esta regla existe para cortar esa inercia**.
+
+**Qué SÍ va en el modelo (es tabla, no cerebro):**
+- Campo nuevo, `choices`, índices, `constraints`, `Meta`
+- `__str__()`, `clean()` de integridad (fechas/estados imposibles)
+- Relación FK/M2M
+
+**Qué NO va en el modelo (nace en `services/` o `utils/`):**
+- Cálculos de dinero (IVA, márgenes, totales, profit)
+- Workflow largo (`generar_compras`, aprobar/rechazar con sync, WPB/DOA con side effects)
+- Ampliar `save()` con más side effects (crear filas en otra app, correo, resize de imagen, historial extra)
+- Métricas/semáforos de dashboard (`dias_habiles_*`, `esta_atrasada`, etc.)
+
+```
+❌ NUNCA “solo un método más” en OrdenServicio, SolicitudCotizacion, LineaCotizacion, CompraProducto
+❌ NUNCA nuevas @property de dinero/totales/IVA en el modelo — van a utils/services
+❌ NUNCA engordar save() con sync Almacén↔ST, Celery o archivos
+❌ NUNCA extraer models.py de golpe “por limpieza” sin pedido explícito (rompe templates y sync)
+
+✅ Lógica nueva en services/ (ST) o utils/ (Almacén)
+✅ Si vista/template necesita un nombre en el modelo: fachada de 3 líneas que delega
+   (patrón ya usado: SolicitudCotizacion.persistir_precios_cliente → cotizacion_precios_cliente.py)
+✅ Extraer código VIEJO solo si se toca esa zona por un bug/feature y sale barato de paso,
+   o si el archivo se vuelve doloroso de verdad — no por estética
+✅ Mismo espíritu en tasks.py / forms.py ya densos: feature nueva = módulo nuevo, no “una función más”
+```
+
+**Fachada (el interruptor se queda, el cerebro no):**
+
+```python
+# En el modelo: 3 líneas. El HTML sigue llamando solicitud.foo().
+def persistir_precios_cliente(self):
+    from almacen.utils.cotizacion_precios_cliente import persistir_precios_cliente_solicitud
+    return persistir_precios_cliente_solicitud(self)
+```
 
 ---
 
@@ -392,6 +434,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 22. CSRF prod = `sigma_csrftoken`
 23. No re-inflar monolitos ni agrandar `views_*.py` — §4 Modularidad (ST y Almacén); helpers en `services/`/`utils/`
 24. Comportamiento nuevo → test humo y/o integración según §1; excepción: docs/CSS cosmético o pedido del usuario
+25. No hinchar `models.py` grandes (`OrdenServicio`, `SolicitudCotizacion`, etc.) — §4 Fat models; lógica nueva en `services/`/`utils/`; extraer lo viejo solo si duele o de paso
 
 ---
 
