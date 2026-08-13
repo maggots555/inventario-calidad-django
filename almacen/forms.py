@@ -1615,6 +1615,7 @@ class UnidadInventarioFiltroForm(forms.Form):
     - Estado (nuevo, usado, defectuoso)
     - Disponibilidad (disponible, reservada, asignada)
     - Origen (compra, orden de servicio, etc.)
+    - Texto libre: código, serie, modelo u orden del cliente (OOW-/FL-)
     """
     
     producto = forms.ModelChoiceField(
@@ -1667,7 +1668,7 @@ class UnidadInventarioFiltroForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             'class': 'form-control form-control-sm',
-            'placeholder': 'Buscar por código, serie, modelo...',
+            'placeholder': 'Buscar por código, serie, modelo u orden...',
         }),
         label='Buscar',
     )

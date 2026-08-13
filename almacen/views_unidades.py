@@ -46,7 +46,7 @@ def lista_unidades(request):
     
     Funcionalidades:
     - Filtrado por producto, marca, estado, disponibilidad, origen
-    - Búsqueda por código interno, número de serie, modelo
+    - Búsqueda por código interno, número de serie, modelo u orden del cliente
     - Paginación para manejar grandes cantidades de unidades
     - Contadores de resumen (total, disponibles, por revisar)
     
@@ -63,6 +63,9 @@ def lista_unidades(request):
         'compra',
         'orden_servicio_origen',
         'orden_servicio_destino',
+        # EXPLICACIÓN: el folio del cliente vive en DetalleEquipo (OneToOne
+        # de la orden). Lo cargamos aquí para no hacer 1 query extra por fila.
+        'orden_servicio_destino__detalle_equipo',
         'sucursal_actual',  # NUEVO: Para mostrar ubicación
     ).order_by('-fecha_registro')
     
@@ -98,12 +101,16 @@ def lista_unidades(request):
         # Búsqueda de texto
         buscar = form_filtro.cleaned_data.get('buscar')
         if buscar:
+            # EXPLICACIÓN: también buscamos el folio visible (OOW-/FL-) y el
+            # número interno SIGMA (ORD-…) de la orden a la que está asignada.
             unidades = unidades.filter(
                 Q(codigo_interno__icontains=buscar) |
                 Q(numero_serie__icontains=buscar) |
                 Q(modelo__icontains=buscar) |
                 Q(producto__nombre__icontains=buscar) |
-                Q(notas__icontains=buscar)
+                Q(notas__icontains=buscar) |
+                Q(orden_servicio_destino__detalle_equipo__orden_cliente__icontains=buscar) |
+                Q(orden_servicio_destino__numero_orden_interno__icontains=buscar)
             )
     
     # ========== FILTRO POR SUCURSAL (NUEVO) ==========
@@ -501,6 +508,9 @@ def unidades_por_producto(request, producto_id):
         'compra',
         'orden_servicio_origen',
         'orden_servicio_destino',
+        # EXPLICACIÓN: mismo join que en lista_unidades para pintar el folio
+        # bajo el badge ASIGNADA/RESERVADA sin consultas N+1.
+        'orden_servicio_destino__detalle_equipo',
     ).order_by('-fecha_registro')
     
     # Resumen por marca

@@ -367,6 +367,14 @@ Contexto esperado:
                                                             {% elif unidad.disponibilidad == 'descartada' %}
                                                                 <span class="badge bg-dark">🗑️ Descartada</span>
                                                             {% endif %}
+                                                            {% if unidad.orden_servicio_destino %}
+                                                            {# Folio de la orden (OOW-/FL- o ORD- interno) para no entrar al detalle #}
+                                                            <br>
+                                                            <a href="{% url 'servicio_tecnico:detalle_orden' unidad.orden_servicio_destino.pk %}"
+                                                               class="small text-decoration-none">
+                                                                {{ unidad.orden_servicio_destino.detalle_equipo.orden_cliente|default:unidad.orden_servicio_destino.numero_orden_interno }}
+                                                            </a>
+                                                            {% endif %}
                                                         </td>
                                                         <td>
                                                             {% if unidad.sucursal_actual %}
