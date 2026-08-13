@@ -253,6 +253,9 @@ class SeguimientoPiezasOowRegresionTest(BaseIntegracionCotizacionMixin, TestCase
         self.assertIsNotNone(seguimiento)
         self.assertEqual(seguimiento.cotizacion_id, orden.pk)  # Cotizacion PK = orden
         self.assertIn(pieza, seguimiento.piezas.all())
+        # El texto del seguimiento es nombre × cantidad, sin precio.
+        self.assertIn(pieza.componente.nombre, seguimiento.descripcion_piezas)
+        self.assertNotIn('$', seguimiento.descripcion_piezas)
         self.assertEqual(orden.estado, 'esperando_piezas')
         self.assertFalse(
             PiezaVentaMostrador.objects.filter(linea_cotizacion=linea).exists(),

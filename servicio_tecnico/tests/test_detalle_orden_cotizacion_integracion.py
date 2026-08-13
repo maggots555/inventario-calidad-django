@@ -33,6 +33,7 @@ from servicio_tecnico.models import (
     HistorialOrden,
     OrdenServicio,
     PiezaCotizada,
+    SeguimientoPieza,
 )
 from servicio_tecnico.views import detalle_orden
 
@@ -197,6 +198,13 @@ class DetalleOrdenCotizacionIntegracionTest(TestCase):
         self.assertTrue(cotizacion.usuario_acepto)
         self.assertTrue(pieza.aceptada_por_cliente)
         self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
+
+        # Al aceptar se crea seguimiento por proveedor: nombre × cantidad, sin $.
+        seguimiento = SeguimientoPieza.objects.filter(orden=self.orden).first()
+        self.assertIsNotNone(seguimiento)
+        self.assertIn(pieza, seguimiento.piezas.all())
+        self.assertIn(self.componente.nombre, seguimiento.descripcion_piezas)
+        self.assertNotIn('$', seguimiento.descripcion_piezas)
 
     def test_rechazar_con_feedback_deja_session_y_crea_feedback(self):
         """

@@ -2163,8 +2163,9 @@ class SeguimientoPiezaForm(forms.ModelForm):
         if cotizacion:
             piezas_aceptadas = cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=True)
             self.fields['piezas'].queryset = piezas_aceptadas
+            # Mismo criterio que Venta Mostrador: nombre × cantidad, sin costo.
             self.fields['piezas'].label_from_instance = (
-                lambda obj: f"{obj.componente.nombre} × {obj.cantidad} (${obj.costo_total})"
+                lambda obj: f"{obj.componente.nombre} × {obj.cantidad}"
             )
         else:
             self.fields['piezas'].queryset = PiezaCotizada.objects.none()

@@ -90,9 +90,11 @@ def sincronizar_seguimiento_piezas_al_generar_compras(
     # --- Rama OOW (PiezaCotizada) ---
     grupos_oow = _agrupar_piezas_oow_por_proveedor(lineas_oow)
     for proveedor_nombre, (piezas_grupo, dias_eta) in grupos_oow.items():
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El seguimiento es para saber QUÉ se pidió (nombre × cantidad), no
+        # cuánto costó. El dinero sigue en PiezaCotizada.costo_unitario.
         descripcion = '\n'.join([
             f"• {pieza.componente.nombre} × {pieza.cantidad}"
-            + (f" (${pieza.costo_total})" if getattr(pieza, 'costo_total', None) else '')
             for pieza in piezas_grupo
         ])
         seguimiento = SeguimientoPieza.objects.create(

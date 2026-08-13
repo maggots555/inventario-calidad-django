@@ -352,9 +352,11 @@ def handle_gestionar_cotizacion(request, orden, empleado_actual):
                     # Crear un SeguimientoPieza por cada proveedor
                     seguimientos_creados = 0
                     for proveedor, piezas_grupo in piezas_por_proveedor.items():
-                        # Construir descripción de las piezas
+                        # EXPLICACIÓN PARA PRINCIPIANTES:
+                        # Solo nombre y cantidad: el costo vive en la cotización,
+                        # no en el texto del seguimiento de pedido.
                         descripcion_piezas = '\n'.join([
-                            f"• {pieza.componente.nombre} × {pieza.cantidad} (${pieza.costo_total})"
+                            f"• {pieza.componente.nombre} × {pieza.cantidad}"
                             for pieza in piezas_grupo
                         ])
 
