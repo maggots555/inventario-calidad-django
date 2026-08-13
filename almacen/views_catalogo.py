@@ -523,6 +523,7 @@ def detalle_producto(request, pk):
         'empleado',
         'orden_servicio',
         'orden_servicio__detalle_equipo',
+        'compra',
     ).order_by('-fecha')[:20]
     
     # Historial de compras
@@ -778,6 +779,7 @@ def lista_movimientos(request):
         'orden_servicio',
         'orden_servicio__detalle_equipo',
         'solicitud_baja',
+        'compra',
     )
     
     # Filtro por tipo

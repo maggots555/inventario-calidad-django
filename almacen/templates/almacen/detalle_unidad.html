@@ -224,7 +224,9 @@ Contexto esperado:
                             <label class="form-label text-muted small">Compra Asociada</label>
                             <p class="mb-0">
                                 {% if unidad.compra %}
-                                    <a href="#" class="text-decoration-none">
+                                    <a href="{% url 'almacen:detalle_compra' unidad.compra.pk %}"
+                                       class="text-decoration-none"
+                                       title="Ver compra">
                                         Compra #{{ unidad.compra.pk }}
                                     </a>
                                     <br>

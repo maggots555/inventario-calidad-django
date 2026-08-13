@@ -117,7 +117,12 @@
                                 {% elif mov.solicitud_baja %}
                                     <span class="badge bg-warning text-dark">Sol #{{ mov.solicitud_baja.pk }}</span>
                                 {% elif mov.compra %}
+                                {# Badge clicable: abre el detalle de esa compra #}
+                                <a href="{% url 'almacen:detalle_compra' mov.compra.pk %}"
+                                   class="text-decoration-none"
+                                   title="Ver compra">
                                     <span class="badge bg-success">Compra #{{ mov.compra.pk }}</span>
+                                </a>
                                 {% else %}
                                     -
                                 {% endif %}

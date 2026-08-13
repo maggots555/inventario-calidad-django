@@ -19,7 +19,9 @@ from django.contrib.sessions.backends.db import SessionStore
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from almacen.models import MovimientoAlmacen
+from django.utils import timezone
+
+from almacen.models import CompraProducto, MovimientoAlmacen
 from almacen.tests.helpers_integracion_cotizacion import BaseIntegracionCotizacionMixin
 from almacen.views import detalle_producto, lista_movimientos
 
@@ -123,3 +125,86 @@ class MovimientosFolioEnlaceTest(BaseIntegracionCotizacionMixin, TestCase):
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(html.count(self.url_orden), 1)
+
+
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class MovimientosCompraEnlaceTest(BaseIntegracionCotizacionMixin, TestCase):
+    """
+    El badge Compra #N en movimientos debe abrir el detalle de esa compra.
+
+    Objetivo de negocio:
+        Clic en Compra #129 lleva a `/almacen/compras/129/`, sin buscar a mano.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='MOV-COMPRA')
+        # Compra directa mínima: el save() calcula costo_total solo
+        self.compra = CompraProducto.objects.create(
+            tipo='compra',
+            estado='recibida',
+            producto=self.producto,
+            proveedor=self.proveedor,
+            cantidad=50,
+            costo_unitario=Decimal('598.00'),
+            fecha_pedido=timezone.now().date(),
+            registrado_por=self.user,
+        )
+        self.movimiento_compra = MovimientoAlmacen.objects.create(
+            tipo='entrada',
+            producto=self.producto,
+            cantidad=50,
+            costo_unitario=Decimal('598.00'),
+            empleado=self.empleado,
+            compra=self.compra,
+            observaciones=f'Recepción de compra #{self.compra.pk}.',
+        )
+        self.url_compra = reverse('almacen:detalle_compra', args=[self.compra.pk])
+
+    def _request_get(self, path: str):
+        """
+        Arma un GET autenticado (sesión + messages) para llamar la vista.
+
+        Args:
+            path: Ruta absoluta.
+
+        Returns:
+            HttpRequest listo para la vista.
+        """
+        request = self.factory.get(path)
+        request.user = self.user
+        request.session = SessionStore()
+        request._messages = FallbackStorage(request)
+        return request
+
+    def test_lista_movimientos_compra_es_enlace(self) -> None:
+        """
+        Caso feliz: en la lista de movimientos, Compra #N apunta al detalle.
+
+        EXPLICACIÓN: es el badge verde de la captura (ENTRADA + Compra #129).
+        """
+        url = reverse('almacen:lista_movimientos')
+        respuesta = lista_movimientos(self._request_get(url))
+        html = respuesta.content.decode()
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(f'Compra #{self.compra.pk}', html)
+        self.assertIn(self.url_compra, html)
+
+    def test_historial_producto_compra_es_enlace(self) -> None:
+        """Misma regla en el historial del detalle de producto."""
+        url = reverse('almacen:detalle_producto', args=[self.producto.pk])
+        respuesta = detalle_producto(self._request_get(url), self.producto.pk)
+        html = respuesta.content.decode()
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(f'Compra #{self.compra.pk}', html)
+        self.assertIn(self.url_compra, html)
