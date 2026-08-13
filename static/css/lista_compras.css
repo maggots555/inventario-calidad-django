@@ -6,6 +6,8 @@
  * Bootstrap usa .table-danger con fondo rosa claro. En modo oscuro ese rosa
  * queda ilegible con el texto claro del tema. Aquí usamos una clase propia
  * (.fila-compra-retrasada) con fondo rojo suave en claro y tinte oscuro en dark.
+ * El aviso es solo el fondo: no usamos barras laterales en cada celda
+ * (eso pintaba líneas rojas fuertes entre columnas).
  */
 
 /* ============================================================
@@ -17,7 +19,7 @@
     vertical-align: middle;
 }
 
-/* Fila retrasada: fondo rojo muy suave + borde izquierdo de aviso */
+/* Fila retrasada: solo fondo rojo suave (sin barra en cada celda) */
 .lista-compras-tabla tr.fila-compra-retrasada > * {
     --bs-table-bg: #fef2f2;
     --bs-table-color: #1e293b;
@@ -25,7 +27,6 @@
     --bs-table-hover-color: #1e293b;
     background-color: #fef2f2;
     color: #1e293b;
-    box-shadow: inset 3px 0 0 #ef4444;
 }
 
 .lista-compras-tabla tr.fila-compra-retrasada:hover > * {
@@ -74,7 +75,6 @@
     background-color: rgba(239, 68, 68, 0.14);
     color: #e2e8f0;
     border-bottom-color: #334155;
-    box-shadow: inset 3px 0 0 #ef4444;
 }
 
 [data-bs-theme="dark"] .lista-compras-tabla tr.fila-compra-retrasada:hover > * {
