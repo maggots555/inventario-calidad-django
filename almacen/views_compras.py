@@ -48,6 +48,7 @@ from .models import (
     UnidadCompra,
     UnidadInventario,
 )
+from .utils.lista_compras_orden import ordenar_compras_para_lista
 
 
 # ============================================================================
@@ -87,13 +88,14 @@ def _clave_grupo_compra_cotizacion(compra):
 
 def _agrupar_compras_por_orden(compras):
     """
-    Agrupa compras de cotización por orden, preservando el orden de llegada.
+    Agrupa compras de cotización por orden, preservando el orden de la lista.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     -------------------------------
-    Recorremos la lista ya ordenada por fecha y metemos cada compra en su
-    "canasta" de orden. Así en la plantilla podemos pintar una cabecera por
-    orden y debajo cada pieza con su propio enlace a detalle/recepción.
+    Recorremos la lista ya ordenada (pendiente de llegada / días que faltan)
+    y metemos cada compra en su "canasta" de orden. El grupo aparece cuando
+    entra su primera pieza, así las órdenes urgentes quedan arriba. En la
+    plantilla pintamos una cabecera por orden y debajo cada pieza.
 
     Args:
         compras (iterable): QuerySet o lista de CompraProducto.
@@ -183,6 +185,9 @@ def lista_compras(request):
     Filtros GET (compartidos por ambas pestañas):
     - tab: 'cotizaciones' | 'directas'
     - estado, producto, proveedor, orden_cliente
+
+    Orden por defecto (ambas pestañas): pendiente_llegada primero,
+    y entre esas las más urgentes según dias_para_llegada.
     """
     # Pestaña activa: cotizaciones por defecto (ahí importa el agrupado)
     tab = request.GET.get('tab', 'cotizaciones').strip().lower()
@@ -218,7 +223,9 @@ def lista_compras(request):
     if orden_cliente:
         compras_qs = compras_qs.filter(orden_cliente__icontains=orden_cliente)
 
-    compras_qs = compras_qs.order_by('-fecha_registro')
+    # Orden de negocio en Python: pendiente_llegada + días que faltan.
+    # No se puede hacer solo con order_by SQL: dias_para_llegada es property.
+    compras_ordenadas = ordenar_compras_para_lista(compras_qs)
 
     # Contadores de pestaña (respetan los mismos filtros, sin forzar tipo de tab)
     filtros_comunes = Q()
@@ -242,12 +249,12 @@ def lista_compras(request):
     if tab == 'cotizaciones':
         # Agrupamos TODAS las compras filtradas y paginamos por grupos de orden
         # (así un grupo no se parte entre dos páginas).
-        grupos = _agrupar_compras_por_orden(compras_qs)
+        grupos = _agrupar_compras_por_orden(compras_ordenadas)
         paginator = Paginator(grupos, 15)
         grupos_page = paginator.get_page(page)
     else:
-        # Directas: tabla plana, una fila por compra (comportamiento clásico)
-        paginator = Paginator(compras_qs, 25)
+        # Directas: tabla plana, una fila por compra (mismo orden de urgencia)
+        paginator = Paginator(compras_ordenadas, 25)
         compras_page = paginator.get_page(page)
 
     # Datos para los selects de filtros
