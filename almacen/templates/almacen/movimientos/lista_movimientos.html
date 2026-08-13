@@ -108,7 +108,12 @@
                             <td>{{ mov.empleado|default:"-" }}</td>
                             <td>
                                 {% if mov.orden_servicio %}
-                                    <span class="badge bg-primary">{{ mov.orden_servicio.detalle_equipo.orden_cliente }}</span>
+                                {# Folio clicable: abre el detalle de la orden de servicio #}
+                                <a href="{% url 'servicio_tecnico:detalle_orden' mov.orden_servicio.pk %}"
+                                   class="text-decoration-none"
+                                   title="Ver orden de servicio">
+                                    <span class="badge bg-primary">{{ mov.orden_servicio.detalle_equipo.orden_cliente|default:mov.orden_servicio.numero_orden_interno }}</span>
+                                </a>
                                 {% elif mov.solicitud_baja %}
                                     <span class="badge bg-warning text-dark">Sol #{{ mov.solicitud_baja.pk }}</span>
                                 {% elif mov.compra %}

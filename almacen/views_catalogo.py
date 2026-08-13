@@ -517,8 +517,12 @@ def detalle_producto(request, pk):
             })
     
     # Últimos movimientos
+    # EXPLICACIÓN: detalle_equipo trae el folio (OOW-/FL-) para el enlace
+    # del historial, sin una consulta extra por cada fila.
     movimientos = producto.movimientos.select_related(
-        'empleado', 'orden_servicio'
+        'empleado',
+        'orden_servicio',
+        'orden_servicio__detalle_equipo',
     ).order_by('-fecha')[:20]
     
     # Historial de compras
@@ -767,8 +771,13 @@ def lista_movimientos(request):
     """
     Lista de movimientos de almacén (entradas y salidas).
     """
+    # EXPLICACIÓN: detalle_equipo trae el folio para el badge-enlace a ST.
     movimientos = MovimientoAlmacen.objects.select_related(
-        'producto', 'empleado', 'orden_servicio', 'solicitud_baja'
+        'producto',
+        'empleado',
+        'orden_servicio',
+        'orden_servicio__detalle_equipo',
+        'solicitud_baja',
     )
     
     # Filtro por tipo
