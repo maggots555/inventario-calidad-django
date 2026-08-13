@@ -1435,3 +1435,10 @@ def notificar_cliente_pnc_task(
                 'success': False,
                 'mensaje': f'Error tras {self.max_retries} reintentos: {str(e)}',
             }
+
+
+# EXPLICACIÓN: Celery solo autodescubre almacen/tasks.py. Importar aquí
+# registra la tarea de solicitud de baja sin hinchar este archivo.
+from almacen.tasks_solicitud_baja import (  # noqa: E402, F401
+    notificar_almacenista_solicitud_baja_task,
+)

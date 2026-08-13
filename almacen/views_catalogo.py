@@ -15,6 +15,8 @@ Efectos secundarios:
 - acceso_denegado: página amigable cuando falta un permiso
 """
 
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -46,6 +48,8 @@ from .models import (
 from .utils.sincronizar_solicitud_baja_vm import (
     registrar_pieza_vm_desde_solicitud_baja,
 )
+
+logger = logging.getLogger('almacen')
 
 
 # ============================================================================
@@ -621,6 +625,10 @@ def crear_solicitud(request):
     - Procesa unidades seleccionadas del formulario
     - Valida que el empleado tenga sucursal asignada
     - Filtra unidades por sucursal (empleados) o todas (agentes de almacén)
+
+    Efectos secundarios al guardar:
+        Avisa a almacenistas (push + campanita) y encola correo To/CC
+        (Compras + solicitante). Si el aviso falla, la solicitud queda.
     """
     # Obtener empleado del usuario actual
     try:
@@ -669,6 +677,20 @@ def crear_solicitud(request):
             
             # Guardar formulario completo (incluyendo ManyToMany)
             form.save_m2m()
+
+            # EXPLICACIÓN: el HTML solo hace POST; el aviso vive aquí.
+            # Push/campanita a almacenistas; correo To ellos y CC a Compras
+            # + quien pidió. Si el aviso falla, la baja ya existe.
+            try:
+                from almacen.utils.notificar_solicitud_baja import (
+                    notificar_nueva_solicitud_baja,
+                )
+                notificar_nueva_solicitud_baja(solicitud)
+            except Exception:
+                logger.exception(
+                    '[NOTIF-BAJA] Error al notificar solicitud #%s',
+                    solicitud.pk,
+                )
             
             messages.success(request, 'Solicitud creada correctamente.')
             return redirect('almacen:lista_solicitudes')
