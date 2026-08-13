@@ -2616,6 +2616,7 @@ footer::after {
     min-width: 280px;
     max-height: 70vh;
     overflow-y: auto;
+    scrollbar-width: none;
     background: #34495e;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
@@ -2683,12 +2684,6 @@ footer::after {
     padding: 0;
 }
 
-/* Variante de 3 columnas para mega-menus más amplios (ej: Almacén) */
-.dropdown-mega-3col {
-    min-width: 720px;
-    grid-template-columns: repeat(3, 1fr);
-}
-
 .dropdown-mega .dropdown-column {
     display: flex;
     flex-direction: column;
@@ -2696,11 +2691,6 @@ footer::after {
 }
 
 .dropdown-mega .dropdown-column:first-child {
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Bordes entre columnas para mega-menus de 3 columnas */
-.dropdown-mega-3col .dropdown-column:nth-child(2) {
     border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -2713,23 +2703,174 @@ footer::after {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Scrollbar personalizado para dropdowns */
+/*
+ * Pasillos del navbar (Almacén, ST, Inventario, Calidad, Config).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El riel de color a la izquierda es señalética: cada módulo/tarea
+ * tiene un color para que el ojo sepa en qué menú está. Ámbar/teal
+ * = Almacén; sky = Inventario sucursal y Operación ST; rose = Calidad;
+ * violet = Seguimiento ST; slate = Configuración.
+ * Funciona en mega-menú (2 columnas) y en dropdown simple (1 columna).
+ */
+.dropdown-lane {
+    position: relative;
+}
+
+.dropdown-lane::before {
+    content: '';
+    position: absolute;
+    left: 0.45rem;
+    top: 0.55rem;
+    bottom: 0.55rem;
+    width: 3px;
+    border-radius: 999px;
+    background-color: #94a3b8;
+}
+
+/* En dropdowns de 1 columna el pasillo ocupa todo el ancho */
+.navbar-dropdown:not(.dropdown-mega) > .dropdown-lane {
+    padding: 0.1rem 0 0.25rem;
+}
+
+.dropdown-lane--inventario::before,
+.dropdown-lane--amber::before {
+    background-color: #f59e0b;
+}
+
+.dropdown-lane--adquisicion::before,
+.dropdown-lane--teal::before {
+    background-color: #14b8a6;
+}
+
+.dropdown-lane--sky::before {
+    background-color: #38bdf8;
+}
+
+.dropdown-lane--rose::before {
+    background-color: #fb7185;
+}
+
+.dropdown-lane--violet::before {
+    background-color: #a78bfa;
+}
+
+.dropdown-lane--slate::before {
+    background-color: #94a3b8;
+}
+
+.dropdown-lane-title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.55rem 1.15rem 0.35rem 1.45rem;
+}
+
+.dropdown-lane-title-text {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #ecf0f1;
+}
+
+.dropdown-lane--inventario .dropdown-lane-title-text,
+.dropdown-lane--amber .dropdown-lane-title-text {
+    color: #fbbf24;
+}
+
+.dropdown-lane--adquisicion .dropdown-lane-title-text,
+.dropdown-lane--teal .dropdown-lane-title-text {
+    color: #5eead4;
+}
+
+.dropdown-lane--sky .dropdown-lane-title-text {
+    color: #7dd3fc;
+}
+
+.dropdown-lane--rose .dropdown-lane-title-text {
+    color: #fda4af;
+}
+
+.dropdown-lane--violet .dropdown-lane-title-text {
+    color: #c4b5fd;
+}
+
+.dropdown-lane--slate .dropdown-lane-title-text {
+    color: #cbd5e1;
+}
+
+.dropdown-lane-title-hint {
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #95a5a6;
+    line-height: 1.25;
+}
+
+.dropdown-lane .dropdown-header,
+.dropdown-lane .dropdown-item {
+    padding-left: 1.45rem;
+}
+
+.dropdown-item--cta {
+    background: rgba(46, 204, 113, 0.1);
+}
+
+.dropdown-item--cta:hover {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--inventario::before,
+[data-bs-theme="dark"] .dropdown-lane--amber::before {
+    background-color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--adquisicion::before,
+[data-bs-theme="dark"] .dropdown-lane--teal::before {
+    background-color: #2dd4bf;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--sky::before {
+    background-color: #7dd3fc;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--rose::before {
+    background-color: #fda4af;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--violet::before {
+    background-color: #c4b5fd;
+}
+
+[data-bs-theme="dark"] .dropdown-lane--slate::before {
+    background-color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .dropdown-item--cta {
+    background: rgba(52, 211, 153, 0.12);
+}
+
+[data-bs-theme="dark"] .dropdown-item--cta:hover {
+    background: rgba(52, 211, 153, 0.22);
+    color: #34d399;
+}
+
+/*
+ * Ocultar la barra de scroll de los dropdowns del navbar.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El menú SIGUE pudiendo desplazarse (rueda del mouse, touch, trackpad).
+ * overflow-y: auto se queda; solo escondemos el riel visual para que
+ * no corte el diseño de los pasillos. Firefox usa scrollbar-width;
+ * Chrome/Safari/Edge usan ::-webkit-scrollbar.
+ */
 .navbar-dropdown::-webkit-scrollbar {
-    width: 6px;
-}
-
-.navbar-dropdown::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-.navbar-dropdown::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-}
-
-.navbar-dropdown::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 /* ===== SECCIÓN DE USUARIO ===== */
@@ -3231,8 +3372,7 @@ footer::after {
         transform: translateY(0);
     }
 
-    .navbar-dropdown.dropdown-mega,
-    .navbar-dropdown.dropdown-mega-3col {
+    .navbar-dropdown.dropdown-mega {
         position: absolute;
         left: 0;
         right: auto;
@@ -3250,75 +3390,55 @@ footer::after {
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
     }
 
-    /* Almacén (3 col): más estrecho para que quepa con left:0 bajo el botón */
-    .navbar-dropdown.dropdown-mega-3col {
-        width: min(480px, calc(100vw - 2rem));
-        max-width: min(480px, calc(100vw - 2rem));
-    }
-
     .navbar-menu-item:hover .navbar-dropdown.dropdown-mega,
-    .navbar-menu-item.active .navbar-dropdown.dropdown-mega,
-    .navbar-menu-item:hover .navbar-dropdown.dropdown-mega-3col,
-    .navbar-menu-item.active .navbar-dropdown.dropdown-mega-3col {
+    .navbar-menu-item.active .navbar-dropdown.dropdown-mega {
         transform: translateY(0);
     }
 
     /*
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Ya no usamos right:0 en Almacén: con panel ancho se cortaba por la
-     * izquierda. Todos los mega-menús quedan con left:0 (salen del botón)
-     * y Almacén usa ancho ~480px para caber en tablet.
+     * Todos los mega-menús (Servicio y Almacén) salen del botón con left:0
+     * para no recortarse. Almacén ya no usa 3 columnas, así que comparte
+     * el mismo ancho que Servicio Técnico.
      */
 
     /* Contenido denso dentro del flyout */
-    .navbar-dropdown.dropdown-mega .dropdown-header,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-header {
-        padding: 0.35rem 0.85rem;
+    .navbar-dropdown.dropdown-mega .dropdown-header {
+        padding: 0.35rem 0.85rem 0.35rem 1.15rem;
         font-size: 0.7rem;
         margin-bottom: 0.1rem;
     }
 
-    .navbar-dropdown.dropdown-mega .dropdown-item,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-item {
-        padding: 0.4rem 0.85rem;
+    .navbar-dropdown.dropdown-mega .dropdown-item {
+        padding: 0.4rem 0.85rem 0.4rem 1.15rem;
         font-size: 0.82rem;
         gap: 0.5rem;
         min-height: 36px;
     }
 
-    .navbar-dropdown.dropdown-mega .dropdown-item:hover,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-item:hover {
-        padding-left: 1rem;
+    .navbar-dropdown.dropdown-mega .dropdown-item:hover {
+        padding-left: 1.3rem;
     }
 
-    .navbar-dropdown.dropdown-mega .dropdown-item i,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-item i {
+    .navbar-dropdown.dropdown-mega .dropdown-item i {
         font-size: 0.9rem;
         width: 18px;
     }
 
-    .navbar-dropdown.dropdown-mega .dropdown-section,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-section {
+    .navbar-dropdown.dropdown-mega .dropdown-section {
         padding: 0.35rem 0;
     }
 
-    .navbar-dropdown.dropdown-mega .dropdown-column,
-    .navbar-dropdown.dropdown-mega-3col .dropdown-column {
+    .navbar-dropdown.dropdown-mega .dropdown-column {
         padding: 0.25rem 0;
     }
 
-    /* 3 columnas → 2 en tablet landscape */
-    .dropdown-mega-3col {
-        grid-template-columns: repeat(2, 1fr);
+    .navbar-dropdown.dropdown-mega .dropdown-lane-title {
+        padding: 0.4rem 0.85rem 0.25rem 1.15rem;
     }
 
-    .dropdown-mega-3col .dropdown-column:nth-child(2) {
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .dropdown-mega-3col .dropdown-column:nth-child(3) {
-        border-right: none;
-        grid-column: 1 / -1;
+    .navbar-dropdown.dropdown-mega .dropdown-lane-title-hint {
+        font-size: 0.64rem;
     }
 }
 
@@ -3568,8 +3688,7 @@ footer::after {
     }
 
     /* Mega-menu en móvil: volver a una sola columna */
-    .dropdown-mega,
-    .dropdown-mega-3col {
+    .dropdown-mega {
         min-width: 100%;
         display: block;
         grid-template-columns: none;
@@ -3579,10 +3698,14 @@ footer::after {
         padding: 0;
     }
 
-    .dropdown-mega .dropdown-column:first-child,
-    .dropdown-mega-3col .dropdown-column:nth-child(2) {
+    .dropdown-mega .dropdown-column:first-child {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .dropdown-lane::before {
+        top: 0.35rem;
+        bottom: 0.35rem;
     }
 
     .navbar-actions {

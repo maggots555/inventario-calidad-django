@@ -134,35 +134,38 @@
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
                     <div class="navbar-dropdown" id="dropdown-inventario">
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
-                            <a href="{% url 'dashboard_inventario' %}" class="dropdown-item">
-                                <i class="bi bi-bar-chart-line text-info"></i> Dashboard Inventario
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-box"></i> Productos</h6>
-                            <a href="{% url 'lista_productos' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul text-primary"></i> Lista de Productos
-                            </a>
-                            <a href="{% url 'crear_producto' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle text-success"></i> Agregar Producto
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
-                            <a href="{% url 'lista_movimientos' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul text-primary"></i> Historial de Movimientos
-                            </a>
-                            <a href="{% url 'crear_movimiento' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle text-success"></i> Registrar Movimiento
-                            </a>
-                            <a href="{% url 'movimiento_rapido' %}" class="dropdown-item">
-                                <i class="bi bi-qr-code-scan text-warning"></i> Scanner QR Rápido
-                            </a>
-                            <a href="{% url 'movimiento_fraccionario' %}" class="dropdown-item">
-                                <i class="bi bi-droplet-half text-info"></i> Movimiento Fraccionario
-                            </a>
+                        {# 1 pasillo: inventario de sucursal (distinto del pasillo Inventario de Almacén). #}
+                        <div class="dropdown-lane dropdown-lane--sky">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Inventario sucursal</span>
+                                <span class="dropdown-lane-title-hint">Productos y movimientos de sucursal</span>
+                            </div>
+                            <div class="dropdown-section">
+                                <a href="{% url 'dashboard_inventario' %}" class="dropdown-item">
+                                    <i class="bi bi-graph-up text-info"></i> Dashboard
+                                </a>
+                                <a href="{% url 'lista_productos' %}" class="dropdown-item">
+                                    <i class="bi bi-box-seam text-primary"></i> Productos
+                                </a>
+                                <a href="{% url 'crear_producto' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-plus-square text-success"></i> Nuevo producto
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
+                                <a href="{% url 'lista_movimientos' %}" class="dropdown-item">
+                                    <i class="bi bi-arrow-down-up text-warning"></i> Movimientos
+                                </a>
+                                <a href="{% url 'crear_movimiento' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-arrow-left-right text-success"></i> Registrar movimiento
+                                </a>
+                                <a href="{% url 'movimiento_rapido' %}" class="dropdown-item">
+                                    <i class="bi bi-qr-code-scan text-warning"></i> Scanner QR
+                                </a>
+                                <a href="{% url 'movimiento_fraccionario' %}" class="dropdown-item">
+                                    <i class="bi bi-droplet-half text-info"></i> Fraccionario
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -174,32 +177,38 @@
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
                     <div class="navbar-dropdown" id="dropdown-calidad">
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
-                            <a href="{% url 'scorecard:dashboard' %}" class="dropdown-item">
-                                <i class="bi bi-bar-chart-line text-info"></i> Dashboard Calidad
-                            </a>
-                            <a href="{% url 'scorecard:reportes' %}" class="dropdown-item">
-                                <i class="bi bi-file-earmark-bar-graph text-primary"></i> Reportes y Análisis
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-exclamation-triangle"></i> Incidencias</h6>
-                            <a href="{% url 'scorecard:lista_incidencias' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul text-primary"></i> Lista de Incidencias
-                            </a>
-                            <a href="{% url 'scorecard:crear_incidencia' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle text-success"></i> Registrar Incidencia
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
-                            <a href="{% url 'scorecard:lista_categorias' %}" class="dropdown-item">
-                                <i class="bi bi-tags text-secondary"></i> Categorías
-                            </a>
-                            <a href="{% url 'scorecard:lista_componentes' %}" class="dropdown-item">
-                                <i class="bi bi-cpu text-secondary"></i> Componentes
-                            </a>
+                        {# 1 pasillo: incidencias de calidad y catálogo de categorías/componentes. #}
+                        <div class="dropdown-lane dropdown-lane--rose">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Control de calidad</span>
+                                <span class="dropdown-lane-title-hint">Incidencias y catálogo</span>
+                            </div>
+                            <div class="dropdown-section">
+                                <a href="{% url 'scorecard:dashboard' %}" class="dropdown-item">
+                                    <i class="bi bi-bar-chart-line text-info"></i> Dashboard
+                                </a>
+                                <a href="{% url 'scorecard:reportes' %}" class="dropdown-item">
+                                    <i class="bi bi-file-earmark-bar-graph text-primary"></i> Reportes
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-exclamation-triangle"></i> Incidencias</h6>
+                                <a href="{% url 'scorecard:lista_incidencias' %}" class="dropdown-item">
+                                    <i class="bi bi-clipboard2-pulse text-primary"></i> Incidencias
+                                </a>
+                                <a href="{% url 'scorecard:crear_incidencia' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-flag text-success"></i> Registrar incidencia
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-journal-bookmark"></i> Catálogo</h6>
+                                <a href="{% url 'scorecard:lista_categorias' %}" class="dropdown-item">
+                                    <i class="bi bi-tags text-secondary"></i> Categorías
+                                </a>
+                                <a href="{% url 'scorecard:lista_componentes' %}" class="dropdown-item">
+                                    <i class="bi bi-cpu text-secondary"></i> Componentes
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -211,12 +220,15 @@
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
                     <div class="navbar-dropdown dropdown-mega" id="dropdown-servicio">
-                        <!-- Columna 1: General + Órdenes -->
-                        <div class="dropdown-column">
+                        {# 2 pasillos: Operación (órdenes/tableros) | Seguimiento (reportes, piezas, RHITSO). #}
+                        <div class="dropdown-column dropdown-lane dropdown-lane--sky">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Operación</span>
+                                <span class="dropdown-lane-title-hint">Órdenes y tableros</span>
+                            </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
                                 <a href="{% url 'servicio_tecnico:inicio' %}" class="dropdown-item">
-                                    <i class="bi bi-house"></i> Inicio Servicio Técnico
+                                    <i class="bi bi-house text-info"></i> Inicio
                                 </a>
                                 <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="dropdown-item" data-nav-loader>
                                     <i class="bi bi-graph-up-arrow text-info"></i> Dashboard OOW-/FL-
@@ -230,50 +242,46 @@
                             </div>
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
-                                <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle-fill text-success"></i> Nueva Orden de Servicio
+                                <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-plus-circle-fill text-success"></i> Nueva orden
                                 </a>
                                 <a href="{% url 'servicio_tecnico:lista_activas' %}" class="dropdown-item">
-                                    <i class="bi bi-hourglass-split text-primary"></i> Órdenes Activas
+                                    <i class="bi bi-hourglass-split text-primary"></i> Órdenes activas
                                 </a>
                                 <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
-                                    <i class="bi bi-check-circle text-success"></i> Órdenes Finalizadas
+                                    <i class="bi bi-check-circle text-success"></i> Órdenes finalizadas
                                 </a>
                             </div>
                         </div>
-                        <!-- Columna 2: Reportes + Piezas + RHITSO + Config -->
-                        <div class="dropdown-column">
+                        <div class="dropdown-column dropdown-lane dropdown-lane--violet">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Seguimiento</span>
+                                <span class="dropdown-lane-title-hint">Reportes, piezas y RHITSO</span>
+                            </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-bar-chart-line"></i> Reportes y Encuestas</h6>
                                 <a href="{% url 'servicio_tecnico:concentrado_semanal' %}" class="dropdown-item">
-                                    <i class="bi bi-table text-success"></i> Concentrado Semanal
+                                    <i class="bi bi-table text-success"></i> Concentrado semanal
                                 </a>
                                 <a href="{% url 'servicio_tecnico:dashboard_encuestas' %}" class="dropdown-item">
-                                    <i class="bi bi-clipboard-pulse text-info"></i> Encuestas Satisfacción
+                                    <i class="bi bi-clipboard-pulse text-info"></i> Encuestas
                                 </a>
                                 <a href="{% url 'servicio_tecnico:dashboard_feedback_rechazo' %}" class="dropdown-item">
-                                    <i class="bi bi-exclamation-triangle text-warning"></i> Feedback de Rechazo
+                                    <i class="bi bi-exclamation-triangle text-warning"></i> Feedback de rechazo
                                 </a>
                                 <a href="{% url 'servicio_tecnico:dashboard_seguimiento_enlaces' %}" class="dropdown-item">
-                                    <i class="bi bi-link-45deg text-teal" style="color:#0d9488"></i> Seguimiento de Clientes
+                                    <i class="bi bi-link-45deg text-info"></i> Seguimiento de clientes
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Cotizaciones y Piezas</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Piezas y RHITSO</h6>
                                 <a href="{% url 'servicio_tecnico:dashboard_seguimiento_piezas' %}" class="dropdown-item">
-                                    <i class="bi bi-speedometer2 text-info"></i> Seguimiento de Piezas
+                                    <i class="bi bi-cpu text-info"></i> Seguimiento de piezas
                                 </a>
-                            </div>
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-microchip"></i> Módulo RHITSO</h6>
                                 <a href="{% url 'servicio_tecnico:dashboard_rhitso' %}" class="dropdown-item">
-                                    <i class="bi bi-speedometer text-primary"></i> Dashboard RHITSO
+                                    <i class="bi bi-microchip text-primary"></i> Dashboard RHITSO
                                 </a>
-                            </div>
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
                                 <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="dropdown-item">
-                                    <i class="bi bi-bookmark-star text-secondary"></i> Referencias de Gama
+                                    <i class="bi bi-bookmark-star text-secondary"></i> Referencias de gama
                                 </a>
                             </div>
                         </div>
@@ -286,71 +294,70 @@
                         <i class="bi bi-box-seam-fill"></i> <span class="menu-text">Almacén</span><span class="menu-text-full">Almacén/Compras</span>
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
-                    <div class="navbar-dropdown dropdown-mega dropdown-mega-3col" id="dropdown-almacen">
-                        <!-- Columna 1: General + Productos (con Unidades) -->
-                        <div class="dropdown-column">
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
-                                <a href="{% url 'almacen:dashboard' %}" class="dropdown-item">
-                                    <i class="bi bi-graph-up text-info"></i> Dashboard Almacén
-                                </a>
+                    {# 2 pasillos (como Servicio Técnico): Inventario = lo que hay/sale; Adquisición = cotizar o comprar. #}
+                    <div class="navbar-dropdown dropdown-mega" id="dropdown-almacen">
+                        <!-- Columna izquierda: stock, unidades, movimientos y salidas (SolicitudBaja) -->
+                        <div class="dropdown-column dropdown-lane dropdown-lane--inventario">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Inventario</span>
+                                <span class="dropdown-lane-title-hint">Stock, unidades y salidas</span>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-box"></i> Productos y Unidades</h6>
+                                <a href="{% url 'almacen:dashboard' %}" class="dropdown-item">
+                                    <i class="bi bi-graph-up text-info"></i> Dashboard
+                                </a>
                                 <a href="{% url 'almacen:lista_productos' %}" class="dropdown-item">
-                                    <i class="bi bi-list-ul text-primary"></i> Lista de Productos
+                                    <i class="bi bi-box-seam text-primary"></i> Productos
                                 </a>
                                 <a href="{% url 'almacen:lista_unidades' %}" class="dropdown-item">
-                                    <i class="bi bi-collection text-primary"></i> Unidades Individuales
+                                    <i class="bi bi-collection text-primary"></i> Unidades
                                 </a>
                                 <a href="{% url 'almacen:dashboard_distribucion_sucursales' %}" class="dropdown-item">
-                                    <i class="bi bi-diagram-3 text-info"></i> Distribución Multi-Sucursal
+                                    <i class="bi bi-diagram-3 text-info"></i> Distribución
                                 </a>
-                            </div>
-                        </div>
-                        <!-- Columna 2: Movimientos + Solicitudes -->
-                        <div class="dropdown-column">
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
                                 <a href="{% url 'almacen:lista_movimientos' %}" class="dropdown-item">
-                                    <i class="bi bi-arrow-down-up text-warning"></i> Historial de Movimientos
+                                    <i class="bi bi-arrow-down-up text-warning"></i> Movimientos
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
-                                <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle text-success"></i> Nueva solicitud
+                                <h6 class="dropdown-header"><i class="bi bi-box-arrow-up"></i> Salidas de stock</h6>
+                                <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-box-arrow-up text-success"></i> Pedir pieza
                                 </a>
                                 <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
-                                    <i class="bi bi-list-ul text-primary"></i> Lista de Solicitudes
-                                </a>
-                            </div>
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras Directas</h6>
-                                <a href="{% url 'almacen:crear_compra' %}" class="dropdown-item">
-                                    <i class="bi bi-cart-plus text-success"></i> Nueva Compra Directa
-                                </a>
-                                <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
-                                    <i class="bi bi-list-check text-primary"></i> Lista de Compras
+                                    <i class="bi bi-clipboard-check text-primary"></i> Solicitudes de salida
                                 </a>
                             </div>
                         </div>
-                        <!-- Columna 3: Cotizaciones + Configuración -->
-                        <div class="dropdown-column">
+                        <!-- Columna derecha: cotizar (ST) o comprar directo; catálogo de proveedores -->
+                        <div class="dropdown-column dropdown-lane dropdown-lane--adquisicion">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Adquisición</span>
+                                <span class="dropdown-lane-title-hint">Cotizar o comprar a proveedores</span>
+                            </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones Multi-Proveedor</h6>
-                                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle text-success"></i> Nueva Solicitud de Cotización
+                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones</h6>
+                                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-file-earmark-plus text-success"></i> Nueva cotización
                                 </a>
                                 <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-list-ul text-primary"></i> Lista de Solicitudes
+                                    <i class="bi bi-files text-primary"></i> Ver cotizaciones
                                 </a>
                                 <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
-                                    <i class="bi bi-clipboard-data text-info"></i> Panel de Cotizaciones
+                                    <i class="bi bi-clipboard-data text-info"></i> Panel de cotizaciones
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras directas</h6>
+                                <a href="{% url 'almacen:crear_compra' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-cart-plus text-success"></i> Nueva compra
+                                </a>
+                                <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
+                                    <i class="bi bi-bag-check text-primary"></i> Ver compras
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-journal-bookmark"></i> Catálogo</h6>
                                 <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
                                     <i class="bi bi-truck text-secondary"></i> Proveedores
                                 </a>
@@ -369,49 +376,56 @@
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
                     <div class="navbar-dropdown" id="dropdown-configuracion">
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-building"></i> Sucursales</h6>
-                            <a href="{% url 'lista_sucursales' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul text-primary"></i> Lista de Sucursales
-                            </a>
-                            <a href="{% url 'crear_sucursal' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle text-success"></i> Agregar Sucursal
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-people"></i> Empleados</h6>
-                            <a href="{% url 'lista_empleados' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul text-primary"></i> Lista de Empleados
-                            </a>
-                            <a href="{% url 'crear_empleado' %}" class="dropdown-item">
-                                <i class="bi bi-person-plus text-success"></i> Agregar Empleado
-                            </a>
-                            {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'supervisor' %}
-                            <a href="{% url 'servicio_tecnico:directorio_empleados' %}" class="dropdown-item">
-                                <i class="bi bi-people-fill text-warning"></i> Directorio Empleados
-                            </a>
-                            {% endif %}
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-hdd-stack"></i> Sistema</h6>
-                            <a href="{% url 'admin_storage_monitor' %}" class="dropdown-item">
-                                <i class="bi bi-hdd-stack text-info"></i> Monitor de Almacenamiento
-                            </a>
-                            {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' %}
-                            <a href="{% url 'almacen:panel_parametros_cotizador' %}" class="dropdown-item">
-                                <i class="bi bi-sliders text-primary"></i> Parámetros del cotizador
-                            </a>
-                            {% endif %}
-                            {% if user.is_superuser %}
-                            <a href="{% url 'admin_clear_redis_cache' %}" class="dropdown-item" 
-                               onclick="return confirm('¿Estás seguro de limpiar la caché de Redis? Los dashboards se regenerarán en la próxima carga.');">
-                                <i class="bi bi-arrow-clockwise text-warning"></i> Limpiar Caché Redis
-                            </a>
-                            <a href="{% url 'admin_regenerar_cita' %}" class="dropdown-item"
-                               onclick="return confirm('¿Regenerar la cita del día? Se generará una nueva reflexión con IA.');">
-                                <i class="bi bi-quote text-info"></i> Regenerar Cita del Día
-                            </a>
-                            {% endif %}
+                        {# 1 pasillo: sucursales, gente y herramientas de sistema. Los {% if %} de rol no se tocan. #}
+                        <div class="dropdown-lane dropdown-lane--slate">
+                            <div class="dropdown-lane-title">
+                                <span class="dropdown-lane-title-text">Configuración</span>
+                                <span class="dropdown-lane-title-hint">Sucursales, gente y sistema</span>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-building"></i> Sucursales</h6>
+                                <a href="{% url 'lista_sucursales' %}" class="dropdown-item">
+                                    <i class="bi bi-building text-primary"></i> Sucursales
+                                </a>
+                                <a href="{% url 'crear_sucursal' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-building-add text-success"></i> Nueva sucursal
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-people"></i> Empleados</h6>
+                                <a href="{% url 'lista_empleados' %}" class="dropdown-item">
+                                    <i class="bi bi-people text-primary"></i> Empleados
+                                </a>
+                                <a href="{% url 'crear_empleado' %}" class="dropdown-item dropdown-item--cta">
+                                    <i class="bi bi-person-plus text-success"></i> Nuevo empleado
+                                </a>
+                                {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'supervisor' %}
+                                <a href="{% url 'servicio_tecnico:directorio_empleados' %}" class="dropdown-item">
+                                    <i class="bi bi-people-fill text-warning"></i> Directorio
+                                </a>
+                                {% endif %}
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-hdd-stack"></i> Sistema</h6>
+                                <a href="{% url 'admin_storage_monitor' %}" class="dropdown-item">
+                                    <i class="bi bi-hdd-stack text-info"></i> Monitor
+                                </a>
+                                {% if user.is_superuser or user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' %}
+                                <a href="{% url 'almacen:panel_parametros_cotizador' %}" class="dropdown-item">
+                                    <i class="bi bi-sliders text-primary"></i> Parámetros del cotizador
+                                </a>
+                                {% endif %}
+                                {% if user.is_superuser %}
+                                <a href="{% url 'admin_clear_redis_cache' %}" class="dropdown-item"
+                                   onclick="return confirm('¿Estás seguro de limpiar la caché de Redis? Los dashboards se regenerarán en la próxima carga.');">
+                                    <i class="bi bi-arrow-clockwise text-warning"></i> Limpiar caché Redis
+                                </a>
+                                <a href="{% url 'admin_regenerar_cita' %}" class="dropdown-item"
+                                   onclick="return confirm('¿Regenerar la cita del día? Se generará una nueva reflexión con IA.');">
+                                    <i class="bi bi-quote text-info"></i> Regenerar cita del día
+                                </a>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
