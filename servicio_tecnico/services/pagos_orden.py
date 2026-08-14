@@ -21,8 +21,9 @@ from typing import Optional
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db import transaction
 from django.db.models import Sum
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from config.paises_config import get_pais_actual
 from servicio_tecnico.services.historial import registrar_historial
@@ -227,23 +228,30 @@ def _comprimir_comprobante(imagen_file) -> ContentFile:
     Efectos secundarios:
         Lee el archivo en memoria; no toca disco todavía.
     """
-    imagen_file.seek(0)
-    img = Image.open(imagen_file)
-    img = ImageOps.exif_transpose(img)
+    try:
+        imagen_file.seek(0)
+        img = Image.open(imagen_file)
+        img = ImageOps.exif_transpose(img)
 
-    # Paso: JPEG no soporta transparencia; fondo blanco si viene PNG.
-    if img.mode in ('RGBA', 'LA', 'P'):
-        fondo = Image.new('RGB', img.size, (255, 255, 255))
-        mascara = img.split()[-1] if img.mode == 'RGBA' else None
-        fondo.paste(img, mask=mascara)
-        img = fondo
-    elif img.mode != 'RGB':
-        img = img.convert('RGB')
+        # Paso: JPEG no soporta transparencia; fondo blanco si viene PNG.
+        if img.mode in ('RGBA', 'LA', 'P'):
+            fondo = Image.new('RGB', img.size, (255, 255, 255))
+            mascara = img.split()[-1] if img.mode == 'RGBA' else None
+            fondo.paste(img, mask=mascara)
+            img = fondo
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
 
-    buffer = BytesIO()
-    img.save(buffer, format='JPEG', quality=82, optimize=True)
-    buffer.seek(0)
-    return ContentFile(buffer.read(), name='comprobante.jpg')
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=82, optimize=True)
+        buffer.seek(0)
+        return ContentFile(buffer.read(), name='comprobante.jpg')
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        # EXPLICACIÓN: un .jpg corrupto pasa la extensión pero Pillow no
+        # puede abrirlo. Devolvemos error de formulario, no un 500.
+        raise ValidationError(
+            'El comprobante no es una imagen válida. Sube un JPG o PNG nítido.'
+        ) from exc
 
 
 def registrar_pago(
@@ -278,7 +286,7 @@ def registrar_pago(
     Raises:
         ValidationError: monto inválido o mayor al saldo pendiente.
     """
-    from servicio_tecnico.models import PagoOrden
+    from servicio_tecnico.models import OrdenServicio, PagoOrden
 
     if empleado is None:
         raise ValidationError('Se necesita un empleado para registrar el pago.')
@@ -287,36 +295,49 @@ def registrar_pago(
     if monto_dec <= Decimal('0.00'):
         raise ValidationError('El monto del pago debe ser mayor a cero.')
 
-    # Paso: no dejamos cobrar de más si ya hay un total conocido.
-    resumen = calcular_resumen_cobro(orden, codigo_pais=codigo_pais)
-    if resumen.total_a_cobrar > 0 and monto_dec > resumen.saldo:
-        raise ValidationError(
-            f'El pago (${monto_dec}) supera el saldo pendiente '
-            f'(${resumen.saldo}).'
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # atomic + select_for_update: si dos personas cobran a la vez la misma
+    # orden, la segunda espera a que termine la primera y vuelve a leer
+    # el saldo. Sin esto, ambas verían "faltan $500" y se duplicaría el cobro.
+    with transaction.atomic():
+        orden_bloqueada = OrdenServicio.objects.select_for_update().get(pk=orden.pk)
+        resumen = calcular_resumen_cobro(orden_bloqueada, codigo_pais=codigo_pais)
+
+        # Paso: sin cotización ni venta no hay cifra contra la cual abonar.
+        if resumen.total_a_cobrar <= Decimal('0.00'):
+            raise ValidationError(
+                'No hay un total a cobrar todavía. Genera la cotización '
+                'o una venta mostrador antes de registrar un pago.'
+            )
+
+        if monto_dec > resumen.saldo:
+            raise ValidationError(
+                f'El pago (${monto_dec}) supera el saldo pendiente '
+                f'(${resumen.saldo}).'
+            )
+
+        pago = PagoOrden(
+            orden=orden_bloqueada,
+            monto=monto_dec,
+            tipo=tipo,
+            metodo=metodo,
+            notas=(notas or '').strip(),
+            registrado_por=empleado,
         )
+        if comprobante_file:
+            pago.comprobante = _comprimir_comprobante(comprobante_file)
+        pago.save()
 
-    pago = PagoOrden(
-        orden=orden,
-        monto=monto_dec,
-        tipo=tipo,
-        metodo=metodo,
-        notas=(notas or '').strip(),
-        registrado_por=empleado,
-    )
-    if comprobante_file:
-        pago.comprobante = _comprimir_comprobante(comprobante_file)
-    pago.save()
-
-    registrar_historial(
-        orden=orden,
-        tipo_evento='sistema',
-        usuario=empleado,
-        comentario=(
-            f'Pago registrado: ${monto_dec} ({pago.get_tipo_display()}, '
-            f'{pago.get_metodo_display()}).'
-        ),
-        es_sistema=True,
-    )
+        registrar_historial(
+            orden=orden_bloqueada,
+            tipo_evento='sistema',
+            usuario=empleado,
+            comentario=(
+                f'Pago registrado: ${monto_dec} ({pago.get_tipo_display()}, '
+                f'{pago.get_metodo_display()}).'
+            ),
+            es_sistema=True,
+        )
     return pago
 
 
@@ -331,16 +352,20 @@ def eliminar_pago(pago, empleado) -> None:
     Efectos secundarios:
         DELETE del pago (y archivo de comprobante) + HistorialOrden.
     """
+    if empleado is None:
+        raise ValidationError('Se necesita un empleado para eliminar el pago.')
+
     orden = pago.orden
     monto = pago.monto
-    pago.delete()
-    registrar_historial(
-        orden=orden,
-        tipo_evento='sistema',
-        usuario=empleado,
-        comentario=f'Pago eliminado (corrección): ${monto}.',
-        es_sistema=True,
-    )
+    with transaction.atomic():
+        pago.delete()
+        registrar_historial(
+            orden=orden,
+            tipo_evento='sistema',
+            usuario=empleado,
+            comentario=f'Pago eliminado (corrección): ${monto}.',
+            es_sistema=True,
+        )
 
 
 def mensaje_alerta_pago_por_estado(orden, nuevo_estado: str) -> Optional[str]:

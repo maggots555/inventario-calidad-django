@@ -183,6 +183,46 @@ class CalcularResumenCobroTest(TestCase):
             )
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
 
+    def test_sin_total_no_permite_pago(self):
+        """
+        Borde: orden sin cotización ni venta no acepta abonos sueltos.
+        Evita que el saldo se quede en $0 con pagos 'fantasma'.
+        """
+        self.cotizacion.delete()
+        with self.assertRaises(ValidationError) as ctx:
+            registrar_pago(
+                self.orden, self.empleado, Decimal('100.00'),
+                'otro', 'efectivo', codigo_pais='MX',
+            )
+        self.assertIn('total a cobrar', str(ctx.exception).lower())
+        self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
+
+    def test_cotizacion_rechazada_subtotal_cero(self):
+        """Borde: si el cliente rechazó, esa cotización ya no se cobra."""
+        self.cotizacion.usuario_acepto = False
+        self.cotizacion.save()
+        resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
+        self.assertEqual(resumen.subtotal_cotizacion, Decimal('0.00'))
+        self.assertEqual(resumen.total_a_cobrar, Decimal('0.00'))
+        self.assertFalse(resumen.es_estimado)
+
+    def test_comprobante_corrupto_no_tira_500(self):
+        """Borde: un archivo con extensión de imagen pero contenido basura."""
+        falso = SimpleUploadedFile(
+            'ticket.jpg',
+            b'esto no es una imagen',
+            content_type='image/jpeg',
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            registrar_pago(
+                self.orden, self.empleado, Decimal('348.00'),
+                'anticipo', 'transferencia',
+                comprobante_file=falso,
+                codigo_pais='MX',
+            )
+        self.assertIn('imagen válida', str(ctx.exception).lower())
+        self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
+
 
 class DetalleOrdenPagosIntegracionTest(TestCase):
     """
@@ -354,6 +394,27 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
         textos = [str(m.message) for m in self._ultima_request._messages]
         self.assertTrue(any('permiso' in t.lower() for t in textos))
+
+    def test_eliminar_pago_recalcula_saldo(self):
+        """Feliz: borrar un abono capturado por error deja el saldo otra vez."""
+        registrar_pago(
+            self.orden,
+            self.user_recepcion.empleado,
+            Decimal('348.00'),
+            'anticipo',
+            'efectivo',
+            codigo_pais='MX',
+        )
+        pago = PagoOrden.objects.get(orden=self.orden)
+        response = self._post(self.user_recepcion, {
+            'form_type': 'eliminar_pago',
+            'pago_id': str(pago.pk),
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
+        resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
+        self.assertEqual(resumen.pagado, Decimal('0.00'))
+        self.assertEqual(resumen.saldo, Decimal('696.00'))
 
     @override_settings(MEDIA_ROOT='/tmp/sigma_pagos_test_media')
     def test_entregar_con_saldo_avisa_pero_cambia_estado(self):

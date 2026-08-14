@@ -144,6 +144,11 @@ def handle_eliminar_pago(request, orden, empleado_actual):
         messages.error(request, 'No se encontró el pago a eliminar.')
         return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
-    eliminar_pago(pago, empleado_actual)
+    try:
+        eliminar_pago(pago, empleado_actual)
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
     messages.success(request, 'Pago eliminado. El saldo se recalculó.')
     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
