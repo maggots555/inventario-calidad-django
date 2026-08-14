@@ -4,8 +4,10 @@ Cálculo de cobros y registro de pagos de una orden de servicio.
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 El modelo PagoOrden solo guarda cada abono (monto, foto, quién cobró).
-Este archivo es el "cerebro": suma cotización + venta mostrador, aplica
-IVA de México, resta lo ya pagado y valida que no se cobre de más.
+Este archivo es el "cerebro": suma piezas cotizadas (sin diagnóstico),
+aplica IVA de México, suma venta mostrador, resta lo ya pagado y
+valida que no se cobre de más. El diagnóstico de ingreso ya está
+cubierto al recibir el equipo: no entra al cobro.
 
 No es una vista HTTP: lo llaman detalle_orden, el banner de alertas y
 los tests. Así no hinchamos OrdenServicio ni models.py (regla fat models).
@@ -48,12 +50,14 @@ class ResumenCobro:
     Totales listos para mostrar en el detalle de la orden.
 
     Objetivo de negocio:
-        Una sola foto del dinero: qué se cotizó, cuánto IVA, qué se
-        pagó y cuánto falta (incluyendo si ya cubre el 50% de anticipo).
+        Una sola foto del dinero: piezas cotizadas (el diagnóstico ya
+        se cubrió al ingresar), IVA ya incorporado, venta mostrador,
+        lo pagado y el saldo (incluye si cubre el 50% de anticipo).
     """
 
     subtotal_cotizacion: Decimal
     iva_cotizacion: Decimal
+    total_cotizacion_con_iva: Decimal
     total_venta_mostrador: Decimal
     total_a_cobrar: Decimal
     pagado: Decimal
@@ -119,15 +123,39 @@ def _codigo_pais_activo(codigo_pais: Optional[str] = None) -> str:
         return 'MX'
 
 
-def _subtotal_cotizacion(orden) -> tuple[Decimal, bool]:
+def _suma_precio_piezas(piezas) -> Decimal:
     """
-    Subtotal de la cotización ST (sin IVA).
+    Suma el precio al cliente de un iterable de PiezaCotizada.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Si el cliente ya aceptó, usamos costo_total_final (solo piezas
-    aceptadas + mano de obra con descuento). Si todavía no responde,
-    usamos un estimado (todas las piezas + MO) para poder cobrar el
-    anticipo del 50% antes de pedir refacciones.
+    Almacén guarda `precio_unitario_cliente` (sin IVA, con margen).
+    Cotizaciones viejas solo de ST no tienen ese campo: usamos el
+    costo de proveedor como respaldo.
+
+    Args:
+        piezas: queryset o lista de PiezaCotizada.
+
+    Returns:
+        Decimal redondeado a 2 decimales.
+    """
+    total = Decimal('0.00')
+    for pieza in piezas:
+        if pieza.precio_unitario_cliente is not None:
+            total += pieza.cantidad * pieza.precio_unitario_cliente
+        else:
+            total += pieza.costo_total
+    return _dinero(total)
+
+
+def _subtotal_cotizacion(orden) -> tuple[Decimal, bool]:
+    """
+    Subtotal de piezas cotizadas (sin IVA y sin diagnóstico).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El diagnóstico (mano de obra de ingreso) ya se cubre al recibir
+    el equipo. Aquí solo entran las piezas. Si el cliente ya aceptó,
+    sumamos las aceptadas; si todavía no responde, un estimado con
+    todas las piezas para poder cobrar el anticipo del 50%.
 
     Args:
         orden: OrdenServicio (puede o no tener cotizacion).
@@ -139,23 +167,16 @@ def _subtotal_cotizacion(orden) -> tuple[Decimal, bool]:
     if cotizacion is None:
         return Decimal('0.00'), False
 
-    # Paso: cotización aceptada → total real a cobrar (piezas sí).
+    # Paso: cotización aceptada → solo piezas que el cliente sí pidió.
     if cotizacion.usuario_acepto:
-        return _dinero(cotizacion.costo_total_final), False
+        return _dinero(cotizacion.monto_piezas_aceptadas_cobro), False
 
     # Paso: rechazada → ya no cobramos esa cotización (sí puede haber VM).
     if cotizacion.usuario_acepto is False:
         return Decimal('0.00'), False
 
-    # Paso: sin respuesta → estimado con todas las piezas al precio cliente.
-    total_piezas = Decimal('0.00')
-    for pieza in cotizacion.piezas_cotizadas.all():
-        if pieza.precio_unitario_cliente is not None:
-            total_piezas += pieza.cantidad * pieza.precio_unitario_cliente
-        else:
-            total_piezas += pieza.costo_total
-    estimado = total_piezas + (cotizacion.costo_mano_obra or Decimal('0.00'))
-    return _dinero(estimado), True
+    # Paso: sin respuesta → estimado con todas las piezas (sin MO).
+    return _suma_precio_piezas(cotizacion.piezas_cotizadas.all()), True
 
 
 def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenCobro:
@@ -179,11 +200,13 @@ def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenC
     aplica_iva = codigo == 'MX'
     tasa = IVA_TASA_MX if aplica_iva else Decimal('0.00')
     iva = _dinero(subtotal * tasa) if aplica_iva else Decimal('0.00')
+    # Paso: piezas + IVA en un solo monto (la UI no lo vuelve a sumar).
+    total_cotizacion_con_iva = _dinero(subtotal + iva)
 
     venta = getattr(orden, 'venta_mostrador', None)
     total_vm = _dinero(venta.total_venta) if venta is not None else Decimal('0.00')
 
-    total = _dinero(subtotal + iva + total_vm)
+    total = _dinero(total_cotizacion_con_iva + total_vm)
 
     # Paso: suma de abonos ya capturados (si no hay, 0).
     agregado = orden.pagos.aggregate(total=Sum('monto'))['total']
@@ -207,6 +230,7 @@ def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenC
     return ResumenCobro(
         subtotal_cotizacion=subtotal,
         iva_cotizacion=iva,
+        total_cotizacion_con_iva=total_cotizacion_con_iva,
         total_venta_mostrador=total_vm,
         total_a_cobrar=total,
         pagado=pagado,

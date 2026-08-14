@@ -42,15 +42,14 @@
                             <table class="table table-sm seccion-pagos__desglose mb-0">
                                 <tbody>
                                     <tr>
-                                        <td>Cotización (piezas + mano de obra, sin IVA)</td>
-                                        <td class="text-end">${{ resumen_cobro.subtotal_cotizacion|floatformat:2 }}</td>
+                                        <td>
+                                            Cotización (solo piezas, IVA incluido)
+                                            <div class="small text-muted">
+                                                El diagnóstico de ingreso no se incluye: ya se cubre al recibir el equipo.
+                                            </div>
+                                        </td>
+                                        <td class="text-end">${{ resumen_cobro.total_cotizacion_con_iva|floatformat:2 }}</td>
                                     </tr>
-                                    {% if resumen_cobro.aplica_iva %}
-                                    <tr>
-                                        <td>IVA (16%)</td>
-                                        <td class="text-end">${{ resumen_cobro.iva_cotizacion|floatformat:2 }}</td>
-                                    </tr>
-                                    {% endif %}
                                     <tr>
                                         <td>Venta mostrador (IVA incluido)</td>
                                         <td class="text-end">${{ resumen_cobro.total_venta_mostrador|floatformat:2 }}</td>

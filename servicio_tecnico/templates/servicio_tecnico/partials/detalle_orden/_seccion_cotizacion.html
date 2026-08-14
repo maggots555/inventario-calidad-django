@@ -311,7 +311,10 @@
                                         
                                         <table class="table table-sm table-borderless">
                                             <tr>
-                                                <td class="text-muted">Mano de Obra:</td>
+                                                <td class="text-muted">
+                                                    Mano de Obra:
+                                                    <div class="small">Diagnóstico de ingreso (ya cubierto al recibir el equipo; no se cobra otra vez).</div>
+                                                </td>
                                                 <td class="text-end">
                                                     <form method="post" class="d-inline-flex align-items-center gap-1" id="formEditarManoObra">
                                                         {% csrf_token %}
@@ -371,7 +374,6 @@
                                                 <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
                                             </tr>
                                             
-                                            <!-- 🆕 NUEVO: Mostrar descuento de mano de obra si aplica -->
                                             {% if cotizacion.usuario_acepto and cotizacion.descontar_mano_obra %}
                                                 <tr style="border-top: 2px solid #ffc107;">
                                                     <td class="text-danger">
@@ -384,32 +386,31 @@
                                                     </td>
                                                 </tr>
                                             {% endif %}
-                                            
-                                            <!-- Total a pagar (actualizado para usar costo_total_final) -->
-                                            {% if cotizacion.usuario_acepto %}
+
+                                            {% if resumen_cobro.subtotal_cotizacion > 0 or resumen_cobro.total_cotizacion_con_iva > 0 %}
+                                                {% if resumen_cobro.aplica_iva %}
+                                                <tr>
+                                                    <td class="text-muted">Piezas (precio cliente, sin IVA):</td>
+                                                    <td class="text-end"><strong>${{ resumen_cobro.subtotal_cotizacion|floatformat:2 }}</strong></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="text-muted">IVA (16%):</td>
+                                                    <td class="text-end"><strong>${{ resumen_cobro.iva_cotizacion|floatformat:2 }}</strong></td>
+                                                </tr>
+                                                {% endif %}
                                                 <tr style="border-top: 2px solid #28a745;">
-                                                    <td class="text-success"><strong>🎯 TOTAL A PAGAR:</strong></td>
+                                                    <td class="text-success">
+                                                        <strong>TOTAL A COBRAR (piezas{% if resumen_cobro.aplica_iva %} + IVA{% endif %}):</strong>
+                                                        {% if resumen_cobro.es_estimado %}
+                                                        <div class="small text-muted">Estimado: la cotización aún no está aceptada.</div>
+                                                        {% endif %}
+                                                    </td>
                                                     <td class="text-end">
                                                         <h5 class="mb-0 text-success">
-                                                            ${{ cotizacion.costo_total_final|floatformat:2 }}
+                                                            ${{ resumen_cobro.total_cotizacion_con_iva|floatformat:2 }}
                                                         </h5>
                                                     </td>
                                                 </tr>
-                                                
-                                                <!-- Mostrar ahorro si hay descuento -->
-                                                {% if cotizacion.descontar_mano_obra %}
-                                                    <tr>
-                                                        <td colspan="2" class="text-center">
-                                                            <div class="alert alert-success mb-0 mt-2 py-2" style="border-left: 4px solid #28a745;">
-                                                                <small>
-                                                                    <i class="bi bi-gift-fill"></i>
-                                                                    <strong>¡Beneficio aplicado!</strong>
-                                                                    El cliente ahorra <strong>${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}</strong> en mano de obra
-                                                                </small>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                {% endif %}
                                             {% endif %}
                                         </table>
                                         

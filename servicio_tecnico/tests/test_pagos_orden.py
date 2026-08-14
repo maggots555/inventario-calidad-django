@@ -3,8 +3,8 @@ Tests de cobros: resumen (IVA/saldo/50%) y POST en detalle_orden.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-1) Unidad: calcular_resumen_cobro suma cotización + IVA MX + venta
-   mostrador, y marca si ya cubre el 50% o el 100%.
+1) Unidad: calcular_resumen_cobro suma piezas (sin diagnóstico) + IVA MX
+   + venta mostrador, y marca si ya cubre el 50% o el 100%.
 2) Unidad: registrar_pago rechaza un abono mayor al saldo.
 3) Integración: recepción SÍ guarda el pago (con foto); el técnico NO.
 4) Integración: pasar a "entregado" con saldo avisa, pero SÍ cambia estado.
@@ -56,7 +56,8 @@ def _png_bytes() -> bytes:
 
 class CalcularResumenCobroTest(TestCase):
     """
-    Objetivo: el total combina cotización (con IVA en MX) y venta mostrador.
+    Objetivo: el total combina piezas cotizadas (con IVA en MX) y venta mostrador.
+    El diagnóstico / mano de obra de ingreso no entra.
 
     Efectos: crea sucursal, orden, cotización y opcionalmente VM/pagos.
     """
@@ -112,33 +113,36 @@ class CalcularResumenCobroTest(TestCase):
 
     def test_mexico_suma_iva_y_marca_anticipo(self):
         """
-        Feliz MX: piezas 500 + MO 100 = 600; IVA 96; total 696.
-        Un pago de 348 cubre el 50% y deja saldo.
+        Feliz MX: solo piezas 500; IVA 80; total 580. La MO 100 no entra.
+        Un pago de 290 cubre el 50% y deja saldo.
         """
-        # 600 * 0.16 = 96.00 → total 696.00; 50% = 348.00
+        # 500 * 0.16 = 80.00 → total 580.00; 50% = 290.00
         registrar_pago(
             orden=self.orden,
             empleado=self.empleado,
-            monto=Decimal('348.00'),
+            monto=Decimal('290.00'),
             tipo='anticipo',
             metodo='transferencia',
             codigo_pais='MX',
         )
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
-        self.assertEqual(resumen.subtotal_cotizacion, Decimal('600.00'))
-        self.assertEqual(resumen.iva_cotizacion, Decimal('96.00'))
-        self.assertEqual(resumen.total_a_cobrar, Decimal('696.00'))
-        self.assertEqual(resumen.pagado, Decimal('348.00'))
-        self.assertEqual(resumen.saldo, Decimal('348.00'))
+        self.assertEqual(self.cotizacion.costo_mano_obra, Decimal('100.00'))
+        self.assertEqual(resumen.subtotal_cotizacion, Decimal('500.00'))
+        self.assertEqual(resumen.iva_cotizacion, Decimal('80.00'))
+        self.assertEqual(resumen.total_cotizacion_con_iva, Decimal('580.00'))
+        self.assertEqual(resumen.total_a_cobrar, Decimal('580.00'))
+        self.assertEqual(resumen.pagado, Decimal('290.00'))
+        self.assertEqual(resumen.saldo, Decimal('290.00'))
         self.assertTrue(resumen.cubre_anticipo_50)
         self.assertFalse(resumen.cubierto_100)
         self.assertTrue(resumen.aplica_iva)
 
     def test_argentina_no_suma_iva(self):
-        """Borde: fuera de MX el total es subtotal + VM, sin IVA inventado."""
+        """Borde: fuera de MX el total es piezas + VM, sin IVA inventado ni MO."""
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='AR')
         self.assertEqual(resumen.iva_cotizacion, Decimal('0.00'))
-        self.assertEqual(resumen.total_a_cobrar, Decimal('600.00'))
+        self.assertEqual(resumen.total_cotizacion_con_iva, Decimal('500.00'))
+        self.assertEqual(resumen.total_a_cobrar, Decimal('500.00'))
         self.assertFalse(resumen.aplica_iva)
 
     def test_incluye_venta_mostrador(self):
@@ -150,26 +154,27 @@ class CalcularResumenCobroTest(TestCase):
             incluye_limpieza=True,
         )
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
-        # 600 + 96 IVA + 200 VM = 896
+        # 500 piezas + 80 IVA + 200 VM = 780
         self.assertEqual(resumen.total_venta_mostrador, Decimal('200.00'))
-        self.assertEqual(resumen.total_a_cobrar, Decimal('896.00'))
+        self.assertEqual(resumen.total_a_cobrar, Decimal('780.00'))
 
     def test_estimado_si_cotizacion_pendiente(self):
-        """Borde: sin aceptar, el total es estimado (todas las piezas + MO)."""
+        """Borde: sin aceptar, el total es estimado (todas las piezas, sin MO)."""
         self.cotizacion.usuario_acepto = None
         self.cotizacion.save()
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
         self.assertTrue(resumen.es_estimado)
-        self.assertEqual(resumen.subtotal_cotizacion, Decimal('600.00'))
+        self.assertEqual(resumen.subtotal_cotizacion, Decimal('500.00'))
+        self.assertEqual(resumen.total_cotizacion_con_iva, Decimal('580.00'))
 
     def test_liquidado_cuando_se_cubre_el_total(self):
         """Feliz: dos pagos (50% + 50%) dejan saldo 0 y cubierto_100."""
         registrar_pago(
-            self.orden, self.empleado, Decimal('348.00'),
+            self.orden, self.empleado, Decimal('290.00'),
             'anticipo', 'efectivo', codigo_pais='MX',
         )
         registrar_pago(
-            self.orden, self.empleado, Decimal('348.00'),
+            self.orden, self.empleado, Decimal('290.00'),
             'saldo', 'efectivo', codigo_pais='MX',
         )
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
@@ -447,7 +452,7 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
         self.assertEqual(resumen.pagado, Decimal('0.00'))
-        self.assertEqual(resumen.saldo, Decimal('696.00'))
+        self.assertEqual(resumen.saldo, Decimal('580.00'))
 
     @override_settings(MEDIA_ROOT='/tmp/sigma_pagos_test_media')
     def test_entregar_con_saldo_avisa_pero_cambia_estado(self):
