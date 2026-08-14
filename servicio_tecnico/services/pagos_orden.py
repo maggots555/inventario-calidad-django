@@ -67,6 +67,27 @@ class ResumenCobro:
     tasa_iva: Decimal
 
 
+def _db_de(instancia) -> str:
+    """
+    Alias de BD donde ya vive el objeto (México, Argentina, …).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    SIGMA tiene una base por país. Django abre una CONEXIÓN distinta
+    por alias (`default`, `mexico`, `argentina`…). `transaction.atomic()`
+    sin `using=` siempre usa `default`. Si la orden se leyó en `mexico`,
+    `select_for_update` corre en esa conexión… fuera de la transacción
+    → error en producción: "select_for_update cannot be used outside
+    of a transaction".
+
+    Args:
+        instancia: modelo ya cargado (OrdenServicio, PagoOrden, …).
+
+    Returns:
+        str: alias (`default`, `mexico`, …).
+    """
+    return getattr(instancia._state, 'db', None) or 'default'
+
+
 def _dinero(valor) -> Decimal:
     """
     Redondea a 2 decimales como un cajero (0.005 sube a 0.01).
@@ -296,11 +317,16 @@ def registrar_pago(
         raise ValidationError('El monto del pago debe ser mayor a cero.')
 
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # atomic + select_for_update: si dos personas cobran a la vez la misma
-    # orden, la segunda espera a que termine la primera y vuelve a leer
-    # el saldo. Sin esto, ambas verían "faltan $500" y se duplicaría el cobro.
-    with transaction.atomic():
-        orden_bloqueada = OrdenServicio.objects.select_for_update().get(pk=orden.pk)
+    # atomic(using=la BD de ESTA orden) + select_for_update: si dos
+    # personas cobran a la vez, la segunda espera y vuelve a leer el saldo.
+    # using= es obligatorio por el router multi-país (ver _db_de).
+    db_alias = _db_de(orden)
+    with transaction.atomic(using=db_alias):
+        orden_bloqueada = (
+            OrdenServicio.objects.using(db_alias)
+            .select_for_update()
+            .get(pk=orden.pk)
+        )
         resumen = calcular_resumen_cobro(orden_bloqueada, codigo_pais=codigo_pais)
 
         # Paso: sin cotización ni venta no hay cifra contra la cual abonar.
@@ -357,7 +383,8 @@ def eliminar_pago(pago, empleado) -> None:
 
     orden = pago.orden
     monto = pago.monto
-    with transaction.atomic():
+    db_alias = _db_de(pago)
+    with transaction.atomic(using=db_alias):
         pago.delete()
         registrar_historial(
             orden=orden,

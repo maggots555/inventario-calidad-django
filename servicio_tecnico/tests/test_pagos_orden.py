@@ -12,6 +12,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 
 from decimal import Decimal
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -35,6 +36,7 @@ from servicio_tecnico.models import (
     VentaMostrador,
 )
 from servicio_tecnico.services.pagos_orden import (
+    _db_de,
     calcular_resumen_cobro,
     mensaje_alerta_pago_por_estado,
     registrar_pago,
@@ -222,6 +224,37 @@ class CalcularResumenCobroTest(TestCase):
             )
         self.assertIn('imagen válida', str(ctx.exception).lower())
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
+
+    def test_transaccion_usa_la_bd_de_la_orden(self):
+        """
+        Regresión producción: select_for_update exige transacción EN LA
+        misma conexión. En SIGMA el router manda la orden a `mexico`
+        (u otro país) y atomic() sin using= abre `default` → 500.
+
+        Aquí comprobamos que atomic recibe using= de la instancia.
+        """
+        from django.db import transaction as dj_transaction
+
+        atomic_real = dj_transaction.atomic
+        seen = {}
+
+        def atomic_espiado(*args, **kwargs):
+            seen['args'] = args
+            seen['kwargs'] = kwargs
+            return atomic_real(*args, **kwargs)
+
+        with patch(
+            'servicio_tecnico.services.pagos_orden.transaction.atomic',
+            side_effect=atomic_espiado,
+        ):
+            registrar_pago(
+                self.orden, self.empleado, Decimal('100.00'),
+                'anticipo', 'efectivo', codigo_pais='MX',
+            )
+
+        alias_esperado = _db_de(self.orden)
+        self.assertEqual(seen.get('kwargs', {}).get('using'), alias_esperado)
+        self.assertEqual(alias_esperado, 'default')
 
 
 class DetalleOrdenPagosIntegracionTest(TestCase):
