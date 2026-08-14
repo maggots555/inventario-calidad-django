@@ -7,19 +7,40 @@ tareas específicas relacionadas con la creación de usuarios y envío de emails
 Al ponerlas aquí, evitamos repetir código en las vistas.
 
 Funciones principales:
+- ROL_A_GRUPO: diccionario único rol de empleado → nombre del Group de Django
 - generar_contraseña_temporal(): Crea contraseñas aleatorias seguras
 - crear_usuario_para_empleado(): Crea usuario de Django para un empleado
 - enviar_credenciales_empleado(): Envía email con credenciales de acceso
+- sincronizar_grupo_empleado(): Alinea el Group del User con Empleado.rol
 """
 
 import secrets
 import string
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# El empleado guarda el rol en minúsculas ('tecnico', 'facturacion').
+# Django Groups usa el nombre visible ('Técnico', 'Facturación').
+# Este diccionario es la ÚNICA fuente: crear usuario, sincronizar y scripts
+# de asignación lo leen de aquí. Si agregas un rol, agrégalo también en
+# Empleado.ROL_CHOICES y en scripts/setup_grupos_permisos.py.
+ROL_A_GRUPO = {
+    'supervisor': 'Supervisor',
+    'inspector': 'Inspector',
+    'dispatcher': 'Dispatcher',
+    'compras': 'Compras',
+    'recepcionista': 'Recepcionista',
+    'gerente_operacional': 'Gerente Operacional',
+    'gerente_general': 'Gerente General',
+    'tecnico': 'Técnico',
+    'almacenista': 'Almacenista',
+    'facturacion': 'Facturación',
+}
 
 
 def generar_contraseña_temporal(longitud=12):
@@ -109,23 +130,8 @@ def crear_usuario_para_empleado(empleado, contraseña_temporal=None):
         is_superuser=False  # No es superusuario
     )
     
-    # Asignar grupo según el rol del empleado
-    from django.contrib.auth.models import Group
-    
-    # Mapeo de roles de empleado a nombres de grupos de Django
-    rol_a_grupo = {
-        'supervisor': 'Supervisor',
-        'inspector': 'Inspector',
-        'dispatcher': 'Dispatcher',
-        'compras': 'Compras',
-        'recepcionista': 'Recepcionista',
-        'gerente_operacional': 'Gerente Operacional',
-        'gerente_general': 'Gerente General',
-        'tecnico': 'Técnico',
-        'almacenista': 'Almacenista',
-    }
-    
-    nombre_grupo = rol_a_grupo.get(empleado.rol)
+    # Asignar grupo según el rol del empleado (fuente única: ROL_A_GRUPO).
+    nombre_grupo = ROL_A_GRUPO.get(empleado.rol)
     if nombre_grupo:
         try:
             grupo = Group.objects.get(name=nombre_grupo)
@@ -308,37 +314,27 @@ def validar_email_empleado(email, empleado_actual=None):
 def sincronizar_grupo_empleado(empleado):
     """
     Sincroniza el grupo del usuario de Django con el rol del empleado
-    
+
     Args:
         empleado (Empleado): Instancia del empleado a sincronizar
-    
+
+    Efectos secundarios:
+        Limpia los grupos actuales del User y deja solo el de ROL_A_GRUPO.
+
     Proceso:
         1. Valida que el empleado tenga usuario asignado
-        2. Obtiene el nombre del grupo según el rol
+        2. Obtiene el nombre del grupo según el rol (ROL_A_GRUPO)
         3. Limpia todos los grupos actuales del usuario
         4. Asigna el nuevo grupo correspondiente al rol
     """
-    from django.contrib.auth.models import Group
     import logging
-    
+
     logger = logging.getLogger(__name__)
-    
+
     if not empleado.user:
         return
-    
-    rol_a_grupo = {
-        'supervisor': 'Supervisor',
-        'inspector': 'Inspector',
-        'dispatcher': 'Dispatcher',
-        'compras': 'Compras',
-        'recepcionista': 'Recepcionista',
-        'gerente_operacional': 'Gerente Operacional',
-        'gerente_general': 'Gerente General',
-        'tecnico': 'Técnico',
-        'almacenista': 'Almacenista',
-    }
-    
-    nombre_grupo = rol_a_grupo.get(empleado.rol)
+
+    nombre_grupo = ROL_A_GRUPO.get(empleado.rol)
     
     if nombre_grupo:
         try:

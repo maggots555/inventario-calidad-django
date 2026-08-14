@@ -629,12 +629,15 @@ class Empleado(models.Model):
         ('gerente_general', 'Gerente General'),
         ('tecnico', 'Técnico'),
         ('almacenista', 'Almacenista'),
+        ('facturacion', 'Facturación'),
     ]
 
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # Constante de negocio para filtros ORM (home ST, panel carga, baja, FL, detalle_orden).
     # Usar Empleado.ROL_TECNICO en lugar del texto libre del campo cargo.
     ROL_TECNICO = 'tecnico'
+    # Personal de facturación: solo consulta de órdenes/cotizaciones y dashboards.
+    ROL_FACTURACION = 'facturacion'
 
     rol = models.CharField(
         max_length=30,

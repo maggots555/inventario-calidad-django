@@ -124,10 +124,10 @@ print(f'   📊 Grupos existentes: {grupos_existentes}')
 
 if grupos_existentes == 0:
     print('   ℹ️  No hay grupos creados (se crearán al ejecutar scripts)')
-elif grupos_existentes == 9:
-    print('   ✅ Ya existen los 9 grupos esperados')
+elif grupos_existentes == 10:
+    print('   ✅ Ya existen los 10 grupos esperados')
 else:
-    print(f'   ⚠️  Se esperaban 9 grupos, hay {grupos_existentes}')
+    print(f'   ⚠️  Se esperaban 10 grupos, hay {grupos_existentes}')
 "
 
 # 7. Verificar scripts requeridos

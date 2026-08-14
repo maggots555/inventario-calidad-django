@@ -45,10 +45,10 @@ django.setup()
 from django.contrib.auth.models import Group
 
 grupos = Group.objects.all().count()
-if grupos == 9:
+if grupos == 10:
     print(f'   ✅ {grupos} grupos encontrados')
 else:
-    print(f'   ⚠️  Se esperaban 9 grupos, se encontraron {grupos}')
+    print(f'   ⚠️  Se esperaban 10 grupos, se encontraron {grupos}')
     print('   💡 Ejecuta: python scripts/manage_grupos.py → Opción 1')
 "
 

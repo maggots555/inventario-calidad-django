@@ -49,6 +49,13 @@ Este documento describe el sistema de roles y permisos implementado usando Djang
 - **Aplicaciones**: Almacén (completo), Servicio Técnico (consulta)
 - **Total permisos**: 32
 
+### 10. FACTURACIÓN
+- **Permisos**: Solo lectura de órdenes, cotizaciones (ST y Almacén) y dashboards gerenciales
+- **Aplicaciones**: Servicio Técnico (consulta), Almacén cotizador (consulta), dashboards de dinero
+- **No incluye**: crear/editar/borrar, inventario, compras, bajas ni configuración
+- **Total permisos**: 17
+- **Notas**: Reutiliza `view_dashboard_gerencial` (también abre concentrado, encuestas, productividad, OOW/FL)
+
 ## 🚀 Scripts Disponibles
 
 ### 1. Configurar Grupos y Permisos
@@ -82,7 +89,7 @@ python scripts/manage_grupos.py
    - Migración `0014_empleado_rol.py` aplicada
 
 2. **Grupos creados**: ✅
-   - 9 grupos de Django creados
+   - 10 grupos de Django creados
    - Permisos asignados a cada grupo
 
 3. **Asignación automática**: ✅
@@ -134,7 +141,7 @@ def crear_orden(request):
 - ✅ Campo `rol` agregado al modelo Empleado
 - ✅ Formulario actualizado para incluir campo rol
 - ✅ Template actualizado para mostrar campo rol
-- ✅ 9 grupos de Django creados con permisos
+- ✅ 10 grupos de Django creados con permisos
 - ✅ Asignación automática de grupos al crear usuarios
 - ✅ 5 empleados actualizados con sus grupos
 - ✅ Scripts de gestión disponibles

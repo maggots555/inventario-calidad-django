@@ -21,7 +21,7 @@ python scripts/manage_grupos.py
 ---
 
 ### 2. `setup_grupos_permisos.py` - Configurar Grupos
-**Descripción**: Crea los 9 grupos de Django y asigna permisos a cada uno.
+**Descripción**: Crea los 10 grupos de Django y asigna permisos a cada uno.
 
 **Cómo ejecutar**:
 ```bash
@@ -34,7 +34,7 @@ python -c "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'c
 ```
 
 **Qué hace**:
-- Crea 9 grupos: Supervisor, Inspector, Dispatcher, Compras, Recepcionista, Gerente Operacional, Gerente General, Técnico, Almacenista
+- Crea 10 grupos: Supervisor, Inspector, Dispatcher, Compras, Recepcionista, Gerente Operacional, Gerente General, Técnico, Almacenista, Facturación
 - Asigna permisos específicos a cada grupo
 - Si el grupo ya existe, actualiza sus permisos
 
@@ -148,7 +148,7 @@ print(f"Permisos: {emp.user.get_all_permissions()}")
 ### Desde el Admin de Django:
 1. Ve a: http://localhost:8000/admin/
 2. Navega a: Autenticación y autorización → Grupos
-3. Verifica que existan los 9 grupos
+3. Verifica que existan los 10 grupos
 4. Haz clic en cada grupo para ver sus permisos
 
 ---

@@ -130,7 +130,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     Configuracion completa de grupos y permisos para una BD especifica.
 
     EXPLICACION PARA PRINCIPIANTES:
-    Esta funcion crea los 9 grupos del sistema y asigna los permisos
+    Esta funcion crea los 10 grupos del sistema y asigna los permisos
     correspondientes a cada uno. Ahora recibe db_alias para poder
     ejecutarse contra la BD de cualquier pais.
 
@@ -415,6 +415,46 @@ def setup_grupos_y_permisos(db_alias='default'):
 
     grupo_almacenista.permissions.set(permisos_almacenista)
     print(f"     {len(permisos_almacenista)} permisos asignados\n")
+
+    # ========== FACTURACIÓN ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Personal de facturación solo CONSULTA (ver órdenes, cotizaciones y
+    # dashboards de dinero). No puede crear, editar ni borrar. Es como
+    # Dispatcher (lectura ST) + cotizaciones de Almacén + dashboard gerencial.
+    print("  Configurando grupo: FACTURACIÓN")
+    grupo_facturacion = crear_grupo(
+        "Facturación",
+        "Consulta de órdenes, cotizaciones y dashboards gerenciales",
+        db_alias,
+    )
+    permisos_facturacion = []
+
+    # Servicio Técnico - Solo lectura (mismo paquete que Dispatcher)
+    permisos_facturacion.extend(obtener_permisos_modelo(OrdenServicio, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(DetalleEquipo, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(Cotizacion, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(HistorialOrden, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(ImagenOrden, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(SeguimientoPieza, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(EstadoRHITSO, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(SeguimientoRHITSO, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(IncidenciaRHITSO, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(VentaMostrador, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(PiezaCotizada, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view'], db_alias))
+
+    # Almacén - Solo consulta del cotizador (no inventario ni compras)
+    permisos_facturacion.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(LineaCotizacion, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(ImagenLineaCotizacion, ['view'], db_alias))
+
+    # Dashboards de dinero / cotizaciones (el mismo permiso de gerencia)
+    if permiso_dashboard_gerencial:
+        permisos_facturacion.append(permiso_dashboard_gerencial)
+
+    grupo_facturacion.permissions.set(permisos_facturacion)
+    print(f"     {len(permisos_facturacion)} permisos asignados\n")
 
     # ========== RESUMEN ==========
     print("="*70)

@@ -128,7 +128,7 @@ echo "CONFIRMACION"
 echo "======================================================================="
 echo ""
 echo "Este proceso hara lo siguiente:"
-echo "  1. Crear/actualizar 9 grupos de Django"
+echo "  1. Crear/actualizar 10 grupos de Django"
 echo "  2. Asignar permisos a cada grupo"
 echo "  3. Asignar grupos a empleados segun su rol"
 if [ -n "$DB_TARGET" ]; then

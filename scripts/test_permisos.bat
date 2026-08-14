@@ -32,7 +32,7 @@ if errorlevel 1 (
 
 echo.
 echo 2️⃣  Verificando grupos creados...
-python -c "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); from django.contrib.auth.models import Group; grupos = Group.objects.all().count(); print(f'   ✅ {grupos} grupos encontrados') if grupos == 9 else print(f'   ⚠️  Se esperaban 9 grupos, se encontraron {grupos}')"
+python -c "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); from django.contrib.auth.models import Group; grupos = Group.objects.all().count(); print(f'   ✅ {grupos} grupos encontrados') if grupos == 10 else print(f'   ⚠️  Se esperaban 10 grupos, se encontraron {grupos}')"
 
 echo.
 echo 3️⃣  Verificando empleados con grupos...

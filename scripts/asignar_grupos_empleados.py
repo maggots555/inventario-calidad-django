@@ -17,6 +17,7 @@ IMPORTANTE: Ejecutar desde el directorio raiz del proyecto
 
 from django.contrib.auth.models import Group
 from inventario.models import Empleado
+from inventario.utils import ROL_A_GRUPO
 
 
 def asignar_grupos_empleados(db_alias='default'):
@@ -53,23 +54,11 @@ def asignar_grupos_empleados(db_alias='default'):
     print(f"Base de datos: {db_alias}")
     print("="*70 + "\n")
 
-    # Mapeo de roles de empleado a nombres de grupos de Django
-    #
+    # Mapeo único en inventario.utils.ROL_A_GRUPO (incluye Facturación).
     # EXPLICACION PARA PRINCIPIANTES:
-    # El campo 'rol' del modelo Empleado guarda valores como 'supervisor',
-    # 'tecnico', etc. Los nombres de los grupos en Django son 'Supervisor',
-    # 'Técnico', etc. Este diccionario conecta uno con otro.
-    rol_a_grupo = {
-        'supervisor': 'Supervisor',
-        'inspector': 'Inspector',
-        'dispatcher': 'Dispatcher',
-        'compras': 'Compras',
-        'recepcionista': 'Recepcionista',
-        'gerente_operacional': 'Gerente Operacional',
-        'gerente_general': 'Gerente General',
-        'tecnico': 'Técnico',
-        'almacenista': 'Almacenista',
-    }
+    # El campo 'rol' guarda 'tecnico'; el grupo Django se llama 'Técnico'.
+    # No duplicar el diccionario aquí: si se olvida una copia, el empleado
+    # queda sin grupo al ejecutar este script.
 
     # Obtener empleados que tienen usuario del sistema EN LA BD ESPECIFICADA
     #
@@ -84,7 +73,7 @@ def asignar_grupos_empleados(db_alias='default'):
     sin_grupo = 0
 
     for empleado in empleados_con_usuario:
-        nombre_grupo = rol_a_grupo.get(empleado.rol)
+        nombre_grupo = ROL_A_GRUPO.get(empleado.rol)
 
         if nombre_grupo:
             try:

@@ -5,7 +5,7 @@ EXPLICACION PARA PRINCIPIANTES:
 ================================
 Este script es el "control central" para manejar grupos y permisos.
 Te da un menu donde puedes:
-1. Crear los 9 grupos con sus permisos
+1. Crear los 10 grupos con sus permisos
 2. Asignar grupos a empleados segun su rol
 3. Ver un resumen de como quedo todo
 
