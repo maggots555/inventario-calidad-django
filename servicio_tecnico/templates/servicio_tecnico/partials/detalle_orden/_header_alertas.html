@@ -157,3 +157,25 @@
         </div>
     </div>
     {% endif %}
+
+    {% if resumen_cobro and resumen_cobro.total_a_cobrar > 0 and not resumen_cobro.cubierto_100 %}
+    <div class="alert {% if resumen_cobro.cubre_anticipo_50 %}alert-warning{% else %}alert-danger{% endif %} seccion-pagos__banner mb-4"
+         role="status" id="bannerSaldoPendiente">
+        <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-cash-stack fs-4"></i>
+            <div>
+                {% if not resumen_cobro.cubre_anticipo_50 %}
+                <strong>Falta el anticipo del 50%.</strong>
+                Pagado ${{ resumen_cobro.pagado|floatformat:2 }} de
+                ${{ resumen_cobro.anticipo_minimo|floatformat:2 }} mínimos
+                (total ${{ resumen_cobro.total_a_cobrar|floatformat:2 }}).
+                {% else %}
+                <strong>Anticipo cubierto; falta el saldo a la entrega.</strong>
+                Pendiente ${{ resumen_cobro.saldo|floatformat:2 }} de
+                ${{ resumen_cobro.total_a_cobrar|floatformat:2 }}.
+                {% endif %}
+                <a href="#seccionPagos" class="alert-link ms-1">Ir a cobros</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}

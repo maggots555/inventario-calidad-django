@@ -25,9 +25,11 @@ from servicio_tecnico.forms import (
     CambioEstadoForm,
     ComentarioForm,
     ConfiguracionAdicionalForm,
+    DatosFacturaOrdenForm,
     EditarInformacionEquipoForm,
     GuardarManoObraForm,
     GestionarCotizacionForm,
+    RegistrarPagoOrdenForm,
     ReingresoRHITSOForm,
     SubirImagenesForm,
     SubirVideoForm,
@@ -260,6 +262,23 @@ def build_detalle_orden_context(request, orden):
     form_pieza_venta_mostrador = PiezaVentaMostradorForm()
 
     # ========================================================================
+    # COBROS / FACTURACIÓN (pagos, saldo, flags de factura)
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El resumen (total, IVA, pagado, saldo) se calcula en un service
+    # para no meter lógica de dinero en el modelo ni en el template.
+    from servicio_tecnico.services.pagos_orden import (
+        calcular_resumen_cobro,
+        usuario_puede_registrar_pago,
+    )
+
+    resumen_cobro = calcular_resumen_cobro(orden)
+    pagos_orden = orden.pagos.select_related('registrado_por').all()
+    puede_registrar_pago = usuario_puede_registrar_pago(request.user)
+    form_registrar_pago = RegistrarPagoOrdenForm()
+    form_datos_factura = DatosFacturaOrdenForm(instance=orden)
+
+    # ========================================================================
     # COMPONENTES ADICIONALES PARA EL MODAL DE DIAGNÓSTICO
     # ========================================================================
     # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -387,5 +406,12 @@ def build_detalle_orden_context(request, orden):
         # Lista unificada de modelos de todos los proveedores habilitados.
         # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-3.6-flash"
         'ollama_models': getattr(settings, 'AI_MODELS', []),
+
+        # Cobros / facturación (pagos + saldo + flags de factura)
+        'resumen_cobro': resumen_cobro,
+        'pagos_orden': pagos_orden,
+        'puede_registrar_pago': puede_registrar_pago,
+        'form_registrar_pago': form_registrar_pago,
+        'form_datos_factura': form_datos_factura,
     }
     return context

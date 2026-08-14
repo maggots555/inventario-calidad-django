@@ -1,0 +1,234 @@
+{% comment %}
+  Partial de detalle_orden — _seccion_pagos.html
+  Cobros al cliente: total, abonos, comprobantes y flags de factura.
+  El cálculo (IVA, saldo, 50%) llega en resumen_cobro desde el service.
+{% endcomment %}
+    <!-- ============================================================ -->
+    <!-- SECCIÓN: COBROS Y FACTURACIÓN -->
+    <!-- ============================================================ -->
+
+    <div class="row" id="seccionPagos">
+        <div class="col-12">
+            <div class="card section-card seccion-pagos">
+                <div class="section-header seccion-pagos__header">
+                    <div class="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
+                        <div>
+                            <i class="bi bi-cash-coin"></i>
+                            Cobros y facturación
+                        </div>
+                        {% if resumen_cobro.cubierto_100 and resumen_cobro.total_a_cobrar > 0 %}
+                            <span class="badge bg-success">Liquidado</span>
+                        {% elif resumen_cobro.cubre_anticipo_50 and resumen_cobro.total_a_cobrar > 0 %}
+                            <span class="badge bg-info text-dark">Anticipo 50% cubierto</span>
+                        {% elif resumen_cobro.total_a_cobrar > 0 %}
+                            <span class="badge bg-warning text-dark">Falta anticipo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Sin total aún</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+
+                    {% if resumen_cobro.es_estimado %}
+                    <div class="alert alert-info py-2" role="status">
+                        <i class="bi bi-info-circle"></i>
+                        La cotización aún no está aceptada. El total es un
+                        <strong>estimado</strong> para poder registrar el anticipo del 50%.
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-7">
+                            <table class="table table-sm seccion-pagos__desglose mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td>Cotización (piezas + mano de obra, sin IVA)</td>
+                                        <td class="text-end">${{ resumen_cobro.subtotal_cotizacion|floatformat:2 }}</td>
+                                    </tr>
+                                    {% if resumen_cobro.aplica_iva %}
+                                    <tr>
+                                        <td>IVA (16%)</td>
+                                        <td class="text-end">${{ resumen_cobro.iva_cotizacion|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td>Venta mostrador (IVA incluido)</td>
+                                        <td class="text-end">${{ resumen_cobro.total_venta_mostrador|floatformat:2 }}</td>
+                                    </tr>
+                                    <tr class="seccion-pagos__total">
+                                        <th>Total a cobrar</th>
+                                        <th class="text-end">${{ resumen_cobro.total_a_cobrar|floatformat:2 }}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Pagado</td>
+                                        <td class="text-end text-success">${{ resumen_cobro.pagado|floatformat:2 }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Saldo pendiente</th>
+                                        <th class="text-end {% if resumen_cobro.saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                                            ${{ resumen_cobro.saldo|floatformat:2 }}
+                                        </th>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            {% if resumen_cobro.total_a_cobrar > 0 %}
+                            <p class="small text-muted mb-1 mt-2">
+                                Anticipo mínimo (50%): ${{ resumen_cobro.anticipo_minimo|floatformat:2 }}
+                            </p>
+                            <div class="progress seccion-pagos__barra" role="progressbar"
+                                 aria-valuenow="{{ resumen_cobro.porcentaje_pagado|floatformat:0 }}"
+                                 aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar {% if resumen_cobro.cubierto_100 %}bg-success{% elif resumen_cobro.cubre_anticipo_50 %}bg-info{% else %}bg-warning{% endif %}"
+                                     style="width: {{ resumen_cobro.porcentaje_pagado|floatformat:0 }}%;">
+                                    {{ resumen_cobro.porcentaje_pagado|floatformat:0 }}%
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-5">
+                            {% if puede_registrar_pago %}
+                            <form method="post" enctype="multipart/form-data" id="formRegistrarPago">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_type" value="registrar_pago">
+                                <div class="mb-2">
+                                    <label class="form-label" for="{{ form_registrar_pago.monto.id_for_label }}">{{ form_registrar_pago.monto.label }}</label>
+                                    {{ form_registrar_pago.monto }}
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label" for="{{ form_registrar_pago.tipo.id_for_label }}">{{ form_registrar_pago.tipo.label }}</label>
+                                        {{ form_registrar_pago.tipo }}
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        <label class="form-label" for="{{ form_registrar_pago.metodo.id_for_label }}">{{ form_registrar_pago.metodo.label }}</label>
+                                        {{ form_registrar_pago.metodo }}
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label" for="{{ form_registrar_pago.notas.id_for_label }}">{{ form_registrar_pago.notas.label }}</label>
+                                    {{ form_registrar_pago.notas }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="{{ form_registrar_pago.comprobante.id_for_label }}">{{ form_registrar_pago.comprobante.label }}</label>
+                                    {{ form_registrar_pago.comprobante }}
+                                    <div class="form-text">JPG, PNG o captura del ticket. Opcional.</div>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="bi bi-plus-circle"></i> Registrar pago
+                                </button>
+                            </form>
+                            {% else %}
+                            <div class="alert alert-secondary mb-0">
+                                <i class="bi bi-lock"></i>
+                                Puedes ver el saldo. Solo Facturación, Recepción
+                                y gerencia registran pagos.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <h6 class="mb-2"><i class="bi bi-receipt"></i> Pagos registrados</h6>
+                    {% if pagos_orden %}
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm align-middle" id="tablaPagosOrden">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Método</th>
+                                    <th class="text-end">Monto</th>
+                                    <th>Comprobante</th>
+                                    <th>Registró</th>
+                                    {% if puede_registrar_pago %}<th></th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in pagos_orden %}
+                                <tr>
+                                    <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ pago.get_tipo_display }}</td>
+                                    <td>{{ pago.get_metodo_display }}</td>
+                                    <td class="text-end">${{ pago.monto|floatformat:2 }}</td>
+                                    <td>
+                                        {% if pago.comprobante %}
+                                        <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener">
+                                            <img src="{{ pago.comprobante.url }}"
+                                                 alt="Comprobante {{ pago.monto }}"
+                                                 class="seccion-pagos__thumb">
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ pago.registrado_por.nombre_completo }}</td>
+                                    {% if puede_registrar_pago %}
+                                    <td>
+                                        <form method="post" class="d-inline"
+                                              onsubmit="return confirm('¿Eliminar este pago? El saldo se recalculará.');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="form_type" value="eliminar_pago">
+                                            <input type="hidden" name="pago_id" value="{{ pago.pk }}">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Eliminar pago">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% if pago.notas %}
+                                <tr class="seccion-pagos__notas">
+                                    <td colspan="{% if puede_registrar_pago %}7{% else %}6{% endif %}" class="small text-muted">
+                                        {{ pago.notas }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-4">Aún no hay pagos registrados en esta orden.</p>
+                    {% endif %}
+
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-file-earmark-text"></i> Factura fiscal</h6>
+                    {% if puede_registrar_pago %}
+                    <form method="post" id="formDatosFactura">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="actualizar_datos_factura">
+                        <div class="form-check mb-2">
+                            {{ form_datos_factura.requiere_factura }}
+                            <label class="form-check-label" for="{{ form_datos_factura.requiere_factura.id_for_label }}">
+                                {{ form_datos_factura.requiere_factura.label }}
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            {{ form_datos_factura.factura_emitida }}
+                            <label class="form-check-label" for="{{ form_datos_factura.factura_emitida.id_for_label }}">
+                                {{ form_datos_factura.factura_emitida.label }}
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form_datos_factura.motivo_no_factura.id_for_label }}">
+                                {{ form_datos_factura.motivo_no_factura.label }}
+                            </label>
+                            {{ form_datos_factura.motivo_no_factura }}
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            Guardar datos de factura
+                        </button>
+                    </form>
+                    {% else %}
+                    <ul class="list-unstyled mb-0 small">
+                        <li>Requiere factura: {% if orden.requiere_factura %}Sí{% else %}No{% endif %}</li>
+                        <li>Factura emitida: {% if orden.factura_emitida %}Sí{% else %}No{% endif %}</li>
+                        {% if orden.motivo_no_factura %}
+                        <li>Motivo: {{ orden.motivo_no_factura }}</li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>

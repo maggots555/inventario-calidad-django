@@ -11,6 +11,7 @@ Handlers:
 - views_detalle_orden_estado.py
 - views_detalle_orden_multimedia.py
 - views_detalle_orden_cotizacion.py
+- views_detalle_orden_pagos.py
 
 urls.py sigue con views.detalle_orden (reexport en views.py).
 """
@@ -40,6 +41,11 @@ from .views_detalle_orden_multimedia import (
     handle_subir_imagenes,
     handle_subir_video,
 )
+from .views_detalle_orden_pagos import (
+    handle_actualizar_datos_factura,
+    handle_eliminar_pago,
+    handle_registrar_pago,
+)
 
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -59,6 +65,9 @@ _FORM_TYPE_HANDLERS = {
     'editar_fecha_envio': handle_editar_fecha_envio,
     'editar_mano_obra': handle_editar_mano_obra,
     'gestionar_cotizacion': handle_gestionar_cotizacion,
+    'registrar_pago': handle_registrar_pago,
+    'actualizar_datos_factura': handle_actualizar_datos_factura,
+    'eliminar_pago': handle_eliminar_pago,
 }
 
 
@@ -91,6 +100,7 @@ def detalle_orden(request, orden_id):
             'historial__usuario',
             'historial__tecnico_anterior',
             'historial__tecnico_nuevo',
+            'pagos__registrado_por',
         ),
         pk=orden_id,
     )

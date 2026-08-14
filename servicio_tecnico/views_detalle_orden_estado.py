@@ -214,6 +214,17 @@ def handle_cambio_estado(request, orden, empleado_actual):
             f'✅ Estado cambiado a: {orden_actualizada.get_estado_display()}'
         )
 
+        # Alerta de cobro (no bloquea): 50% al iniciar / 100% al entregar.
+        from servicio_tecnico.services.pagos_orden import (
+            mensaje_alerta_pago_por_estado,
+        )
+        alerta_pago = mensaje_alerta_pago_por_estado(
+            orden_actualizada,
+            orden_actualizada.estado,
+        )
+        if alerta_pago:
+            messages.warning(request, alerta_pago)
+
         return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
     else:
         # DEPURACIÓN: Mostrar errores específicos del formulario

@@ -6809,3 +6809,58 @@ thead.sticky-top {
     box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28);
     animation: none;
 }
+
+/* ------------------------------------------------------------------ */
+/* Cobros y facturación (detalle de orden)                            */
+/* ------------------------------------------------------------------ */
+.seccion-pagos__header {
+    background: var(--primary-color, #1f6391);
+}
+
+.seccion-pagos__desglose th,
+.seccion-pagos__desglose td {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+}
+
+.seccion-pagos__total th {
+    border-top: 2px solid var(--border-color, #dee2e6);
+    font-size: 1.05rem;
+}
+
+.seccion-pagos__barra {
+    height: 1.1rem;
+}
+
+.seccion-pagos__thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+.seccion-pagos__banner {
+    border-left: 5px solid var(--bs-warning, #fbbf24);
+}
+
+[data-bs-theme="dark"] .seccion-pagos {
+    background-color: var(--card-bg, #1e293b);
+}
+
+[data-bs-theme="dark"] .seccion-pagos__header {
+    background: #0f172a;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .seccion-pagos__total th {
+    border-top-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .seccion-pagos__thumb {
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .seccion-pagos__desglose {
+    color: var(--text-primary, #e2e8f0);
+}

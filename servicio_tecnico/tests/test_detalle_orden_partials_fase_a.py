@@ -7,7 +7,7 @@ La Fase A NO cambia Python ni el context de la vista. Solo mueve HTML a
 archivos en partials/detalle_orden/ y deja detalle_orden.html como orquestador.
 
 Qué validamos aquí:
-1) Existen los 25 partials esperados y el orquestador los incluye.
+1) Existen los 26 partials esperados y el orquestador los incluye.
 2) Un GET real a detalle_orden responde 200 y conserva IDs críticos
    (el JS/TS busca esos id en el DOM).
 """
@@ -42,6 +42,7 @@ _PARTIALS_ESPERADOS = (
     '_seccion_reingreso.html',
     '_seccion_cotizacion.html',
     '_seccion_venta_mostrador.html',
+    '_seccion_pagos.html',
     '_seccion_estado_responsables.html',
     '_seccion_historial.html',
     '_seccion_galeria_imagenes.html',
@@ -76,6 +77,7 @@ _IDS_SIEMPRE_EN_RENDER = (
     'id="modalEnviarImagenesCliente"',
     'id="modalCompartirEvidencia"',
     'id="galeria-videos"',
+    'id="seccionPagos"',
 )
 
 # IDs condicionales: deben vivir en el markup de los partials (aunque el GET
@@ -91,7 +93,7 @@ class DetalleOrdenPartialsEstructuraTest(SimpleTestCase):
     Sin BD: solo comprueba archivos e includes del orquestador.
     """
 
-    def test_existen_los_25_partials_y_el_orquestador_los_incluye(self):
+    def test_existen_los_partials_y_el_orquestador_los_incluye(self):
         """
         Objetivo: detectar borrados accidentales de partials o includes.
 

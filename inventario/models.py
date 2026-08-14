@@ -636,7 +636,8 @@ class Empleado(models.Model):
     # Constante de negocio para filtros ORM (home ST, panel carga, baja, FL, detalle_orden).
     # Usar Empleado.ROL_TECNICO en lugar del texto libre del campo cargo.
     ROL_TECNICO = 'tecnico'
-    # Personal de facturación: solo consulta de órdenes/cotizaciones y dashboards.
+    # Personal de facturación: consulta de órdenes/cotizaciones/dashboards
+    # y registro de pagos (abonos + comprobante) en el detalle de orden.
     ROL_FACTURACION = 'facturacion'
 
     rol = models.CharField(

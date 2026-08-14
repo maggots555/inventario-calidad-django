@@ -50,11 +50,11 @@ Este documento describe el sistema de roles y permisos implementado usando Djang
 - **Total permisos**: 32
 
 ### 10. FACTURACIÓN
-- **Permisos**: Solo lectura de órdenes, cotizaciones (ST y Almacén) y dashboards gerenciales
-- **Aplicaciones**: Servicio Técnico (consulta), Almacén cotizador (consulta), dashboards de dinero
-- **No incluye**: crear/editar/borrar, inventario, compras, bajas ni configuración
-- **Total permisos**: 17
-- **Notas**: Reutiliza `view_dashboard_gerencial` (también abre concentrado, encuestas, productividad, OOW/FL)
+- **Permisos**: Lectura de órdenes y cotizaciones (ST y Almacén), dashboards gerenciales, y **registro de pagos** (`PagoOrden`)
+- **Aplicaciones**: Servicio Técnico (consulta + cobros), Almacén cotizador (consulta), dashboards de dinero
+- **No incluye**: crear/editar órdenes, inventario, compras, bajas ni configuración
+- **Total permisos**: 20
+- **Notas**: Reutiliza `view_dashboard_gerencial`. Puede `add`/`change`/`view` de `PagoOrden` (abonos y comprobantes).
 
 ## 🚀 Scripts Disponibles
 

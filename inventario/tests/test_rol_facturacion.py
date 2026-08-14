@@ -1,10 +1,11 @@
 """
-Tests del rol Facturación (consulta de órdenes, cotizaciones y dashboards).
+Tests del rol Facturación (consulta + registro de pagos).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 El sistema tiene dos capas: el campo Empleado.rol (etiqueta) y un Group
-de Django (permisos reales). Este archivo comprueba que el rol nuevo
-existe, se mapea al grupo "Facturación" y solo otorga permisos de ver.
+de Django (permisos reales). Este archivo comprueba que el rol existe,
+se mapea al grupo "Facturación", ve órdenes/dashboards y puede cobrar
+(add_pagoorden) sin editar órdenes.
 """
 
 from django.contrib.auth.models import Group, Permission, User
@@ -14,7 +15,7 @@ from django.test import TestCase
 from almacen.models import SolicitudCotizacion
 from inventario.models import Empleado
 from inventario.utils import ROL_A_GRUPO, sincronizar_grupo_empleado
-from servicio_tecnico.models import Cotizacion, OrdenServicio
+from servicio_tecnico.models import Cotizacion, OrdenServicio, PagoOrden
 
 
 def _permiso(modelo, codename: str) -> Permission:
@@ -99,20 +100,22 @@ class SincronizarGrupoFacturacionTest(TestCase):
 
 class PermisosSoloLecturaFacturacionTest(TestCase):
     """
-    Objetivo: Facturación ve órdenes/cotizaciones/dashboard; no puede escribir.
+    Objetivo: Facturación ve órdenes/cotizaciones/dashboard y puede registrar pagos.
 
     Efectos secundarios: crea Group, User, Empleado y asigna Permission.
     """
 
     def setUp(self) -> None:
-        """Arma el grupo con el mismo paquete de solo lectura del plan."""
+        """Arma el grupo con consulta + captura de pagos (sin editar órdenes)."""
         self.grupo = Group.objects.create(name='Facturación')
-        # Permisos de consulta (view) — no add/change/delete.
         self.grupo.permissions.set([
             _permiso(OrdenServicio, 'view_ordenservicio'),
             _permiso(OrdenServicio, 'view_dashboard_gerencial'),
             _permiso(Cotizacion, 'view_cotizacion'),
             _permiso(SolicitudCotizacion, 'view_solicitudcotizacion'),
+            _permiso(PagoOrden, 'view_pagoorden'),
+            _permiso(PagoOrden, 'add_pagoorden'),
+            _permiso(PagoOrden, 'change_pagoorden'),
         ])
 
         self.user = User.objects.create_user(
@@ -140,8 +143,8 @@ class PermisosSoloLecturaFacturacionTest(TestCase):
         self.assertTrue(self.user.has_perm('almacen.view_solicitudcotizacion'))
         self.assertTrue(self.user.has_perm('servicio_tecnico.view_dashboard_gerencial'))
 
-    def test_no_puede_crear_ni_editar_ni_borrar(self) -> None:
-        """Borde: el rol es de consulta; no debe tener escritura."""
+    def test_no_puede_crear_ni_editar_ni_borrar_ordenes(self) -> None:
+        """Borde: no escribe órdenes ni cotizaciones; el cobro es el único alta."""
         self.assertFalse(self.user.has_perm('servicio_tecnico.add_ordenservicio'))
         self.assertFalse(self.user.has_perm('servicio_tecnico.change_ordenservicio'))
         self.assertFalse(self.user.has_perm('servicio_tecnico.delete_ordenservicio'))
@@ -149,6 +152,13 @@ class PermisosSoloLecturaFacturacionTest(TestCase):
         self.assertFalse(self.user.has_perm('almacen.add_solicitudcotizacion'))
         self.assertFalse(self.user.has_perm('almacen.change_solicitudcotizacion'))
         self.assertFalse(self.user.has_perm('almacen.delete_solicitudcotizacion'))
+
+    def test_puede_registrar_pagos(self) -> None:
+        """Feliz: el rol cobra (add/change PagoOrden) sin editar la orden."""
+        self.assertTrue(self.user.has_perm('servicio_tecnico.view_pagoorden'))
+        self.assertTrue(self.user.has_perm('servicio_tecnico.add_pagoorden'))
+        self.assertTrue(self.user.has_perm('servicio_tecnico.change_pagoorden'))
+        self.assertFalse(self.user.has_perm('servicio_tecnico.delete_pagoorden'))
 
 
 class SetupGruposCreaFacturacionTest(TestCase):
@@ -158,8 +168,8 @@ class SetupGruposCreaFacturacionTest(TestCase):
     Efectos secundarios: crea los 10 grupos de Django en la BD de test.
     """
 
-    def test_script_asigna_consulta_y_dashboard_sin_escritura(self) -> None:
-        """El setup real (no el test) debe dejar view + dashboard, sin add."""
+    def test_script_asigna_consulta_dashboard_y_pagos_sin_escribir_ordenes(self) -> None:
+        """El setup real deja view + dashboard + add_pagoorden, sin add de orden."""
         from scripts.setup_grupos_permisos import setup_grupos_y_permisos
 
         setup_grupos_y_permisos('default')
@@ -171,7 +181,9 @@ class SetupGruposCreaFacturacionTest(TestCase):
         self.assertIn('view_cotizacion', codenames)
         self.assertIn('view_solicitudcotizacion', codenames)
         self.assertIn('view_dashboard_gerencial', codenames)
-        # Escritura no debe colarse en este rol.
+        self.assertIn('add_pagoorden', codenames)
+        self.assertIn('change_pagoorden', codenames)
+        self.assertIn('view_pagoorden', codenames)
         self.assertNotIn('add_ordenservicio', codenames)
         self.assertNotIn('change_ordenservicio', codenames)
         self.assertNotIn('delete_ordenservicio', codenames)

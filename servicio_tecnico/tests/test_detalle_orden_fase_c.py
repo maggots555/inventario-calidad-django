@@ -65,6 +65,9 @@ class DetalleOrdenFaseCDispatcherTest(SimpleTestCase):
             'editar_fecha_envio',
             'editar_mano_obra',
             'gestionar_cotizacion',
+            'registrar_pago',
+            'actualizar_datos_factura',
+            'eliminar_pago',
         }
         self.assertEqual(set(_FORM_TYPE_HANDLERS.keys()), esperados)
         for nombre, handler in _FORM_TYPE_HANDLERS.items():
@@ -199,6 +202,9 @@ class DetalleOrdenFaseCContextTest(TestCase):
             'componentes_diagnostico_orden',
             'es_orden_diagnostico',
             'ollama_enabled',
+            'resumen_cobro',
+            'puede_registrar_pago',
+            'form_registrar_pago',
         ):
             with self.subTest(clave=clave):
                 self.assertIn(clave, ctx)

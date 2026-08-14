@@ -21,6 +21,7 @@ from .models import (
     SeguimientoPieza,
     VentaMostrador,  # ← NUEVO - FASE 3
     PiezaVentaMostrador,  # ← NUEVO - FASE 3
+    PagoOrden,
     # RHITSO - FASE 3 del módulo de seguimiento especializado
     EstadoRHITSO,
     TipoIncidenciaRHITSO,
@@ -3287,3 +3288,87 @@ class FeedbackSatisfaccionClienteForm(forms.Form):
         if not 0 <= val <= 10:
             raise forms.ValidationError('El valor debe estar entre 0 y 10.')
         return val
+
+
+class RegistrarPagoOrdenForm(forms.ModelForm):
+    """
+    Formulario para capturar un abono del cliente en el detalle de orden.
+
+    Objetivo de negocio:
+        Recibir monto, tipo (anticipo/saldo), método y foto opcional
+        del comprobante. La validación de saldo (no cobrar de más) vive
+        en services/pagos_orden.py, no aquí.
+
+    Args:
+        ModelForm de PagoOrden. No incluye orden ni registrado_por
+        (los pone la vista).
+    """
+
+    class Meta:
+        model = PagoOrden
+        fields = ['monto', 'tipo', 'metodo', 'notas', 'comprobante']
+        widgets = {
+            'monto': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': '0.00',
+            }),
+            'tipo': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'metodo': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'notas': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Referencia, últimos 4 dígitos, etc.',
+                'maxlength': '250',
+            }),
+            'comprobante': forms.ClearableFileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/jpeg,image/png,image/gif,image/webp',
+            }),
+        }
+        labels = {
+            'monto': 'Monto cobrado',
+            'tipo': 'Tipo de pago',
+            'metodo': 'Método',
+            'notas': 'Notas (opcional)',
+            'comprobante': 'Comprobante (opcional)',
+        }
+
+
+class DatosFacturaOrdenForm(forms.ModelForm):
+    """
+    Flags de factura fiscal (requiere / emitida / motivo).
+
+    Objetivo de negocio:
+        Usar por fin los campos que ya existían en OrdenServicio
+        y solo se veían en Django Admin.
+
+    Args:
+        ModelForm de OrdenServicio, solo 3 campos de facturación.
+    """
+
+    class Meta:
+        model = OrdenServicio
+        fields = ['requiere_factura', 'factura_emitida', 'motivo_no_factura']
+        widgets = {
+            'requiere_factura': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+            'factura_emitida': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+            'motivo_no_factura': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Si no se ha emitido, indica el motivo…',
+            }),
+        }
+        labels = {
+            'requiere_factura': 'El cliente requiere factura',
+            'factura_emitida': 'La factura ya fue emitida',
+            'motivo_no_factura': 'Motivo si aún no hay factura',
+        }

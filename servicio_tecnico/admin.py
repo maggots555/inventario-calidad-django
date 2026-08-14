@@ -41,6 +41,7 @@ from .models import (
     # Formato Digital Garantía Dell
     FormatoServicioGarantia,
     DanoEsteticoVistaGarantia,
+    PagoOrden,
 )
 
 
@@ -119,7 +120,40 @@ class HistorialOrdenInline(admin.TabularInline):
     fields = ('fecha_evento', 'tipo_evento', 'comentario', 'usuario')
     readonly_fields = ('fecha_evento', 'tipo_evento', 'comentario', 'usuario')
     ordering = ['-fecha_evento']
-    
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class PagoOrdenInline(admin.TabularInline):
+    """
+    Abonos del cliente dentro de la orden (solo lectura en el inline).
+
+    Objetivo: ver montos y comprobantes sin salir de la orden.
+    La captura diaria se hace en el detalle de orden, no aquí.
+    """
+
+    model = PagoOrden
+    extra = 0
+    can_delete = False
+    fields = (
+        'fecha_pago',
+        'monto',
+        'tipo',
+        'metodo',
+        'comprobante',
+        'registrado_por',
+    )
+    readonly_fields = (
+        'fecha_pago',
+        'monto',
+        'tipo',
+        'metodo',
+        'comprobante',
+        'registrado_por',
+    )
+    ordering = ['-fecha_pago']
+
     def has_add_permission(self, request, obj=None):
         return False
 
@@ -297,6 +331,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         DetalleEquipoInline,
         ImagenOrdenInline,
         HistorialOrdenInline,
+        PagoOrdenInline,
     ]
     
     def tipo_servicio_badge(self, obj):
@@ -2377,4 +2412,40 @@ class DanoEsteticoVistaGarantiaAdmin(admin.ModelAdmin):
         'etiqueta_dano',
     )
     raw_id_fields = ('formato',)
+
+
+@admin.register(PagoOrden)
+class PagoOrdenAdmin(admin.ModelAdmin):
+    """
+    Admin de abonos al cliente.
+
+    Objetivo: auditar quién cobró, cuánto y con qué comprobante.
+    """
+
+    list_display = (
+        'orden',
+        'monto',
+        'tipo',
+        'metodo',
+        'fecha_pago',
+        'registrado_por',
+        'tiene_comprobante',
+    )
+    list_filter = ('tipo', 'metodo', 'fecha_pago')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+        'notas',
+        'registrado_por__nombre_completo',
+    )
+    date_hierarchy = 'fecha_pago'
+    raw_id_fields = ('orden', 'registrado_por')
+    readonly_fields = ('fecha_pago',)
+
+    def tiene_comprobante(self, obj):
+        """Sí/No para la lista (más claro que el path del archivo)."""
+        return bool(obj.comprobante)
+
+    tiene_comprobante.boolean = True
+    tiene_comprobante.short_description = 'Comprobante'
 

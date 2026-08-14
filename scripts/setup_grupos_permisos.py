@@ -28,7 +28,7 @@ from servicio_tecnico.models import (
     OrdenServicio, DetalleEquipo, Cotizacion, HistorialOrden,
     ImagenOrden, VentaMostrador, SeguimientoPieza, EstadoRHITSO,
     SeguimientoRHITSO, IncidenciaRHITSO, ReferenciaGamaEquipo,
-    PiezaCotizada, PiezaVentaMostrador
+    PiezaCotizada, PiezaVentaMostrador, PagoOrden
 )
 from scorecard.models import Incidencia, ComponenteEquipo, CategoriaIncidencia, ServicioRealizado
 from almacen.models import (
@@ -199,6 +199,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_supervisor.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, db_alias=db_alias))
     permisos_supervisor.extend(obtener_permisos_modelo(PiezaCotizada, db_alias=db_alias))
     permisos_supervisor.extend(obtener_permisos_modelo(PiezaVentaMostrador, db_alias=db_alias))
+    permisos_supervisor.extend(obtener_permisos_modelo(PagoOrden, db_alias=db_alias))
 
     # Permisos personalizados de dashboards (solo gerenciales)
     if permiso_dashboard_gerencial:
@@ -256,6 +257,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_dispatcher.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))
     permisos_dispatcher.extend(obtener_permisos_modelo(PiezaCotizada, ['view'], db_alias))
     permisos_dispatcher.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view'], db_alias))
+    permisos_dispatcher.extend(obtener_permisos_modelo(PagoOrden, ['view'], db_alias))
 
     # Almacen - SIN ACCESO (Dispatcher no necesita ver modulo de almacen)
     # El Dispatcher solo gestiona ordenes de servicio, no inventario
@@ -282,6 +284,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_compras.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, db_alias=db_alias))
     permisos_compras.extend(obtener_permisos_modelo(PiezaCotizada, db_alias=db_alias))
     permisos_compras.extend(obtener_permisos_modelo(PiezaVentaMostrador, db_alias=db_alias))
+    permisos_compras.extend(obtener_permisos_modelo(PagoOrden, ['view'], db_alias))
 
     # Almacen - Acceso completo
     permisos_compras.extend(obtener_permisos_modelo(Proveedor, db_alias=db_alias))
@@ -320,6 +323,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_recepcionista.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))  # Para autocompletado
     permisos_recepcionista.extend(obtener_permisos_modelo(PiezaCotizada, ['view'], db_alias))  # Solo vista
     permisos_recepcionista.extend(obtener_permisos_modelo(PiezaVentaMostrador, db_alias=db_alias))  # Acceso completo
+    permisos_recepcionista.extend(obtener_permisos_modelo(PagoOrden, ['view', 'add', 'change'], db_alias))
 
     # Almacen - Acceso limitado
     permisos_recepcionista.extend(obtener_permisos_modelo(ProductoAlmacen, ['view', 'add', 'change'], db_alias))
@@ -372,6 +376,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_tecnico.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))
     permisos_tecnico.extend(obtener_permisos_modelo(PiezaCotizada, ['view', 'add', 'change'], db_alias))
     permisos_tecnico.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view', 'add', 'change'], db_alias))
+    permisos_tecnico.extend(obtener_permisos_modelo(PagoOrden, ['view'], db_alias))
 
     # Almacen - Solo consulta y solicitudes
     permisos_tecnico.extend(obtener_permisos_modelo(ProductoAlmacen, ['view'], db_alias))
@@ -412,24 +417,25 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_almacenista.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))
     permisos_almacenista.extend(obtener_permisos_modelo(PiezaCotizada, ['view'], db_alias))
     permisos_almacenista.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view'], db_alias))
+    permisos_almacenista.extend(obtener_permisos_modelo(PagoOrden, ['view'], db_alias))
 
     grupo_almacenista.permissions.set(permisos_almacenista)
     print(f"     {len(permisos_almacenista)} permisos asignados\n")
 
     # ========== FACTURACIÓN ==========
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Personal de facturación solo CONSULTA (ver órdenes, cotizaciones y
-    # dashboards de dinero). No puede crear, editar ni borrar. Es como
-    # Dispatcher (lectura ST) + cotizaciones de Almacén + dashboard gerencial.
+    # Personal de facturación CONSULTA órdenes/cotizaciones/dashboards
+    # y ADEMÁS puede registrar pagos (abonos + comprobante). No crea
+    # ni edita órdenes, inventario ni compras.
     print("  Configurando grupo: FACTURACIÓN")
     grupo_facturacion = crear_grupo(
         "Facturación",
-        "Consulta de órdenes, cotizaciones y dashboards gerenciales",
+        "Consulta de órdenes/cotizaciones y registro de pagos",
         db_alias,
     )
     permisos_facturacion = []
 
-    # Servicio Técnico - Solo lectura (mismo paquete que Dispatcher)
+    # Servicio Técnico - Lectura de órdenes + captura de pagos
     permisos_facturacion.extend(obtener_permisos_modelo(OrdenServicio, ['view'], db_alias))
     permisos_facturacion.extend(obtener_permisos_modelo(DetalleEquipo, ['view'], db_alias))
     permisos_facturacion.extend(obtener_permisos_modelo(Cotizacion, ['view'], db_alias))
@@ -443,6 +449,7 @@ def setup_grupos_y_permisos(db_alias='default'):
     permisos_facturacion.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view'], db_alias))
     permisos_facturacion.extend(obtener_permisos_modelo(PiezaCotizada, ['view'], db_alias))
     permisos_facturacion.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view'], db_alias))
+    permisos_facturacion.extend(obtener_permisos_modelo(PagoOrden, ['view', 'add', 'change'], db_alias))
 
     # Almacén - Solo consulta del cotizador (no inventario ni compras)
     permisos_facturacion.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view'], db_alias))

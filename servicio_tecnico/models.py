@@ -4524,3 +4524,135 @@ class DanoEsteticoVistaGarantia(models.Model):
         unique_together = [('formato', 'clave_vista')]
         ordering = ['clave_vista']
 
+
+# ============================================================================
+# MODELO: PAGO / ABONO DE ORDEN (cobros al cliente)
+# ============================================================================
+
+def comprobante_pago_upload_path(instance, filename):
+    """
+    Ruta en disco para el comprobante de un pago.
+
+    Objetivo de negocio:
+        Guardar el ticket/captura junto a la orden, sin mezclarlo con
+        las fotos de evidencia (ingreso/egreso) que cambian el estado.
+
+    Args:
+        instance: PagoOrden que se está guardando.
+        filename: Nombre original del archivo subido.
+
+    Returns:
+        str: Ruta relativa dentro de MEDIA_ROOT.
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Preferimos el folio del cliente (orden_cliente). Si aún no existe,
+    # usamos el número interno para no dejar el archivo "suelto".
+    orden_cliente = ''
+    if instance.orden_id and hasattr(instance.orden, 'detalle_equipo'):
+        orden_cliente = instance.orden.detalle_equipo.orden_cliente or ''
+    if not orden_cliente or not orden_cliente.strip():
+        orden_cliente = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/comprobantes/{orden_cliente}/{filename}'
+
+
+class PagoOrden(models.Model):
+    """
+    Un abono (pago parcial o total) que el cliente hizo sobre una orden.
+
+    Objetivo de negocio:
+        Registrar cuánto pagó el cliente, cómo pagó y (opcional) la foto
+        del comprobante. El saldo se calcula en services/pagos_orden.py,
+        no aquí: este modelo es la tabla, no el cerebro.
+
+    Args/campos:
+        orden: OrdenServicio a la que pertenece el abono.
+        monto: Cantidad cobrada en esta captura (mayor a cero).
+        tipo: anticipo / saldo / pago_completo / otro.
+        metodo: efectivo / transferencia / tarjeta / otro.
+        comprobante: Imagen opcional del ticket o captura bancaria.
+        notas: Texto corto (referencia de transferencia, etc.).
+        registrado_por: Empleado que capturó el pago.
+        fecha_pago: Momento del cobro.
+
+    Efectos secundarios:
+        Ninguno en save(). El historial lo escribe el servicio al registrar.
+    """
+
+    TIPO_PAGO_CHOICES = [
+        ('anticipo', 'Anticipo (50% para iniciar)'),
+        ('saldo', 'Saldo (resto a la entrega)'),
+        ('pago_completo', 'Pago en una sola exhibición'),
+        ('otro', 'Otro abono'),
+    ]
+    METODO_PAGO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('transferencia', 'Transferencia'),
+        ('tarjeta', 'Tarjeta'),
+        ('otro', 'Otro'),
+    ]
+
+    orden = models.ForeignKey(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='pagos',
+        help_text='Orden de servicio a la que se aplica este pago',
+    )
+    monto = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text='Monto cobrado en este abono (debe ser mayor a cero)',
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_PAGO_CHOICES,
+        default='anticipo',
+        help_text='Si es el anticipo del 50%, el saldo, un pago único u otro',
+    )
+    metodo = models.CharField(
+        max_length=20,
+        choices=METODO_PAGO_CHOICES,
+        default='transferencia',
+        help_text='Cómo pagó el cliente',
+    )
+    comprobante = models.ImageField(
+        upload_to=comprobante_pago_upload_path,
+        max_length=255,
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']),
+            FileSizeValidator(10),
+        ],
+        help_text='Foto o captura del comprobante (opcional, máx. 10 MB)',
+    )
+    notas = models.CharField(
+        max_length=250,
+        blank=True,
+        help_text='Referencia de transferencia, últimos 4 dígitos, etc.',
+    )
+    registrado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name='pagos_registrados',
+        help_text='Empleado que capturó este pago en el sistema',
+    )
+    fecha_pago = models.DateTimeField(
+        default=timezone.now,
+        help_text='Fecha y hora en que se recibió el pago',
+    )
+
+    def __str__(self):
+        return (
+            f"${self.monto} ({self.get_tipo_display()}) — "
+            f"{self.orden.numero_orden_interno}"
+        )
+
+    class Meta:
+        ordering = ['fecha_pago']
+        verbose_name = 'Pago de orden'
+        verbose_name_plural = 'Pagos de órdenes'
+        indexes = [
+            models.Index(fields=['orden', 'fecha_pago']),
+        ]
+
