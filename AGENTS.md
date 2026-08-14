@@ -99,6 +99,7 @@ python manage.py test servicio_tecnico.tests
 - Models: docstring, `__str__()`, `Meta` con `verbose_name`. **No hinchar** `models.py` grandes (ver §4 Fat models).
 - Forms: widgets con clases Bootstrap (`form-control`, etc.).
 - Vistas nuevas (ST y Almacén): módulo `views_*.py` + reexport (ver Modularidad); **no** hinchar `views.py`.
+- Tareas Celery nuevas: `tasks_<dominio>.py` + reexport al final de `tasks.py` (ver §4 Fat tasks); **no** hinchar `tasks.py`.
 
 **TypeScript:** ver §4 (única lista crítica). Tipado explícito; no `any`.
 
@@ -199,6 +200,7 @@ inventario-calidad-django/
 | Helper/regla reutilizable sin HTTP | `services/` (ST) o `utils/` (Almacén) |
 | Campo nuevo / `choices` / `clean()` de integridad | `models.py` (eso es tabla, no cerebro) |
 | Cálculo, workflow, sync, `save()` con side effects | `services/` (ST) o `utils/` (Almacén); el modelo solo fachada si hace falta |
+| Tarea Celery nueva | `tasks_<dominio>.py` + reexport al **final** de `tasks.py` (Celery solo autodescubre `tasks.py`) |
 | Decoradores de permiso/cache | `decorators.py` de la app |
 | Fachada para `urls.py` | `views.py` solo reexports (`# noqa: F401`) |
 
@@ -261,7 +263,6 @@ Misma trampa que `views.py`: “solo un método más” en `OrdenServicio` / `So
    (patrón ya usado: SolicitudCotizacion.persistir_precios_cliente → cotizacion_precios_cliente.py)
 ✅ Extraer código VIEJO solo si se toca esa zona por un bug/feature y sale barato de paso,
    o si el archivo se vuelve doloroso de verdad — no por estética
-✅ Mismo espíritu en tasks.py / forms.py ya densos: feature nueva = módulo nuevo, no “una función más”
 ```
 
 **Fachada (el interruptor se queda, el cerebro no):**
@@ -271,6 +272,51 @@ Misma trampa que `views.py`: “solo un método más” en `OrdenServicio` / `So
 def persistir_precios_cliente(self):
     from almacen.utils.cotizacion_precios_cliente import persistir_precios_cliente_solicitud
     return persistir_precios_cliente_solicitud(self)
+```
+
+### Fat tasks — no hinchar `tasks.py` grandes (Ago 2026)
+
+**CRITICAL — no agrandar tareas gordas:** está **prohibido** pegar `@shared_task` nuevas en `servicio_tecnico/tasks.py` (~5800 LOC) ni en `almacen/tasks.py` (~1400 LOC + reexports). Esos archivos **aún son manejables**; partirlos de golpe no es urgente. Lo que **sí** hay que hacer es **dejar de hincharlos**.
+
+Celery (`autodiscover_tasks` en `config/celery.py`) **solo** busca el módulo `tasks` de cada app. Por eso la tarea nueva NO puede vivir “suelta” sin registrarse: nace en `tasks_<dominio>.py` y se **reexporta al final** de `tasks.py`.
+
+**Patrón canónico (Almacén, solicitud de baja):**
+- Cerebro (quién avisa, textos, URLs) → `almacen/utils/notificar_solicitud_baja.py`
+- Tarea Celery → `almacen/tasks_solicitud_baja.py`
+- Registro → 4 líneas al **final** de `almacen/tasks.py` (`# noqa: E402, F401`)
+
+**Qué SÍ va en el `tasks.py` gordo:**
+- Nada de lógica nueva. Solo el reexport al final para que el worker vea la tarea.
+
+**Qué NO va en el `tasks.py` gordo:**
+- Una `@shared_task` más de correo, PDF, FFmpeg, push o Beat
+- Ampliar helpers privados (`_adjuntar_logo_*`) con más casos; si hace falta compartir, extraer a `utils/` o import **lazy** (dentro de la función) desde el módulo nuevo
+
+```
+❌ NUNCA “solo una tarea más” al final de servicio_tecnico/tasks.py o almacen/tasks.py
+❌ NUNCA crear tasks_foo.py SIN reexportarlo al final de tasks.py (el worker no la carga)
+❌ NUNCA poner el reexport ARRIBA de tasks.py si el módulo nuevo importa helpers de tasks.py
+   (import circular). Reexport SIEMPRE al final; imports del archivo nuevo DENTRO de la tarea
+❌ NUNCA cambiar name='servicio_tecnico.*' / name='almacen.*' al mover o crear tareas
+   (rompe Beat y colas pendientes)
+❌ NUNCA partir tasks.py de golpe “por limpieza” sin pedido explícito
+❌ NUNCA extraer FFmpeg / unificar helpers de email en el mismo PR que una tarea nueva
+
+✅ Tarea nueva = tasks_<dominio>.py + reexport al final de tasks.py
+✅ Lógica de negocio (destinatarios, textos) en services/ (ST) o utils/ (Almacén);
+   la tarea solo encola y envía
+✅ Firma con db_alias='default' y name='app.nombre_estable' — ver §10
+✅ Extraer el archivo VIEJO solo si se toca esa zona y sale barato, o si duele de verdad
+```
+
+**Fachada Celery (el worker sigue mirando `tasks.py`):**
+
+```python
+# Al FINAL de tasks.py — Celery autodescubre este archivo, no tasks_solicitud_baja.py
+from almacen.tasks_solicitud_baja import (  # noqa: E402, F401
+    notificar_almacenista_solicitud_baja_task,
+    notificar_solicitud_baja_procesada_task,
+)
 ```
 
 ---
@@ -289,7 +335,7 @@ Failover disco primario/alterno (`.env`: `PRIMARY_MEDIA_ROOT`, `ALTERNATE_MEDIA_
 
 ### Video / cámaras / resumen
 - TS: `upload_video.ts`, `camara_integrada.ts`, `camara_video.ts`, `compartir_video.ts`, `video_resumen.ts`
-- Celery en `servicio_tecnico/tasks.py`: comprimir, resumen, evidencia, rewind egreso
+- Celery video (hoy en `servicio_tecnico/tasks.py`): comprimir, resumen, evidencia, rewind egreso. **Tarea nueva** → `tasks_<dominio>.py` + reexport (ver §4 Fat tasks)
 - Envíos HTTP: `views_envios_cliente.py`
 
 **Fotos (detalle orden) — Web Worker JPEG:**
@@ -435,6 +481,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 23. No re-inflar monolitos ni agrandar `views_*.py` — §4 Modularidad (ST y Almacén); helpers en `services/`/`utils/`
 24. Comportamiento nuevo → test humo y/o integración según §1; excepción: docs/CSS cosmético o pedido del usuario
 25. No hinchar `models.py` grandes (`OrdenServicio`, `SolicitudCotizacion`, etc.) — §4 Fat models; lógica nueva en `services/`/`utils/`; extraer lo viejo solo si duele o de paso
+26. No hinchar `tasks.py` grandes — §4 Fat tasks; tarea nueva = `tasks_<dominio>.py` + reexport al final; no cambiar `name=`; no partir el gordo sin pedido explícito
 
 ---
 
@@ -513,8 +560,8 @@ celery_chain(tarea_a.s(orden_id, usuario_id, _db), tarea_b.s(orden_id, usuario_i
 **Redis:** Celery `/0`–`/1`; cache Django `/2` (`REDIS_CACHE_URL`). Cache con `IGNORE_EXCEPTIONS=True`. No mezclar DBs.
 
 **Tasks (inventario breve):**  
-ST — RHITSO/feedback/vigencia, diagnóstico/imágenes, seguimiento, video resumen/comprimir/evidencia/rewind.  
-Almacén — `notificar_front_cotizacion_task`, `notificar_compras_nueva_cotizacion_task`, `enviar_cotizacion_cliente_task`.  
+ST — RHITSO/feedback/vigencia, diagnóstico/imágenes, seguimiento, video resumen/comprimir/evidencia/rewind (hoy en `tasks.py`; **nuevas** en `tasks_<dominio>.py`, §4 Fat tasks).  
+Almacén — cotizaciones en `tasks.py`; solicitud de baja en `tasks_solicitud_baja.py` (reexport al final).  
 Todas ya llevan `db_alias` en firma; nuevas igual.
 
 ---
