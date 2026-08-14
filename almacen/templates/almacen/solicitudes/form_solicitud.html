@@ -164,6 +164,24 @@
                                             <i class="bi bi-link-45deg me-1"></i>Vincular a Orden de Servicio
                                         </h6>
                                         
+                                        <!--
+                                          EXPLICACIÓN PARA PRINCIPIANTES:
+                                          En Venta Mostrador el folio FL- lo genera el sistema
+                                          (como en cotización sin orden). El botón pide el
+                                          siguiente FL-YYYY-NNNN; el typeahead sigue sirviendo
+                                          para vincular un FL- que ya existe.
+                                        -->
+                                        <div class="mb-3" id="crear-fl-container" style="display: none;">
+                                            <button type="button"
+                                                    class="btn btn-outline-success btn-sm"
+                                                    id="btn-crear-orden-fl">
+                                                <i class="bi bi-plus-circle me-1"></i>Crear orden FL nueva
+                                            </button>
+                                            <small class="text-muted d-block mt-1">
+                                                Si aún no hay folio, el sistema sugiere el siguiente FL- del año.
+                                            </small>
+                                        </div>
+                                        
                                         <!-- Typeahead: data-prefijo lo actualiza solicitud_baja_form.ts -->
                                         <div class="mb-3">
                                             <label class="form-label">
@@ -255,8 +273,9 @@
      * 1. Autocompletado de producto (búsqueda AJAX + stock)
      * 2. Carga dinámica de unidades al elegir producto
      * 3. Campos visibles según tipo (técnico, orden, sucursal destino)
-     * 4. Autocompletado de orden con filtro OOW- (ST) o FL- (venta mostrador)
-     * 5. Creación automática de orden si no existe al enviar
+     * 4. Autocompletado de orden (OOW- diagnóstico / FL- venta mostrador)
+     * 5. Venta Mostrador: botón "Crear orden FL nueva" (folio auto-sugerido)
+     * 6. Servicio Técnico: si el OOW- no existe, se crea al enviar (pide sucursal)
      *
      * Las URLs vienen de Django (etiqueta url) para no hardcodear rutas.
      */

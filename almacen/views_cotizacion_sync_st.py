@@ -287,25 +287,10 @@ def crear_orden_fl_desde_cotizacion(request, pk):
             rol=Empleado.ROL_TECNICO,
         ).select_related('sucursal').order_by('nombre_completo')
 
-        # Auto-generar sugerencia de número FL- con formato FL-YYYY-NNNN
-        # Busca el último FL- de este año en DetalleEquipo para sugerir el siguiente
-        año_actual = timezone.now().year
-        ultimo_fl = DetalleEquipo.objects.filter(
-            orden_cliente__startswith=f'FL-{año_actual}'
-        ).order_by('-orden_cliente').first()
+        # El consecutivo FL-YYYY-NNNN vive en utils para compartirlo con baja.
+        from almacen.utils.folio_orden_fl import sugerir_siguiente_folio_fl
 
-        if ultimo_fl:
-            # Extraer el número secuencial del último FL- y sumar 1
-            try:
-                ultimo_num = int(ultimo_fl.orden_cliente.split('-')[-1])
-                siguiente_num = ultimo_num + 1
-            except (ValueError, IndexError):
-                siguiente_num = 1
-        else:
-            # Si no hay ningún FL- este año, empezar desde 1
-            siguiente_num = 1
-
-        numero_fl_sugerido = f"FL-{año_actual}-{siguiente_num:04d}"
+        numero_fl_sugerido = sugerir_siguiente_folio_fl()
 
         return JsonResponse({
             'success': True,
@@ -364,14 +349,14 @@ def crear_orden_fl_desde_cotizacion(request, pk):
         messages.error(request, 'El técnico seleccionado no es válido.')
         return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
-    # --- Determinar la sucursal desde el usuario que creó la solicitud ---
-    # Se intenta obtener la sucursal del empleado creador; si no tiene, se usa la del técnico
+    # Sucursal: empleado creador, si no tiene, la del técnico (misma regla que baja).
+    from almacen.utils.folio_orden_fl import resolver_sucursal_orden_almacen
+
     try:
         empleado_creador = Empleado.objects.get(user=solicitud.creado_por)
-        sucursal = empleado_creador.sucursal
     except (Empleado.DoesNotExist, AttributeError):
-        # Fallback: usar la sucursal del técnico asignado
-        sucursal = tecnico.sucursal
+        empleado_creador = None
+    sucursal = resolver_sucursal_orden_almacen(empleado_creador, tecnico)
 
     if not sucursal:
         messages.error(

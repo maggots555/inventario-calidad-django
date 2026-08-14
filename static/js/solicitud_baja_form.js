@@ -19,7 +19,7 @@
    
    4. Autocompletado de orden de servicio (Junio 2026):
       - servicio_tecnico → solo busca órdenes OOW- (diagnóstico)
-      - venta_mostrador → solo busca órdenes FL- (venta mostrador)
+      - venta_mostrador → busca FL- existentes O crea una nueva con folio sugerido
       - Typeahead parcial vía servicio_tecnico:api_buscar_ordenes_autocomplete
       - Coincidencia exacta / creación vía almacen:api_buscar_crear_orden
    
@@ -33,9 +33,10 @@
    - Escribe en el campo de orden → dropdown con órdenes activas filtradas
    - Al seleccionar del dropdown → vincula id_orden_servicio automáticamente
    - Si escribe número completo no listado → blur busca coincidencia exacta
-   - Si no existe → al enviar se crea orden con estado "Proveniente de Almacén"
+   - OOW- inexistente → al enviar se crea con sucursal elegida
+   - FL- inexistente → NO se inventa el folio; usar "Crear orden FL nueva"
    
-   ACTUALIZADO: Junio 2026 - Autocompletado de producto y orden con filtro OOW/FL
+   ACTUALIZADO: Agosto 2026 - Crear FL- auto-sugerido en Venta Mostrador
    ============================================================================= */
 /**
  * Clase principal que maneja el formulario de Nueva solicitud.
@@ -60,6 +61,9 @@ class SolicitudBajaFormHandler {
         this.prefijoOrdenRequerido = null;
         this.stockActual = 0;
         this.productoTextoSeleccionado = '';
+        // true cuando el usuario pulsó "Crear orden FL nueva" (folio sugerido, no inventado)
+        this.creandoOrdenFlNueva = false;
+        this.sucursalInferidaId = null;
         // Estado de selección de unidades (NUEVO)
         this.unidadesSeleccionadas = new Set();
         this.cantidadSolicitada = 0;
@@ -97,6 +101,8 @@ class SolicitudBajaFormHandler {
         this.ordenAutocompleteWrapper = document.getElementById('orden-autocomplete-wrapper');
         this.ordenAutocompleteDropdown = (_b = this.ordenAutocompleteWrapper) === null || _b === void 0 ? void 0 : _b.querySelector('.orden-autocomplete-dropdown');
         this.sucursalContainer = document.getElementById('sucursal-container');
+        this.crearFlContainer = document.getElementById('crear-fl-container');
+        this.btnCrearOrdenFl = document.getElementById('btn-crear-orden-fl');
         const form = document.getElementById('solicitud-baja-form');
         this.apiBuscarProductosUrl = (form === null || form === void 0 ? void 0 : form.dataset.apiBuscarProductos)
             || ((_c = this.productoAutocompleteWrapper) === null || _c === void 0 ? void 0 : _c.dataset.apiUrl)
@@ -369,7 +375,7 @@ class SolicitudBajaFormHandler {
             }
             else if (nuevoPrefijo === 'FL') {
                 this.ordenHelpText.innerHTML =
-                    'Busca órdenes <strong>FL-</strong> (venta mostrador). Si no existe, se creará al enviar.';
+                    'Busca un <strong>FL-</strong> existente, o pulsa <strong>Crear orden FL nueva</strong> si aún no hay folio.';
             }
             else {
                 this.ordenHelpText.textContent =
@@ -445,6 +451,8 @@ class SolicitudBajaFormHandler {
             }
             this.ordenEncontrada = true;
             this.ordenId = r.id;
+            this.creandoOrdenFlNueva = false;
+            this.sucursalInferidaId = null;
             cerrarDropdown();
             if (this.ordenStatusDiv) {
                 this.ordenStatusDiv.innerHTML = '';
@@ -631,6 +639,12 @@ class SolicitudBajaFormHandler {
                 }
             });
         }
+        // Venta Mostrador: pedir el siguiente FL- al backend (no inventar folio)
+        if (this.btnCrearOrdenFl) {
+            this.btnCrearOrdenFl.addEventListener('click', () => {
+                this.sugerirYPrepararOrdenFl();
+            });
+        }
         // Interceptar el submit del formulario para validar y crear orden si es necesario
         const form = document.getElementById('solicitud-baja-form');
         if (form) {
@@ -671,6 +685,11 @@ class SolicitudBajaFormHandler {
                 if (ordenContainer) {
                     ordenContainer.style.display = 'block';
                 }
+                // El botón de FL nuevo solo aplica a Venta Mostrador.
+                if (this.crearFlContainer) {
+                    this.crearFlContainer.style.display =
+                        tipoSolicitud === 'venta_mostrador' ? 'block' : 'none';
+                }
             }
             else {
                 this.tecnicoContainer.style.display = 'none';
@@ -678,6 +697,9 @@ class SolicitudBajaFormHandler {
                 this.tecnicoSelect.removeAttribute('required');
                 if (ordenContainer) {
                     ordenContainer.style.display = 'none';
+                }
+                if (this.crearFlContainer) {
+                    this.crearFlContainer.style.display = 'none';
                 }
                 this.limpiarCamposOrden();
             }
@@ -727,6 +749,8 @@ class SolicitudBajaFormHandler {
         this.ordenId = null;
         this.ordenTextoSeleccionado = '';
         this.ordenAutocompleteResultados = [];
+        this.creandoOrdenFlNueva = false;
+        this.sucursalInferidaId = null;
     }
     /**
      * Valida el formato del número de orden según el tipo de solicitud.
@@ -770,6 +794,109 @@ class SolicitudBajaFormHandler {
         return true;
     }
     /**
+     * Aviso cuando el folio FL- se va a crear al enviar (no existe aún).
+     *
+     * @param folioFl - Folio sugerido o editado (ej. FL-2026-0003)
+     */
+    mostrarAvisoCreacionFl(folioFl) {
+        var _a, _b;
+        if (!this.ordenStatusDiv) {
+            return;
+        }
+        const sucursalTxt = ((_b = (_a = this.sucursalOrdenSelect) === null || _a === void 0 ? void 0 : _a.selectedOptions[0]) === null || _b === void 0 ? void 0 : _b.text)
+            || 'se inferirá de tu perfil o del técnico';
+        this.ordenStatusDiv.innerHTML = `
+            <div class="alert alert-success py-2 mb-0">
+                <i class="bi bi-plus-circle me-1"></i>
+                <strong>Se creará la orden ${folioFl}</strong>
+                <br>
+                <small>
+                    Folio sugerido por el sistema (puedes editarlo).
+                    Sucursal: ${sucursalTxt}.
+                </small>
+            </div>
+        `;
+        this.ordenEncontrada = false;
+        this.ordenId = null;
+        this.ocultarOrdenInfo();
+        if (this.ordenServicioHidden) {
+            this.ordenServicioHidden.value = '';
+        }
+        // Solo mostrar sucursal si el backend no pudo inferirla.
+        if (this.sucursalContainer) {
+            this.sucursalContainer.style.display = this.sucursalInferidaId ? 'none' : 'block';
+        }
+    }
+    /**
+     * Pide el siguiente FL-YYYY-NNNN y deja el formulario listo para crearlo al enviar.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El almacenista no conoce el folio porque SIGMA lo genera. Este método
+     * llama a la misma API con sugerir_fl=1, rellena el campo y marca
+     * creandoOrdenFlNueva para que el submit cree la orden sin pedir sucursal.
+     */
+    sugerirYPrepararOrdenFl() {
+        var _a;
+        if (!this.ordenClienteInput || !this.ordenStatusDiv) {
+            return;
+        }
+        const tecnicoId = ((_a = this.tecnicoSelect) === null || _a === void 0 ? void 0 : _a.value) || '';
+        const params = new URLSearchParams({ sugerir_fl: '1' });
+        if (tecnicoId) {
+            params.set('tecnico_id', tecnicoId);
+        }
+        if (this.btnCrearOrdenFl) {
+            this.btnCrearOrdenFl.disabled = true;
+        }
+        this.ordenStatusDiv.innerHTML = `
+            <span class="text-muted">
+                <i class="bi bi-hourglass-split me-1"></i>Obteniendo siguiente folio FL-...
+            </span>
+        `;
+        fetch(`${this.apiBuscarCrearOrdenUrl}?${params.toString()}`)
+            .then((response) => response.json())
+            .then((data) => {
+            if (!data.success || !data.numero_fl_sugerido) {
+                this.ordenStatusDiv.innerHTML = `
+                        <span class="text-danger">
+                            <i class="bi bi-x-circle me-1"></i>
+                            ${data.error || 'No se pudo sugerir el folio FL-'}
+                        </span>
+                    `;
+                return;
+            }
+            this.creandoOrdenFlNueva = true;
+            this.ordenEncontrada = false;
+            this.ordenId = null;
+            this.ordenClienteInput.value = data.numero_fl_sugerido;
+            this.ordenTextoSeleccionado = data.numero_fl_sugerido;
+            if (data.sucursal_id) {
+                this.sucursalInferidaId = String(data.sucursal_id);
+                if (this.sucursalOrdenSelect) {
+                    this.sucursalOrdenSelect.value = this.sucursalInferidaId;
+                }
+            }
+            else {
+                this.sucursalInferidaId = null;
+            }
+            this.mostrarAvisoCreacionFl(data.numero_fl_sugerido);
+        })
+            .catch((error) => {
+            console.error('Error sugiriendo folio FL:', error);
+            this.ordenStatusDiv.innerHTML = `
+                    <span class="text-danger">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Error al obtener el folio FL-
+                    </span>
+                `;
+        })
+            .finally(() => {
+            if (this.btnCrearOrdenFl) {
+                this.btnCrearOrdenFl.disabled = false;
+            }
+        });
+    }
+    /**
      * Busca una orden por coincidencia exacta de orden_cliente.
      *
      * Se ejecuta en blur cuando el usuario escribió un número completo pero no
@@ -809,7 +936,7 @@ class SolicitudBajaFormHandler {
      * Procesa la respuesta de búsqueda de orden
      */
     procesarRespuestaBusqueda(data) {
-        var _a;
+        var _a, _b;
         if (!this.ordenStatusDiv || !this.sucursalContainer) {
             return;
         }
@@ -840,6 +967,8 @@ class SolicitudBajaFormHandler {
             this.ordenEncontrada = true;
             this.ordenId = data.orden_id || null;
             this.ordenTextoSeleccionado = data.orden_cliente || ((_a = this.ordenClienteInput) === null || _a === void 0 ? void 0 : _a.value) || '';
+            this.creandoOrdenFlNueva = false;
+            this.sucursalInferidaId = null;
             if (this.ordenServicioHidden && data.orden_id) {
                 this.ordenServicioHidden.value = data.orden_id.toString();
             }
@@ -856,8 +985,30 @@ class SolicitudBajaFormHandler {
                 `;
             }
         }
+        else if (this.creandoOrdenFlNueva) {
+            // El folio sugerido (o editado) no existe: es el caso esperado al crear FL.
+            this.mostrarAvisoCreacionFl(data.orden_cliente || ((_b = this.ordenClienteInput) === null || _b === void 0 ? void 0 : _b.value) || '');
+        }
+        else if (data.puede_crear_con_folio_ingresado === false) {
+            // Venta Mostrador: no inventar el FL- escrito a mano.
+            this.ordenStatusDiv.innerHTML = `
+                <div class="alert alert-warning py-2 mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Orden FL- no encontrada</strong>
+                    <br>
+                    <small>${data.mensaje || 'Busca un FL- existente o usa "Crear orden FL nueva".'}</small>
+                </div>
+            `;
+            this.ordenEncontrada = false;
+            this.ordenId = null;
+            this.ocultarOrdenInfo();
+            if (this.ordenServicioHidden) {
+                this.ordenServicioHidden.value = '';
+            }
+            this.sucursalContainer.style.display = 'none';
+        }
         else {
-            // ⚠️ Orden no encontrada - mostrar opción de crear
+            // OOW- no encontrada: se puede crear con el folio escrito + sucursal.
             this.ordenStatusDiv.innerHTML = `
                 <div class="alert alert-info py-2 mb-0">
                     <i class="bi bi-info-circle me-1"></i>
@@ -872,11 +1023,9 @@ class SolicitudBajaFormHandler {
             this.ordenEncontrada = false;
             this.ordenId = null;
             this.ocultarOrdenInfo();
-            // Limpiar campo oculto
             if (this.ordenServicioHidden) {
                 this.ordenServicioHidden.value = '';
             }
-            // Mostrar selector de sucursal (necesario para crear)
             this.sucursalContainer.style.display = 'block';
         }
     }
@@ -936,9 +1085,15 @@ class SolicitudBajaFormHandler {
             alert(mensajePrefijo);
             return;
         }
-        // Verificar que se haya seleccionado sucursal
-        const sucursalId = (_g = this.sucursalOrdenSelect) === null || _g === void 0 ? void 0 : _g.value;
-        if (!sucursalId) {
+        // FL- escrito a mano que no existe: no se crea; hay que usar el botón.
+        if (tipoSolicitud === 'venta_mostrador' && !this.creandoOrdenFlNueva) {
+            alert('No se encontró esa orden FL-. Busca una existente o pulsa "Crear orden FL nueva".');
+            return;
+        }
+        // OOW- pide sucursal. FL- nueva usa sucursal inferida; solo pide si falló.
+        const sucursalId = ((_g = this.sucursalOrdenSelect) === null || _g === void 0 ? void 0 : _g.value) || this.sucursalInferidaId || '';
+        const necesitaSucursalVisible = tipoSolicitud !== 'venta_mostrador' || !this.sucursalInferidaId;
+        if (necesitaSucursalVisible && !sucursalId) {
             alert('Debe seleccionar una sucursal para crear la orden de servicio.');
             (_h = this.sucursalOrdenSelect) === null || _h === void 0 ? void 0 : _h.focus();
             return;
@@ -958,25 +1113,29 @@ class SolicitudBajaFormHandler {
             submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Creando orden...';
         }
         // Crear la orden vía API y luego enviar el formulario
-        this.crearOrdenYEnviar(ordenCliente, sucursalId, tecnicoId, form, submitBtn, originalText);
+        this.crearOrdenYEnviar(ordenCliente, sucursalId || null, tecnicoId, form, submitBtn, originalText);
     }
     /**
      * Crea una orden de servicio y luego envía el formulario
      */
     crearOrdenYEnviar(ordenCliente, sucursalId, tecnicoId, form, submitBtn, originalText) {
         var _a;
+        const payload = {
+            orden_cliente: ordenCliente,
+            tecnico_id: tecnicoId,
+            tipo_solicitud: ((_a = this.tipoSolicitudSelect) === null || _a === void 0 ? void 0 : _a.value) || 'servicio_tecnico',
+        };
+        // FL- puede omitir sucursal_id: el backend la infiere del empleado/técnico.
+        if (sucursalId) {
+            payload.sucursal_id = sucursalId;
+        }
         fetch(this.apiBuscarCrearOrdenUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': this.getCSRFToken(),
             },
-            body: JSON.stringify({
-                orden_cliente: ordenCliente,
-                sucursal_id: sucursalId,
-                tecnico_id: tecnicoId,
-                tipo_solicitud: ((_a = this.tipoSolicitudSelect) === null || _a === void 0 ? void 0 : _a.value) || 'servicio_tecnico',
-            }),
+            body: JSON.stringify(payload),
         })
             .then(response => response.json())
             .then((data) => {
@@ -1335,7 +1494,8 @@ let solicitudBajaHandler = null;
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Django genera las URLs de los APIs y las pasa aquí para que JavaScript
  * no tenga rutas hardcodeadas. El handler configura autocompletado de producto
- * y orden, además del flujo de creación automática de órdenes OOW-/FL-.
+ * y orden, además del flujo de creación automática de órdenes OOW-/FL-
+ * (en Venta Mostrador el FL- se sugiere, no se inventa).
  *
  * @param apiUnidadesUrl - Unidades disponibles de un producto seleccionado
  * @param apiTecnicosUrl - Técnicos de laboratorio para asignar

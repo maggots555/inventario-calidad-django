@@ -890,7 +890,7 @@ class SolicitudBajaForm(forms.ModelForm):
             'autocomplete': 'off',
         }),
         label='Número de Orden del Cliente',
-        help_text='Busque la orden por número. Si no existe, se creará al enviar.',
+        help_text='Busque una orden existente. En Venta Mostrador use "Crear orden FL nueva" si aún no hay folio.',
     )
     
     # Campo extra para seleccionar sucursal (necesario para crear órdenes nuevas)

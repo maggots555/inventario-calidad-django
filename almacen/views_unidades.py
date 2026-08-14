@@ -901,7 +901,8 @@ def api_buscar_crear_orden_cliente(request):
     --------------------------------
     Usada en el formulario de Nueva solicitud del almacén. Permite:
     1. Buscar órdenes existentes por número de orden del cliente (coincidencia exacta)
-    2. Crear automáticamente una orden si no existe al enviar el formulario
+    2. Sugerir el siguiente folio FL- (GET con sugerir_fl=1) para no inventar números
+    3. Crear una orden al enviar el formulario (POST)
     
     El campo orden_cliente vive en DetalleEquipo; la búsqueda cruza esa relación.
     
@@ -912,18 +913,20 @@ def api_buscar_crear_orden_cliente(request):
       - venta_mostrador   → solo acepta FL-
     
     MÉTODOS HTTP:
-    - GET: Buscar orden existente
+    - GET: Buscar orden existente, o sugerir FL- si sugerir_fl=1
     - POST: Crear nueva orden si no existe
     
     PARÁMETROS GET:
-    - orden_cliente (str): Número a buscar (ej. OOW-12345)
+    - orden_cliente (str): Número a buscar (ej. OOW-12345). No aplica con sugerir_fl=1
     - tipo_solicitud (str, opcional): 'servicio_tecnico' o 'venta_mostrador' para validar prefijo
+    - sugerir_fl (str, opcional): '1' para devolver el siguiente FL-YYYY-NNNN y sucursal inferida
+    - tecnico_id (int, opcional): Con sugerir_fl, fallback de sucursal si el empleado no tiene
     
     PARÁMETROS POST (JSON):
     - orden_cliente (str): Número de orden del cliente
     - tipo_solicitud (str, opcional): Valida prefijo OOW/FL según tipo
-    - sucursal_id (int): Sucursal donde se registra la orden nueva
-    - tecnico_id (int): Técnico asignado (obligatorio para servicio técnico)
+    - sucursal_id (int, opcional en venta_mostrador): Si falta, se infiere del empleado/técnico
+    - tecnico_id (int): Técnico asignado (obligatorio)
     
     RETORNA:
     {
@@ -983,6 +986,32 @@ def api_buscar_crear_orden_cliente(request):
         return True, ''
     
     if request.method == 'GET':
+        # ========== MODO SUGERIR FL- (Venta Mostrador, sin inventar folio) ==========
+        # El front pide el siguiente consecutivo; no busca un número escrito a mano.
+        sugerir_fl = request.GET.get('sugerir_fl', '').strip() in ('1', 'true', 'True')
+        if sugerir_fl:
+            from almacen.utils.folio_orden_fl import datos_sugerencia_folio_fl
+
+            empleado_actual = None
+            try:
+                empleado_actual = Empleado.objects.select_related('sucursal').get(
+                    user=request.user
+                )
+            except Empleado.DoesNotExist:
+                empleado_actual = None
+
+            # Si el formulario ya eligió técnico, sirve de fallback de sucursal.
+            tecnico_sugerido = None
+            tecnico_id_get = request.GET.get('tecnico_id', '').strip()
+            if tecnico_id_get:
+                tecnico_sugerido = Empleado.objects.select_related('sucursal').filter(
+                    pk=tecnico_id_get
+                ).first()
+
+            payload = datos_sugerencia_folio_fl(empleado_actual, tecnico_sugerido)
+            payload['success'] = True
+            return JsonResponse(payload)
+
         # ========== MODO BÚSQUEDA ==========
         orden_cliente = request.GET.get('orden_cliente', '').strip().upper()
         tipo_solicitud = request.GET.get('tipo_solicitud', '').strip()
@@ -1035,13 +1064,26 @@ def api_buscar_crear_orden_cliente(request):
             })
             
         except DetalleEquipo.DoesNotExist:
-            # No se encontró, indicar que se puede crear
+            # FL- no se inventa a mano: el front debe usar "Crear orden FL nueva".
+            # OOW- sí puede crearse con el folio escrito (viene de Dell/el cliente).
+            es_venta_mostrador = tipo_solicitud == 'venta_mostrador'
+            if es_venta_mostrador:
+                mensaje_no_encontrada = (
+                    f'No se encontró la orden "{orden_cliente}". '
+                    'Busca un FL- existente o usa "Crear orden FL nueva".'
+                )
+            else:
+                mensaje_no_encontrada = (
+                    f'No se encontró orden con número "{orden_cliente}". '
+                    'Se puede crear automáticamente.'
+                )
             return JsonResponse({
                 'success': True,
                 'found': False,
                 'created': False,
                 'orden_cliente': orden_cliente,
-                'mensaje': f'No se encontró orden con número "{orden_cliente}". Se puede crear automáticamente.'
+                'puede_crear_con_folio_ingresado': not es_venta_mostrador,
+                'mensaje': mensaje_no_encontrada,
             })
             
         except DetalleEquipo.MultipleObjectsReturned:
@@ -1094,24 +1136,7 @@ def api_buscar_crear_orden_cliente(request):
                     'created': False
                 })
             
-            # Validar sucursal
-            if not sucursal_id:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Se requiere seleccionar una sucursal',
-                    'created': False
-                })
-            
-            try:
-                sucursal = Sucursal.objects.get(pk=sucursal_id)
-            except Sucursal.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Sucursal no válida',
-                    'created': False
-                })
-            
-            # Validar técnico
+            # Técnico primero: en FL- la sucursal puede inferirse de él.
             if not tecnico_id:
                 return JsonResponse({
                     'success': False,
@@ -1120,7 +1145,7 @@ def api_buscar_crear_orden_cliente(request):
                 })
             
             try:
-                tecnico = Empleado.objects.get(pk=tecnico_id)
+                tecnico = Empleado.objects.select_related('sucursal').get(pk=tecnico_id)
             except Empleado.DoesNotExist:
                 return JsonResponse({
                     'success': False,
@@ -1130,10 +1155,35 @@ def api_buscar_crear_orden_cliente(request):
             
             # Obtener empleado del usuario actual (responsable de seguimiento)
             try:
-                responsable = Empleado.objects.get(user=request.user)
+                responsable = Empleado.objects.select_related('sucursal').get(
+                    user=request.user
+                )
             except Empleado.DoesNotExist:
                 # Si el usuario no tiene empleado asociado, usar el técnico como responsable
                 responsable = tecnico
+
+            # Sucursal: en OOW- se pide; en FL- se infiere si no viene sucursal_id.
+            sucursal = None
+            if sucursal_id:
+                try:
+                    sucursal = Sucursal.objects.get(pk=sucursal_id)
+                except Sucursal.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Sucursal no válida',
+                        'created': False
+                    })
+            elif tipo_solicitud == 'venta_mostrador':
+                from almacen.utils.folio_orden_fl import resolver_sucursal_orden_almacen
+
+                sucursal = resolver_sucursal_orden_almacen(responsable, tecnico)
+
+            if not sucursal:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Se requiere seleccionar una sucursal',
+                    'created': False
+                })
             
             # ========== CREAR ORDEN DE SERVICIO ==========
             # tipo_servicio: 'diagnostico' para Servicio Técnico, 'venta_mostrador' para Venta Mostrador
