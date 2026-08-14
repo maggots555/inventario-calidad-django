@@ -849,11 +849,52 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
 # NO requiere autenticación.
 # ============================================================================
 
+def _estrellas_preseleccionadas_desde_query(request):
+    """
+    Lee ?estrellas= del correo One-Click Survey y lo convierte a 1–5.
+
+    Objetivo de negocio: si el cliente tocó una estrella en el email,
+    el formulario web abre con esa calificación ya marcada. NO guarda
+    nada en BD (Gmail/Outlook pueden abrir el enlace al escanear el mail).
+
+    Args:
+        request: HttpRequest GET con query string opcional ``estrellas``.
+
+    Returns:
+        int entre 1 y 5, o None si falta o es inválido.
+
+    Efectos secundarios:
+        Ninguno. Solo lee request.GET.
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES: GET.get devuelve None si no viene
+    # el parámetro; int('abc') lanza ValueError y lo tratamos como "ignorar".
+    crudo = request.GET.get('estrellas')
+    try:
+        valor = int(crudo)
+    except (TypeError, ValueError):
+        return None
+    # Solo aceptamos el rango del formulario (1 a 5 estrellas).
+    if valor in (1, 2, 3, 4, 5):
+        return valor
+    return None
+
+
 @ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
 def feedback_satisfaccion_cliente(request, token):
     """
     Vista pública para la encuesta de satisfacción post-entrega.
-    Valida el token, muestra el formulario interactivo y guarda la respuesta.
+
+    Objetivo: validar el token, mostrar el formulario y guardar la respuesta.
+    Soporta One-Click Survey: GET ?estrellas=1-5 prellena calificación_general
+    sin marcar el token como usado.
+
+    Args:
+        request: HttpRequest GET (mostrar form) o POST (guardar).
+        token: token único de FeedbackCliente tipo='satisfaccion'.
+
+    Efectos secundarios (solo POST válido):
+        Actualiza FeedbackCliente, crea HistorialOrden y puede notificar
+        al responsable de seguimiento.
     """
     from .models import FeedbackCliente
     from .forms import FeedbackSatisfaccionClienteForm
@@ -964,7 +1005,13 @@ def feedback_satisfaccion_cliente(request, token):
                 'sucursal_nombre': orden.sucursal.nombre,
             })
     else:
-        form = FeedbackSatisfaccionClienteForm()
+        # One-Click Survey: el clic en el correo NO guarda el voto.
+        # Solo prellenamos el hidden para que el JS pinte las estrellas.
+        estrellas = _estrellas_preseleccionadas_desde_query(request)
+        initial = {}
+        if estrellas is not None:
+            initial['calificacion_general'] = estrellas
+        form = FeedbackSatisfaccionClienteForm(initial=initial)
 
     return render(request, TEMPLATE, {
         'estado': 'formulario',

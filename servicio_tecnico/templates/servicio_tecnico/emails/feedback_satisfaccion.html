@@ -51,7 +51,7 @@
   }
   .mensaje h2 { font-size:1.25rem; color:#374151; font-weight:700; margin:0 0 10px; }
   .mensaje p  { color:#6b7280; font-size:0.92rem; line-height:1.6; margin:0 0 24px; }
-  /* CTA Button */
+  /* CTA Button (respaldo si el cliente de correo no pinta las estrellas) */
   .cta-wrapper { text-align:center; padding:0 32px 32px; }
   .cta-btn {
     display:inline-block;
@@ -65,6 +65,10 @@
     letter-spacing:0.3px;
     box-shadow:0 6px 20px rgba(102,126,234,0.45);
   }
+  /* One-Click Survey: cada estrella es un <a>, no JavaScript (el correo no lo ejecuta) */
+  .star-rating-wrap { text-align:center; padding:0 16px 8px; }
+  .star-rating-hint { color:#6b7280; font-size:0.85rem; margin:0 0 12px; }
+  .cta-fallback-hint { color:#9ca3af; font-size:0.78rem; margin:16px 0 10px; }
   /* Vigencia */
   .vigencia {
     margin: 0 32px 24px;
@@ -106,7 +110,7 @@
   .footer a { color:#7dd3fc; text-decoration:none; }
   /* Responsive */
   @media (max-width:600px) {
-    .header, .equipo-box, .mensaje, .cta-wrapper, .vigencia, .info-lista {
+    .header, .equipo-box, .mensaje, .cta-wrapper, .star-rating-wrap, .vigencia, .info-lista {
       padding-left:16px; padding-right:16px; margin-left:8px; margin-right:8px;
     }
   }
@@ -139,15 +143,66 @@
   <div class="mensaje">
     <h2>¿Cómo te tratamos?</h2>
     <p>
-      Tu opinión es muy importante para nosotros. Solo te tomará
-      <strong>2 minutos</strong> y nos ayudará a brindarte un mejor servicio.
+      Tu opinión es muy importante para nosotros. Toca una estrella para
+      empezar: te abre el formulario con esa calificación ya marcada.
+      Completarlo toma unos <strong>2 minutos</strong>.
     </p>
   </div>
 
-  <!-- ── BOTÓN CTA ── -->
+  <!-- ── ONE-CLICK SURVEY ──
+     EXPLICACIÓN PARA PRINCIPIANTES:
+     El correo NO puede ejecutar JavaScript. Cada estrella es un enlace
+     distinto (?estrellas=1 … 5). Al hacer clic se abre el formulario web
+     con esa calificación prellenada; el voto se guarda al enviar el form.
+     Usamos <table> + estilos inline porque Outlook ignora casi todo el CSS. -->
+  <div class="star-rating-wrap">
+    <p class="star-rating-hint">Toca una estrella para calificar:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 8px;">
+      <tr>
+        <td align="center" valign="top" width="88" style="padding:4px 2px;">
+          <a href="{{ feedback_url }}?estrellas=1" target="_blank" style="text-decoration:none; display:block;">
+            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
+            <span style="font-size:12px; font-weight:700; color:#374151;">1</span><br>
+            <span style="font-size:10px; color:#6b7280;">Muy malo</span>
+          </a>
+        </td>
+        <td align="center" valign="top" width="88" style="padding:4px 2px;">
+          <a href="{{ feedback_url }}?estrellas=2" target="_blank" style="text-decoration:none; display:block;">
+            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
+            <span style="font-size:12px; font-weight:700; color:#374151;">2</span><br>
+            <span style="font-size:10px; color:#6b7280;">Malo</span>
+          </a>
+        </td>
+        <td align="center" valign="top" width="88" style="padding:4px 2px;">
+          <a href="{{ feedback_url }}?estrellas=3" target="_blank" style="text-decoration:none; display:block;">
+            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
+            <span style="font-size:12px; font-weight:700; color:#374151;">3</span><br>
+            <span style="font-size:10px; color:#6b7280;">Regular</span>
+          </a>
+        </td>
+        <td align="center" valign="top" width="88" style="padding:4px 2px;">
+          <a href="{{ feedback_url }}?estrellas=4" target="_blank" style="text-decoration:none; display:block;">
+            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
+            <span style="font-size:12px; font-weight:700; color:#374151;">4</span><br>
+            <span style="font-size:10px; color:#6b7280;">Bueno</span>
+          </a>
+        </td>
+        <td align="center" valign="top" width="88" style="padding:4px 2px;">
+          <a href="{{ feedback_url }}?estrellas=5" target="_blank" style="text-decoration:none; display:block;">
+            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
+            <span style="font-size:12px; font-weight:700; color:#374151;">5</span><br>
+            <span style="font-size:10px; color:#6b7280;">Excelente</span>
+          </a>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ── BOTÓN CTA DE RESPALDO ── -->
   <div class="cta-wrapper">
+    <p class="cta-fallback-hint">¿No se ven las estrellas? Usa este botón:</p>
     <a href="{{ feedback_url }}" class="cta-btn">
-      ⭐&nbsp;&nbsp;Calificar mi experiencia
+      ⭐&nbsp;&nbsp;O completa la encuesta aquí
     </a>
   </div>
 
@@ -161,10 +216,10 @@
   <div class="info-lista">
     <p>✅ Sobre la encuesta:</p>
     <ul>
+      <li>Toca una estrella para abrir el formulario ya calificado</li>
       <li>No requiere crear cuenta ni iniciar sesión</li>
       <li>El enlace es seguro y solo funciona una vez</li>
       <li>Tus respuestas son confidenciales</li>
-      <li>Solo toma 2 minutos completar</li>
     </ul>
   </div>
 

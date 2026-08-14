@@ -3,6 +3,9 @@
  * feedback_satisfaccion.ts
  * Lógica interactiva de la encuesta de satisfacción del cliente.
  * Maneja estrellas, NPS, pulgares, progreso y confetti.
+ *
+ * One-Click Survey: si Django prellenó #id_calificacion_general (el cliente
+ * tocó una estrella en el correo), pintamos esas estrellas al cargar.
  */
 // ─── Etiquetas de estrellas ───────────────────────────────────────────────────
 const STAR_LABELS = {
@@ -28,7 +31,7 @@ function hideError(id) {
 }
 // ─── Sistema de calificación con estrellas ────────────────────────────────────
 function initStarGroup(containerId, inputId, labelId) {
-    var _a;
+    var _a, _b;
     const container = getEl(containerId);
     const hiddenInput = getEl(inputId);
     if (!container || !hiddenInput)
@@ -36,6 +39,16 @@ function initStarGroup(containerId, inputId, labelId) {
     const stars = container.querySelectorAll('.fs-star');
     const label = labelId ? ((_a = getEl(labelId)) !== null && _a !== void 0 ? _a : undefined) : undefined;
     const group = { container, stars, hiddenInput, label, value: 0 };
+    // EXPLICACIÓN PARA PRINCIPIANTES: el correo pone ?estrellas=N y Django
+    // rellena el input hidden. Si ya hay un 1–5, pintamos esas estrellas.
+    const initialVal = parseInt(hiddenInput.value.trim(), 10);
+    if (initialVal >= 1 && initialVal <= 5) {
+        group.value = initialVal;
+        highlightStars(stars, initialVal);
+        if (label) {
+            label.textContent = (_b = STAR_LABELS[initialVal]) !== null && _b !== void 0 ? _b : '';
+        }
+    }
     stars.forEach((star) => {
         var _a;
         const val = parseInt((_a = star.dataset['value']) !== null && _a !== void 0 ? _a : '0', 10);

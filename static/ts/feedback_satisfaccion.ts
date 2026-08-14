@@ -2,6 +2,9 @@
  * feedback_satisfaccion.ts
  * Lógica interactiva de la encuesta de satisfacción del cliente.
  * Maneja estrellas, NPS, pulgares, progreso y confetti.
+ *
+ * One-Click Survey: si Django prellenó #id_calificacion_general (el cliente
+ * tocó una estrella en el correo), pintamos esas estrellas al cargar.
  */
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -60,6 +63,17 @@ function initStarGroup(
   const label = labelId ? (getEl<HTMLElement>(labelId) ?? undefined) : undefined;
 
   const group: StarGroup = { container, stars, hiddenInput, label, value: 0 };
+
+  // EXPLICACIÓN PARA PRINCIPIANTES: el correo pone ?estrellas=N y Django
+  // rellena el input hidden. Si ya hay un 1–5, pintamos esas estrellas.
+  const initialVal = parseInt(hiddenInput.value.trim(), 10);
+  if (initialVal >= 1 && initialVal <= 5) {
+    group.value = initialVal;
+    highlightStars(stars, initialVal);
+    if (label) {
+      label.textContent = STAR_LABELS[initialVal] ?? '';
+    }
+  }
 
   stars.forEach((star) => {
     const val = parseInt(star.dataset['value'] ?? '0', 10);
