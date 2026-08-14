@@ -97,22 +97,64 @@
   .info-lista li {
     font-size:0.8rem; color:#047857; margin-bottom:4px;
   }
-  /* Footer */
+  /* Footer — mismo diseño que el resto de correos del sistema */
   .footer {
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    padding: 24px 32px;
+    color: white;
+    padding: 30px;
     text-align: center;
   }
-  .redes { margin-bottom: 12px; }
-  .redes a { display:inline-block; margin:0 6px; }
-  .redes img { width:24px; height:24px; opacity:0.85; }
-  .footer p { color:#94a3b8; font-size:0.75rem; margin:0; line-height:1.5; }
-  .footer a { color:#7dd3fc; text-decoration:none; }
+  .footer a { color: #ffffff; text-decoration: none; }
+  .company {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+  }
+  .company-link {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 5px;
+  }
+  .company-link a { color: #7dd3fc; text-decoration: none; }
+  .social-media {
+    margin: 20px 0;
+    padding: 15px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: center;
+  }
+  .social-title {
+    font-size: 14px;
+    margin-bottom: 12px;
+    opacity: 0.9;
+    text-align: center;
+  }
+  .social-links {
+    text-align: center;
+  }
+  .social-link {
+    display: inline-block;
+    padding: 10px 20px;
+    margin: 4px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 25px;
+    text-decoration: none;
+    color: #ffffff !important;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+  .timestamp {
+    font-size: 12px;
+    opacity: 0.8;
+    margin-top: 15px;
+  }
   /* Responsive */
   @media (max-width:600px) {
     .header, .equipo-box, .mensaje, .cta-wrapper, .star-rating-wrap, .vigencia, .info-lista {
       padding-left:16px; padding-right:16px; margin-left:8px; margin-right:8px;
     }
+    .social-link { padding: 6px 10px; font-size: 11px; }
   }
 </style>
 </head>
@@ -223,20 +265,42 @@
     </ul>
   </div>
 
-  <!-- ── FOOTER ── -->
+  <!-- ── FOOTER ──
+     EXPLICACIÓN PARA PRINCIPIANTES:
+     Mismo diseño visual que diagnóstico/cotización (pills de redes +
+     empresa + fecha). El contenido no cambia: las 4 redes, el nombre
+     de SIC, sicfix.mx y la fecha de envío. -->
   <div class="footer">
-    <div class="redes">
-      <a href="https://sicfix.mx"><img src="cid:icon_link" alt="Web"></a>
-      <a href="https://instagram.com/sicfix.mx"><img src="cid:icon_instagram" alt="Instagram"></a>
-      <a href="https://facebook.com/sicfix.mx"><img src="cid:icon_facebook" alt="Facebook"></a>
-      <a href="https://wa.me/523318189988"><img src="cid:icon_whatsapp" alt="WhatsApp"></a>
-    </div>
-    <p>
-      SIC - Comercialización y Servicios<br>
+    <div class="company">SIC - Comercialización y Servicios</div>
+    <div class="company-link">
       <a href="https://sicfix.mx">sicfix.mx</a>
-      &nbsp;·&nbsp;
+    </div>
+
+    <div class="social-media">
+      <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+      <div class="social-links">
+        <a href="https://sicfix.mx" class="social-link" target="_blank">
+          <img src="cid:icon_link" alt="Web" style="width:18px; height:18px; vertical-align:middle;">
+          <span>Sitio Web</span>
+        </a>
+        <a href="https://instagram.com/sicfix.mx" class="social-link" target="_blank">
+          <img src="cid:icon_instagram" alt="Instagram" style="width:18px; height:18px; vertical-align:middle;">
+          <span>Instagram</span>
+        </a>
+        <a href="https://facebook.com/sicfix.mx" class="social-link" target="_blank">
+          <img src="cid:icon_facebook" alt="Facebook" style="width:18px; height:18px; vertical-align:middle;">
+          <span>Facebook</span>
+        </a>
+        <a href="https://wa.me/523318189988" class="social-link" target="_blank">
+          <img src="cid:icon_whatsapp" alt="WhatsApp" style="width:18px; height:18px; vertical-align:middle;">
+          <span>WhatsApp</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="timestamp">
       Este correo fue enviado el {{ fecha_envio }}
-    </p>
+    </div>
   </div>
 
 </div>

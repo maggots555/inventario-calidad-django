@@ -54,6 +54,12 @@ class EmailOneClickSurveyTemplateTest(SimpleTestCase):
             self.assertIn(f'{url_base}?estrellas={n}', html)
         self.assertIn('O completa la encuesta aquí', html)
         self.assertIn(url_base, html)
+        # Footer: mismo contenido, diseño estándar (pills + empresa + fecha).
+        self.assertIn('SIC - Comercialización y Servicios', html)
+        self.assertIn('Visítanos y síguenos en nuestras redes sociales', html)
+        self.assertIn('Este correo fue enviado el 14/08/2026', html)
+        self.assertIn('https://instagram.com/sicfix.mx', html)
+        self.assertIn('https://wa.me/523318189988', html)
 
 
 class EstrellasQueryHelperTest(SimpleTestCase):
