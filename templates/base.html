@@ -251,6 +251,11 @@
                                 <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
                                     <i class="bi bi-check-circle text-success"></i> Órdenes finalizadas
                                 </a>
+                                {% if user.is_superuser or user.empleado.rol == 'facturacion' or user.empleado.rol == 'supervisor' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'gerente_general' %}
+                                <a href="{% url 'servicio_tecnico:bandeja_pagos_validacion' %}" class="dropdown-item">
+                                    <i class="bi bi-bank text-warning"></i> Pagos por validar
+                                </a>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="dropdown-column dropdown-lane dropdown-lane--violet">

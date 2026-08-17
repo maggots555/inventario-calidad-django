@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Set
 from django.urls import reverse
 
 from almacen.utils.notificar_respuesta_cotizacion import enviar_push_y_campanita
+from servicio_tecnico.services.pagos_orden import referencia_visible_orden
 
 if TYPE_CHECKING:
     from inventario.models import Empleado
@@ -102,6 +103,16 @@ def obtener_empleados_por_rol(rol: str) -> List['Empleado']:
     )
 
 
+def url_relativa_bandeja_pagos() -> str:
+    """
+    Ruta a la bandeja de pagos por validar (cola de Facturación).
+
+    Returns:
+        str: ruta relativa lista para push/campana.
+    """
+    return reverse('servicio_tecnico:bandeja_pagos_validacion')
+
+
 def url_relativa_detalle_pagos(orden: 'OrdenServicio') -> str:
     """
     Ruta al detalle de la orden, anclada a la sección de cobros.
@@ -121,15 +132,16 @@ def url_relativa_detalle_pagos(orden: 'OrdenServicio') -> str:
 
 def _folio_orden(orden: 'OrdenServicio') -> str:
     """
-    Folio corto para títulos (interno o pk).
+    Identificador visible: cliente → Service Tag → interno.
 
     Args:
         orden: OrdenServicio.
 
     Returns:
-        str listo para un asunto de correo.
+        str listo para asunto, push y campana.
     """
-    return (orden.numero_orden_interno or '').strip() or f'#{orden.pk}'
+    # EXPLICACIÓN: misma prioridad que la bandeja y el correo HTML.
+    return referencia_visible_orden(orden).texto
 
 
 def _resumen_pago(pago: 'PagoOrden') -> str:
@@ -280,7 +292,8 @@ def notificar_pago_pendiente_validacion(pago: 'PagoOrden') -> int:
         f'{_resumen_pago(pago)}. Confirma si ya aparece en la cuenta '
         f'de la empresa.'
     )
-    url = url_relativa_detalle_pagos(pago.orden)
+    # Facturación cae a la bandeja (toda la cola), no a una orden suelta.
+    url = url_relativa_bandeja_pagos()
     enviados = enviar_push_y_campanita(
         destinatarios,
         titulo=titulo,

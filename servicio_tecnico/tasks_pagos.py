@@ -20,6 +20,33 @@ from celery import shared_task
 logger = logging.getLogger('servicio_tecnico')
 
 
+def _remitente_sistema_facturacion() -> str:
+    """
+    Nombre visible del From en correos de validación de pago.
+
+    Objetivo de negocio:
+        El buzón sigue siendo el de SIGMA (DEFAULT_FROM_EMAIL), pero
+        quien recibe ve «Sistema de Facturación», no «Score Card System».
+
+    Returns:
+        str tipo «Sistema de Facturación <correo@empresa>».
+
+    Efectos secundarios:
+        Ninguno (solo lee settings).
+    """
+    import re
+
+    from django.conf import settings
+
+    # Paso: DEFAULT_FROM_EMAIL suele ser «Nombre <correo>»; nos quedamos
+    # solo con el correo para no cambiar el buzón que sí puede enviar.
+    email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+    email_solo = (
+        email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+    )
+    return f'Sistema de Facturación <{email_solo}>'
+
+
 @shared_task(
     bind=True,
     max_retries=3,
@@ -46,12 +73,14 @@ def notificar_validacion_pago_task(
     Returns:
         dict: success y mensaje para logs de Celery.
     """
-    from django.conf import settings
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string
     from django.utils import timezone
 
-    from almacen.utils.cotizacion_email_context import url_absoluta_detalle_orden
+    from almacen.utils.cotizacion_email_context import (
+        url_absoluta_detalle_orden,
+        url_base_pais_email,
+    )
     from config.paises_config import fecha_local_pais, get_pais_actual
     from servicio_tecnico.models import PagoOrden
     from servicio_tecnico.services.notificaciones_pagos import (
@@ -62,7 +91,9 @@ def notificar_validacion_pago_task(
         destinatarios_pago_pendiente,
         destinatarios_pago_validado,
         emails_de_empleados,
+        url_relativa_bandeja_pagos,
     )
+    from servicio_tecnico.services.pagos_orden import referencia_visible_orden
 
     log_prefix = '[PAGO-VALIDACION-EMAIL]'
     logger.info(
@@ -90,19 +121,20 @@ def notificar_validacion_pago_task(
                 'mensaje': f'PagoOrden ID {pago_id} no encontrado.',
             }
 
+        # Paso: folio visible = cliente → Service Tag → interno (mismo helper).
+        referencia = referencia_visible_orden(pago.orden)
+
         # Paso: los destinatarios se vuelven a calcular aquí (el worker
         # no recibe la lista) para no mandar correos a gente que ya no aplica.
         if tipo_evento == TIPO_PAGO_PENDIENTE:
             destinatarios = destinatarios_pago_pendiente(pago)
             asunto = (
-                f'Pago por validar: ${pago.monto} — '
-                f'{pago.orden.numero_orden_interno or pago.orden.pk}'
+                f'Pago por validar: ${pago.monto} — {referencia.texto}'
             )
         elif tipo_evento == TIPO_PAGO_VALIDADO:
             destinatarios = destinatarios_pago_validado(pago)
             asunto = (
-                f'Pago validado en cuenta: ${pago.monto} — '
-                f'{pago.orden.numero_orden_interno or pago.orden.pk}'
+                f'Pago validado en cuenta: ${pago.monto} — {referencia.texto}'
             )
         elif tipo_evento == TIPO_PAGO_NO_APARECE:
             destinatarios = destinatarios_pago_no_aparece(
@@ -110,8 +142,7 @@ def notificar_validacion_pago_task(
                 quien_marco=pago.validado_por,
             )
             asunto = (
-                f'Pago no aparece en cuenta: ${pago.monto} — '
-                f'{pago.orden.numero_orden_interno or pago.orden.pk}'
+                f'Pago no aparece en cuenta: ${pago.monto} — {referencia.texto}'
             )
         else:
             logger.error('%s tipo_evento desconocido: %s', log_prefix, tipo_evento)
@@ -128,13 +159,12 @@ def notificar_validacion_pago_task(
         _pais_email = get_pais_actual()
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
         url_orden = url_absoluta_detalle_orden(pago.orden)
-        # El ancla lleva a la tabla de cobros, no al tope de la orden.
-        url_pagos = f'{url_orden}#seccionPagos'
-
-        detalle = getattr(pago.orden, 'detalle_equipo', None)
-        folio_cliente = ''
-        if detalle is not None:
-            folio_cliente = getattr(detalle, 'orden_cliente', '') or ''
+        # Pendiente: Facturación abre la bandeja. El resto (responsable /
+        # recepción) abre el detalle de esa orden, anclado a cobros.
+        if tipo_evento == TIPO_PAGO_PENDIENTE:
+            url_pagos = f'{url_base_pais_email()}{url_relativa_bandeja_pagos()}'
+        else:
+            url_pagos = f'{url_orden}#seccionPagos'
 
         html = render_to_string(
             'servicio_tecnico/emails/validacion_pago.html',
@@ -143,8 +173,10 @@ def notificar_validacion_pago_task(
                 'orden': pago.orden,
                 'tipo_evento': tipo_evento,
                 'url_pagos': url_pagos,
-                'folio_interno': pago.orden.numero_orden_interno or f'#{pago.orden.pk}',
-                'folio_cliente': folio_cliente,
+                'referencia_orden': referencia.texto,
+                'folio_cliente': referencia.orden_cliente,
+                'service_tag': referencia.service_tag,
+                'folio_interno': referencia.folio_interno,
                 'ahora_local': ahora_local,
                 'pais': _pais_email,
             },
@@ -153,7 +185,7 @@ def notificar_validacion_pago_task(
         email_msg = EmailMessage(
             subject=asunto,
             body=html,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=_remitente_sistema_facturacion(),
             to=emails_to,
         )
         email_msg.content_subtype = 'html'

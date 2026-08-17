@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Validación de pago — {{ folio_interno }}</title>
+    <title>Validación de pago — {{ referencia_orden }}</title>
     <style>
         body {
             margin: 0;
@@ -75,17 +75,17 @@
         {% if tipo_evento == 'validado' %}
         <div class="header ok">
             <h1>Pago validado en la cuenta</h1>
-            <p>Orden {{ folio_interno }}</p>
+            <p>Orden {{ referencia_orden }}</p>
         </div>
         {% elif tipo_evento == 'no_aparece' %}
         <div class="header warn">
             <h1>El pago aún no aparece en la cuenta</h1>
-            <p>Orden {{ folio_interno }}</p>
+            <p>Orden {{ referencia_orden }}</p>
         </div>
         {% else %}
         <div class="header">
             <h1>Pago pendiente de validar</h1>
-            <p>Orden {{ folio_interno }}</p>
+            <p>Orden {{ referencia_orden }}</p>
         </div>
         {% endif %}
 
@@ -120,16 +120,22 @@
                     <span class="info-label">Tipo</span>
                     {{ pago.get_tipo_display }}
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Folio interno</span>
-                    {{ folio_interno }}
-                </div>
                 {% if folio_cliente %}
                 <div class="info-row">
                     <span class="info-label">Folio cliente</span>
                     {{ folio_cliente }}
                 </div>
                 {% endif %}
+                {% if service_tag %}
+                <div class="info-row">
+                    <span class="info-label">Service Tag</span>
+                    {{ service_tag }}
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">Folio interno</span>
+                    {{ folio_interno }}
+                </div>
                 <div class="info-row">
                     <span class="info-label">Registró</span>
                     {{ pago.registrado_por.nombre_completo }}

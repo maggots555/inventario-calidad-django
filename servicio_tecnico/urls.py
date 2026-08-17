@@ -31,6 +31,13 @@ urlpatterns = [
     
     # Detalle de orden (NUEVA VISTA)
     path('ordenes/<int:orden_id>/', views.detalle_orden, name='detalle_orden'),
+
+    # Bandeja: Facturación/gerencia concilian transferencias y tarjetas
+    path(
+        'pagos/validacion/',
+        views.bandeja_pagos_validacion,
+        name='bandeja_pagos_validacion',
+    ),
     
     # Descargar imagen original
     path('imagenes/<int:imagen_id>/descargar/', views.descargar_imagen_original, name='descargar_imagen'),

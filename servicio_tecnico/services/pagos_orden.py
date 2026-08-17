@@ -21,7 +21,7 @@ from io import BytesIO
 from typing import Optional
 
 from django.contrib.auth.models import AbstractBaseUser
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Sum
@@ -51,6 +51,14 @@ ROLES_PUEDEN_VALIDAR_PAGO = (
 
 # Desde estos estados Facturación aún puede decidir (o corregir un "no aparece").
 ESTADOS_VALIDACION_ABIERTOS = ('pendiente', 'no_aparece')
+
+# Filtros de la bandeja: uno solo o los dos abiertos juntos.
+FILTROS_BANDEJA_VALIDACION = ('pendiente', 'no_aparece', 'abiertos')
+
+# Cómo se nombra la orden en correos y bandeja (el primero que exista gana).
+TIPO_REF_ORDEN_CLIENTE = 'orden_cliente'
+TIPO_REF_SERVICE_TAG = 'service_tag'
+TIPO_REF_INTERNO = 'interno'
 
 # Estados en los que el negocio espera al menos el 50% (anticipo).
 ESTADOS_REQUIEREN_ANTICIPO_50 = (
@@ -85,6 +93,84 @@ class ResumenCobro:
     es_estimado: bool
     aplica_iva: bool
     tasa_iva: Decimal
+
+
+@dataclass(frozen=True)
+class ReferenciaOrdenVisible:
+    """
+    Cómo se nombra la orden en correos, push y bandeja.
+
+    Objetivo de negocio:
+        El cliente y Facturación buscan primero el folio de cliente
+        (OOW-/FL-), luego el Service Tag del equipo y, si no hay
+        ninguno, el folio interno de SIGMA.
+
+    Atributos:
+        texto: el que gana la prioridad (el que se pone en el asunto).
+        tipo: 'orden_cliente', 'service_tag' o 'interno'.
+        orden_cliente / service_tag / folio_interno: los tres, por si
+            la pantalla quiere mostrar los demás en letra chica.
+    """
+
+    texto: str
+    tipo: str
+    orden_cliente: str
+    service_tag: str
+    folio_interno: str
+
+
+def referencia_visible_orden(orden) -> ReferenciaOrdenVisible:
+    """
+    Elige el identificador de la orden con la prioridad de negocio.
+
+    Prioridad:
+        1) Folio del cliente (`orden_cliente` en DetalleEquipo).
+        2) Service Tag (`numero_serie` del equipo).
+        3) Folio interno (`numero_orden_interno` o `#pk`).
+
+    Args:
+        orden: OrdenServicio (idealmente con `detalle_equipo` precargado).
+
+    Returns:
+        ReferenciaOrdenVisible lista para asunto, header y bandeja.
+
+    Efectos secundarios:
+        Ninguno (solo lectura).
+    """
+    # Paso 1: el interno siempre existe (save() lo genera o usamos el pk).
+    folio_interno = (getattr(orden, 'numero_orden_interno', None) or '').strip()
+    if not folio_interno:
+        folio_interno = f'#{orden.pk}' if getattr(orden, 'pk', None) else ''
+
+    # Paso 2: folio cliente y Service Tag viven en DetalleEquipo (1 a 1).
+    orden_cliente = ''
+    service_tag = ''
+    try:
+        detalle = orden.detalle_equipo
+    except ObjectDoesNotExist:
+        detalle = None
+    if detalle is not None:
+        orden_cliente = (detalle.orden_cliente or '').strip()
+        service_tag = (detalle.numero_serie or '').strip()
+
+    # Paso 3: el primero que tenga texto gana (cliente → ST → interno).
+    if orden_cliente:
+        tipo = TIPO_REF_ORDEN_CLIENTE
+        texto = orden_cliente
+    elif service_tag:
+        tipo = TIPO_REF_SERVICE_TAG
+        texto = service_tag
+    else:
+        tipo = TIPO_REF_INTERNO
+        texto = folio_interno
+
+    return ReferenciaOrdenVisible(
+        texto=texto,
+        tipo=tipo,
+        orden_cliente=orden_cliente,
+        service_tag=service_tag,
+        folio_interno=folio_interno,
+    )
 
 
 def _db_de(instancia) -> str:
@@ -299,6 +385,84 @@ def usuario_puede_validar_pago(user: Optional[AbstractBaseUser]) -> bool:
     if empleado is None or not getattr(empleado, 'activo', False):
         return False
     return empleado.rol in ROLES_PUEDEN_VALIDAR_PAGO
+
+
+def _estados_del_filtro_bandeja(filtro: str) -> tuple[str, ...]:
+    """
+    Traduce el query ?filtro= de la bandeja a estados de PagoOrden.
+
+    Args:
+        filtro: 'pendiente', 'no_aparece' o 'abiertos' (u otro → pendiente).
+
+    Returns:
+        Tupla de claves de ESTADO_VALIDACION_CHOICES.
+    """
+    if filtro == 'no_aparece':
+        return ('no_aparece',)
+    if filtro == 'abiertos':
+        return ESTADOS_VALIDACION_ABIERTOS
+    return ('pendiente',)
+
+
+def listar_pagos_abiertos_validacion(filtro: str = 'pendiente'):
+    """
+    Pagos que Facturación aún debe conciliar (bandeja).
+
+    Args:
+        filtro: 'pendiente' (default), 'no_aparece' o 'abiertos'.
+
+    Returns:
+        QuerySet de PagoOrden ordenado del más viejo al más nuevo
+        (lo que lleva más tiempo sin validar sale primero).
+
+    Efectos secundarios:
+        Solo lectura. Precarga orden, cliente y quién cobró.
+    """
+    from servicio_tecnico.models import PagoOrden
+
+    # Paso: un filtro inválido no debe vaciar la bandeja; caemos a pendientes.
+    estados = _estados_del_filtro_bandeja(filtro)
+    return (
+        PagoOrden.objects.filter(estado_validacion__in=estados)
+        .select_related(
+            'orden',
+            'orden__detalle_equipo',
+            'orden__sucursal',
+            'registrado_por',
+            'validado_por',
+        )
+        .order_by('fecha_pago', 'pk')
+    )
+
+
+def contar_pagos_abiertos_validacion() -> dict:
+    """
+    Conteos para las pestañas de la bandeja.
+
+    Returns:
+        dict con claves pendiente / no_aparece / abiertos (ints).
+
+    Efectos secundarios:
+        Una consulta agregada; no escribe.
+    """
+    from django.db.models import Count, Q
+
+    from servicio_tecnico.models import PagoOrden
+
+    # Paso: un solo COUNT con filtro evita 2 viajes a la BD.
+    datos = PagoOrden.objects.filter(
+        estado_validacion__in=ESTADOS_VALIDACION_ABIERTOS,
+    ).aggregate(
+        pendientes=Count('pk', filter=Q(estado_validacion='pendiente')),
+        no_aparecen=Count('pk', filter=Q(estado_validacion='no_aparece')),
+    )
+    pendientes = datos['pendientes'] or 0
+    no_aparecen = datos['no_aparecen'] or 0
+    return {
+        'pendiente': pendientes,
+        'no_aparece': no_aparecen,
+        'abiertos': pendientes + no_aparecen,
+    }
 
 
 def estado_validacion_inicial(metodo: str) -> str:

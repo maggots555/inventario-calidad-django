@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Pagos por validar - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+<link rel="stylesheet" href="{% static 'css/bandeja_pagos.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 bandeja-pagos">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1 class="h3 mb-1">
+                <i class="bi bi-bank"></i> Pagos por validar
+            </h1>
+            <p class="text-muted mb-0">
+                Confirma si el abono ya aparece en la cuenta de la empresa.
+                Transferencias y tarjetas; el efectivo de caja no entra aquí.
+            </p>
+        </div>
+    </div>
+
+    <div class="bandeja-pagos__filtros mb-3" role="tablist" aria-label="Filtro de la bandeja">
+        <a href="{% url 'servicio_tecnico:bandeja_pagos_validacion' %}"
+           class="btn {% if filtro == 'pendiente' %}btn-warning{% else %}btn-outline-warning{% endif %}"
+           {% if filtro == 'pendiente' %}aria-current="page"{% endif %}>
+            Pendientes
+            <span class="badge text-bg-light">{{ conteos.pendiente }}</span>
+        </a>
+        <a href="{% url 'servicio_tecnico:bandeja_pagos_validacion' %}?filtro=no_aparece"
+           class="btn {% if filtro == 'no_aparece' %}btn-danger{% else %}btn-outline-danger{% endif %}"
+           {% if filtro == 'no_aparece' %}aria-current="page"{% endif %}>
+            No aparecen
+            <span class="badge text-bg-light">{{ conteos.no_aparece }}</span>
+        </a>
+        <a href="{% url 'servicio_tecnico:bandeja_pagos_validacion' %}?filtro=abiertos"
+           class="btn {% if filtro == 'abiertos' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+           {% if filtro == 'abiertos' %}aria-current="page"{% endif %}>
+            Todos abiertos
+            <span class="badge text-bg-light">{{ conteos.abiertos }}</span>
+        </a>
+    </div>
+
+    <div class="card section-card">
+        <div class="card-body">
+            {% if pagina_pagos.object_list %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle bandeja-pagos__tabla">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Orden</th>
+                            <th>Método</th>
+                            <th class="text-end">Monto</th>
+                            <th>Estado</th>
+                            <th>Comprobante</th>
+                            <th>Registró</th>
+                            <th>Validar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pago in pagina_pagos %}
+                        <tr>
+                            <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {# EXPLICACIÓN: firstof toma el primero que tenga texto (cliente → ST → interno). #}
+                                <a href="{% url 'servicio_tecnico:detalle_orden' pago.orden.pk %}#seccionPagos">
+                                    {% firstof pago.orden.detalle_equipo.orden_cliente pago.orden.detalle_equipo.numero_serie pago.orden.numero_orden_interno pago.orden.pk %}
+                                </a>
+                                {% if pago.orden.detalle_equipo.orden_cliente %}
+                                    {% if pago.orden.detalle_equipo.numero_serie %}
+                                    <div class="small text-muted">ST {{ pago.orden.detalle_equipo.numero_serie }}</div>
+                                    {% endif %}
+                                    {% if pago.orden.numero_orden_interno %}
+                                    <div class="small text-muted">{{ pago.orden.numero_orden_interno }}</div>
+                                    {% endif %}
+                                {% elif pago.orden.detalle_equipo.numero_serie %}
+                                    {% if pago.orden.numero_orden_interno %}
+                                    <div class="small text-muted">{{ pago.orden.numero_orden_interno }}</div>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ pago.get_metodo_display }}</td>
+                            <td class="text-end">${{ pago.monto|floatformat:2 }}</td>
+                            <td>
+                                {% if pago.estado_validacion == 'pendiente' %}
+                                <span class="badge text-bg-warning">Pendiente en cuenta</span>
+                                {% else %}
+                                <span class="badge text-bg-danger">No aparece</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if pago.comprobante %}
+                                <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener">
+                                    <img src="{{ pago.comprobante.url }}"
+                                         alt="Comprobante {{ pago.monto }}"
+                                         class="bandeja-pagos__thumb">
+                                </a>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ pago.registrado_por.nombre_completo }}
+                                {% if pago.notas %}
+                                <div class="small text-muted">{{ pago.notas }}</div>
+                                {% endif %}
+                                {% if pago.nota_validacion %}
+                                <div class="small">Facturación: {{ pago.nota_validacion }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" class="bandeja-pagos__form-validar">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="validar_pago">
+                                    <input type="hidden" name="pago_id" value="{{ pago.pk }}">
+                                    <input type="hidden" name="filtro" value="{{ filtro }}">
+                                    <label class="visually-hidden" for="nota-bandeja-{{ pago.pk }}">Nota de validación</label>
+                                    <input type="text"
+                                           class="form-control form-control-sm mb-2"
+                                           id="nota-bandeja-{{ pago.pk }}"
+                                           name="nota_validacion"
+                                           maxlength="250"
+                                           placeholder="Nota (opcional)">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        <button type="submit" name="decision" value="validado"
+                                                class="btn btn-success btn-sm bandeja-pagos__btn">
+                                            Ya aparece
+                                        </button>
+                                        <button type="submit" name="decision" value="no_aparece"
+                                                class="btn btn-outline-danger btn-sm bandeja-pagos__btn">
+                                            No aparece
+                                        </button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if pagina_pagos.has_other_pages %}
+            <nav aria-label="Páginas de la bandeja" class="mt-3">
+                <ul class="pagination pagination-sm mb-0">
+                    {% if pagina_pagos.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?filtro={{ filtro }}&page={{ pagina_pagos.previous_page_number }}">Anterior</a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Página {{ pagina_pagos.number }} de {{ pagina_pagos.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if pagina_pagos.has_next %}
+                    <li class="page-item">
+                        <a class="page-link"
+                           href="?filtro={{ filtro }}&page={{ pagina_pagos.next_page_number }}">Siguiente</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <p class="text-muted mb-0">
+                {% if filtro == 'no_aparece' %}
+                No hay pagos marcados como “no aparece”.
+                {% elif filtro == 'abiertos' %}
+                No hay pagos pendientes de conciliar.
+                {% else %}
+                No hay pagos pendientes de validar en la cuenta.
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

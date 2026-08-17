@@ -1,0 +1,54 @@
+/* Bandeja de pagos por validar (Facturación / gerencia) */
+
+.bandeja-pagos__filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.bandeja-pagos__filtros .btn {
+    min-height: 44px;
+}
+
+.bandeja-pagos__thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+.bandeja-pagos__form-validar {
+    max-width: 16rem;
+}
+
+.bandeja-pagos__btn {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.bandeja-pagos__tabla th,
+.bandeja-pagos__tabla td {
+    vertical-align: middle;
+}
+
+[data-bs-theme="dark"] .bandeja-pagos {
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .bandeja-pagos .card {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .bandeja-pagos__tabla {
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .bandeja-pagos__thumb {
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .bandeja-pagos .text-muted {
+    color: var(--gray-400, #94a3b8) !important;
+}

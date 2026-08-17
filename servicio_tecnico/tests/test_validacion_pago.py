@@ -19,7 +19,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from inventario.models import Empleado, Sucursal
@@ -36,14 +36,21 @@ from servicio_tecnico.services.notificaciones_pagos import (
     destinatarios_pago_no_aparece,
     destinatarios_pago_pendiente,
     destinatarios_pago_validado,
+    url_relativa_bandeja_pagos,
 )
 from servicio_tecnico.services.pagos_orden import (
+    TIPO_REF_INTERNO,
+    TIPO_REF_ORDEN_CLIENTE,
+    TIPO_REF_SERVICE_TAG,
     estado_validacion_inicial,
+    listar_pagos_abiertos_validacion,
+    referencia_visible_orden,
     registrar_pago,
     usuario_puede_validar_pago,
     validar_pago_en_cuenta,
 )
-from servicio_tecnico.views import detalle_orden
+from servicio_tecnico.tasks_pagos import _remitente_sistema_facturacion
+from servicio_tecnico.views import bandeja_pagos_validacion, detalle_orden
 
 
 User = get_user_model()
@@ -65,6 +72,106 @@ class EstadoValidacionInicialTest(TestCase):
         """Borde: caja no se valida contra la cuenta de la empresa."""
         self.assertEqual(estado_validacion_inicial('efectivo'), 'no_aplica')
         self.assertEqual(estado_validacion_inicial('otro'), 'no_aplica')
+
+
+class RemitenteFacturacionTest(SimpleTestCase):
+    """
+    Objetivo: el From de validación de pago no dice Score Card.
+    """
+
+    @override_settings(
+        DEFAULT_FROM_EMAIL='Score Card System <oow_mx@sic.com.mx>',
+    )
+    def test_nombre_facturacion_conserva_buzon(self):
+        """Feliz: cambia el nombre visible y deja el mismo correo."""
+        self.assertEqual(
+            _remitente_sistema_facturacion(),
+            'Sistema de Facturación <oow_mx@sic.com.mx>',
+        )
+
+
+class ReferenciaVisibleOrdenTest(TestCase):
+    """
+    Objetivo: correos y bandeja nombran la orden por prioridad.
+
+    Prioridad: folio cliente → Service Tag → folio interno.
+    """
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Referencia Pago',
+            ciudad='CDMX',
+        )
+        user = User.objects.create_user(
+            username='tecnico.ref@test.local',
+            email='tecnico.ref@test.local',
+            password='testpass123',
+        )
+        self.tecnico = Empleado.objects.create(
+            nombre_completo='Técnico Referencia',
+            cargo='tecnico',
+            area='TECNICA',
+            email='tecnico.ref@test.local',
+            sucursal=self.sucursal,
+            user=user,
+            rol='tecnico',
+            activo=True,
+            contraseña_configurada=True,
+        )
+
+    def _crear_orden(self, orden_cliente='', numero_serie=''):
+        """
+        Orden mínima con o sin folio de cliente / Service Tag.
+
+        Args:
+            orden_cliente: folio del cliente (puede ir vacío).
+            numero_serie: Service Tag (puede ir vacío).
+
+        Returns:
+            OrdenServicio con detalle_equipo.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='cotizacion',
+            tecnico_asignado_actual=self.tecnico,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=orden_cliente,
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude',
+            numero_serie=numero_serie,
+            falla_principal='No enciende',
+            gama='baja',
+        )
+        return OrdenServicio.objects.select_related('detalle_equipo').get(
+            pk=orden.pk,
+        )
+
+    def test_gana_folio_cliente_si_existe(self):
+        """Feliz: con OOW- se ignora el Service Tag y el interno."""
+        orden = self._crear_orden('OOW-REF-01', 'SN-REF-01')
+        ref = referencia_visible_orden(orden)
+        self.assertEqual(ref.texto, 'OOW-REF-01')
+        self.assertEqual(ref.tipo, TIPO_REF_ORDEN_CLIENTE)
+        self.assertEqual(ref.service_tag, 'SN-REF-01')
+        self.assertTrue(ref.folio_interno.startswith('ORD-'))
+
+    def test_sin_cliente_gana_service_tag(self):
+        """Borde: sin folio de cliente se usa el Service Tag."""
+        orden = self._crear_orden('', 'SN-SOLO-01')
+        ref = referencia_visible_orden(orden)
+        self.assertEqual(ref.texto, 'SN-SOLO-01')
+        self.assertEqual(ref.tipo, TIPO_REF_SERVICE_TAG)
+
+    def test_sin_cliente_ni_tag_usa_interno(self):
+        """Borde: si no hay cliente ni ST, queda el folio interno."""
+        orden = self._crear_orden('', '')
+        ref = referencia_visible_orden(orden)
+        self.assertEqual(ref.tipo, TIPO_REF_INTERNO)
+        self.assertEqual(ref.texto, orden.numero_orden_interno)
 
 
 class ValidacionPagoServiceTest(TestCase):
@@ -242,6 +349,10 @@ class ValidacionPagoServiceTest(TestCase):
         self.assertIn(self.facturacion_2.pk, ids)
         self.assertNotIn(self.recepcion.pk, ids)
         self.mock_email.assert_called_once()
+        self.assertEqual(
+            self.mock_push.call_args.kwargs['url'],
+            url_relativa_bandeja_pagos(),
+        )
 
     def test_efectivo_no_avisa(self):
         """Borde: un cobro en caja no dispara el flujo de Facturación."""
@@ -329,6 +440,29 @@ class ValidacionPagoServiceTest(TestCase):
         pago.refresh_from_db()
         with self.assertRaises(ValidationError):
             validar_pago_en_cuenta(pago, self.facturacion, aparece=False)
+
+    def test_lista_bandeja_solo_pendientes(self):
+        """Feliz: la bandeja default no mezcla efectivo ni ya validados."""
+        spei = self._registrar('transferencia')
+        self._registrar('efectivo', monto='50.00')
+        ids = list(
+            listar_pagos_abiertos_validacion('pendiente').values_list('pk', flat=True)
+        )
+        self.assertEqual(ids, [spei.pk])
+
+    def test_lista_bandeja_filtro_no_aparece(self):
+        """Borde: el filtro no_aparece no trae los que siguen pendientes."""
+        pendiente = self._registrar('transferencia')
+        rechazado = self._registrar('tarjeta', monto='50.00')
+        validar_pago_en_cuenta(rechazado, self.facturacion, aparece=False)
+        ids_pend = list(
+            listar_pagos_abiertos_validacion('pendiente').values_list('pk', flat=True)
+        )
+        ids_no = list(
+            listar_pagos_abiertos_validacion('no_aparece').values_list('pk', flat=True)
+        )
+        self.assertEqual(ids_pend, [pendiente.pk])
+        self.assertEqual(ids_no, [rechazado.pk])
 
 
 class ValidacionPagoHttpTest(TestCase):
@@ -547,3 +681,231 @@ class ValidacionPagoHttpTest(TestCase):
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 1)
         textos = [str(m.message) for m in self._ultima_request._messages]
         self.assertTrue(any('no aparece' in t.lower() for t in textos))
+
+
+@override_settings(
+    # En tests no hay collectstatic: el manifest rompe {% static %} del CSS nuevo.
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class BandejaPagosValidacionHttpTest(TestCase):
+    """
+    GET/POST de la bandeja: Facturación entra; Recepción no.
+
+    Efectos: usuarios, orden, pagos y (mock) avisos.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self._email_patcher = patch(
+            'servicio_tecnico.services.notificaciones_pagos._encolar_email_validacion',
+        )
+        self._push_patcher = patch(
+            'servicio_tecnico.services.notificaciones_pagos.enviar_push_y_campanita',
+            return_value=1,
+        )
+        self._email_patcher.start()
+        self._push_patcher.start()
+        self.addCleanup(self._email_patcher.stop)
+        self.addCleanup(self._push_patcher.stop)
+
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Bandeja HTTP',
+            ciudad='CDMX',
+        )
+        self.user_recepcion = self._crear_usuario(
+            'recepcion.bandeja@test.local',
+            'Recepción Bandeja',
+            'recepcionista',
+        )
+        self.user_facturacion = self._crear_usuario(
+            'facturacion.bandeja@test.local',
+            'Facturación Bandeja',
+            'facturacion',
+        )
+        self.user_tecnico = self._crear_usuario(
+            'tecnico.bandeja@test.local',
+            'Técnico Bandeja',
+            'tecnico',
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='cliente_acepta_cotizacion',
+            tecnico_asignado_actual=self.user_tecnico.empleado,
+            responsable_seguimiento=self.user_recepcion.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-BAN-01',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Inspiron',
+            numero_serie='SN-BAN-01',
+            falla_principal='Teclado',
+            gama='baja',
+        )
+        componente = ComponenteEquipo.objects.create(
+            nombre='Teclado Bandeja',
+            tipo_equipo='laptop',
+            activo=True,
+        )
+        cotizacion = Cotizacion.objects.create(
+            orden=self.orden,
+            costo_mano_obra=Decimal('100.00'),
+            usuario_acepto=True,
+        )
+        PiezaCotizada.objects.create(
+            cotizacion=cotizacion,
+            componente=componente,
+            cantidad=1,
+            costo_unitario=Decimal('200.00'),
+            precio_unitario_cliente=Decimal('500.00'),
+            aceptada_por_cliente=True,
+        )
+        self.url = reverse('servicio_tecnico:bandeja_pagos_validacion')
+
+    def _crear_usuario(self, email, nombre, rol):
+        """
+        User + Empleado. La bandeja mira el rol, no add_pagoorden.
+
+        Args:
+            email: username/email.
+            nombre: nombre_completo.
+            rol: código de Empleado.ROL_CHOICES.
+
+        Returns:
+            User recargado.
+        """
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password='testpass123',
+        )
+        Empleado.objects.create(
+            nombre_completo=nombre,
+            cargo=rol,
+            area='FRONTDESK',
+            email=email,
+            sucursal=self.sucursal,
+            user=user,
+            rol=rol,
+            activo=True,
+            contraseña_configurada=True,
+        )
+        return User.objects.get(pk=user.pk)
+
+    def _registrar(self, metodo, monto='290.00'):
+        """
+        Abono de prueba cobrado por Recepción.
+
+        Args:
+            metodo: transferencia / tarjeta / efectivo.
+            monto: string del abono.
+
+        Returns:
+            PagoOrden.
+        """
+        return registrar_pago(
+            self.orden,
+            self.user_recepcion.empleado,
+            Decimal(monto),
+            'anticipo',
+            metodo,
+            codigo_pais='MX',
+        )
+
+    def _get(self, user, query=''):
+        """
+        GET autenticado a la bandeja (sin middleware de login).
+
+        Args:
+            user: User que "abre" la pantalla.
+            query: query string sin el ? inicial (ej. filtro=no_aparece).
+
+        Returns:
+            HttpResponse de bandeja_pagos_validacion.
+        """
+        path = f'{self.url}?{query}' if query else self.url
+        request = self.factory.get(path)
+        request.user = user
+        request.session = {}
+        request._messages = FallbackStorage(request)
+        return bandeja_pagos_validacion(request)
+
+    def _post(self, user, data: dict):
+        """
+        POST autenticado a la bandeja.
+
+        Args:
+            user: User que confirma.
+            data: campos del form (pago_id, decision, nota).
+
+        Returns:
+            HttpResponse (normalmente redirect).
+        """
+        request = self.factory.post(self.url, data=data)
+        request.user = user
+        request.session = {}
+        request._messages = FallbackStorage(request)
+        return bandeja_pagos_validacion(request)
+
+    def test_facturacion_ve_pago_pendiente(self):
+        """Feliz: Facturación abre la bandeja y ve el SPEI pendiente."""
+        self._registrar('transferencia')
+        response = self._get(self.user_facturacion)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Pendiente en cuenta')
+        self.assertContains(response, '290.00')
+        self.assertContains(response, 'OOW-BAN-01')
+        # El enlace principal es el folio de cliente, no el ORD- interno.
+        html = response.content.decode()
+        pos_cliente = html.find('OOW-BAN-01')
+        pos_interno = html.find(self.orden.numero_orden_interno)
+        self.assertLess(pos_cliente, pos_interno)
+
+    def test_recepcion_no_entra_a_la_bandeja(self):
+        """Borde: Recepción pega la URL y va a acceso denegado."""
+        response = self._get(self.user_recepcion)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('acceso-denegado', response.url)
+
+    def test_post_ya_aparece_desde_bandeja(self):
+        """Feliz: validar en la lista cambia el estado y vuelve a la bandeja."""
+        pago = self._registrar('transferencia')
+        response = self._post(self.user_facturacion, {
+            'pago_id': str(pago.pk),
+            'decision': 'validado',
+            'nota_validacion': 'OK desde bandeja',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/pagos/validacion/', response.url)
+        pago.refresh_from_db()
+        self.assertEqual(pago.estado_validacion, 'validado')
+        self.assertEqual(pago.nota_validacion, 'OK desde bandeja')
+
+    def test_filtro_no_aparece_no_mezcla_pendientes(self):
+        """Borde: la pestaña No aparecen no lista los que siguen pendientes."""
+        pendiente = self._registrar('transferencia')
+        rechazado = self._registrar('tarjeta', monto='50.00')
+        validar_pago_en_cuenta(
+            rechazado,
+            self.user_facturacion.empleado,
+            aparece=False,
+        )
+        response = self._get(self.user_facturacion, 'filtro=no_aparece')
+        self.assertEqual(response.status_code, 200)
+        # RequestFactory + render() no trae .context; miramos el HTML.
+        self.assertContains(response, '50.00')
+        self.assertNotContains(response, '290.00')
+        self.assertContains(response, 'filtro=no_aparece')
+        self.assertContains(response, str(rechazado.pk))
+        self.assertNotContains(response, f'value="{pendiente.pk}"')
