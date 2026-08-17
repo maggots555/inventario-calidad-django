@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load pagos_tags %}
 
 {% block title %}Pagos por validar - {{ block.super }}{% endblock %}
 
@@ -65,20 +66,20 @@
                         <tr>
                             <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
                             <td>
-                                {# EXPLICACIÓN: firstof toma el primero que tenga texto (cliente → ST → interno). #}
+                                {% referencia_visible pago.orden as ref %}
                                 <a href="{% url 'servicio_tecnico:detalle_orden' pago.orden.pk %}#seccionPagos">
-                                    {% firstof pago.orden.detalle_equipo.orden_cliente pago.orden.detalle_equipo.numero_serie pago.orden.numero_orden_interno pago.orden.pk %}
+                                    {{ ref.texto }}
                                 </a>
-                                {% if pago.orden.detalle_equipo.orden_cliente %}
-                                    {% if pago.orden.detalle_equipo.numero_serie %}
-                                    <div class="small text-muted">ST {{ pago.orden.detalle_equipo.numero_serie }}</div>
+                                {% if ref.tipo == 'orden_cliente' %}
+                                    {% if ref.service_tag %}
+                                    <div class="small text-muted">ST {{ ref.service_tag }}</div>
                                     {% endif %}
-                                    {% if pago.orden.numero_orden_interno %}
-                                    <div class="small text-muted">{{ pago.orden.numero_orden_interno }}</div>
+                                    {% if ref.folio_interno %}
+                                    <div class="small text-muted">{{ ref.folio_interno }}</div>
                                     {% endif %}
-                                {% elif pago.orden.detalle_equipo.numero_serie %}
-                                    {% if pago.orden.numero_orden_interno %}
-                                    <div class="small text-muted">{{ pago.orden.numero_orden_interno }}</div>
+                                {% elif ref.tipo == 'service_tag' %}
+                                    {% if ref.folio_interno %}
+                                    <div class="small text-muted">{{ ref.folio_interno }}</div>
                                     {% endif %}
                                 {% endif %}
                             </td>

@@ -14,6 +14,7 @@
 
     <!-- Favicons - Múltiples formatos para compatibilidad máxima -->
     {% load static %}
+    {% load pagos_tags %}
     <!-- SVG Favicon - Moderno, escalable (Chrome, Firefox, Edge) -->
     <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}?v=5">
     <!-- Fallback PNG para navegadores sin soporte SVG -->
@@ -251,7 +252,7 @@
                                 <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
                                     <i class="bi bi-check-circle text-success"></i> Órdenes finalizadas
                                 </a>
-                                {% if user.is_superuser or user.empleado.rol == 'facturacion' or user.empleado.rol == 'supervisor' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'gerente_general' %}
+                                {% if user|puede_validar_pagos %}
                                 <a href="{% url 'servicio_tecnico:bandeja_pagos_validacion' %}" class="dropdown-item">
                                     <i class="bi bi-bank text-warning"></i> Pagos por validar
                                 </a>

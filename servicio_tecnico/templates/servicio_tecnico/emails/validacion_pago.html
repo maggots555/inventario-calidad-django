@@ -93,7 +93,7 @@
             {% if tipo_evento == 'pendiente' %}
             <p>
                 Recepción registró un abono. Revisa si ya se refleja en la
-                cuenta de la empresa y confírmalo en el detalle de la orden.
+                cuenta de la empresa y confírmalo en la bandeja de pagos.
             </p>
             {% elif tipo_evento == 'validado' %}
             <p>
@@ -155,7 +155,11 @@
             </div>
 
             <p>
+                {% if tipo_evento == 'pendiente' %}
+                <a class="btn" href="{{ url_pagos }}">Abrir bandeja de pagos</a>
+                {% else %}
                 <a class="btn" href="{{ url_pagos }}">Abrir cobros de la orden</a>
+                {% endif %}
             </p>
         </div>
 

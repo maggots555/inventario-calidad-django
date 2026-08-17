@@ -19,6 +19,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.exceptions import ValidationError
+from django.template import Context, Template
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
@@ -172,6 +173,16 @@ class ReferenciaVisibleOrdenTest(TestCase):
         ref = referencia_visible_orden(orden)
         self.assertEqual(ref.tipo, TIPO_REF_INTERNO)
         self.assertEqual(ref.texto, orden.numero_orden_interno)
+
+    def test_tag_de_template_usa_el_mismo_helper(self):
+        """Feliz: la bandeja pinta el folio vía tag, no con firstof suelto."""
+        orden = self._crear_orden('OOW-TAG-01', 'SN-TAG-01')
+        html = Template(
+            '{% load pagos_tags %}'
+            '{% referencia_visible orden as ref %}'
+            '{{ ref.texto }}'
+        ).render(Context({'orden': orden}))
+        self.assertEqual(html.strip(), 'OOW-TAG-01')
 
 
 class ValidacionPagoServiceTest(TestCase):

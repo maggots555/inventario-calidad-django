@@ -106,7 +106,6 @@ def bandeja_pagos_validacion(request):
     pagos = listar_pagos_abiertos_validacion(filtro)
     paginator = Paginator(pagos, PAGOS_POR_PAGINA)
     pagina = paginator.get_page(request.GET.get('page'))
-    # El folio visible (cliente → ST → interno) se arma en el template.
 
     return render(
         request,
