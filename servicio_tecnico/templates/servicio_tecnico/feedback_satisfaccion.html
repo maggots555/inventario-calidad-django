@@ -119,37 +119,34 @@
       </div>
 
       {# ─────────────────────────────────────────────────── #}
-      {# SECCIÓN 3: Calificaciones opcionales (colapsable) #}
-      {# El sí/no de recomendación se calcula del NPS al guardar. #}
+      {# SECCIÓN 3: Atención y Tiempo (solo si 1–3 estrellas) #}
+      {# JS muestra esta sección; arranca oculta. #}
       {# ─────────────────────────────────────────────────── #}
-      <div class="fs-section">
-        <div class="fs-optional-wrapper" id="optionalWrapper">
-          <div class="fs-optional-toggle" id="optionalToggle" role="button" tabindex="0" aria-expanded="false">
-            <span>✨ Calificaciones adicionales (opcional)</span>
-            <span class="chevron">▼</span>
-          </div>
-          <div class="fs-optional-content" id="optionalContent">
-            {# Sub-calificación: Atención #}
-            <div>
-              <div class="fs-mini-label">Calidad de la atención recibida</div>
-              <div class="fs-mini-stars" id="atencionStars">
-                <span class="fs-mini-star" data-group="atencion" data-value="1" title="1">★</span>
-                <span class="fs-mini-star" data-group="atencion" data-value="2" title="2">★</span>
-                <span class="fs-mini-star" data-group="atencion" data-value="3" title="3">★</span>
-                <span class="fs-mini-star" data-group="atencion" data-value="4" title="4">★</span>
-                <span class="fs-mini-star" data-group="atencion" data-value="5" title="5">★</span>
-              </div>
+      <div class="fs-section fs-section-hidden" id="section-detalle-calificaciones">
+        <div class="fs-section-label">
+          ¿En qué podemos mejorar? <span style="font-weight:400;color:#9ca3af;">(opcional)</span>
+        </div>
+        <div class="fs-detalle-calificaciones">
+          {# Sub-calificación: Atención #}
+          <div>
+            <div class="fs-mini-label">Calidad de la atención recibida</div>
+            <div class="fs-mini-stars" id="atencionStars">
+              <span class="fs-mini-star" data-group="atencion" data-value="1" title="1">★</span>
+              <span class="fs-mini-star" data-group="atencion" data-value="2" title="2">★</span>
+              <span class="fs-mini-star" data-group="atencion" data-value="3" title="3">★</span>
+              <span class="fs-mini-star" data-group="atencion" data-value="4" title="4">★</span>
+              <span class="fs-mini-star" data-group="atencion" data-value="5" title="5">★</span>
             </div>
-            {# Sub-calificación: Tiempo #}
-            <div>
-              <div class="fs-mini-label">Tiempo de reparación</div>
-              <div class="fs-mini-stars" id="tiempoStars">
-                <span class="fs-mini-star" data-group="tiempo" data-value="1" title="1">★</span>
-                <span class="fs-mini-star" data-group="tiempo" data-value="2" title="2">★</span>
-                <span class="fs-mini-star" data-group="tiempo" data-value="3" title="3">★</span>
-                <span class="fs-mini-star" data-group="tiempo" data-value="4" title="4">★</span>
-                <span class="fs-mini-star" data-group="tiempo" data-value="5" title="5">★</span>
-              </div>
+          </div>
+          {# Sub-calificación: Tiempo #}
+          <div>
+            <div class="fs-mini-label">Tiempo de reparación</div>
+            <div class="fs-mini-stars" id="tiempoStars">
+              <span class="fs-mini-star" data-group="tiempo" data-value="1" title="1">★</span>
+              <span class="fs-mini-star" data-group="tiempo" data-value="2" title="2">★</span>
+              <span class="fs-mini-star" data-group="tiempo" data-value="3" title="3">★</span>
+              <span class="fs-mini-star" data-group="tiempo" data-value="4" title="4">★</span>
+              <span class="fs-mini-star" data-group="tiempo" data-value="5" title="5">★</span>
             </div>
           </div>
         </div>

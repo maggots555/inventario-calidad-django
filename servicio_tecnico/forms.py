@@ -3276,6 +3276,25 @@ class FeedbackSatisfaccionClienteForm(forms.Form):
             raise forms.ValidationError('El valor debe estar entre 0 y 10.')
         return val
 
+    def clean(self):
+        """
+        Si la nota general es 4 o 5, Atención y Tiempo no aplican.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El JS oculta esas preguntas, pero alguien podría enviar el POST
+        a mano con esos campos llenos. Aquí los borramos para que el
+        dashboard no reciba detalle en una visita que ya fue buena.
+        """
+        datos = super().clean()
+        from servicio_tecnico.services.encuesta_nps import (
+            debe_pedir_detalle_calificacion,
+        )
+        general = datos.get('calificacion_general')
+        if not debe_pedir_detalle_calificacion(general):
+            datos['calificacion_atencion'] = None
+            datos['calificacion_tiempo'] = None
+        return datos
+
 
 class RegistrarPagoOrdenForm(forms.ModelForm):
     """

@@ -96,9 +96,16 @@ function initStarGroup(
       hiddenInput.value = String(val);
       highlightStars(stars, val);
       if (label) label.textContent = STAR_LABELS[val] ?? '';
+      // EXPLICACIÓN: 1–3 muestran Atención/Tiempo; 4–5 los ocultan.
+      actualizarDetalleSegunEstrellas(val);
       updateProgress();
     });
   });
+
+  // One-click del correo: si ya hay estrellas, aplicar el mismo filtro.
+  if (group.value > 0) {
+    actualizarDetalleSegunEstrellas(group.value);
+  }
 
   return group;
 }
@@ -118,16 +125,19 @@ function initMiniStarGroup(groupName: string, inputId: string): void {
   if (!container || !hiddenInput) return;
 
   const stars = container.querySelectorAll<HTMLElement>('.fs-mini-star');
-  let currentValue = 0;
 
   stars.forEach((star) => {
     const val = parseInt(star.dataset['value'] ?? '0', 10);
 
     star.addEventListener('mouseenter', () => highlightMiniStars(stars, val));
-    star.addEventListener('mouseleave', () => highlightMiniStars(stars, currentValue));
+    // EXPLICACIÓN: leemos el hidden, no una variable local, para que
+    // al borrar el detalle (subir a 4–5 estrellas) el hover vuelva a 0.
+    star.addEventListener('mouseleave', () => {
+      const guardado = parseInt(hiddenInput.value.trim() || '0', 10);
+      highlightMiniStars(stars, Number.isNaN(guardado) ? 0 : guardado);
+    });
 
     star.addEventListener('click', () => {
-      currentValue = val;
       hiddenInput.value = String(val);
       highlightMiniStars(stars, val);
     });
@@ -138,6 +148,33 @@ function highlightMiniStars(stars: NodeListOf<HTMLElement>, upTo: number): void 
   stars.forEach((star) => {
     const val = parseInt(star.dataset['value'] ?? '0', 10);
     star.classList.toggle('active', val <= upTo);
+  });
+}
+
+// Debe coincidir con MAX_ESTRELLAS_DETALLE en encuesta_nps.py
+const MAX_ESTRELLAS_DETALLE = 3;
+
+function actualizarDetalleSegunEstrellas(estrellas: number): void {
+  const seccion = getEl<HTMLElement>('section-detalle-calificaciones');
+  if (!seccion) return;
+
+  const pideDetalle = estrellas >= 1 && estrellas <= MAX_ESTRELLAS_DETALLE;
+  seccion.classList.toggle('fs-section-hidden', !pideDetalle);
+
+  // Si sube a 4–5, no guardar mini-estrellas que ya no aplican.
+  if (!pideDetalle) {
+    limpiarMiniEstrellas('id_calificacion_atencion', 'atencionStars');
+    limpiarMiniEstrellas('id_calificacion_tiempo', 'tiempoStars');
+  }
+}
+
+function limpiarMiniEstrellas(inputId: string, containerId: string): void {
+  const hiddenInput = getEl<HTMLInputElement>(inputId);
+  const container = getEl<HTMLElement>(containerId);
+  if (hiddenInput) hiddenInput.value = '';
+  if (!container) return;
+  container.querySelectorAll<HTMLElement>('.fs-mini-star').forEach((star) => {
+    star.classList.remove('active');
   });
 }
 
@@ -161,26 +198,6 @@ function initNPS(): void {
       hideError('errorNps');
       updateProgress();
     });
-  });
-}
-
-// ─── Toggle sección opcional ─────────────────────────────────────────────────
-
-function initOptionalToggle(): void {
-  const toggle  = getEl<HTMLElement>('optionalToggle');
-  const content = getEl<HTMLElement>('optionalContent');
-  const wrapper = getEl<HTMLElement>('optionalWrapper');
-  if (!toggle || !content || !wrapper) return;
-
-  function doToggle(): void {
-    const isOpen = content!.classList.toggle('open');
-    wrapper!.classList.toggle('open', isOpen);
-    toggle!.setAttribute('aria-expanded', String(isOpen));
-  }
-
-  toggle.addEventListener('click', doToggle);
-  toggle.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doToggle(); }
   });
 }
 
@@ -278,9 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMiniStarGroup('atencion', 'id_calificacion_atencion');
     initMiniStarGroup('tiempo',   'id_calificacion_tiempo');
 
-    // NPS, toggle opcional, contador
+    // NPS y contador
     initNPS();
-    initOptionalToggle();
     initCharCounter();
 
     // Validar al submit

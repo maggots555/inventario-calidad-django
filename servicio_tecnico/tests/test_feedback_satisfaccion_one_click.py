@@ -254,3 +254,39 @@ class FeedbackSatisfaccionOneClickVistaTest(TestCase):
         self.assertTrue(self.feedback.utilizado)
         self.assertEqual(self.feedback.nps, 6)
         self.assertFalse(self.feedback.recomienda)
+
+    def test_post_cinco_estrellas_descarta_detalle(self):
+        """Con 4–5 el POST puede traer atención/tiempo; Django los ignora."""
+        response = self._post({
+            'calificacion_general': '5',
+            'nps': '10',
+            'calificacion_atencion': '1',
+            'calificacion_tiempo': '2',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.feedback.refresh_from_db()
+        self.assertTrue(self.feedback.utilizado)
+        self.assertIsNone(self.feedback.calificacion_atencion)
+        self.assertIsNone(self.feedback.calificacion_tiempo)
+
+    def test_post_dos_estrellas_guarda_detalle(self):
+        """Con 1–3 sí se guardan Atención y Tiempo si el cliente las llena."""
+        response = self._post({
+            'calificacion_general': '2',
+            'nps': '4',
+            'calificacion_atencion': '3',
+            'calificacion_tiempo': '2',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.feedback.refresh_from_db()
+        self.assertTrue(self.feedback.utilizado)
+        self.assertEqual(self.feedback.calificacion_atencion, 3)
+        self.assertEqual(self.feedback.calificacion_tiempo, 2)
+
+    def test_get_detalle_arranca_oculto(self):
+        """Atención/Tiempo existen en el HTML pero ocultos hasta 1–3 estrellas."""
+        response = self._get()
+        html = response.content.decode()
+        self.assertIn('section-detalle-calificaciones', html)
+        self.assertIn('fs-section-hidden', html)
+        self.assertNotIn('Calificaciones adicionales', html)
