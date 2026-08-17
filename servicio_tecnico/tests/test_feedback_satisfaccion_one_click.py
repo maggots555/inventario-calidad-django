@@ -218,12 +218,20 @@ class FeedbackSatisfaccionOneClickVistaTest(TestCase):
         self.feedback.refresh_from_db()
         self.assertFalse(self.feedback.utilizado)
 
+    def test_get_ya_no_pide_pulgares(self):
+        """La encuesta ya no muestra la pregunta binaria de recomendar."""
+        response = self._get()
+        html = response.content.decode()
+        self.assertIn('id="feedbackForm"', html)
+        self.assertNotIn('section-recomienda', html)
+        self.assertNotIn('id_recomienda', html)
+        self.assertNotIn('¿Recomendarías nuestro servicio?', html)
+
     def test_post_completo_guarda_y_marca_utilizado(self):
-        """El voto real ocurre en el POST (NPS + recomienda + estrellas)."""
+        """El voto real ocurre en el POST (estrellas + NPS). recomienda se deriva."""
         response = self._post({
             'calificacion_general': '4',
             'nps': '9',
-            'recomienda': 'true',
         })
         self.assertEqual(response.status_code, 200)
         self.assertIn('gracias', response.content.decode().lower())
@@ -232,4 +240,17 @@ class FeedbackSatisfaccionOneClickVistaTest(TestCase):
         self.assertTrue(self.feedback.utilizado)
         self.assertEqual(self.feedback.calificacion_general, 4)
         self.assertEqual(self.feedback.nps, 9)
+        # NPS 9 = promotor → Django marca recomienda=True sin preguntar pulgares.
         self.assertTrue(self.feedback.recomienda)
+
+    def test_post_nps_detractor_deriva_no_recomienda(self):
+        """NPS 0–6 (detractor) se guarda como recomienda=False."""
+        response = self._post({
+            'calificacion_general': '2',
+            'nps': '6',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.feedback.refresh_from_db()
+        self.assertTrue(self.feedback.utilizado)
+        self.assertEqual(self.feedback.nps, 6)
+        self.assertFalse(self.feedback.recomienda)

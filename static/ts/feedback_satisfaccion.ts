@@ -1,7 +1,8 @@
 /**
  * feedback_satisfaccion.ts
  * Lógica interactiva de la encuesta de satisfacción del cliente.
- * Maneja estrellas, NPS, pulgares, progreso y confetti.
+ * Maneja estrellas, NPS, progreso y confetti.
+ * El sí/no de recomendación ya no se pregunta: Django lo deriva del NPS.
  *
  * One-Click Survey: si Django prellenó #id_calificacion_general (el cliente
  * tocó una estrella en el correo), pintamos esas estrellas al cargar.
@@ -163,31 +164,6 @@ function initNPS(): void {
   });
 }
 
-// ─── Thumb Buttons (Recomienda) ───────────────────────────────────────────────
-
-function initThumbs(): void {
-  const thumbYes      = getEl<HTMLButtonElement>('thumbYes');
-  const thumbNo       = getEl<HTMLButtonElement>('thumbNo');
-  const recomiendaIn  = getEl<HTMLInputElement>('id_recomienda');
-  if (!thumbYes || !thumbNo || !recomiendaIn) return;
-
-  thumbYes.addEventListener('click', () => {
-    recomiendaIn.value = 'true';
-    thumbYes.classList.add('active-yes');
-    thumbNo.classList.remove('active-no');
-    hideError('errorRecomienda');
-    updateProgress();
-  });
-
-  thumbNo.addEventListener('click', () => {
-    recomiendaIn.value = 'false';
-    thumbNo.classList.add('active-no');
-    thumbYes.classList.remove('active-yes');
-    hideError('errorRecomienda');
-    updateProgress();
-  });
-}
-
 // ─── Toggle sección opcional ─────────────────────────────────────────────────
 
 function initOptionalToggle(): void {
@@ -226,15 +202,15 @@ function updateProgress(): void {
   const fill         = getEl<HTMLElement>('progressFill');
   const generalInput = getEl<HTMLInputElement>('id_calificacion_general');
   const npsInput     = getEl<HTMLInputElement>('id_nps');
-  const recomiendaIn = getEl<HTMLInputElement>('id_recomienda');
   if (!fill) return;
 
+  // EXPLICACIÓN: solo hay 2 obligatorios (estrellas + NPS). El pulgar
+  // ya no se pide: Django lo calcula del NPS al guardar.
   let filled = 0;
   if (generalInput && generalInput.value)  filled++;
   if (npsInput     && npsInput.value !== '') filled++;
-  if (recomiendaIn && recomiendaIn.value)  filled++;
 
-  const pct = Math.round((filled / 3) * 100);
+  const pct = Math.round((filled / 2) * 100);
   fill.style.width = `${pct}%`;
 }
 
@@ -259,15 +235,6 @@ function validateForm(): boolean {
     valid = false;
   } else {
     hideError('errorNps');
-  }
-
-  const recomiendaIn = getEl<HTMLInputElement>('id_recomienda');
-  if (!recomiendaIn?.value) {
-    if (valid) document.getElementById('section-recomienda')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    showError('errorRecomienda');
-    valid = false;
-  } else {
-    hideError('errorRecomienda');
   }
 
   return valid;
@@ -311,9 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMiniStarGroup('atencion', 'id_calificacion_atencion');
     initMiniStarGroup('tiempo',   'id_calificacion_tiempo');
 
-    // NPS, pulgares, toggle opcional, contador
+    // NPS, toggle opcional, contador
     initNPS();
-    initThumbs();
     initOptionalToggle();
     initCharCounter();
 

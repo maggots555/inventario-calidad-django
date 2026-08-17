@@ -67,7 +67,6 @@
       {# ── Inputs hidden (llenados por JS) ── #}
       {{ form.calificacion_general }}
       {{ form.nps }}
-      {{ form.recomienda }}
       {{ form.calificacion_atencion }}
       {{ form.calificacion_tiempo }}
 
@@ -120,28 +119,8 @@
       </div>
 
       {# ─────────────────────────────────────────────────── #}
-      {# SECCIÓN 3: ¿Recomienda? (pulgares) #}
-      {# ─────────────────────────────────────────────────── #}
-      <div class="fs-section" id="section-recomienda">
-        <div class="fs-section-label">
-          <span class="fs-required-dot">*</span>
-          ¿Recomendarías nuestro servicio?
-        </div>
-        <div class="fs-thumbs" id="thumbButtons">
-          <button type="button" class="fs-thumb-btn" id="thumbYes" data-value="true">
-            <span class="thumb-icon">👍</span>
-            <span>Sí, claro</span>
-          </button>
-          <button type="button" class="fs-thumb-btn" id="thumbNo" data-value="false">
-            <span class="thumb-icon">👎</span>
-            <span>No por ahora</span>
-          </button>
-        </div>
-        <div class="fs-error-msg" id="errorRecomienda">Por favor indica si recomendarías el servicio.</div>
-      </div>
-
-      {# ─────────────────────────────────────────────────── #}
-      {# SECCIÓN 4: Calificaciones opcionales (colapsable) #}
+      {# SECCIÓN 3: Calificaciones opcionales (colapsable) #}
+      {# El sí/no de recomendación se calcula del NPS al guardar. #}
       {# ─────────────────────────────────────────────────── #}
       <div class="fs-section">
         <div class="fs-optional-wrapper" id="optionalWrapper">
@@ -177,7 +156,7 @@
       </div>
 
       {# ─────────────────────────────────────────────────── #}
-      {# SECCIÓN 5: Comentario libre #}
+      {# SECCIÓN 4: Comentario libre #}
       {# ─────────────────────────────────────────────────── #}
       <div class="fs-section">
         <div class="fs-section-label">

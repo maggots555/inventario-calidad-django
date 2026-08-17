@@ -3192,7 +3192,8 @@ class FeedbackRechazoClienteForm(forms.Form):
 class FeedbackSatisfaccionClienteForm(forms.Form):
     """
     Formulario público para la encuesta de satisfacción del cliente.
-    Los campos hidden son llenados por JavaScript (estrellas, NPS, pulgares).
+    Los campos hidden son llenados por JavaScript (estrellas y NPS).
+    El sí/no de recomendación se deriva del NPS al guardar, no se pide aquí.
     """
 
     # ── Honeypot: Campo invisible para detectar bots ──
@@ -3227,14 +3228,9 @@ class FeedbackSatisfaccionClienteForm(forms.Form):
             'invalid':  'Valor de NPS inválido.',
         }
     )
-    recomienda = forms.CharField(
-        label="¿Recomendarías nuestro servicio?",
-        max_length=10,
-        widget=forms.HiddenInput(attrs={'id': 'id_recomienda'}),
-        error_messages={
-            'required': 'Por favor indica si recomendarías nuestro servicio.',
-        }
-    )
+    # EXPLICACIÓN: `recomienda` ya no se pregunta al cliente. La vista lo
+    # calcula con derivar_recomienda_desde_nps() al guardar (NPS 0–6 = no,
+    # 7–10 = sí) para que el dashboard y el perfil sigan mostrando el pulgar.
 
     # Campos opcionales
     calificacion_atencion = forms.IntegerField(
@@ -3263,15 +3259,6 @@ class FeedbackSatisfaccionClienteForm(forms.Form):
             'id': 'id_comentario_satisfaccion',
         }),
     )
-
-    def clean_recomienda(self):
-        """Convierte el string 'true'/'false' del input hidden a booleano."""
-        valor = self.cleaned_data.get('recomienda', '').strip().lower()
-        if valor in ('true', '1', 'si', 'sí', 'yes'):
-            return True
-        elif valor in ('false', '0', 'no'):
-            return False
-        raise forms.ValidationError('Por favor indica si recomendarías nuestro servicio.')
 
     def clean_calificacion_general(self):
         val = self.cleaned_data.get('calificacion_general')

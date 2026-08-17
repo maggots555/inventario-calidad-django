@@ -948,9 +948,17 @@ def feedback_satisfaccion_cliente(request, token):
                     'sucursal_nombre': orden.sucursal.nombre,
                 })
 
+            # EXPLICACIÓN: el cliente ya no contesta pulgares; el sí/no
+            # se deriva del NPS (0–6 = no, 7–10 = sí) para perfil y dashboard.
+            from servicio_tecnico.services.encuesta_nps import (
+                derivar_recomienda_desde_nps,
+            )
+            nps = d['nps']
+            recomienda = derivar_recomienda_desde_nps(nps)
+
             feedback.calificacion_general  = d['calificacion_general']
-            feedback.nps                   = d['nps']
-            feedback.recomienda            = d['recomienda']
+            feedback.nps                   = nps
+            feedback.recomienda            = recomienda
             feedback.calificacion_atencion = d.get('calificacion_atencion')
             feedback.calificacion_tiempo   = d.get('calificacion_tiempo')
             feedback.comentario_cliente    = d.get('comentario_cliente', '')
@@ -973,8 +981,8 @@ def feedback_satisfaccion_cliente(request, token):
                         mensaje=(
                             f"Orden {orden.numero_orden_interno} — "
                             f"Calificación: {d['calificacion_general']}/5 | "
-                            f"NPS: {d['nps']}/10 | "
-                            f"Recomienda: {'Sí' if d['recomienda'] else 'No'}"
+                            f"NPS: {nps}/10 | "
+                            f"Recomienda: {'Sí' if recomienda else 'No'}"
                         ),
                         usuario=responsable.usuario,
                         app_origen='servicio_tecnico',
@@ -990,8 +998,8 @@ def feedback_satisfaccion_cliente(request, token):
                     comentario=(
                         f'⭐ Cliente completó encuesta de satisfacción\n'
                         f'   Calificación: {d["calificacion_general"]}/5 | '
-                        f'NPS: {d["nps"]}/10 | '
-                        f'Recomienda: {"Sí" if d["recomienda"] else "No"}'
+                        f'NPS: {nps}/10 | '
+                        f'Recomienda: {"Sí" if recomienda else "No"}'
                     ),
                     usuario=None,
                     es_sistema=True,

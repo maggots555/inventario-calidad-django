@@ -12,8 +12,6 @@
   --fs-nps-low:       #ef4444;
   --fs-nps-mid:       #f59e0b;
   --fs-nps-high:      #10b981;
-  --fs-thumb-yes:     #10b981;
-  --fs-thumb-no:      #ef4444;
   --fs-card-bg:       rgba(255, 255, 255, 0.93);
   --fs-radius:        18px;
   --fs-shadow:        0 24px 64px rgba(0, 0, 0, 0.18);
@@ -295,53 +293,6 @@
   margin-top: 0.4rem;
 }
 
-/* === Thumb Buttons (Recomienda) === */
-.fs-thumbs {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.fs-thumb-btn {
-  flex: 1;
-  max-width: 190px;
-  padding: 1rem 1rem;
-  border-radius: 14px;
-  border: 2px solid #e5e7eb;
-  background: white;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: var(--fs-spring);
-  color: #374151;
-}
-
-.fs-thumb-btn .thumb-icon {
-  font-size: 1.7rem;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  line-height: 1;
-}
-
-.fs-thumb-btn:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
-
-.fs-thumb-btn.active-yes {
-  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-  border-color: var(--fs-thumb-yes);
-  color: #065f46;
-}
-.fs-thumb-btn.active-yes .thumb-icon { transform: scale(1.35) rotate(-8deg); }
-
-.fs-thumb-btn.active-no {
-  background: linear-gradient(135deg, #fee2e2, #fecaca);
-  border-color: var(--fs-thumb-no);
-  color: #7f1d1d;
-}
-.fs-thumb-btn.active-no .thumb-icon { transform: scale(1.35) rotate(8deg); }
-
 /* === Ratings opcionales colapsables === */
 .fs-optional-wrapper {
   background: #f9fafb;
@@ -558,8 +509,6 @@
   .fs-star          { font-size: 2.1rem; }
   .fs-nps-grid      { grid-template-columns: repeat(6, 1fr); }
   .fs-nps-btn       { min-height: 35px; font-size: 0.74rem; border-radius: 7px; }
-  .fs-thumbs        { gap: 0.75rem; }
-  .fs-thumb-btn     { padding: 0.8rem 0.75rem; font-size: 0.88rem; max-width: none; }
   .fs-submit-btn    { font-size: 0.96rem; }
   .fs-header-title  { font-size: 1.2rem; }
 }
@@ -628,23 +577,6 @@
 
 [data-bs-theme="dark"] .fs-nps-labels {
   color: #64748b;
-}
-
-/* Botones Thumb */
-[data-bs-theme="dark"] .fs-thumb-btn {
-  background: #1e293b;
-  border-color: #334155;
-  color: #e2e8f0;
-}
-
-[data-bs-theme="dark"] .fs-thumb-btn.active-yes {
-  background: linear-gradient(135deg, #064e3b, #065f46);
-  color: #6ee7b7;
-}
-
-[data-bs-theme="dark"] .fs-thumb-btn.active-no {
-  background: linear-gradient(135deg, #450a0a, #7f1d1d);
-  color: #fca5a5;
 }
 
 /* Sección opcionales colapsable */

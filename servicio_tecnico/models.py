@@ -3007,7 +3007,11 @@ class FeedbackCliente(models.Model):
     recomienda = models.BooleanField(
         null=True,
         blank=True,
-        verbose_name="¿Recomendaría el servicio? (pulgar arriba/abajo)"
+        verbose_name="¿Recomendaría el servicio?",
+        help_text=(
+            "Se calcula al guardar a partir del NPS (0–6 = no, 7–10 = sí). "
+            "Ya no se pregunta al cliente en el formulario."
+        ),
     )
     nps = models.PositiveSmallIntegerField(
         null=True,
