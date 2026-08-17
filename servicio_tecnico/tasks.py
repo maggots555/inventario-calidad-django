@@ -5828,3 +5828,10 @@ def enviar_formato_garantia_email_task(
     except Exception as exc:
         logger.error('[FORMATO_GARANTIA] Error email: %s', exc, exc_info=True)
         raise self.retry(exc=exc, countdown=60)
+
+
+# EXPLICACIÓN: Celery solo autodescubre servicio_tecnico/tasks.py.
+# Importar aquí registra la tarea de validación de pagos sin hinchar este archivo.
+from servicio_tecnico.tasks_pagos import (  # noqa: E402, F401
+    notificar_validacion_pago_task,
+)

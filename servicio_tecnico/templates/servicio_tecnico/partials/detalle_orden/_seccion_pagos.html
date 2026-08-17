@@ -136,9 +136,10 @@
                                     <th>Tipo</th>
                                     <th>Método</th>
                                     <th class="text-end">Monto</th>
+                                    <th>Cuenta empresa</th>
                                     <th>Comprobante</th>
                                     <th>Registró</th>
-                                    {% if puede_registrar_pago %}<th></th>{% endif %}
+                                    {% if puede_registrar_pago or puede_validar_pago %}<th></th>{% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -148,6 +149,23 @@
                                     <td>{{ pago.get_tipo_display }}</td>
                                     <td>{{ pago.get_metodo_display }}</td>
                                     <td class="text-end">${{ pago.monto|floatformat:2 }}</td>
+                                    <td>
+                                        {% if pago.estado_validacion == 'pendiente' %}
+                                        <span class="badge text-bg-warning seccion-pagos__badge-validacion">Pendiente en cuenta</span>
+                                        {% elif pago.estado_validacion == 'validado' %}
+                                        <span class="badge text-bg-success seccion-pagos__badge-validacion">Validado</span>
+                                        {% if pago.validado_por %}
+                                        <div class="small text-muted">{{ pago.validado_por.nombre_completo }}{% if pago.fecha_validacion %} · {{ pago.fecha_validacion|date:"d/m/Y H:i" }}{% endif %}</div>
+                                        {% endif %}
+                                        {% elif pago.estado_validacion == 'no_aparece' %}
+                                        <span class="badge text-bg-danger seccion-pagos__badge-validacion">No aparece</span>
+                                        {% if pago.validado_por %}
+                                        <div class="small text-muted">{{ pago.validado_por.nombre_completo }}{% if pago.fecha_validacion %} · {{ pago.fecha_validacion|date:"d/m/Y H:i" }}{% endif %}</div>
+                                        {% endif %}
+                                        {% else %}
+                                        <span class="text-muted">Caja (no aplica)</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if pago.comprobante %}
                                         <a href="{{ pago.comprobante.url }}" target="_blank" rel="noopener">
@@ -160,8 +178,33 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ pago.registrado_por.nombre_completo }}</td>
-                                    {% if puede_registrar_pago %}
-                                    <td>
+                                    {% if puede_registrar_pago or puede_validar_pago %}
+                                    <td class="seccion-pagos__acciones">
+                                        {% if puede_validar_pago and pago.estado_validacion != 'no_aplica' and pago.estado_validacion != 'validado' %}
+                                        <form method="post" class="seccion-pagos__form-validar mb-2">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="form_type" value="validar_pago">
+                                            <input type="hidden" name="pago_id" value="{{ pago.pk }}">
+                                            <label class="visually-hidden" for="nota-validacion-{{ pago.pk }}">Nota de validación</label>
+                                            <input type="text"
+                                                   class="form-control form-control-sm mb-2"
+                                                   id="nota-validacion-{{ pago.pk }}"
+                                                   name="nota_validacion"
+                                                   maxlength="250"
+                                                   placeholder="Nota (opcional)">
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <button type="submit" name="decision" value="validado"
+                                                        class="btn btn-success btn-sm seccion-pagos__btn-validar">
+                                                    Ya aparece
+                                                </button>
+                                                <button type="submit" name="decision" value="no_aparece"
+                                                        class="btn btn-outline-danger btn-sm seccion-pagos__btn-validar">
+                                                    No aparece
+                                                </button>
+                                            </div>
+                                        </form>
+                                        {% endif %}
+                                        {% if puede_registrar_pago %}
                                         <form method="post" class="d-inline"
                                               onsubmit="return confirm('¿Eliminar este pago? El saldo se recalculará.');">
                                             {% csrf_token %}
@@ -171,13 +214,17 @@
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </form>
+                                        {% endif %}
                                     </td>
                                     {% endif %}
                                 </tr>
-                                {% if pago.notas %}
+                                {% if pago.notas or pago.nota_validacion %}
                                 <tr class="seccion-pagos__notas">
-                                    <td colspan="{% if puede_registrar_pago %}7{% else %}6{% endif %}" class="small text-muted">
-                                        {{ pago.notas }}
+                                    <td colspan="{% if puede_registrar_pago or puede_validar_pago %}8{% else %}7{% endif %}" class="small text-muted">
+                                        {% if pago.notas %}{{ pago.notas }}{% endif %}
+                                        {% if pago.nota_validacion %}
+                                        <div>Facturación: {{ pago.nota_validacion }}</div>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endif %}

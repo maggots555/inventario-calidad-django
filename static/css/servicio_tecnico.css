@@ -6864,3 +6864,20 @@ thead.sticky-top {
 [data-bs-theme="dark"] .seccion-pagos__desglose {
     color: var(--text-primary, #e2e8f0);
 }
+
+.seccion-pagos__badge-validacion {
+    font-weight: 600;
+}
+
+.seccion-pagos__btn-validar {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.seccion-pagos__form-validar {
+    max-width: 16rem;
+}
+
+[data-bs-theme="dark"] .seccion-pagos__acciones {
+    color: var(--text-primary, #e2e8f0);
+}

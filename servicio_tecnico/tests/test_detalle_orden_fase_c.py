@@ -68,6 +68,7 @@ class DetalleOrdenFaseCDispatcherTest(SimpleTestCase):
             'registrar_pago',
             'actualizar_datos_factura',
             'eliminar_pago',
+            'validar_pago',
         }
         self.assertEqual(set(_FORM_TYPE_HANDLERS.keys()), esperados)
         for nombre, handler in _FORM_TYPE_HANDLERS.items():

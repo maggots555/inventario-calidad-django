@@ -4577,9 +4577,13 @@ class PagoOrden(models.Model):
         notas: Texto corto (referencia de transferencia, etc.).
         registrado_por: Empleado que capturó el pago.
         fecha_pago: Momento del cobro.
+        estado_validacion: Si Facturación ya confirmó que el abono
+            aparece en la cuenta de la empresa (solo transferencia/tarjeta).
+        validado_por / fecha_validacion / nota_validacion: auditoría
+            de esa confirmación (tabla, no cerebro).
 
     Efectos secundarios:
-        Ninguno en save(). El historial lo escribe el servicio al registrar.
+        Ninguno en save(). El historial y los avisos los escribe el servicio.
     """
 
     TIPO_PAGO_CHOICES = [
@@ -4593,6 +4597,16 @@ class PagoOrden(models.Model):
         ('transferencia', 'Transferencia'),
         ('tarjeta', 'Tarjeta'),
         ('otro', 'Otro'),
+    ]
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Efectivo/otro no pasan por la cuenta de la empresa → no_aplica.
+    # Transferencia/tarjeta nacen en pendiente hasta que Facturación mira
+    # el estado de cuenta y marca validado o no_aparece.
+    ESTADO_VALIDACION_CHOICES = [
+        ('no_aplica', 'No requiere validación'),
+        ('pendiente', 'Pendiente de validar en cuenta'),
+        ('validado', 'Validado en cuenta'),
+        ('no_aparece', 'No aparece en cuenta'),
     ]
 
     orden = models.ForeignKey(
@@ -4644,6 +4658,34 @@ class PagoOrden(models.Model):
     fecha_pago = models.DateTimeField(
         default=timezone.now,
         help_text='Fecha y hora en que se recibió el pago',
+    )
+    estado_validacion = models.CharField(
+        max_length=20,
+        choices=ESTADO_VALIDACION_CHOICES,
+        default='no_aplica',
+        db_index=True,
+        help_text=(
+            'Si Facturación ya confirmó que este abono aparece '
+            'en la cuenta de la empresa'
+        ),
+    )
+    validado_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name='pagos_validados',
+        null=True,
+        blank=True,
+        help_text='Empleado de Facturación (o gerencia) que confirmó el abono',
+    )
+    fecha_validacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Momento en que se marcó validado o no_aparece',
+    )
+    nota_validacion = models.CharField(
+        max_length=250,
+        blank=True,
+        help_text='Comentario de Facturación (útil si el pago no aparece)',
     )
 
     def __str__(self):

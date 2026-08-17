@@ -270,11 +270,16 @@ def build_detalle_orden_context(request, orden):
     from servicio_tecnico.services.pagos_orden import (
         calcular_resumen_cobro,
         usuario_puede_registrar_pago,
+        usuario_puede_validar_pago,
     )
 
     resumen_cobro = calcular_resumen_cobro(orden)
-    pagos_orden = orden.pagos.select_related('registrado_por').all()
+    pagos_orden = orden.pagos.select_related(
+        'registrado_por',
+        'validado_por',
+    ).all()
     puede_registrar_pago = usuario_puede_registrar_pago(request.user)
+    puede_validar_pago = usuario_puede_validar_pago(request.user)
     form_registrar_pago = RegistrarPagoOrdenForm()
     form_datos_factura = DatosFacturaOrdenForm(instance=orden)
 
@@ -411,6 +416,7 @@ def build_detalle_orden_context(request, orden):
         'resumen_cobro': resumen_cobro,
         'pagos_orden': pagos_orden,
         'puede_registrar_pago': puede_registrar_pago,
+        'puede_validar_pago': puede_validar_pago,
         'form_registrar_pago': form_registrar_pago,
         'form_datos_factura': form_datos_factura,
     }

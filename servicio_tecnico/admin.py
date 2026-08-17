@@ -141,6 +141,7 @@ class PagoOrdenInline(admin.TabularInline):
         'monto',
         'tipo',
         'metodo',
+        'estado_validacion',
         'comprobante',
         'registrado_por',
     )
@@ -149,6 +150,7 @@ class PagoOrdenInline(admin.TabularInline):
         'monto',
         'tipo',
         'metodo',
+        'estado_validacion',
         'comprobante',
         'registrado_por',
     )
@@ -2427,11 +2429,12 @@ class PagoOrdenAdmin(admin.ModelAdmin):
         'monto',
         'tipo',
         'metodo',
+        'estado_validacion',
         'fecha_pago',
         'registrado_por',
         'tiene_comprobante',
     )
-    list_filter = ('tipo', 'metodo', 'fecha_pago')
+    list_filter = ('tipo', 'metodo', 'estado_validacion', 'fecha_pago')
     search_fields = (
         'orden__numero_orden_interno',
         'orden__detalle_equipo__orden_cliente',
@@ -2439,8 +2442,8 @@ class PagoOrdenAdmin(admin.ModelAdmin):
         'registrado_por__nombre_completo',
     )
     date_hierarchy = 'fecha_pago'
-    raw_id_fields = ('orden', 'registrado_por')
-    readonly_fields = ('fecha_pago',)
+    raw_id_fields = ('orden', 'registrado_por', 'validado_por')
+    readonly_fields = ('fecha_pago', 'fecha_validacion')
 
     def tiene_comprobante(self, obj):
         """Sí/No para la lista (más claro que el path del archivo)."""

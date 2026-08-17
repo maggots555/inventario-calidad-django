@@ -3345,6 +3345,38 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
         }
 
 
+class ValidarPagoOrdenForm(forms.Form):
+    """
+    Facturación confirma si el abono ya aparece en la cuenta.
+
+    Objetivo de negocio:
+        Dos botones (sí / no) sobre un pago pendiente. La nota es
+        opcional y sirve sobre todo cuando el dinero aún no se ve.
+
+    Args:
+        Form suelto (no ModelForm): pago_id + decision + nota.
+    """
+
+    pago_id = forms.IntegerField(widget=forms.HiddenInput)
+    decision = forms.ChoiceField(
+        choices=[
+            ('validado', 'Validado en cuenta'),
+            ('no_aparece', 'No aparece en cuenta'),
+        ],
+        widget=forms.HiddenInput,
+    )
+    nota_validacion = forms.CharField(
+        required=False,
+        max_length=250,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-sm',
+            'placeholder': 'Nota (opcional, útil si no aparece)',
+            'maxlength': '250',
+        }),
+        label='Nota de validación',
+    )
+
+
 class DatosFacturaOrdenForm(forms.ModelForm):
     """
     Flags de factura fiscal (requiere / emitida / motivo).

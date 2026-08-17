@@ -118,6 +118,7 @@ def enviar_push_y_campanita(
     titulo: str,
     mensaje: str,
     url: str,
+    app_origen: str = 'almacen',
 ) -> int:
     """
     Envía push + campanita a cada empleado (fallos aislados por persona).
@@ -127,6 +128,7 @@ def enviar_push_y_campanita(
         titulo: Título corto de la notificación.
         mensaje: Cuerpo del aviso.
         url: Ruta relativa al hacer clic.
+        app_origen: etiqueta de la app que dispara (campanita / logs).
 
     Returns:
         Cantidad de empleados a los que se intentó notificar.
@@ -158,7 +160,7 @@ def enviar_push_y_campanita(
                 mensaje=mensaje,
                 usuario=user,
                 url=url,
-                app_origen='almacen',
+                app_origen=app_origen,
             )
         except Exception as notif_err:
             logger.warning(

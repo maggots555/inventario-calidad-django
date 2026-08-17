@@ -25,6 +25,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Sum
+from django.utils import timezone
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from config.paises_config import get_pais_actual
@@ -35,6 +36,21 @@ from servicio_tecnico.services.historial import registrar_historial
 IVA_TASA_MX = Decimal('0.16')
 CENTAVO = Decimal('0.01')
 PERMISO_REGISTRAR_PAGO = 'servicio_tecnico.add_pagoorden'
+
+# Transferencia y tarjeta deben verse en la cuenta de la empresa.
+# Efectivo/otro se cobraron en caja: no piden validación de Facturación.
+METODOS_REQUIEREN_VALIDACION = ('transferencia', 'tarjeta')
+
+# Quién puede marcar "ya aparece / no aparece". Recepción cobra, no concilia.
+ROLES_PUEDEN_VALIDAR_PAGO = (
+    'facturacion',
+    'supervisor',
+    'gerente_operacional',
+    'gerente_general',
+)
+
+# Desde estos estados Facturación aún puede decidir (o corregir un "no aparece").
+ESTADOS_VALIDACION_ABIERTOS = ('pendiente', 'no_aparece')
 
 # Estados en los que el negocio espera al menos el 50% (anticipo).
 ESTADOS_REQUIEREN_ANTICIPO_50 = (
@@ -260,6 +276,69 @@ def usuario_puede_registrar_pago(user: Optional[AbstractBaseUser]) -> bool:
     return user.has_perm(PERMISO_REGISTRAR_PAGO)
 
 
+def usuario_puede_validar_pago(user: Optional[AbstractBaseUser]) -> bool:
+    """
+    True si el usuario puede confirmar que el pago ya está en la cuenta.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Recepción también tiene change_pagoorden (puede cobrar), pero
+    conciliar contra la cuenta es trabajo de Facturación y gerencia.
+    Por eso aquí miramos el rol del Empleado, no solo el permiso Django.
+
+    Args:
+        user: request.user o None.
+
+    Returns:
+        bool: superuser o rol facturacion/supervisor/gerencia.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+    empleado = getattr(user, 'empleado', None)
+    if empleado is None or not getattr(empleado, 'activo', False):
+        return False
+    return empleado.rol in ROLES_PUEDEN_VALIDAR_PAGO
+
+
+def estado_validacion_inicial(metodo: str) -> str:
+    """
+    Estado al crear el abono según cómo pagó el cliente.
+
+    Args:
+        metodo: clave de PagoOrden.METODO_PAGO_CHOICES.
+
+    Returns:
+        'pendiente' si hay que checar la cuenta; 'no_aplica' si no.
+    """
+    if metodo in METODOS_REQUIEREN_VALIDACION:
+        return 'pendiente'
+    return 'no_aplica'
+
+
+def _avisar_pago_seguro(callback, *args, **kwargs) -> None:
+    """
+    Dispara un aviso sin revertir el pago si el canal falla.
+
+    Args:
+        callback: función de notificaciones_pagos.
+        *args / **kwargs: se reenvían al callback.
+
+    Efectos secundarios:
+        Solo logs si el aviso truena (SMTP, push, etc.).
+    """
+    import logging
+
+    logger = logging.getLogger('servicio_tecnico')
+    try:
+        callback(*args, **kwargs)
+    except Exception as exc:
+        logger.exception(
+            '[PAGO-VALIDACION] El aviso falló pero el pago ya está guardado: %s',
+            exc,
+        )
+
+
 def _comprimir_comprobante(imagen_file) -> ContentFile:
     """
     Comprime el comprobante a JPEG (corrige EXIF, baja peso).
@@ -327,11 +406,16 @@ def registrar_pago(
 
     Efectos secundarios:
         Inserta PagoOrden, escribe media/ si hay foto, crea HistorialOrden.
+        Si el método es transferencia/tarjeta, avisa a Facturación
+        (push + campana + correo) para que confirmen la cuenta.
 
     Raises:
         ValidationError: monto inválido o mayor al saldo pendiente.
     """
     from servicio_tecnico.models import OrdenServicio, PagoOrden
+    from servicio_tecnico.services.notificaciones_pagos import (
+        notificar_pago_pendiente_validacion,
+    )
 
     if empleado is None:
         raise ValidationError('Se necesita un empleado para registrar el pago.')
@@ -366,6 +450,7 @@ def registrar_pago(
                 f'(${resumen.saldo}).'
             )
 
+        # Paso: transferencia/tarjeta nacen pendientes; efectivo no se concilia.
         pago = PagoOrden(
             orden=orden_bloqueada,
             monto=monto_dec,
@@ -373,6 +458,7 @@ def registrar_pago(
             metodo=metodo,
             notas=(notas or '').strip(),
             registrado_por=empleado,
+            estado_validacion=estado_validacion_inicial(metodo),
         )
         if comprobante_file:
             pago.comprobante = _comprimir_comprobante(comprobante_file)
@@ -388,7 +474,131 @@ def registrar_pago(
             ),
             es_sistema=True,
         )
+
+    # Paso: el aviso va DESPUÉS del commit. Si push/correo fallan,
+    # el cobro ya quedó y Recepción no ve un error falso.
+    if pago.estado_validacion == 'pendiente':
+        _avisar_pago_seguro(notificar_pago_pendiente_validacion, pago)
     return pago
+
+
+def validar_pago_en_cuenta(
+    pago,
+    empleado,
+    aparece: bool,
+    nota: str = '',
+):
+    """
+    Facturación confirma si el abono ya se ve en la cuenta de la empresa.
+
+    Args:
+        pago: PagoOrden a conciliar (debe estar pendiente o no_aparece).
+        empleado: quién marca (Facturación o gerencia).
+        aparece: True = ya está en la cuenta; False = todavía no.
+        nota: comentario opcional (muy útil cuando no aparece).
+
+    Returns:
+        PagoOrden actualizado.
+
+    Efectos secundarios:
+        Actualiza estado/auditoría, escribe HistorialOrden y avisa:
+        - validado → responsable de seguimiento (o recepcionistas)
+        - no_aparece → quien registró el pago (si no es la misma persona)
+
+    Raises:
+        ValidationError: el pago no admite esta decisión o falta empleado.
+    """
+    from servicio_tecnico.models import PagoOrden
+    from servicio_tecnico.services.notificaciones_pagos import (
+        notificar_pago_no_aparece,
+        notificar_pago_validado,
+    )
+
+    if empleado is None:
+        raise ValidationError(
+            'Se necesita un empleado para validar el pago en la cuenta.'
+        )
+
+    # Efectivo/otro nunca se concilian contra el banco.
+    if pago.estado_validacion == 'no_aplica':
+        raise ValidationError(
+            'Este pago no requiere validación en cuenta '
+            '(efectivo u otro método de caja).'
+        )
+
+    if pago.estado_validacion == 'validado':
+        raise ValidationError(
+            'Este pago ya fue validado en la cuenta de la empresa.'
+        )
+
+    if pago.estado_validacion not in ESTADOS_VALIDACION_ABIERTOS:
+        raise ValidationError('Este pago no se puede validar en su estado actual.')
+
+    nuevo_estado = 'validado' if aparece else 'no_aparece'
+    nota_limpia = (nota or '').strip()
+    db_alias = _db_de(pago)
+
+    with transaction.atomic(using=db_alias):
+        pago_bloqueado = (
+            PagoOrden.objects.using(db_alias)
+            .select_for_update()
+            .select_related('orden', 'registrado_por')
+            .get(pk=pago.pk)
+        )
+        # Paso: otra pestaña pudo validarlo mientras esta esperaba el lock.
+        if pago_bloqueado.estado_validacion == 'validado':
+            raise ValidationError(
+                'Este pago ya fue validado en la cuenta de la empresa.'
+            )
+        if pago_bloqueado.estado_validacion == 'no_aplica':
+            raise ValidationError(
+                'Este pago no requiere validación en cuenta.'
+            )
+
+        pago_bloqueado.estado_validacion = nuevo_estado
+        pago_bloqueado.validado_por = empleado
+        pago_bloqueado.fecha_validacion = timezone.now()
+        pago_bloqueado.nota_validacion = nota_limpia
+        pago_bloqueado.save(
+            update_fields=[
+                'estado_validacion',
+                'validado_por',
+                'fecha_validacion',
+                'nota_validacion',
+            ]
+        )
+
+        if aparece:
+            comentario = (
+                f'Pago de ${pago_bloqueado.monto} validado en la cuenta '
+                f'de la empresa ({pago_bloqueado.get_metodo_display()}).'
+            )
+        else:
+            comentario = (
+                f'Pago de ${pago_bloqueado.monto} aún no aparece en la '
+                f'cuenta ({pago_bloqueado.get_metodo_display()}).'
+            )
+            if nota_limpia:
+                comentario = f'{comentario} Nota: {nota_limpia}'
+
+        registrar_historial(
+            orden=pago_bloqueado.orden,
+            tipo_evento='sistema',
+            usuario=empleado,
+            comentario=comentario,
+            es_sistema=True,
+        )
+
+    # Paso: avisos fuera de la transacción (mismo criterio que al registrar).
+    if aparece:
+        _avisar_pago_seguro(notificar_pago_validado, pago_bloqueado)
+    else:
+        _avisar_pago_seguro(
+            notificar_pago_no_aparece,
+            pago_bloqueado,
+            quien_marco=empleado,
+        )
+    return pago_bloqueado
 
 
 def eliminar_pago(pago, empleado) -> None:

@@ -45,6 +45,7 @@ from .views_detalle_orden_pagos import (
     handle_actualizar_datos_factura,
     handle_eliminar_pago,
     handle_registrar_pago,
+    handle_validar_pago,
 )
 
 
@@ -68,6 +69,7 @@ _FORM_TYPE_HANDLERS = {
     'registrar_pago': handle_registrar_pago,
     'actualizar_datos_factura': handle_actualizar_datos_factura,
     'eliminar_pago': handle_eliminar_pago,
+    'validar_pago': handle_validar_pago,
 }
 
 
