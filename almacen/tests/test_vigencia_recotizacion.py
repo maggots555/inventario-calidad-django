@@ -492,6 +492,39 @@ class RecotizacionTest(BaseIntegracionCotizacionMixin, TestCase):
         self.orden.refresh_from_db()
         self.assertEqual(self.orden.estado, 'reparacion')
 
+    def test_alias_de_base_sale_de_la_instancia(self) -> None:
+        """
+        La transacción debe abrirse en la base del país, no en 'default'.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cada país tiene su propia base (México vive en el alias ``mexico``).
+        El router enruta las consultas solo, pero las transacciones NO pasan
+        por el router: hay que decirle a Django explícitamente en qué base
+        abrirla. Django deja anotado en cada objeto de dónde lo leyó
+        (``_state.db``), y esa es la fuente que usamos.
+        """
+        from almacen.utils.recotizacion import resolver_db_alias
+
+        # Simulamos una solicitud leída desde la base de México
+        self.solicitud._state.db = 'mexico'
+        self.assertEqual(resolver_db_alias(self.solicitud), 'mexico')
+
+    def test_alias_de_base_cae_al_router_si_la_instancia_no_lo_sabe(self) -> None:
+        """
+        Si el objeto no viene de la base, le preguntamos al router.
+
+        Caso raro (objeto recién construido en memoria), pero necesitamos un
+        alias válido de todos modos para poder abrir la transacción.
+        """
+        from almacen.utils.recotizacion import resolver_db_alias
+
+        self.solicitud._state.db = None
+        alias = resolver_db_alias(self.solicitud)
+
+        # No sabemos cuál será en cada entorno, pero nunca puede quedar vacío
+        self.assertTrue(alias)
+
     def test_aviso_a_compras_se_encola_despues_del_commit(self) -> None:
         """
         La tarea Celery se encola al confirmar la transacción, no antes.

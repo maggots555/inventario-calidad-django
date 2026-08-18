@@ -32,7 +32,7 @@ Fecha: Agosto 2026
 import logging
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import router, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,44 @@ def construir_snapshot(solicitud) -> dict:
 # APERTURA DE UNA RONDA NUEVA
 # ============================================================================
 
-@transaction.atomic
+def resolver_db_alias(solicitud) -> str:
+    """
+    Averigua en qué base de datos (país) vive esta solicitud.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El sistema tiene UNA BASE DE DATOS POR PAÍS: México vive en el alias
+    ``mexico``, Argentina en ``argentina``, etc. El router de Django ya sabe
+    enrutar cada consulta sola, pero las TRANSACCIONES no pasan por el router:
+    si escribes ``transaction.atomic()`` a secas, Django abre la transacción en
+    ``default``, que NO es la base donde estamos escribiendo. El resultado es
+    una transacción vacía que no protege nada.
+
+    Por eso aquí resolvemos el alias explícitamente:
+    1. ``_state.db`` del objeto: si la solicitud se leyó de ``mexico``, Django
+       dejó anotado ese alias en la instancia. Es la fuente más confiable
+       porque respeta también un ``.using()`` manual.
+    2. Si el objeto todavía no viene de la base (caso raro), le preguntamos al
+       router dónde escribiría este modelo.
+
+    Args:
+        solicitud (SolicitudCotizacion): Cotización de la que queremos el alias.
+
+    Returns:
+        str: Alias de la base de datos (ej. ``'mexico'``).
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    from almacen.models import SolicitudCotizacion
+
+    alias_instancia = getattr(getattr(solicitud, '_state', None), 'db', None)
+    if alias_instancia:
+        return alias_instancia
+
+    return router.db_for_write(SolicitudCotizacion, instance=solicitud)
+
+
 def iniciar_nueva_ronda(solicitud, usuario=None, observaciones: str = ''):
     """
     Cierra la ronda vencida y reabre la solicitud para que Compras recotice.
@@ -190,10 +227,12 @@ def iniciar_nueva_ronda(solicitud, usuario=None, observaciones: str = ''):
         - Modifica la solicitud: sube ``ronda_cotizacion``, la regresa a
           ``borrador`` y limpia fechas y banderas de la ronda anterior.
         - Borra los precios congelados de todas las líneas.
+        - Regresa la orden de Servicio Técnico al hito de proveedores.
         - Encola una tarea Celery que avisa a Compras.
 
-    Nota: todo corre dentro de una transacción. Si algo falla a mitad del
-    camino, la base de datos queda como estaba (no hay rondas a medias).
+    Nota: todo corre dentro de una transacción abierta EN LA BASE DEL PAÍS
+    (ver ``resolver_db_alias``). Si algo falla a mitad del camino, esa base
+    queda como estaba y no hay rondas a medias.
     """
     # Importaciones locales para evitar ciclos: models importa utils al final
     from almacen.models import RondaCotizacion, SolicitudCotizacion
@@ -202,99 +241,117 @@ def iniciar_nueva_ronda(solicitud, usuario=None, observaciones: str = ''):
     )
     from almacen.utils.vigencia_cotizacion import puede_recotizar
 
-    # ---- PASO 0: bloquear la fila para que dos clics no abran dos rondas ----
-    # EXPLICACIÓN PARA PRINCIPIANTES:
-    # select_for_update() le pide a la base de datos que "aparte" esta fila
-    # hasta que termine la transacción. Si el usuario da doble clic, la segunda
-    # petición espera aquí; cuando entra, la solicitud ya está en 'borrador' y
-    # la validación de abajo la rechaza con un mensaje claro en vez de reventar
-    # con un error de clave duplicada.
-    SolicitudCotizacion.objects.select_for_update().filter(pk=solicitud.pk).first()
-    # Releemos por si otra petición alcanzó a cambiar algo mientras esperábamos
-    solicitud.refresh_from_db()
+    # Sin esto, la transacción se abriría en 'default' mientras los INSERT y
+    # UPDATE reales viajan a la base del país: no protegería absolutamente nada.
+    db_alias = resolver_db_alias(solicitud)
 
-    # ---- PASO 1: validar que realmente se pueda recotizar ----
-    # Regla de negocio: solo si venció Y el cliente no respondió absolutamente
-    # nada. Si ya aprobó una pieza hay precios congelados y posiblemente
-    # compras generadas; reciclar la solicitud rompería ese historial.
-    if not puede_recotizar(solicitud):
-        raise ValueError(
-            'Esta cotización no se puede recotizar. Solo aplica cuando la '
-            'vigencia ya venció y el cliente no ha respondido ninguna pieza '
-            'ni servicio.'
+    with transaction.atomic(using=db_alias):
+        # ---- PASO 0: bloquear la fila para que dos clics no abran dos rondas --
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # select_for_update() le pide a la base que "aparte" esta fila hasta que
+        # termine la transacción. Si el usuario da doble clic, la segunda
+        # petición espera aquí; cuando entra, la solicitud ya está en 'borrador'
+        # y la validación de abajo la rechaza con un mensaje claro en vez de
+        # reventar con un error de clave duplicada.
+        # El .using() explícito garantiza que el bloqueo se pida en la MISMA
+        # conexión donde abrimos la transacción.
+        (
+            SolicitudCotizacion.objects
+            .using(db_alias)
+            .select_for_update()
+            .filter(pk=solicitud.pk)
+            .first()
+        )
+        # Releemos por si otra petición alcanzó a cambiar algo mientras esperábamos
+        solicitud.refresh_from_db()
+
+        # ---- PASO 1: validar que realmente se pueda recotizar ----
+        # Regla de negocio: solo si venció Y el cliente no respondió
+        # absolutamente nada. Si ya aprobó una pieza hay precios congelados y
+        # posiblemente compras generadas; reciclar la solicitud rompería ese
+        # historial.
+        if not puede_recotizar(solicitud):
+            raise ValueError(
+                'Esta cotización no se puede recotizar. Solo aplica cuando la '
+                'vigencia ya venció y el cliente no ha respondido ninguna pieza '
+                'ni servicio.'
+            )
+
+        ronda_actual = solicitud.ronda_cotizacion or 1
+
+        # ---- PASO 2: fotografiar la ronda que estamos cerrando ----
+        snapshot = construir_snapshot(solicitud)
+
+        ronda = RondaCotizacion.objects.create(
+            solicitud=solicitud,
+            numero_ronda=ronda_actual,
+            fecha_inicio_vigencia=solicitud.fecha_inicio_vigencia,
+            fecha_vencimiento=solicitud.fecha_vencimiento_vigencia,
+            motivo_cierre='recotizacion',
+            snapshot_lineas=snapshot['lineas'],
+            snapshot_servicios=snapshot['servicios'],
+            costo_total_snapshot=snapshot['costo_total'],
+            precio_cliente_total_snapshot=snapshot['precio_cliente_total'],
+            creada_por=usuario,
+            observaciones=observaciones,
         )
 
-    ronda_actual = solicitud.ronda_cotizacion or 1
+        # ---- PASO 3: limpiar los precios congelados de las líneas ----
+        # EXPLICACIÓN: si dejáramos estos precios, la calculadora de profit
+        # creería que ya están confirmados y el PDF nuevo saldría con importes
+        # viejos.
+        for linea in solicitud.lineas.all():
+            for campo in CAMPOS_PRECIO_A_LIMPIAR_LINEA:
+                setattr(linea, campo, None)
+            linea.save(update_fields=list(CAMPOS_PRECIO_A_LIMPIAR_LINEA))
 
-    # ---- PASO 2: fotografiar la ronda que estamos cerrando ----
-    snapshot = construir_snapshot(solicitud)
+        # ---- PASO 4: reabrir la solicitud como borrador de la ronda siguiente --
+        solicitud.ronda_cotizacion = ronda_actual + 1
+        solicitud.estado = 'borrador'
+        # El reloj de vigencia se reinicia cuando Compras notifique a Front
+        solicitud.fecha_inicio_vigencia = None
+        solicitud.fecha_vencimiento_vigencia = None
+        solicitud.aviso_vencimiento_enviado = False
+        # Los precios de cabecera también se descongelan
+        solicitud.fecha_precios_cliente = None
+        solicitud.tipo_servicio_cliente = ''
+        # Las banderas de PNC pertenecían a la ronda anterior
+        solicitud.plantilla_pnc_front_enviada = False
+        solicitud.aviso_pnc_cliente_enviado = False
 
-    ronda = RondaCotizacion.objects.create(
-        solicitud=solicitud,
-        numero_ronda=ronda_actual,
-        fecha_inicio_vigencia=solicitud.fecha_inicio_vigencia,
-        fecha_vencimiento=solicitud.fecha_vencimiento_vigencia,
-        motivo_cierre='recotizacion',
-        snapshot_lineas=snapshot['lineas'],
-        snapshot_servicios=snapshot['servicios'],
-        costo_total_snapshot=snapshot['costo_total'],
-        precio_cliente_total_snapshot=snapshot['precio_cliente_total'],
-        creada_por=usuario,
-        observaciones=observaciones,
-    )
+        solicitud.save(update_fields=[
+            'ronda_cotizacion',
+            'estado',
+            'fecha_inicio_vigencia',
+            'fecha_vencimiento_vigencia',
+            'aviso_vencimiento_enviado',
+            'fecha_precios_cliente',
+            'tipo_servicio_cliente',
+            'plantilla_pnc_front_enviada',
+            'aviso_pnc_cliente_enviado',
+        ])
 
-    # ---- PASO 3: limpiar los precios congelados de las líneas ----
-    # EXPLICACIÓN: si dejáramos estos precios, la calculadora de profit creería
-    # que ya están confirmados y el PDF nuevo saldría con importes viejos.
-    for linea in solicitud.lineas.all():
-        for campo in CAMPOS_PRECIO_A_LIMPIAR_LINEA:
-            setattr(linea, campo, None)
-        linea.save(update_fields=list(CAMPOS_PRECIO_A_LIMPIAR_LINEA))
+        # ---- PASO 5: regresar la orden de ST al hito de proveedores ----
+        # EXPLICACIÓN: sin esto la orden se quedaría en «Esperando Aprobación
+        # Cliente» durante toda la ronda nueva, y el técnico no vería que el
+        # equipo volvió a manos de Compras.
+        sincronizar_estado_st_al_recotizar(
+            solicitud,
+            usuario=usuario,
+            ronda_cerrada=ronda_actual,
+        )
 
-    # ---- PASO 4: reabrir la solicitud como borrador de la ronda siguiente ----
-    solicitud.ronda_cotizacion = ronda_actual + 1
-    solicitud.estado = 'borrador'
-    # El reloj de vigencia se reinicia cuando Compras vuelva a notificar a Front
-    solicitud.fecha_inicio_vigencia = None
-    solicitud.fecha_vencimiento_vigencia = None
-    solicitud.aviso_vencimiento_enviado = False
-    # Los precios de cabecera también se descongelan
-    solicitud.fecha_precios_cliente = None
-    solicitud.tipo_servicio_cliente = ''
-    # Las banderas de PNC pertenecían a la ronda anterior
-    solicitud.plantilla_pnc_front_enviada = False
-    solicitud.aviso_pnc_cliente_enviado = False
-
-    solicitud.save(update_fields=[
-        'ronda_cotizacion',
-        'estado',
-        'fecha_inicio_vigencia',
-        'fecha_vencimiento_vigencia',
-        'aviso_vencimiento_enviado',
-        'fecha_precios_cliente',
-        'tipo_servicio_cliente',
-        'plantilla_pnc_front_enviada',
-        'aviso_pnc_cliente_enviado',
-    ])
-
-    # ---- PASO 5: regresar la orden de Servicio Técnico al hito de proveedores --
-    # EXPLICACIÓN: sin esto la orden se quedaría en «Esperando Aprobación
-    # Cliente» durante toda la ronda nueva, y el técnico no vería que el equipo
-    # volvió a manos de Compras.
-    sincronizar_estado_st_al_recotizar(
-        solicitud,
-        usuario=usuario,
-        ronda_cerrada=ronda_actual,
-    )
-
-    # ---- PASO 6: avisarle a Compras que tiene trabajo nuevo ----
-    # on_commit: la tarea se encola SOLO cuando la transacción termina bien.
-    # Si la encoláramos aquí mismo, Celery podría empezar a leer la solicitud
-    # antes de que la base confirme los cambios y mandaría un correo con los
-    # datos de la ronda vieja.
-    transaction.on_commit(
-        lambda: _notificar_compras_recotizacion(solicitud, usuario)
-    )
+        # ---- PASO 6: avisarle a Compras que tiene trabajo nuevo ----
+        # on_commit: la tarea se encola SOLO cuando la transacción termina bien.
+        # Si la encoláramos aquí mismo, Celery podría empezar a leer la
+        # solicitud antes de que la base confirme los cambios y mandaría un
+        # correo con los datos de la ronda vieja.
+        # using=db_alias: el callback debe colgarse de la transacción del país,
+        # no de la de 'default' (que ni siquiera está abierta).
+        transaction.on_commit(
+            lambda: _notificar_compras_recotizacion(solicitud, usuario),
+            using=db_alias,
+        )
 
     logger.info(
         '[RECOTIZACION] %s pasó de ronda %s a ronda %s (solicitada por %s)',
