@@ -835,18 +835,12 @@ def detalle_solicitud_cotizacion(request, pk):
         'motivo_rechazo_solicitud_etiqueta': motivo_rechazo_solicitud_etiqueta,
     }
 
-    context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
-    context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
-    # EXPLICACIÓN: tras PNC (costos en $0) con orden, igual hay que poder abrir
-    # el modal para mandar alternativa REAC.
-    context['mostrar_enviar_cotizacion_cliente'] = puede_mostrar_enviar_cotizacion_cliente(
-        solicitud,
-        tiene_items_cotizables=context['tiene_items_cotizables'],
-    )
     # ========== VIGENCIA DE LA COTIZACIÓN (5 días hábiles) ==========
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Aquí calculamos una sola vez todo lo que la plantilla necesita saber
-    # sobre el plazo, en lugar de que el HTML llame varias veces al modelo.
+    # Este bloque va ANTES de los flags de botones porque varios de ellos
+    # dependen de si la vigencia venció. Calculamos una sola vez todo lo que
+    # la plantilla necesita saber sobre el plazo, en lugar de que el HTML
+    # llame varias veces al modelo.
     from .utils.vigencia_cotizacion import (
         dias_habiles_restantes,
         esta_vencida,
@@ -861,6 +855,21 @@ def detalle_solicitud_cotizacion(request, pk):
     context['vigencia_dias_restantes'] = dias_habiles_restantes(solicitud)
     context['vigencia_mensaje_bloqueo'] = motivo_bloqueo_aprobacion(solicitud)
     context['puede_recotizar'] = puede_recotizar(solicitud)
+
+    context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
+    context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
+    # EXPLICACIÓN: tras PNC (costos en $0) con orden, igual hay que poder abrir
+    # el modal para mandar alternativa REAC.
+    # Se combina con la vigencia: enviar o reenviar una cotización vencida le
+    # mandaría al cliente precios que el proveedor ya pudo haber cambiado, así
+    # que el camino correcto es recotizar primero (bloqueo duro).
+    context['mostrar_enviar_cotizacion_cliente'] = (
+        puede_mostrar_enviar_cotizacion_cliente(
+            solicitud,
+            tiene_items_cotizables=context['tiene_items_cotizables'],
+        )
+        and not vigencia_vencida
+    )
 
     # EXPLICACIÓN: tras aviso PNC, ocultar botones de aprobar hasta cotización/REAC.
     # Se combina con la vigencia: si venció, tampoco se puede aprobar (bloqueo duro).

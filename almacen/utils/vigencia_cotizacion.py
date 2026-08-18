@@ -338,6 +338,38 @@ def puede_recotizar(solicitud) -> bool:
     return solicitud_sin_respuesta_cliente(solicitud)
 
 
+def motivo_bloqueo_envio_cliente(solicitud) -> str:
+    """
+    Texto explicativo de por qué no se puede enviar/reenviar la cotización.
+
+    Objetivo principal (contexto de negocio):
+        Reenviar una cotización vencida le prometería al cliente un precio que
+        quizá ya no podemos sostener. Este texto se muestra en el modal y en la
+        respuesta de la API para que quede claro que hay que recotizar primero.
+
+    Args:
+        solicitud (SolicitudCotizacion): Cotización bloqueada.
+
+    Returns:
+        str: Mensaje listo para mostrar al usuario. Cadena vacía si no hay
+        bloqueo por vigencia.
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    if not esta_vencida(solicitud):
+        return ''
+
+    fecha = solicitud.fecha_vencimiento_vigencia.strftime('%d/%m/%Y')
+    return (
+        f'La vigencia de esta cotización venció el {fecha} '
+        f'({DIAS_HABILES_VIGENCIA_COTIZACION} días hábiles sin respuesta). '
+        'No es posible enviarla ni reenviarla al cliente porque los costos del '
+        'proveedor pueden haber cambiado. Solicita una recotización a Compras '
+        'para confirmar disponibilidad y precio actualizado.'
+    )
+
+
 def motivo_bloqueo_aprobacion(solicitud) -> str:
     """
     Texto explicativo de por qué no se puede aprobar (para messages y UI).

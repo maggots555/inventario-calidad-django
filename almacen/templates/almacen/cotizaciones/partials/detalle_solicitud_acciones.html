@@ -15,6 +15,20 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
         </button>
         <p class="small text-muted mb-0 mt-2">
             Compras confirmará disponibilidad y costos actualizados.
+            Mientras tanto no se puede enviar ni aprobar la cotización.
+        </p>
+    </div>
+    {% elif vigencia_vencida %}
+    {# Venció, pero el cliente ya respondió algo: no aplica recotizar. Explicamos por qué desaparecieron los botones de enviar y aprobar. #}
+    <div class="border border-danger rounded p-2 bg-body-secondary">
+        <p class="small mb-1 text-danger fw-semibold">
+            <i class="bi bi-clock-history me-1"></i>
+            Cotización vencida
+        </p>
+        <p class="small text-muted mb-0">
+            No se puede enviar ni aprobar con precios vencidos. Como el cliente
+            ya respondió alguna pieza o servicio, tampoco aplica recotizar:
+            cierra el caso o levanta una solicitud nueva.
         </p>
     </div>
     {% endif %}
@@ -35,9 +49,12 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" class="btn btn-outline-primary w-100">
         <i class="bi bi-pencil-square me-2"></i>Editar Líneas
     </a>
+    {% if mostrar_enviar_cotizacion_cliente %}
+    {# El flag ya contempla la vigencia: si venció, no se envía nada al cliente #}
     <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-send me-2"></i>Enviar Cotización al Cliente
     </button>
+    {% endif %}
     {% if mostrar_notificar_cliente_pnc %}
     {# Solo si el último «Notificar a Front» usó plantilla PNC #}
     <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalNotificarClientePnc">

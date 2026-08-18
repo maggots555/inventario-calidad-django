@@ -161,6 +161,23 @@ def api_enviar_cotizacion_cliente(request, pk):
                          f'o "Parcialmente Aprobada".'
             })
 
+        # --- 1b. BLOQUEO DURO POR VIGENCIA ---
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si pasaron los 5 días hábiles, los costos del proveedor ya no son
+        # confiables. Mandar (o reenviar) esa cotización significaría prometerle
+        # al cliente un precio que quizá ya no podemos sostener. Validamos aquí
+        # en el servidor y no solo ocultando el botón, porque cualquiera podría
+        # disparar este POST a mano desde la consola del navegador.
+        from almacen.utils.vigencia_cotizacion import (
+            esta_vencida,
+            motivo_bloqueo_envio_cliente,
+        )
+        if esta_vencida(solicitud):
+            return JsonResponse({
+                'success': False,
+                'error': motivo_bloqueo_envio_cliente(solicitud),
+            })
+
         # --- 2. EXTRAER PARÁMETROS DEL POST ---
         modo_cotizacion = request.POST.get('modo_cotizacion', 'reparacion')
         tipo_servicio  = request.POST.get('tipo_servicio', 'estandar')

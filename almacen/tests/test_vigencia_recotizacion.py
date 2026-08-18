@@ -25,7 +25,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.sessions.backends.db import SessionStore
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -46,7 +48,9 @@ from almacen.utils.vigencia_cotizacion import (
     sumar_dias_habiles,
 )
 from almacen.views import (
+    api_enviar_cotizacion_cliente,
     aprobar_todas_lineas,
+    detalle_solicitud_cotizacion,
     iniciar_recotizacion_solicitud,
     rechazar_todas_lineas,
 )
@@ -170,6 +174,93 @@ class VigenciaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(self.linea.estado_cliente, 'pendiente')
         self.solicitud.refresh_from_db()
         self.assertEqual(self.solicitud.estado, 'enviada_cliente')
+
+    def test_vencida_bloquea_enviar_cotizacion_al_cliente(self) -> None:
+        """
+        La API de envío al cliente rechaza el POST si la vigencia venció.
+
+        EXPLICACIÓN: reenviar una cotización caducada le prometería al cliente
+        un precio que el proveedor ya pudo haber cambiado. El bloqueo vive en
+        el servidor porque ocultar el botón no basta: el POST se puede disparar
+        a mano desde la consola del navegador.
+        """
+        import json
+
+        self.solicitud.enviar_a_front(usuario=self.user)
+        self.solicitud.enviar_a_cliente(usuario=self.user)
+        self._vencer_vigencia()
+
+        url = reverse(
+            'almacen:api_enviar_cotizacion_cliente',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(
+            self.factory,
+            self.user,
+            url,
+            {
+                'modo_cotizacion': 'reparacion',
+                'tipo_servicio': 'estandar',
+                'email_cliente': 'cliente.vencida@test.local',
+                'modo_agrupacion': 'todo_junto',
+            },
+        )
+        respuesta = api_enviar_cotizacion_cliente(request, self.solicitud.pk)
+
+        datos = json.loads(respuesta.content)
+        self.assertFalse(datos['success'])
+        self.assertIn('recotización', datos['error'].lower())
+
+    def _html_detalle(self) -> str:
+        """
+        Renderiza el detalle de la solicitud y devuelve el HTML como texto.
+
+        Returns:
+            str: HTML completo de la página de detalle.
+
+        Efectos secundarios:
+            Ninguno (solo lectura); usa RequestFactory igual que el resto
+            de los tests de este módulo.
+        """
+        url = reverse(
+            'almacen:detalle_solicitud_cotizacion',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = self.factory.get(url)
+        request.user = self.user
+        request.session = SessionStore()
+        request._messages = FallbackStorage(request)
+        respuesta = detalle_solicitud_cotizacion(request, self.solicitud.pk)
+        return respuesta.content.decode('utf-8')
+
+    @override_settings(STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        # EXPLICACIÓN: en producción los estáticos llevan hash (Manifest...),
+        # pero en tests no corrimos collectstatic, así que usamos el storage
+        # simple para poder renderizar el template completo.
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    })
+    def test_detalle_oculta_boton_reenviar_cotizacion_si_vencio(self) -> None:
+        """
+        El botón «Reenviar Cotización» desaparece al vencer la vigencia.
+
+        EXPLICACIÓN: buscamos el disparador del modal de envío al cliente.
+        El modal en sí siempre está en el HTML; lo que debe desaparecer es
+        cualquier botón que lo abra (panel de acciones y dock móvil).
+        """
+        disparador_modal = 'data-bs-target="#modalEnviarCotizacionCliente"'
+
+        self.solicitud.enviar_a_front(usuario=self.user)
+        self.solicitud.enviar_a_cliente(usuario=self.user)
+
+        # Antes de vencer el botón sí debe estar disponible
+        self.assertIn(disparador_modal, self._html_detalle())
+
+        self._vencer_vigencia()
+
+        self.assertNotIn(disparador_modal, self._html_detalle())
 
     @patch('almacen.utils.notificar_respuesta_cotizacion.notificar_cotizacion_rechazada')
     def test_vencida_permite_rechazar(self, _mock_notif) -> None:
