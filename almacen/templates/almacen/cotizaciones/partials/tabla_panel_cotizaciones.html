@@ -1,0 +1,117 @@
+{% comment %}
+Tabla reutilizable del Panel de Cotizaciones.
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+-------------------------------
+Las dos pestañas (Front / Cliente) muestran casi las mismas columnas.
+En vez de copiar el HTML dos veces, este partial se incluye con
+parámetros distintos.
+
+Parámetros (via {% include ... with %}):
+- cotizaciones: queryset de SolicitudCotizacion a listar
+- etiqueta_dias: encabezado de la columna de días (ej. "Días en Front")
+- empty_titulo / empty_detalle: textos si la lista está vacía
+- mostrar_responsable: True solo en la pestaña Front
+{% endcomment %}
+<div class="table-responsive">
+    {# .panel-cot-tabla: target de overrides dark (thead + filas urgentes) #}
+    <table class="table table-hover mb-0 panel-cot-tabla">
+        <thead class="table-light">
+            <tr>
+                <th>Solicitud</th>
+                <th>Orden Cliente</th>
+                <th class="text-center">Líneas</th>
+                <th class="text-end">Total Estimado</th>
+                {% if mostrar_responsable %}
+                <th>
+                    Responsable
+                    {# En Front: seguimiento de la orden; sin orden, quien creó la solicitud #}
+                    <i class="bi bi-info-circle text-muted"
+                       title="Responsable de seguimiento. Si no hay orden activa, quien creó la solicitud."></i>
+                </th>
+                {% endif %}
+                <th>Creado por</th>
+                <th class="text-center">{{ etiqueta_dias }}</th>
+                <th>Fecha Envío</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cot in cotizaciones %}
+            {% with dias_sin_resp=cot.dias_sin_respuesta %}
+            <tr class="{% if dias_sin_resp > 3 %}table-warning{% endif %}">
+                <td>
+                    <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}" class="fw-bold text-decoration-none">
+                        {{ cot.numero_solicitud }}
+                    </a>
+                </td>
+                <td>
+                    {% if cot.numero_orden_cliente %}
+                        <span class="badge bg-light text-dark">{{ cot.numero_orden_cliente }}</span>
+                    {% else %}
+                        <span class="text-muted">Stock General</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-info">{{ cot.lineas.count }} líneas</span>
+                </td>
+                <td class="text-end fw-bold">${{ cot.total_estimado|floatformat:2 }}</td>
+                {% if mostrar_responsable %}
+                <td>
+                    {# Con orden: responsable de seguimiento. Sin orden activa: creador. #}
+                    {% if cot.sin_orden_activa or not cot.orden_servicio_id %}
+                        {% if cot.creado_por %}
+                            <small>{% firstof cot.creado_por.empleado.nombre_completo cot.creado_por.get_full_name cot.creado_por.username %}</small>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    {% elif cot.orden_servicio.responsable_seguimiento %}
+                        <small>{{ cot.orden_servicio.responsable_seguimiento.nombre_completo }}</small>
+                    {% else %}
+                        <span class="text-muted">Sin asignar</span>
+                    {% endif %}
+                </td>
+                {% endif %}
+                <td>
+                    {% if cot.creado_por %}
+                        <small>{{ cot.creado_por.get_full_name|default:cot.creado_por.username }}</small>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if dias_sin_resp > 3 %}
+                        <span class="badge bg-danger">{{ dias_sin_resp }} días ⚠️</span>
+                    {% elif dias_sin_resp > 1 %}
+                        <span class="badge bg-warning text-dark">{{ dias_sin_resp }} días</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark">{{ dias_sin_resp|default:"0" }} días</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {# fecha_envio_cliente se llena al liberar a Front; si falta, usamos creación #}
+                    <small>{{ cot.fecha_envio_cliente|date:"d/m/Y H:i"|default:cot.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                </td>
+                <td class="text-end">
+                    <div class="btn-group">
+                        <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}"
+                           class="btn btn-sm btn-outline-primary" title="Ver detalle y responder">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr>
+                <td colspan="{% if mostrar_responsable %}9{% else %}8{% endif %}" class="text-center py-5 text-muted">
+                    <i class="bi bi-check-circle display-1 d-block mb-3 text-success"></i>
+                    <strong>{{ empty_titulo }}</strong>
+                    <br>
+                    <small>{{ empty_detalle }}</small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

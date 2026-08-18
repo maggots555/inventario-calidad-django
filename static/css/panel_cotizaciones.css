@@ -111,3 +111,40 @@
 [data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-opacity-10 .card-body h2 {
     color: #e2e8f0;
 }
+
+/* ============================================================
+   PESTAÑAS Front / Cliente (Bootstrap nav-tabs)
+   ============================================================ */
+
+.panel-cotizaciones-page .panel-cot-tabs {
+    border-bottom: 1px solid var(--border-color, var(--gray-200));
+}
+
+.panel-cotizaciones-page .panel-cot-tabs .nav-link {
+    color: var(--text-secondary, var(--gray-700));
+    min-height: 44px;
+}
+
+.panel-cotizaciones-page .panel-cot-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabs {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabs .nav-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabs .nav-link:hover {
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabs .nav-link.active {
+    color: #60a5fa;
+    background-color: #1e293b;
+    border-color: #334155 #334155 #1e293b;
+}

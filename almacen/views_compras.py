@@ -282,73 +282,76 @@ def lista_compras(request):
 @permission_required_with_message('almacen.view_solicitudcotizacion')
 def panel_cotizaciones(request):
     """
-    Panel de cotizaciones pendientes de aprobación.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    --------------------------------
-    Esta vista muestra un dashboard específico para las cotizaciones
-    que están esperando respuesta del cliente.
-    
-    IMPORTANTE - NUEVO SISTEMA DE COTIZACIONES:
-    Ahora las cotizaciones se manejan con el modelo SolicitudCotizacion,
-    que permite múltiples proveedores por cotización.
-    
-    Estados del nuevo sistema:
-    - borrador: En preparación
-    - enviada_front: Enviada a recepción para revisión
-    - enviada_cliente: Enviada al cliente, esperando respuesta
-    - parcialmente_aprobada: Algunas líneas aprobadas
-    - totalmente_aprobada: Todas las líneas aprobadas
-    - totalmente_rechazada: Todas las líneas rechazadas
-    - completada: Proceso finalizado
-    
-    Incluye:
-    - Cotizaciones en diferentes estados
-    - Alertas de cotizaciones con muchos días sin respuesta
-    - Estadísticas de aprobación/rechazo
+    Panel de cotizaciones pendientes (enviadas a Front o al cliente).
+
+    Objetivo de negocio:
+        Mostrar en un dashboard las solicitudes que todavía no tienen
+        respuesta final, separadas por estatus:
+        - enviada_front: Compras ya liberó; Recepción aún no comparte.
+        - enviada_cliente: Recepción ya compartió; se espera al cliente.
+
+    Args:
+        request: HttpRequest autenticado con permiso view_solicitudcotizacion.
+
+    Efectos secundarios:
+        Ninguno (solo lectura). El template pinta dos pestañas Bootstrap.
     """
     from datetime import timedelta
-    from django.db.models import Count, Q
-    
-    # Cotizaciones pendientes de respuesta del cliente
-    # Incluye enviada_front (en revisión por recepción) y enviada_cliente (con el cliente)
-    cotizaciones_pendientes = SolicitudCotizacion.objects.filter(
-        estado__in=['enviada_front', 'enviada_cliente']
-    ).select_related(
-        'orden_servicio', 'creado_por'
-    ).prefetch_related('lineas').order_by('-fecha_creacion')
-    
-    # Cotizaciones en borrador (aún no enviadas)
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # select_related trae de un jalón las FKs que la tabla va a mostrar
+    # (orden, responsable de seguimiento, quien creó la solicitud).
+    # Sin esto, cada fila haría queries extra (problema N+1).
+    relaciones = (
+        'orden_servicio',
+        'orden_servicio__responsable_seguimiento',
+        'creado_por',
+        'creado_por__empleado',
+    )
+
+    # Pestaña 1: todavía en recepción (aún no se compartieron al cliente)
+    cotizaciones_front = SolicitudCotizacion.objects.filter(
+        estado='enviada_front'
+    ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+
+    # Pestaña 2: ya se compartieron al cliente y esperan su respuesta
+    cotizaciones_cliente = SolicitudCotizacion.objects.filter(
+        estado='enviada_cliente'
+    ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+
+    total_front = cotizaciones_front.count()
+    total_cliente = cotizaciones_cliente.count()
+
     cotizaciones_borrador = SolicitudCotizacion.objects.filter(
         estado='borrador'
     ).count()
-    
-    # Alertas: cotizaciones con más de 3 días sin respuesta
+
+    # Urgentes: más de 3 días en Front O con el cliente (ambos se “estancan”)
     fecha_limite = timezone.now() - timedelta(days=3)
-    cotizaciones_urgentes = cotizaciones_pendientes.filter(
-        fecha_creacion__lt=fecha_limite
+    cotizaciones_urgentes = SolicitudCotizacion.objects.filter(
+        estado__in=['enviada_front', 'enviada_cliente'],
+        fecha_creacion__lt=fecha_limite,
     ).count()
-    
-    # Estadísticas del mes
+
     inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
     cotizaciones_mes = SolicitudCotizacion.objects.filter(
         fecha_creacion__gte=inicio_mes
     )
-    
     total_mes = cotizaciones_mes.count()
     aprobadas_mes = cotizaciones_mes.filter(
         estado__in=['parcialmente_aprobada', 'totalmente_aprobada', 'completada']
     ).count()
     rechazadas_mes = cotizaciones_mes.filter(estado='totalmente_rechazada').count()
-    
     tasa_aprobacion = (aprobadas_mes / total_mes * 100) if total_mes > 0 else 0
-    
+
     context = {
-        'cotizaciones': cotizaciones_pendientes,
+        'cotizaciones_front': cotizaciones_front,
+        'cotizaciones_cliente': cotizaciones_cliente,
+        'total_front': total_front,
+        'total_cliente': total_cliente,
+        'total_pendientes': total_front + total_cliente,
         'cotizaciones_urgentes': cotizaciones_urgentes,
         'cotizaciones_borrador': cotizaciones_borrador,
-        'total_pendientes': cotizaciones_pendientes.count(),
         'estadisticas': {
             'total_mes': total_mes,
             'aprobadas_mes': aprobadas_mes,
@@ -356,7 +359,7 @@ def panel_cotizaciones(request):
             'tasa_aprobacion': round(tasa_aprobacion, 1),
         }
     }
-    
+
     return render(request, 'almacen/cotizaciones/panel_cotizaciones.html', context)
 
 
