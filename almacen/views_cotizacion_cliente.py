@@ -973,13 +973,22 @@ def aprobar_todas_lineas(request, pk):
             )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
-        lineas_pendientes = solicitud.lineas.filter(
-            estado_cliente='pendiente',
-            es_linea_reacondicionado=False,
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Guardamos solo los IDs y releemos cada línea DENTRO del bucle.
+        # Motivo: la primera respuesta congela los precios al cliente de TODAS
+        # las líneas con un UPDATE directo a la BD. Si iteráramos sobre objetos
+        # cargados antes de eso, las siguientes líneas seguirían con
+        # precio_unitario_cliente = None en memoria y su save() lo borraría.
+        pks_pendientes = list(
+            solicitud.lineas.filter(
+                estado_cliente='pendiente',
+                es_linea_reacondicionado=False,
+            ).values_list('pk', flat=True)
         )
         aprobadas = 0
-        
-        for linea in lineas_pendientes:
+
+        for linea_pk in pks_pendientes:
+            linea = LineaCotizacion.objects.get(pk=linea_pk)
             if linea.aprobar():
                 aprobadas += 1
         
@@ -1022,10 +1031,19 @@ def rechazar_todas_lineas(request, pk):
 
     if request.method == 'POST':
         motivo = request.POST.get('motivo', 'Rechazado por el cliente')
-        lineas_pendientes = solicitud.lineas.filter(estado_cliente='pendiente')
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Igual que al aprobar todas: iteramos por ID y releemos cada línea de
+        # la BD. Así cada una llega "fresca" con el precio al cliente que la
+        # primera respuesta acaba de congelar, y su save() no lo pisa con None.
+        pks_pendientes = list(
+            solicitud.lineas.filter(
+                estado_cliente='pendiente',
+            ).values_list('pk', flat=True)
+        )
         rechazadas = 0
 
-        for linea in lineas_pendientes:
+        for linea_pk in pks_pendientes:
+            linea = LineaCotizacion.objects.get(pk=linea_pk)
             if linea.rechazar(motivo=motivo):
                 rechazadas += 1
 

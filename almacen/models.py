@@ -4984,6 +4984,15 @@ class LineaCotizacion(models.Model):
         if not self.puede_aprobar():
             return False
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si la solicitud ya tiene precios congelados, este objeto puede venir
+        # "viejo" en memoria (cargado antes de congelar) y su save() borraría el
+        # precio. Releemos solo los campos de dinero antes de tocar nada más.
+        from almacen.utils.cotizacion_precios_cliente import (
+            refrescar_precios_cliente_en_memoria,
+        )
+        refrescar_precios_cliente_en_memoria(self)
+
         # Equipo reacondicionado: precio según contado o financiamiento elegido
         if self.es_linea_reacondicionado:
             from almacen.utils.costeo_reacondicionado import obtener_precio_reac_sin_iva
@@ -5039,6 +5048,15 @@ class LineaCotizacion(models.Model):
         """
         if not self.puede_rechazar():
             return False
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Mismo candado que al aprobar: si los precios ya se congelaron y este
+        # objeto quedó obsoleto (típico en "Rechazar todas"), lo releemos para
+        # no guardar precio_unitario_cliente = None encima del precio real.
+        from almacen.utils.cotizacion_precios_cliente import (
+            refrescar_precios_cliente_en_memoria,
+        )
+        refrescar_precios_cliente_en_memoria(self)
 
         self.estado_cliente = 'rechazada'
         self.fecha_respuesta = timezone.now()

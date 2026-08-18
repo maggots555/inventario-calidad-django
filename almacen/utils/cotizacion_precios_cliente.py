@@ -26,6 +26,65 @@ logger = logging.getLogger('almacen')
 
 IVA_FACTOR = 1.16
 
+# Campos de precio al cliente que se congelan en la primera respuesta.
+# Se listan aquí para poder releerlos de forma selectiva (ver helper de abajo).
+CAMPOS_PRECIO_CLIENTE_LINEA = (
+    'precio_unitario_cliente',
+    'subtotal_cliente_sin_iva',
+    'profit_aplicado',
+)
+
+
+def refrescar_precios_cliente_en_memoria(linea) -> bool:
+    """
+    Relee de la BD los precios ya congelados de una línea para no pisarlos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    ``persistir_precios_cliente_solicitud()`` guarda los precios con
+    ``LineaCotizacion.objects.filter(pk=...).update(...)``: escribe directo en
+    la base de datos y NO actualiza los objetos que ya estaban cargados en
+    memoria de Python.
+
+    Eso provoca un bug cuando alguien recorre varias líneas en un mismo
+    request (por ejemplo el botón "Rechazar todas"): la primera línea congela
+    los precios de todas, pero las siguientes siguen trayendo
+    ``precio_unitario_cliente = None`` en memoria y su ``save()`` completo
+    reescribe ese ``None`` encima del precio recién guardado.
+
+    Este helper es el candado: si la solicitud YA tiene precios congelados
+    (``fecha_precios_cliente``), volvemos a leer solo los tres campos de
+    precio desde la BD. Se refrescan únicamente esos campos para no perder
+    lo que el llamador acabe de poner en memoria (``estado_cliente``,
+    ``motivo_rechazo``, ``fecha_respuesta``, etc.).
+
+    Args:
+        linea: Instancia de ``LineaCotizacion`` (puede venir obsoleta).
+
+    Efectos secundarios:
+        Hace un SELECT a la BD y muta los atributos de precio de ``linea``.
+        No guarda nada: quien llama decide cuándo hacer ``save()``.
+
+    Returns:
+        bool: True si se releyeron los precios; False si no hacía falta
+        (línea sin PK todavía, o solicitud sin precios congelados aún).
+    """
+    # Línea que aún no existe en BD: no hay nada que releer
+    if not getattr(linea, 'pk', None):
+        return False
+
+    solicitud = getattr(linea, 'solicitud', None)
+    if solicitud is None:
+        return False
+
+    # Si aún no se congelaron precios, el flujo normal los calculará después
+    if not getattr(solicitud, 'fecha_precios_cliente', None):
+        return False
+
+    # Refresco selectivo: solo los campos de dinero, nada más
+    linea.refresh_from_db(fields=CAMPOS_PRECIO_CLIENTE_LINEA)
+    return True
+
 
 def obtener_tipo_servicio_solicitud(solicitud) -> str:
     """
