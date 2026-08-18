@@ -196,8 +196,22 @@ def iniciar_nueva_ronda(solicitud, usuario=None, observaciones: str = ''):
     camino, la base de datos queda como estaba (no hay rondas a medias).
     """
     # Importaciones locales para evitar ciclos: models importa utils al final
-    from almacen.models import RondaCotizacion
+    from almacen.models import RondaCotizacion, SolicitudCotizacion
+    from almacen.utils.sincronizar_estado_st import (
+        sincronizar_estado_st_al_recotizar,
+    )
     from almacen.utils.vigencia_cotizacion import puede_recotizar
+
+    # ---- PASO 0: bloquear la fila para que dos clics no abran dos rondas ----
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # select_for_update() le pide a la base de datos que "aparte" esta fila
+    # hasta que termine la transacción. Si el usuario da doble clic, la segunda
+    # petición espera aquí; cuando entra, la solicitud ya está en 'borrador' y
+    # la validación de abajo la rechaza con un mensaje claro en vez de reventar
+    # con un error de clave duplicada.
+    SolicitudCotizacion.objects.select_for_update().filter(pk=solicitud.pk).first()
+    # Releemos por si otra petición alcanzó a cambiar algo mientras esperábamos
+    solicitud.refresh_from_db()
 
     # ---- PASO 1: validar que realmente se pueda recotizar ----
     # Regla de negocio: solo si venció Y el cliente no respondió absolutamente
@@ -263,8 +277,24 @@ def iniciar_nueva_ronda(solicitud, usuario=None, observaciones: str = ''):
         'aviso_pnc_cliente_enviado',
     ])
 
-    # ---- PASO 5: avisarle a Compras que tiene trabajo nuevo ----
-    _notificar_compras_recotizacion(solicitud, usuario)
+    # ---- PASO 5: regresar la orden de Servicio Técnico al hito de proveedores --
+    # EXPLICACIÓN: sin esto la orden se quedaría en «Esperando Aprobación
+    # Cliente» durante toda la ronda nueva, y el técnico no vería que el equipo
+    # volvió a manos de Compras.
+    sincronizar_estado_st_al_recotizar(
+        solicitud,
+        usuario=usuario,
+        ronda_cerrada=ronda_actual,
+    )
+
+    # ---- PASO 6: avisarle a Compras que tiene trabajo nuevo ----
+    # on_commit: la tarea se encola SOLO cuando la transacción termina bien.
+    # Si la encoláramos aquí mismo, Celery podría empezar a leer la solicitud
+    # antes de que la base confirme los cambios y mandaría un correo con los
+    # datos de la ronda vieja.
+    transaction.on_commit(
+        lambda: _notificar_compras_recotizacion(solicitud, usuario)
+    )
 
     logger.info(
         '[RECOTIZACION] %s pasó de ronda %s a ronda %s (solicitada por %s)',

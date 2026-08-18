@@ -21,7 +21,7 @@ Las notificaciones (Celery, push, correo) se mockean para no tocar el broker
 ni el servidor de correo durante las pruebas.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -90,6 +90,31 @@ class SumarDiasHabilesTest(TestCase):
         """Una fecha límite en el pasado no deja días restantes."""
         vencimiento = timezone.now() - timedelta(days=3)
         self.assertEqual(contar_dias_habiles_restantes(vencimiento), 0)
+
+    def test_cotizar_de_noche_no_regala_un_dia_habil(self) -> None:
+        """
+        El plazo se cuenta con el calendario local, no con el de UTC.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        El servidor guarda todo en UTC y México va 6 horas atrás. Un jueves a
+        las 19:00 en México ya es viernes 01:00 en UTC. Si preguntáramos el día
+        de la semana sobre la hora UTC, el sistema contaría desde el viernes y
+        le regalaría al cliente un día hábil de más.
+
+        Jueves 13/08/2026 + 5 hábiles = jueves 20/08/2026 (correcto).
+        Si contara desde el viernes daría viernes 21/08 (un día de más).
+        """
+        # Jueves 13 de agosto de 2026, 19:00 en México = viernes 01:00 UTC
+        jueves_noche_utc = datetime(
+            2026, 8, 14, 1, 0, tzinfo=dt_timezone.utc,
+        )
+
+        resultado = sumar_dias_habiles(jueves_noche_utc, 5)
+
+        # El vencimiento debe caer en jueves, no en viernes
+        self.assertEqual(resultado.weekday(), 3, 'El plazo debe vencer en jueves')
+        self.assertEqual(resultado.date(), date(2026, 8, 20))
 
 
 class VigenciaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase):
@@ -395,6 +420,128 @@ class RecotizacionTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(
             RondaCotizacion.objects.filter(solicitud=self.solicitud).count(),
             2,
+        )
+
+    @patch('almacen.utils.recotizacion._notificar_compras_recotizacion')
+    def test_recotizar_regresa_la_orden_st_al_hito_de_proveedores(
+        self,
+        _mock_notif,
+    ) -> None:
+        """
+        La orden de Servicio Técnico no se queda «Esperando Aprobación Cliente».
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Al recotizar, el equipo vuelve a manos de Compras. Si la orden se
+        quedara en «cotizacion», el técnico creería que se espera al cliente.
+        Peor aún: las guardias anti-regresión del sync no permiten avanzar
+        desde ese estado, así que el siguiente «Notificar a Front» se omitiría
+        y la orden quedaría congelada. Aquí verificamos las dos cosas.
+        """
+        from almacen.utils.recotizacion import iniciar_nueva_ronda
+        from almacen.utils.sincronizar_estado_st import (
+            sincronizar_estado_st_al_notificar_front,
+        )
+
+        # Estado real tras enviar la cotización al cliente
+        self.orden.estado = 'cotizacion'
+        self.orden.save(update_fields=['estado'])
+
+        iniciar_nueva_ronda(self.solicitud, usuario=self.user)
+
+        self.orden.refresh_from_db()
+        self.assertEqual(self.orden.estado, 'cotizacion_enviada_proveedor')
+
+        # El historial debe explicar por qué retrocedió
+        ultimo = self.orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo='cotizacion_enviada_proveedor',
+        ).order_by('-fecha_evento').first()
+        self.assertIsNotNone(ultimo)
+        self.assertIn('Recotización solicitada', ultimo.comentario)
+
+        # Y el flujo de la ronda 2 debe volver a funcionar de punta a punta
+        self.solicitud.refresh_from_db()
+        self.solicitud.enviar_a_front(usuario=self.user)
+        cambiado = sincronizar_estado_st_al_notificar_front(
+            self.solicitud,
+            usuario=self.user,
+        )
+        self.orden.refresh_from_db()
+        self.assertTrue(cambiado)
+        self.assertEqual(self.orden.estado, 'cotizacion_recibida_proveedor')
+
+    @patch('almacen.utils.recotizacion._notificar_compras_recotizacion')
+    def test_recotizar_no_pisa_una_orden_ya_en_reparacion(
+        self,
+        _mock_notif,
+    ) -> None:
+        """
+        Guardia: si la orden avanzó a reparación, la recotización no la mueve.
+
+        Retroceder una orden que ya está en el taller sería peor que dejarla
+        desincronizada, así que el sync se omite a propósito.
+        """
+        from almacen.utils.recotizacion import iniciar_nueva_ronda
+
+        self.orden.estado = 'reparacion'
+        self.orden.save(update_fields=['estado'])
+
+        iniciar_nueva_ronda(self.solicitud, usuario=self.user)
+
+        self.orden.refresh_from_db()
+        self.assertEqual(self.orden.estado, 'reparacion')
+
+    def test_aviso_a_compras_se_encola_despues_del_commit(self) -> None:
+        """
+        La tarea Celery se encola al confirmar la transacción, no antes.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Si se encolara dentro de la transacción, el worker podría leer la
+        solicitud antes de que la base confirme los cambios y mandaría el
+        correo con los datos de la ronda vieja. ``captureOnCommitCallbacks``
+        ejecuta los callbacks pendientes para poder comprobarlo en el test.
+        """
+        from almacen.utils.recotizacion import iniciar_nueva_ronda
+
+        with patch(
+            'almacen.tasks.notificar_recotizacion_solicitada_task.delay'
+        ) as mock_delay:
+            with self.captureOnCommitCallbacks(execute=True):
+                iniciar_nueva_ronda(self.solicitud, usuario=self.user)
+                # Dentro de la transacción todavía NO debe haberse encolado
+                mock_delay.assert_not_called()
+
+            # Ya confirmada la transacción, el aviso sí sale
+            mock_delay.assert_called_once()
+
+        self.solicitud.refresh_from_db()
+        # El worker recibirá la solicitud con la ronda ya actualizada
+        self.assertEqual(self.solicitud.ronda_cotizacion, 2)
+
+    @patch('almacen.utils.recotizacion._notificar_compras_recotizacion')
+    def test_segundo_intento_no_crea_una_ronda_duplicada(
+        self,
+        _mock_notif,
+    ) -> None:
+        """
+        Doble clic en el botón: el segundo intento se rechaza con mensaje.
+
+        Tras la primera recotización la solicitud queda en borrador, así que
+        ya no cumple las condiciones y ``iniciar_nueva_ronda`` lanza ValueError
+        en lugar de chocar contra la restricción de unicidad de la ronda.
+        """
+        from almacen.utils.recotizacion import iniciar_nueva_ronda
+
+        iniciar_nueva_ronda(self.solicitud, usuario=self.user)
+
+        with self.assertRaises(ValueError):
+            iniciar_nueva_ronda(self.solicitud, usuario=self.user)
+
+        self.assertEqual(
+            RondaCotizacion.objects.filter(solicitud=self.solicitud).count(),
+            1,
         )
 
     def test_no_se_puede_recotizar_si_hubo_respuesta_parcial(self) -> None:

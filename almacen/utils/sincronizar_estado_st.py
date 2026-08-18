@@ -113,6 +113,20 @@ ESTADOS_ST_PERMITIDOS_PARA_NOTIFICAR_CLIENTE_PNC = (
     'rechazada',
 )
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Al RECOTIZAR (venció la vigencia y el cliente reapareció), la solicitud
+# vuelve a manos de Compras, así que la orden debe retroceder al hito
+# «Envío de Cotización al Proveedor». Solo retrocedemos desde los estados en
+# los que realmente puede estar una cotización vencida sin respuesta:
+# esperando al cliente, cotización recibida de proveedor, o PNC.
+# Nunca desde reparación, esperando piezas, entregada, etc.
+ESTADOS_ST_PERMITIDOS_PARA_RECOTIZAR = (
+    ESTADO_ST_ESPERANDO_CLIENTE,
+    ESTADO_ST_COTIZACION_RECIBIDA_PROVEEDOR,
+    ESTADO_ST_PNC,
+    'diagnostico_enviado_cliente',
+)
+
 # Mapeo: estado de SolicitudCotizacion → estado de OrdenServicio
 MAPEO_RESPUESTA_SOLICITUD_A_ESTADO_ST = {
     'totalmente_aprobada': 'cliente_acepta_cotizacion',
@@ -692,3 +706,109 @@ def _enriquecer_historial_respuesta_cliente(
     )
     ultimo.es_sistema = True
     ultimo.save(update_fields=['comentario', 'es_sistema'])
+
+
+def sincronizar_estado_st_al_recotizar(
+    solicitud: 'SolicitudCotizacion',
+    usuario=None,
+    ronda_cerrada: int = 1,
+) -> bool:
+    """
+    Regresa la orden ST al hito de proveedores cuando se abre una ronda nueva.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Al recotizar, la solicitud de Almacén vuelve a ``borrador`` porque Compras
+    tiene que confirmar disponibilidad y precios otra vez. Si no avisáramos a
+    Servicio Técnico, la orden se quedaría marcada como «Esperando Aprobación
+    Cliente» durante toda la ronda nueva, y el técnico creería que la pelota
+    está del lado del cliente cuando en realidad está del lado de Compras.
+
+    Además hay un motivo técnico: las guardias anti-regresión del resto de este
+    archivo no permiten avanzar desde ``cotizacion``, así que si dejáramos la
+    orden ahí, el próximo «Notificar a Front» se omitiría y la orden quedaría
+    congelada para siempre en ese estado.
+
+    Este es el ÚNICO lugar del sistema donde la orden retrocede a propósito,
+    por eso la lista de estados permitidos es corta y explícita.
+
+    Args:
+        solicitud: SolicitudCotizacion que acaba de entrar a una ronda nueva.
+        usuario: User opcional; si tiene empleado, se asocia al historial.
+        ronda_cerrada: Número de la ronda que se acaba de cerrar (para el texto
+            del historial, ej. "ronda 1 vencida").
+
+    Returns:
+        bool: True si se cambió el estado; False si no hay orden vinculada,
+        si ya estaba en el hito de proveedores, o si la orden avanzó a una
+        fase donde retroceder sería peligroso (reparación, entrega, etc.).
+
+    Efectos secundarios:
+        Cambia ``orden.estado`` y crea una entrada de HistorialOrden mediante
+        el ``save()`` de OrdenServicio, cuyo comentario se enriquece aquí.
+    """
+    # Modo sin orden vinculada: no hay nada que sincronizar
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    # Ya está en el hito de proveedores: no duplicamos historial
+    if orden.estado == ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR:
+        return False
+
+    # Guardia: solo retrocedemos desde donde puede estar una cotización
+    # vencida. Si la orden ya está en reparación o entregada, algo raro pasó
+    # y preferimos dejarla quieta antes que romper el workflow del técnico.
+    if orden.estado not in ESTADOS_ST_PERMITIDOS_PARA_RECOTIZAR:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; la recotización NO la regresa a "
+            f"'{ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR}' "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return False
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR
+    # OrdenServicio.save() crea HistorialOrden(tipo_evento='cambio_estado')
+    orden.save(update_fields=['estado'])
+
+    # Enriquecer el historial para que el técnico entienda POR QUÉ retrocedió
+    empleado = None
+    if usuario is not None and hasattr(usuario, 'empleado'):
+        empleado = getattr(usuario, 'empleado', None)
+
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    etiquetas = dict(ESTADO_ORDEN_CHOICES)
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        ultimo.comentario = (
+            f'Recotización solicitada en Almacén: la ronda {ronda_cerrada} '
+            f'venció sin respuesta del cliente. '
+            f'{etiquetas.get(estado_anterior, estado_anterior)} → '
+            f'{etiquetas.get(ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR, ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR)} '
+            f'(solicitud {solicitud.numero_solicitud}, '
+            f'ronda {solicitud.ronda_cotizacion})'
+        )
+        update_fields = ['comentario', 'es_sistema']
+        if empleado is not None:
+            ultimo.usuario = empleado
+            update_fields.append('usuario')
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=update_fields)
+
+    logger.info(
+        f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → {ESTADO_ST_COTIZACION_ENVIADA_PROVEEDOR} "
+        f"(recotización, {solicitud.numero_solicitud}, "
+        f"ronda {solicitud.ronda_cotizacion})"
+    )
+    return True

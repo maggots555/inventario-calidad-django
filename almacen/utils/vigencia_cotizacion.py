@@ -19,6 +19,14 @@ le quedan?". Las vistas y los templates consultan estas funciones.
 Regla del proyecto: la lógica de negocio NO vive en models.py (que ya está muy
 grande). El modelo solo expone una fachada de 3 líneas que llama aquí.
 
+LIMITACIÓN CONOCIDA (a propósito):
+Solo se descartan sábados y domingos. NO hay calendario de días festivos, así
+que el 16 de septiembre o el 25 de diciembre cuentan como días hábiles y el
+plazo corre igual. Agregar festivos implicaría un calendario por país (México,
+Argentina, Chile y Colombia tienen fechas distintas), y eso es un proyecto
+aparte. Si algún día se hace, el único punto a tocar es ``sumar_dias_habiles``
+y ``contar_dias_habiles_restantes``: todo lo demás los consume.
+
 Autor: Sistema Integral de Gestión (SIGMA)
 Fecha: Agosto 2026
 """
@@ -37,6 +45,40 @@ from config.constants import (
 # ============================================================================
 # CÁLCULO DE DÍAS HÁBILES
 # ============================================================================
+
+def a_hora_local(momento):
+    """
+    Convierte un datetime a la hora local del país activo (México, Chile...).
+
+    Objetivo principal (contexto de negocio):
+        El servidor guarda todo en UTC, pero "¿es sábado?" hay que responderlo
+        con el calendario de quien opera. En México (UTC-6), a las 6 de la
+        tarde en UTC ya es el día siguiente: si preguntáramos el día de la
+        semana sobre la hora UTC, un jueves por la noche contaría como viernes
+        y el plazo se correría un día.
+
+    Args:
+        momento (datetime | date): Fecha a convertir. Si no es un datetime con
+            zona horaria, se devuelve tal cual (no hay nada que convertir).
+
+    Returns:
+        datetime | date: El mismo instante expresado en la hora local del país.
+
+    Efectos secundarios:
+        Ninguno. Si la configuración de país no está disponible (por ejemplo en
+        un test aislado), cae al huso por defecto de Django sin romper.
+    """
+    if not isinstance(momento, datetime) or timezone.is_naive(momento):
+        return momento
+
+    try:
+        from config.paises_config import fecha_local_pais, get_pais_actual
+        return fecha_local_pais(momento, get_pais_actual())
+    except Exception:
+        # Fallback: huso configurado en settings. Nunca dejamos que un
+        # problema de configuración tumbe el cálculo de la vigencia.
+        return timezone.localtime(momento)
+
 
 def sumar_dias_habiles(fecha_inicio, dias_habiles: int):
     """
@@ -62,10 +104,14 @@ def sumar_dias_habiles(fecha_inicio, dias_habiles: int):
         Viernes + 5 días hábiles = viernes de la semana siguiente
         (sábado y domingo se saltan, no consumen plazo).
     """
-    # EXPLICACIÓN: trabajamos sobre la parte de fecha (sin hora) para poder
-    # preguntar el día de la semana; al final le devolvemos su hora original.
-    es_datetime = isinstance(fecha_inicio, datetime)
-    fecha_cursor: date = fecha_inicio.date() if es_datetime else fecha_inicio
+    # EXPLICACIÓN: primero pasamos a hora local del país. El día de la semana
+    # solo tiene sentido en el calendario de quien opera, no en UTC.
+    referencia = a_hora_local(fecha_inicio)
+
+    # Trabajamos sobre la parte de fecha (sin hora) para poder preguntar el
+    # día de la semana; al final le devolvemos su hora original.
+    es_datetime = isinstance(referencia, datetime)
+    fecha_cursor: date = referencia.date() if es_datetime else referencia
 
     # Contador de días laborables que ya sumamos
     dias_sumados = 0
@@ -77,9 +123,10 @@ def sumar_dias_habiles(fecha_inicio, dias_habiles: int):
         if fecha_cursor.weekday() < 5:
             dias_sumados += 1
 
-    # Si nos dieron un datetime, devolvemos datetime conservando hora y zona
+    # Si nos dieron un datetime, devolvemos datetime conservando la hora local.
+    # Sigue siendo "aware", así que Django lo guardará convertido a UTC solo.
     if es_datetime:
-        return fecha_inicio.replace(
+        return referencia.replace(
             year=fecha_cursor.year,
             month=fecha_cursor.month,
             day=fecha_cursor.day,
@@ -117,9 +164,10 @@ def contar_dias_habiles_restantes(fecha_vencimiento, desde=None) -> int:
 
     # EXPLICACIÓN: contamos día por día desde mañana hasta el vencimiento,
     # sumando solo los laborables. El día de hoy no se cuenta como "restante"
-    # porque ya se está consumiendo.
-    dia_cursor = referencia.date()
-    dia_limite = fecha_vencimiento.date()
+    # porque ya se está consumiendo. Ambas fechas se pasan a hora local para
+    # que el corte del día sea el de la sucursal y no la medianoche UTC.
+    dia_cursor = a_hora_local(referencia).date()
+    dia_limite = a_hora_local(fecha_vencimiento).date()
     dias = 0
 
     while dia_cursor < dia_limite:
