@@ -560,6 +560,15 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'servicio_tecnico.verificar_recordatorios_imagenes',
         'schedule': crontab(hour=8, minute=0),  # Diario a las 8:00 AM
     },
+    # ── Vigencia de cotizaciones (5 días hábiles) ──────────────────────────
+    # Diario 8:00 AM. Busca cotizaciones enviadas que ya pasaron sus 5 días
+    # hábiles sin respuesta del cliente y avisa a Recepción y Compras para que
+    # llamen al cliente: o se cierra el caso, o se pide una recotización.
+    # El campo SolicitudCotizacion.aviso_vencimiento_enviado evita duplicados.
+    'vigencia-cotizaciones-vencidas': {
+        'task': 'almacen.verificar_vigencia_cotizaciones',
+        'schedule': crontab(hour=8, minute=0),  # Diario a las 8:00 AM
+    },
 }
 
 # ============================================================================

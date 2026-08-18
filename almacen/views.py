@@ -117,6 +117,9 @@ from .views_cotizacion_cliente import (  # noqa: F401
 from .views_cotizacion_pnc_cliente import (  # noqa: F401
     notificar_cliente_pnc,
 )
+from .views_recotizacion import (  # noqa: F401
+    iniciar_recotizacion_solicitud,
+)
 from .views_cotizacion_sync_st import (  # noqa: F401
     crear_orden_fl_desde_cotizacion,
     generar_compras_solicitud,

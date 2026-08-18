@@ -63,6 +63,35 @@
     border-color: rgba(52, 152, 219, 0.25);
 }
 
+/* ============================================================================
+   VIGENCIA DE LA COTIZACIÓN (5 días hábiles) Y RONDAS DE RECOTIZACIÓN
+   ============================================================================
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   El chip de vigencia le dice a Recepción cuánto tiempo le queda al cliente
+   para responder. Verde = hay margen, ámbar (chip-warning, ya existente) = se
+   acaba mañana, rojo = ya venció y no se puede aprobar nada.
+   Se usa el mismo lenguaje visual que los chips que ya existían. */
+
+.detalle-chip.chip-vigencia-activa {
+    background-color: var(--success-light);
+    color: var(--success-dark);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.detalle-chip.chip-vigencia-vencida {
+    background-color: var(--danger-light);
+    color: var(--danger-dark);
+    border-color: rgba(239, 68, 68, 0.35);
+    font-weight: 700;
+}
+
+/* Badge "Ronda N" junto al folio: solo aparece tras una recotización */
+.vigencia-badge-ronda {
+    background-color: var(--gray-600);
+    color: var(--white);
+    font-weight: 600;
+}
+
 /* --- Sidebar sticky (desktop) --- */
 .detalle-solicitud-sidebar {
     position: relative;
@@ -570,6 +599,24 @@
     background-color: rgba(96, 165, 250, 0.12);
     color: #60a5fa;
     border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Vigencia en modo oscuro: mismos tonos que el resto de estados del tema */
+[data-bs-theme="dark"] .detalle-chip.chip-vigencia-activa {
+    background-color: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+[data-bs-theme="dark"] .detalle-chip.chip-vigencia-vencida {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.4);
+}
+
+[data-bs-theme="dark"] .vigencia-badge-ronda {
+    background-color: #334155;
+    color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .detalle-sidebar-card {

@@ -138,6 +138,13 @@ urlpatterns = [
         views.registrar_motivo_rechazo_solicitud,
         name='registrar_motivo_rechazo_solicitud',
     ),
+
+    # Recotización: abrir ronda nueva cuando venció la vigencia de 5 días hábiles
+    path(
+        'solicitudes-cotizacion/<int:pk>/iniciar-recotizacion/',
+        views.iniciar_recotizacion_solicitud,
+        name='iniciar_recotizacion_solicitud',
+    ),
     
     # Servicios adicionales (Venta Mostrador en cotizaciones)
     path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/agregar/', views.agregar_servicio_adicional, name='agregar_servicio_adicional'),

@@ -867,6 +867,17 @@ OPCION_PAGO_REAC_CHOICES = [
 ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
 ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelada']
 
+# VIGENCIA DE LA COTIZACIÓN AL CLIENTE
+# Una cotización solo es válida 5 días hábiles (lunes a viernes) contados desde
+# que Compras la libera a Front. Pasado ese plazo los costos del proveedor ya no
+# son confiables y hay que RECOTIZAR (pedir costos de nuevo a Compras).
+# Este mismo número aparece como texto legal en el PDF y los correos al cliente.
+DIAS_HABILES_VIGENCIA_COTIZACION = 5
+
+# Estados en los que el reloj de vigencia corre (la cotización está "viva"
+# esperando respuesta del cliente). En el resto ya hubo respuesta o cierre.
+ESTADOS_SOLICITUD_CON_VIGENCIA = ('enviada_front', 'enviada_cliente')
+
 # TIPOS DE SERVICIO ADICIONAL (para LíneaServicioAdicional en cotizaciones)
 # Mapea directamente a los campos de VentaMostrador en servicio_tecnico
 TIPO_SERVICIO_ADICIONAL_CHOICES = [

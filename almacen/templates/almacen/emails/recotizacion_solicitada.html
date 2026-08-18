@@ -1,0 +1,338 @@
+{% comment %}
+Correo interno a Compras cuando una cotización vencida entra a ronda nueva.
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Los correos NO pueden usar hojas de estilo externas: muchos clientes de correo
+(Outlook, Gmail) las bloquean. Por eso este template sí lleva CSS dentro del
+archivo, a diferencia de las páginas normales del sistema.
+
+Contexto que espera (lo arma almacen/tasks_vigencia_cotizacion.py):
+- solicitud, ronda_nueva, ronda_cerrada, ronda_anterior, lineas
+- solicitado_por, url_solicitud, empresa_nombre, pais_nombre
+- fecha_envio_texto, hora_envio_texto
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recotización solicitada — {{ solicitud.numero_solicitud }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #64b5f6 100%);
+            color: #0d47a1;
+            padding: 30px;
+            text-align: center;
+        }
+        .logo-image {
+            max-width: 160px;
+            height: auto;
+            display: block;
+            margin: 0 auto 12px;
+        }
+        .logo { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+        .subtitle { font-size: 15px; opacity: 0.9; }
+        .badge {
+            display: inline-block;
+            background-color: #0d47a1;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+        .content { padding: 36px 28px; }
+        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
+        .intro-text { font-size: 15px; color: #555; margin-bottom: 22px; }
+        .alert-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .alert-title { font-size: 15px; font-weight: 700; color: #0d47a1; margin-bottom: 8px; }
+        .alert-text { font-size: 14px; color: #555; }
+        .equipment-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 22px 0;
+            border: 1px solid #e9ecef;
+        }
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #64b5f6;
+            padding-bottom: 8px;
+        }
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-weight: 600; color: #0d47a1; min-width: 170px; font-size: 14px; }
+        .info-value { color: #333; font-size: 14px; flex: 1; }
+        .info-value.highlight { font-weight: 700; color: #0d47a1; }
+        .piezas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .piezas-table th {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            text-align: left;
+            padding: 10px 8px;
+            font-weight: 700;
+            border-bottom: 2px solid #64b5f6;
+        }
+        .piezas-table td {
+            padding: 9px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #444;
+        }
+        .piezas-table td.num { text-align: right; white-space: nowrap; }
+        .cta-box {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            border-radius: 8px;
+            padding: 18px;
+            margin: 22px 0;
+        }
+        .cta-title { font-size: 15px; font-weight: 700; color: #0d47a1; margin-bottom: 8px; }
+        .btn-detalle {
+            display: inline-block;
+            margin-top: 14px;
+            background-color: #0d47a1;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .signature-name { font-size: 18px; font-weight: 700; margin-bottom: 5px; }
+        .signature-role { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .signature-area { font-size: 14px; opacity: 0.85; }
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .timestamp { font-size: 12px; opacity: 0.8; margin-top: 15px; }
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        .social-title { font-size: 14px; margin-bottom: 12px; opacity: 0.9; }
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            <div class="logo">🔄 RECOTIZACIÓN SOLICITADA</div>
+            <div class="subtitle">{{ solicitud.numero_solicitud }}</div>
+            <div class="badge">RONDA {{ ronda_nueva }}</div>
+        </div>
+
+        <div class="content">
+            <div class="greeting">Equipo de Compras,</div>
+            <div class="intro-text">
+                La cotización <strong>{{ solicitud.numero_solicitud }}</strong> cumplió
+                sus 5 días hábiles de vigencia sin respuesta del cliente. El cliente
+                reapareció y desea continuar, por lo que se requiere confirmar
+                disponibilidad y actualizar los costos de las piezas.
+            </div>
+
+            <div class="alert-box">
+                <div class="alert-title">⚠️ Siguiente paso</div>
+                <div class="alert-text">
+                    La solicitud regresó a <strong>Borrador</strong>. Verifica con el
+                    proveedor si las piezas siguen disponibles, captura los costos
+                    actuales y vuelve a notificar a Front. Los precios de la ronda
+                    {{ ronda_cerrada }} quedaron guardados en el historial.
+                </div>
+            </div>
+
+            <div class="equipment-info">
+                <div class="info-title">📋 Datos de la solicitud</div>
+                <div class="info-row">
+                    <div class="info-label">🧾 Folio:</div>
+                    <div class="info-value highlight">{{ solicitud.numero_solicitud }}</div>
+                </div>
+                {% if solicitud.numero_orden_cliente %}
+                <div class="info-row">
+                    <div class="info-label">🔗 Orden cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
+                </div>
+                {% endif %}
+                {% if solicitud.service_tag %}
+                <div class="info-row">
+                    <div class="info-label">🏷️ Service Tag:</div>
+                    <div class="info-value">{{ solicitud.service_tag }}</div>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <div class="info-label">👤 Cliente:</div>
+                    <div class="info-value">{{ solicitud.nombre_cliente|default:"Sin nombre" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">💻 Equipo:</div>
+                    <div class="info-value">
+                        {{ solicitud.marca|default:"" }} {{ solicitud.modelo|default:"" }}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">🔁 Ronda anterior:</div>
+                    <div class="info-value">
+                        Ronda {{ ronda_cerrada }}
+                        {% if ronda_anterior.fecha_vencimiento %}
+                        — venció el {{ ronda_anterior.fecha_vencimiento|date:"d/m/Y" }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">🙋 Solicitó:</div>
+                    <div class="info-value">{{ solicitado_por }}</div>
+                </div>
+                {% if ronda_anterior.observaciones %}
+                <div class="info-row">
+                    <div class="info-label">📝 Nota:</div>
+                    <div class="info-value">{{ ronda_anterior.observaciones }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if lineas %}
+            <div class="equipment-info">
+                <div class="info-title">🔧 Piezas por recotizar</div>
+                <table class="piezas-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Pieza</th>
+                            <th>Proveedor</th>
+                            <th style="text-align: right;">Cant.</th>
+                            <th style="text-align: right;">Costo ronda {{ ronda_cerrada }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linea in lineas %}
+                        <tr>
+                            <td>{{ linea.numero_linea }}</td>
+                            <td>{{ linea.descripcion_pieza }}</td>
+                            <td>{{ linea.proveedor.nombre|default:"Sin proveedor" }}</td>
+                            <td class="num">{{ linea.cantidad }}</td>
+                            <td class="num">${{ linea.costo_unitario|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <div class="cta-box">
+                <div class="cta-title">📌 Abrir la solicitud</div>
+                <div class="alert-text">
+                    Este enlace te lleva al detalle para actualizar costos y volver
+                    a notificar a Front.
+                </div>
+                <a class="btn-detalle" href="{{ url_solicitud }}">➡️ Ir a la cotización</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Almacén SIC
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para consultas, contacte al área de Compras.
+                </div>
+            </div>
+
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

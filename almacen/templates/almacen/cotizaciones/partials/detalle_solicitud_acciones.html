@@ -2,6 +2,23 @@
 Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado via JS).
 {% endcomment %}
 <div id="panelAccionesBody" class="d-grid gap-2">
+    {% if puede_recotizar %}
+    {# EXPLICACIÓN PARA PRINCIPIANTES: Solo aparece cuando la vigencia venció Y el cliente nunca respondió. Va primero en el panel porque es la acción más urgente en ese momento. #}
+    <div class="border border-danger rounded p-2 bg-body-secondary">
+        <p class="small mb-2 text-danger fw-semibold">
+            <i class="bi bi-clock-history me-1"></i>
+            Cotización vencida sin respuesta
+        </p>
+        <button type="button" class="btn btn-danger w-100"
+                data-bs-toggle="modal" data-bs-target="#solicitarRecotizacionModal">
+            <i class="bi bi-arrow-repeat me-2"></i>Solicitar Recotización
+        </button>
+        <p class="small text-muted mb-0 mt-2">
+            Compras confirmará disponibilidad y costos actualizados.
+        </p>
+    </div>
+    {% endif %}
+
     {% if solicitud.estado == 'borrador' %}
     <a href="{% url 'almacen:editar_solicitud_cotizacion' solicitud.pk %}" class="btn btn-outline-primary">
         <i class="bi bi-pencil me-2"></i>Editar Solicitud
@@ -57,6 +74,14 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     <a href="{% url 'almacen:descargar_pdf_cotizacion_final' solicitud.pk %}" class="btn btn-outline-primary w-100" target="_blank">
         <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF Final
     </a>
+    {% endif %}
+
+    {% if solicitud.rondas.exists %}
+    {# Solo aparece si ya hubo al menos una recotización: muestra los costos viejos #}
+    <button type="button" class="btn btn-outline-secondary w-100"
+            data-bs-toggle="modal" data-bs-target="#historialRondasModal">
+        <i class="bi bi-clock-history me-2"></i>Historial de rondas
+    </button>
     {% endif %}
 
     {% if solicitud.estado == 'totalmente_rechazada' and solicitud.orden_servicio_id and admite_motivo_rechazo_st %}

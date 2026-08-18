@@ -11,6 +11,12 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             <h1 class="h3 mb-1">
                 <i class="bi bi-file-earmark-text me-2"></i>{{ solicitud.numero_solicitud }}
                 <span class="badge bg-{{ solicitud.get_badge_estado }} ms-1">{{ solicitud.get_estado_display }}</span>
+                {% if solicitud.ronda_cotizacion > 1 %}
+                {# Solo se muestra si hubo al menos una recotización #}
+                <span class="badge vigencia-badge-ronda ms-1" title="Número de veces que se ha cotizado">
+                    <i class="bi bi-arrow-repeat"></i> Ronda {{ solicitud.ronda_cotizacion }}
+                </span>
+                {% endif %}
             </h1>
             <p class="text-muted mb-0 small">
                 Creada el {{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}
@@ -23,6 +29,25 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                 <span class="detalle-chip chip-warning"><i class="bi bi-hourglass"></i>{{ solicitud.items_pendientes_respuesta }} pendientes</span>
                 {% if solicitud.precio_total_sin_iva_cliente %}
                 <span class="detalle-chip chip-primary"><i class="bi bi-currency-dollar"></i>${{ solicitud.precio_total_sin_iva_cliente|floatformat:2 }} cliente</span>
+                {% endif %}
+                {% if vigencia_aplica %}
+                {# Chip de vigencia: rojo si venció, ámbar si queda 1 día o menos, verde si hay margen #}
+                {% if vigencia_vencida %}
+                <span class="detalle-chip chip-vigencia-vencida"
+                      title="Venció el {{ solicitud.fecha_vencimiento_vigencia|date:'d/m/Y' }}">
+                    <i class="bi bi-clock-history"></i>Vigencia vencida
+                </span>
+                {% elif vigencia_dias_restantes <= 1 %}
+                <span class="detalle-chip chip-warning"
+                      title="Vence el {{ solicitud.fecha_vencimiento_vigencia|date:'d/m/Y' }}">
+                    <i class="bi bi-clock"></i>Vence en {{ vigencia_dias_restantes }} día hábil
+                </span>
+                {% else %}
+                <span class="detalle-chip chip-vigencia-activa"
+                      title="Vence el {{ solicitud.fecha_vencimiento_vigencia|date:'d/m/Y' }}">
+                    <i class="bi bi-clock"></i>Vence en {{ vigencia_dias_restantes }} días hábiles
+                </span>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -58,6 +83,26 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
         <i class="bi bi-slash-circle me-2"></i>
         <strong>Cotización cancelada.</strong>
         Esta solicitud ya no admite cambios ni reenvíos al cliente.
+    </div>
+    {% endif %}
+
+    {% if vigencia_vencida %}
+    {# EXPLICACIÓN: aviso del bloqueo duro. Los botones de aprobar ya están ocultos, pero el usuario necesita saber POR QUÉ y qué hacer ahora. #}
+    <div class="alert alert-danger border mt-3 mb-0" role="alert">
+        <i class="bi bi-clock-history me-2"></i>
+        <strong>Vigencia vencida el {{ solicitud.fecha_vencimiento_vigencia|date:"d/m/Y" }}.</strong>
+        {{ vigencia_mensaje_bloqueo }}
+        {% if puede_recotizar %}
+        <span class="d-block small mt-2">
+            Usa <strong>Acciones → Solicitar Recotización</strong> si el cliente
+            desea continuar, o registra el rechazo si ya no le interesa.
+        </span>
+        {% else %}
+        <span class="d-block small mt-2">
+            Como el cliente ya respondió alguna pieza o servicio, esta cotización
+            no puede recotizarse. Cierra el caso o crea una solicitud nueva.
+        </span>
+        {% endif %}
     </div>
     {% endif %}
 

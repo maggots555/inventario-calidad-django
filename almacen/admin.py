@@ -39,6 +39,7 @@ from .models import (
     ConfiguracionProfitPerfil,
     ConfiguracionRangoProfitMinimo,
     ConfiguracionReacondicionado,
+    RondaCotizacion,
 )
 
 from config.constants import (
@@ -1686,3 +1687,56 @@ class LineaServicioAdicionalAdmin(admin.ModelAdmin):
     def solicitud_display(self, obj):
         """Muestra el número de solicitud"""
         return obj.solicitud.numero_solicitud
+
+# ============================================================================
+# HISTORIAL DE RONDAS DE COTIZACIÓN (RECOTIZACIÓN)
+# ============================================================================
+
+@admin.register(RondaCotizacion)
+class RondaCotizacionAdmin(admin.ModelAdmin):
+    """
+    Consulta del histórico de rondas de cotización.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Estas filas son una "foto" de precios ya cerrados: sirven para auditar
+    cuánto cambió el costo entre una ronda y la siguiente. Por eso el admin
+    es de SOLO LECTURA — editar un snapshot falsearía el histórico.
+    """
+
+    list_display = (
+        'solicitud',
+        'numero_ronda',
+        'motivo_cierre',
+        'fecha_vencimiento',
+        'costo_total_snapshot',
+        'precio_cliente_total_snapshot',
+        'fecha_cierre',
+    )
+    list_filter = ('motivo_cierre', 'numero_ronda', 'fecha_cierre')
+    search_fields = ('solicitud__numero_solicitud',)
+    date_hierarchy = 'fecha_cierre'
+    ordering = ('-fecha_cierre',)
+
+    # Todos los campos en solo lectura: el snapshot no se toca a mano
+    readonly_fields = (
+        'solicitud',
+        'numero_ronda',
+        'fecha_inicio_vigencia',
+        'fecha_vencimiento',
+        'fecha_cierre',
+        'motivo_cierre',
+        'snapshot_lineas',
+        'snapshot_servicios',
+        'costo_total_snapshot',
+        'precio_cliente_total_snapshot',
+        'creada_por',
+        'observaciones',
+    )
+
+    def has_add_permission(self, request):
+        """Las rondas solo nacen desde el flujo de recotización, no a mano."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """Borrar un snapshot rompería la trazabilidad de precios."""
+        return False

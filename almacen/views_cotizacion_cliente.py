@@ -897,6 +897,21 @@ def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
                         'almacen:detalle_solicitud_cotizacion',
                         pk=solicitud_pk,
                     )
+
+                # BLOQUEO DURO POR VIGENCIA:
+                # Si pasaron los 5 días hábiles, el costo del proveedor ya no
+                # es confiable. Validamos aquí (servidor) y no solo ocultando
+                # el botón, porque cualquiera podría enviar el POST a mano.
+                from almacen.utils.vigencia_cotizacion import (
+                    esta_vencida,
+                    motivo_bloqueo_aprobacion,
+                )
+                if esta_vencida(solicitud):
+                    messages.error(request, motivo_bloqueo_aprobacion(solicitud))
+                    return redirect(
+                        'almacen:detalle_solicitud_cotizacion',
+                        pk=solicitud_pk,
+                    )
             
             if decision == 'aprobar':
                 if linea.es_linea_reacondicionado:
@@ -971,6 +986,16 @@ def aprobar_todas_lineas(request, pk):
                 'Tras el aviso PNC al cliente, primero envía una cotización '
                 'o propuesta reacondicionado (REAC) antes de aprobar líneas.',
             )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+        # BLOQUEO DURO POR VIGENCIA: aprobar en masa con precios vencidos
+        # sería el error más caro de todos (se compran todas las piezas).
+        from almacen.utils.vigencia_cotizacion import (
+            esta_vencida,
+            motivo_bloqueo_aprobacion,
+        )
+        if esta_vencida(solicitud):
+            messages.error(request, motivo_bloqueo_aprobacion(solicitud))
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
         # EXPLICACIÓN PARA PRINCIPIANTES:

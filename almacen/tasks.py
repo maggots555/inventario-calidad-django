@@ -1443,3 +1443,11 @@ from almacen.tasks_solicitud_baja import (  # noqa: E402, F401
     notificar_almacenista_solicitud_baja_task,
     notificar_solicitud_baja_procesada_task,
 )
+
+# Mismo motivo: las tareas de vigencia y recotización viven en su propio
+# archivo, pero el worker solo las ve si se importan aquí al final.
+from almacen.tasks_vigencia_cotizacion import (  # noqa: E402, F401
+    notificar_recotizacion_solicitada_task,
+    procesar_vigencias_pais_task,
+    verificar_vigencia_cotizaciones,
+)

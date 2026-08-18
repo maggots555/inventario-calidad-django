@@ -123,6 +123,140 @@ Muestra toda la información y acciones según el estado
     </div>
 </div>
 
+{% if puede_recotizar %}
+{# Modal: confirmar la apertura de una ronda nueva de cotización. Solo se renderiza cuando la vigencia venció y no hubo respuesta del cliente. #}
+<div class="modal fade" id="solicitarRecotizacionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" action="{% url 'almacen:iniciar_recotizacion_solicitud' solicitud.pk %}">
+                {% csrf_token %}
+
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-arrow-repeat me-2"></i>Solicitar Recotización
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                        La cotización <strong>{{ solicitud.numero_solicitud }}</strong> venció el
+                        <strong>{{ solicitud.fecha_vencimiento_vigencia|date:"d/m/Y" }}</strong>
+                        sin respuesta del cliente. Al continuar se abrirá la
+                        <strong>ronda {{ solicitud.ronda_cotizacion|add:1 }}</strong>.
+                    </p>
+
+                    <div class="alert alert-warning" role="alert">
+                        <strong><i class="bi bi-info-circle me-1"></i>Qué va a pasar:</strong>
+                        <ul class="mb-0 mt-2 small">
+                            <li>Los costos y precios actuales se guardan en el historial de rondas.</li>
+                            <li>La solicitud regresa a <strong>Borrador</strong> y se limpian los precios al cliente.</li>
+                            <li>Compras recibe un aviso para confirmar disponibilidad y capturar costos nuevos.</li>
+                            <li>El plazo de 5 días hábiles vuelve a arrancar cuando se notifique a Front.</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="observacionesRecotizacion">
+                            Nota para Compras <span class="text-muted">(opcional)</span>
+                        </label>
+                        <textarea name="observaciones" id="observacionesRecotizacion"
+                                  class="form-control" rows="3"
+                                  placeholder="Ej. El cliente llamó hoy y quiere continuar con la reparación."></textarea>
+                        <div class="form-text">
+                            Se incluye en el correo que recibe Compras y queda guardada en el historial de la ronda.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-arrow-repeat me-1"></i>Confirmar Recotización
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if solicitud.rondas.exists %}
+{# Modal: historial de rondas anteriores (comparativa de costos entre rondas) #}
+<div class="modal fade" id="historialRondasModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history me-2"></i>Historial de rondas de cotización
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">
+                    Cada ronda guarda los costos que estaban vigentes cuando se cotizó.
+                    Sirve para comparar cuánto cambió el precio del proveedor.
+                </p>
+
+                {% for ronda in solicitud.rondas.all %}
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><strong>Ronda {{ ronda.numero_ronda }}</strong></span>
+                        <span class="badge bg-secondary">{{ ronda.get_motivo_cierre_display }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row small mb-3">
+                            <div class="col-sm-6">
+                                <span class="text-muted">Vigencia:</span>
+                                {{ ronda.fecha_inicio_vigencia|date:"d/m/Y"|default:"—" }}
+                                al {{ ronda.fecha_vencimiento|date:"d/m/Y"|default:"—" }}
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted">Costo total proveedor:</span>
+                                <strong>${{ ronda.costo_total_snapshot|floatformat:2 }}</strong>
+                            </div>
+                        </div>
+
+                        {% if ronda.snapshot_lineas %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Pieza</th>
+                                        <th>Proveedor</th>
+                                        <th class="text-end">Cant.</th>
+                                        <th class="text-end">Costo unit.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for linea in ronda.snapshot_lineas %}
+                                    <tr>
+                                        <td>{{ linea.descripcion_pieza }}</td>
+                                        <td>{{ linea.proveedor|default:"—" }}</td>
+                                        <td class="text-end">{{ linea.cantidad }}</td>
+                                        <td class="text-end">${{ linea.costo_unitario|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+
+                        {% if ronda.observaciones %}
+                        <p class="small text-muted mt-2 mb-0">
+                            <i class="bi bi-chat-left-text me-1"></i>{{ ronda.observaciones }}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if solicitud.estado == 'totalmente_rechazada' and solicitud.orden_servicio_id and admite_motivo_rechazo_st %}
 {# Modal catálogo ST: registrar o ver/editar lo ya guardado (no aplica a FL-) #}
 <div class="modal fade" id="registrarMotivoRechazoStModal" tabindex="-1"

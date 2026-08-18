@@ -843,8 +843,31 @@ def detalle_solicitud_cotizacion(request, pk):
         solicitud,
         tiene_items_cotizables=context['tiene_items_cotizables'],
     )
-    # EXPLICACIÓN: tras aviso PNC, ocultar botones de aprobar hasta cotización/REAC
-    context['permite_aprobar_lineas'] = solicitud_permite_aprobar_lineas(solicitud)
+    # ========== VIGENCIA DE LA COTIZACIÓN (5 días hábiles) ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Aquí calculamos una sola vez todo lo que la plantilla necesita saber
+    # sobre el plazo, en lugar de que el HTML llame varias veces al modelo.
+    from .utils.vigencia_cotizacion import (
+        dias_habiles_restantes,
+        esta_vencida,
+        motivo_bloqueo_aprobacion,
+        puede_recotizar,
+        vigencia_aplica,
+    )
+
+    vigencia_vencida = esta_vencida(solicitud)
+    context['vigencia_aplica'] = vigencia_aplica(solicitud)
+    context['vigencia_vencida'] = vigencia_vencida
+    context['vigencia_dias_restantes'] = dias_habiles_restantes(solicitud)
+    context['vigencia_mensaje_bloqueo'] = motivo_bloqueo_aprobacion(solicitud)
+    context['puede_recotizar'] = puede_recotizar(solicitud)
+
+    # EXPLICACIÓN: tras aviso PNC, ocultar botones de aprobar hasta cotización/REAC.
+    # Se combina con la vigencia: si venció, tampoco se puede aprobar (bloqueo duro).
+    context['permite_aprobar_lineas'] = (
+        solicitud_permite_aprobar_lineas(solicitud)
+        and not vigencia_vencida
+    )
     # EXPLICACIÓN: misma fuente de verdad que notificar_cliente_pnc (métodos modelo)
     context['mostrar_notificar_cliente_pnc'] = solicitud.puede_notificar_cliente_pnc()
     context['mostrar_reenviar_aviso_pnc'] = solicitud.puede_reenviar_aviso_pnc()
@@ -992,6 +1015,19 @@ def responder_servicio_adicional(request, solicitud_pk, servicio_pk):
                     'almacen:detalle_solicitud_cotizacion',
                     pk=solicitud_pk,
                 )
+
+            # BLOQUEO DURO POR VIGENCIA: los servicios se cotizan junto con
+            # las piezas, así que caducan al mismo tiempo que la cotización.
+            from almacen.utils.vigencia_cotizacion import (
+                esta_vencida,
+                motivo_bloqueo_aprobacion,
+            )
+            if esta_vencida(solicitud):
+                messages.error(request, motivo_bloqueo_aprobacion(solicitud))
+                return redirect(
+                    'almacen:detalle_solicitud_cotizacion',
+                    pk=solicitud_pk,
+                )
         
         if decision == 'aprobar':
             if servicio.aprobar():
@@ -1037,6 +1073,15 @@ def aprobar_todos_servicios(request, pk):
                 'Tras el aviso PNC al cliente, primero envía una cotización '
                 'o propuesta reacondicionado (REAC) antes de aprobar servicios.',
             )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+        # BLOQUEO DURO POR VIGENCIA (mismo criterio que aprobar_todas_lineas)
+        from almacen.utils.vigencia_cotizacion import (
+            esta_vencida,
+            motivo_bloqueo_aprobacion,
+        )
+        if esta_vencida(solicitud):
+            messages.error(request, motivo_bloqueo_aprobacion(solicitud))
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
         servicios_pendientes = solicitud.servicios_adicionales.filter(estado_cliente='pendiente')

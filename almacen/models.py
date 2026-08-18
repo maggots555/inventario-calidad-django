@@ -2965,7 +2965,37 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Fecha Completada',
         help_text='Cuándo se generaron todas las compras'
     )
-    
+
+    # ========== VIGENCIA Y RONDAS DE COTIZACIÓN ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Una cotización solo vale 5 días hábiles. Pasado ese plazo los precios de
+    # proveedor pueden haber cambiado (o la pieza ya no existe), así que hay que
+    # volver a pedir costos a Compras. A ese "volver a empezar" le llamamos
+    # RECOTIZACIÓN, y cada intento es una RONDA numerada (v1, v2, v3...).
+    ronda_cotizacion = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name='Ronda de Cotización',
+        help_text='Número de veces que se ha cotizado (1 = primera cotización)'
+    )
+    fecha_inicio_vigencia = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Inicio de Vigencia',
+        help_text='Cuándo arrancó el reloj de los 5 días hábiles (al notificar a Front)'
+    )
+    fecha_vencimiento_vigencia = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Vence la Vigencia',
+        help_text='Fecha límite calculada (inicio + 5 días hábiles)'
+    )
+    aviso_vencimiento_enviado = models.BooleanField(
+        default=False,
+        verbose_name='Aviso de Vencimiento Enviado',
+        help_text='Evita que la tarea diaria avise dos veces por la misma ronda'
+    )
+
     # ========== OBSERVACIONES ==========
     observaciones = models.TextField(
         blank=True,
@@ -3545,7 +3575,50 @@ class SolicitudCotizacion(models.Model):
         """
         from almacen.utils.cotizacion_precios_cliente import persistir_precios_cliente_solicitud
         return persistir_precios_cliente_solicitud(self)
-    
+
+    # ========== FACHADAS DE VIGENCIA (el cerebro vive en utils/) ==========
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Estas son "fachadas": métodos de 2-3 líneas que solo reenvían la pregunta
+    # al módulo de utilidades. Existen para que los templates puedan escribir
+    # {% if solicitud.esta_vencida %} sin que la lógica viva en este archivo.
+
+    def iniciar_vigencia_cotizacion(self, guardar=True):
+        """
+        Arranca el plazo de 5 días hábiles para responder la cotización.
+
+        Args:
+            guardar (bool): Si False, no persiste (quien llama hará save()).
+
+        Returns:
+            datetime: Fecha de vencimiento calculada.
+        """
+        from almacen.utils.vigencia_cotizacion import iniciar_vigencia
+        return iniciar_vigencia(self, guardar=guardar)
+
+    @property
+    def esta_vencida(self):
+        """True si pasaron los 5 días hábiles sin respuesta del cliente."""
+        from almacen.utils.vigencia_cotizacion import esta_vencida
+        return esta_vencida(self)
+
+    @property
+    def vigencia_activa(self):
+        """True si el reloj de los 5 días hábiles está corriendo ahora mismo."""
+        from almacen.utils.vigencia_cotizacion import vigencia_aplica
+        return vigencia_aplica(self)
+
+    @property
+    def dias_habiles_restantes(self):
+        """Días hábiles que le quedan al cliente (None si no aplica vigencia)."""
+        from almacen.utils.vigencia_cotizacion import dias_habiles_restantes
+        return dias_habiles_restantes(self)
+
+    @property
+    def puede_recotizar(self):
+        """True si se puede abrir una ronda nueva (venció y sin respuesta)."""
+        from almacen.utils.vigencia_cotizacion import puede_recotizar
+        return puede_recotizar(self)
+
     # ========== PROPIEDADES DE SERVICIOS ADICIONALES ==========
     
     @property
@@ -3722,6 +3795,11 @@ class SolicitudCotizacion(models.Model):
         
         self.estado = 'enviada_front'
         self.fecha_envio_cliente = timezone.now()
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Aquí arranca el reloj de los 5 días hábiles de vigencia. Pasamos
+        # guardar=False porque el save() de abajo ya persiste todo junto
+        # (una sola escritura a la base de datos en lugar de dos).
+        self.iniciar_vigencia_cotizacion(guardar=False)
         self.save()
         return True
     
@@ -6424,3 +6502,17 @@ class ConfiguracionReacondicionado(models.Model):
             'pct_comision_6m': float(self.pct_comision_6m),
             'pct_comision_12m': float(self.pct_comision_12m),
         }
+
+
+# ============================================================================
+# REGISTRO DE MODELOS EN ARCHIVOS HERMANOS
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Django solo autodescubre el módulo `models` de cada app. Si creamos un modelo
+# en otro archivo (para no seguir engordando este, que ya pasa de 6,400 líneas)
+# hay que importarlo AQUÍ AL FINAL para que Django lo registre y genere su
+# migración. Es el mismo patrón de fachada que usa `tasks.py` con Celery.
+#
+# Va al final —y no arriba— porque el archivo hermano hace referencia a
+# modelos definidos en este archivo; importarlo antes causaría un ciclo.
+from almacen.models_recotizacion import RondaCotizacion  # noqa: E402, F401

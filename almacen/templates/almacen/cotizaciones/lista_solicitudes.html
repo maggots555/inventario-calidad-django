@@ -176,6 +176,7 @@ Muestra todas las solicitudes con filtros y contadores por estado
                             <th class="text-center">Líneas</th>
                             <th class="text-end">Total</th>
                             <th>Estado</th>
+                            <th>Vigencia</th>
                             <th>Creado por</th>
                             <th>Fecha</th>
                             <th class="text-end">Acciones</th>
@@ -227,6 +228,28 @@ Muestra todas las solicitudes con filtros y contadores por estado
                                 <span class="badge bg-{{ solicitud.get_badge_estado }}">
                                     {{ solicitud.get_estado_display }}
                                 </span>
+                                {% if solicitud.ronda_cotizacion > 1 %}
+                                {# Bootstrap estándar: esta pantalla no carga detalle_solicitud.css #}
+                                <span class="badge bg-secondary" title="Se ha recotizado">
+                                    <i class="bi bi-arrow-repeat"></i> R{{ solicitud.ronda_cotizacion }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {# EXPLICACIÓN: solo las cotizaciones que esperan respuesta del cliente tienen reloj corriendo; el resto muestran "—" #}
+                                {% if solicitud.esta_vencida %}
+                                <span class="badge bg-danger"
+                                      title="Venció el {{ solicitud.fecha_vencimiento_vigencia|date:'d/m/Y' }}">
+                                    <i class="bi bi-clock-history"></i> Vencida
+                                </span>
+                                {% elif solicitud.vigencia_activa %}
+                                <span class="badge {% if solicitud.dias_habiles_restantes <= 1 %}bg-warning text-dark{% else %}bg-success{% endif %}"
+                                      title="Vence el {{ solicitud.fecha_vencimiento_vigencia|date:'d/m/Y' }}">
+                                    <i class="bi bi-clock"></i> {{ solicitud.dias_habiles_restantes }} día(s)
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if solicitud.creado_por %}
