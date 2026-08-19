@@ -9,16 +9,18 @@ revisan el HTML para comprobar:
 
 1) Cada estado cae en su pestaña.
 2) Un borrador no se lista.
-3) La pestaña Front es la activa al abrir.
+3) La pestaña Front es la activa al abrir; ?tab=cliente activa Cliente.
 4) En Front y en Cliente, con orden se ve el responsable de seguimiento;
    sin orden activa se ve quien creó la solicitud.
 5) La alerta de días usa la vigencia de 5 días hábiles (no 3 calendario):
    vencida pinta «Venció»; por vencer (1 día hábil o menos) pinta «Por vencer».
+6) ?alerta=vencida recorta la tabla pero los KPIs siguen mostrando el total.
 
 RequestFactory (no Client HTTP) evita el middleware multi-país
 (conflicto default vs mexico en tests con dos BD).
 """
 
+import re
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -132,18 +134,42 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
             estado='borrador',
         )
 
-    def _get_panel(self):
+    def _get_panel(self, query=None):
         """
         Ejecuta GET de panel_cotizaciones y devuelve la respuesta HTML.
+
+        Args:
+            query: dict opcional de querystring (ej. ``{'tab': 'cliente'}``).
 
         Returns:
             HttpResponse de la vista (template real, no mockeado).
         """
-        request = self.factory.get(self.url)
+        request = self.factory.get(self.url, query or {})
         request.user = self.user
         request.session = SessionStore()
         request._messages = FallbackStorage(request)
         return panel_cotizaciones(request)
+
+    def _kpi_valor(self, html: str, kpi: str) -> str:
+        """
+        Lee el número pintado en un KPI por el atributo data-kpi.
+
+        Args:
+            html: Cuerpo HTML de la respuesta.
+            kpi: Valor de data-kpi (ej. ``'vencidas'``).
+
+        Returns:
+            Texto del span.panel-cot-kpi-value de esa tarjeta.
+        """
+        # EXPLICACIÓN: el HTML del KPI tiene saltos de línea; [\s\S]*? cruza
+        # líneas hasta el primer valor, que es el de ESA tarjeta.
+        patron = (
+            rf'data-kpi="{kpi}"[\s\S]*?'
+            r'<span class="panel-cot-kpi-value">([^<]+)</span>'
+        )
+        match = re.search(patron, html)
+        self.assertIsNotNone(match, f'No se encontró el KPI {kpi} en el HTML')
+        return match.group(1).strip()
 
     def _html_por_pestana(self, html: str) -> tuple[str, str]:
         """
@@ -194,8 +220,8 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertNotIn(self.sol_borrador.numero_solicitud, html_cliente)
 
         # Dos en Front (con orden + sin orden) y una ya compartida al cliente
-        self.assertIn('2 en Front', html)
-        self.assertIn('1 con el cliente', html)
+        self.assertEqual(self._kpi_valor(html, 'front'), '2')
+        self.assertEqual(self._kpi_valor(html, 'cliente'), '1')
         self.assertIn(self.sol_sin_orden.numero_solicitud, html_front)
         # Sin fechas de vigencia no debe pintarse la alerta de vencida
         self.assertNotIn('Venció', html_front)
@@ -248,9 +274,8 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('Venció', html_cliente)
         self.assertIn(self.sol_cliente.numero_solicitud, html_cliente)
         # KPI de vencidas (el de «por vencer» no debe contar esta)
-        self.assertIn('>Vencidas</h6>', html.replace('\n', ''))
-        self.assertRegex(html, r'Vencidas</h6>\s*<h2 class="mb-0">1</h2>')
-        self.assertRegex(html, r'Por vencer</h6>\s*<h2 class="mb-0">0</h2>')
+        self.assertEqual(self._kpi_valor(html, 'vencidas'), '1')
+        self.assertEqual(self._kpi_valor(html, 'por-vencer'), '0')
 
     def test_vigencia_por_vencer_no_cuenta_como_vencida(self) -> None:
         """
@@ -271,5 +296,67 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn('Por vencer', html_front)
         self.assertNotIn('Venció', html_front)
-        self.assertRegex(html, r'Por vencer</h6>\s*<h2 class="mb-0">1</h2>')
-        self.assertRegex(html, r'Vencidas</h6>\s*<h2 class="mb-0">0</h2>')
+        self.assertEqual(self._kpi_valor(html, 'por-vencer'), '1')
+        self.assertEqual(self._kpi_valor(html, 'vencidas'), '0')
+
+    def test_tab_cliente_en_url_activa_esa_pestana(self) -> None:
+        """
+        Caso feliz: ?tab=cliente pinta esa pestaña activa sin JavaScript.
+
+        EXPLICACIÓN: las pestañas son enlaces con querystring, no botones
+        Bootstrap. Así se puede recargar o compartir «ya compartidas».
+        """
+        respuesta = self._get_panel({'tab': 'cliente'})
+        html = respuesta.content.decode()
+        html_front, html_cliente = self._html_por_pestana(html)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(
+            'class="tab-pane fade show active" id="tab-compartidas-cliente"',
+            html,
+        )
+        self.assertIn(
+            'class="tab-pane fade" id="tab-enviadas-front"',
+            html,
+        )
+        self.assertRegex(
+            html,
+            r'id="tab-compartidas-cliente-btn"[^>]*aria-selected="true"',
+        )
+        # Las filas siguen en su pestaña; solo cambia cuál se muestra.
+        self.assertIn(self.sol_cliente.numero_solicitud, html_cliente)
+        self.assertIn(self.sol_front.numero_solicitud, html_front)
+
+    def test_alerta_vencida_filtra_tabla_y_kpi_sigue_total(self) -> None:
+        """
+        Borde: ?alerta=vencida oculta las que no vencieron; el KPI no baja.
+
+        EXPLICACIÓN: el número grande del KPI es el total global. Si
+        filtráramos también el KPI, parecería que «desaparecieron» al
+        hacer clic. La tabla sí se recorta para trabajar solo esas.
+        """
+        self.sol_cliente.fecha_inicio_vigencia = timezone.now() - timedelta(days=10)
+        self.sol_cliente.fecha_vencimiento_vigencia = timezone.now() - timedelta(days=1)
+        self.sol_cliente.save(update_fields=[
+            'fecha_inicio_vigencia',
+            'fecha_vencimiento_vigencia',
+        ])
+
+        respuesta = self._get_panel({'alerta': 'vencida'})
+        html = respuesta.content.decode()
+        html_front, html_cliente = self._html_por_pestana(html)
+
+        self.assertEqual(respuesta.status_code, 200)
+        # KPI global: 1 vencida, aunque la tabla de Front quede vacía.
+        self.assertEqual(self._kpi_valor(html, 'vencidas'), '1')
+        # Totales de pestaña no bajan aunque la tabla de Front quede vacía
+        self.assertEqual(self._kpi_valor(html, 'front'), '2')
+        self.assertEqual(self._kpi_valor(html, 'cliente'), '1')
+        self.assertIn(self.sol_cliente.numero_solicitud, html_cliente)
+        self.assertNotIn(self.sol_front.numero_solicitud, html_front)
+        self.assertNotIn(self.sol_sin_orden.numero_solicitud, html_front)
+        self.assertIn('No hay cotizaciones vencidas en esta pestaña.', html_front)
+        self.assertIn('data-kpi="vencidas"', html)
+        self.assertIn('is-active', html)
+        # El chip de filtro y el href del KPI conservan alerta=vencida.
+        self.assertIn('alerta=vencida', html)

@@ -6,16 +6,14 @@ Panel de Cotizaciones (Sistema SolicitudCotizacion)
 Dashboard de solicitudes pendientes, separadas en pestañas:
 enviadas a Front (recepción) vs ya compartidas al cliente.
 
-NOTA: Este panel ahora usa el nuevo sistema de SolicitudCotizacion que permite
-múltiples proveedores por cotización, en lugar del antiguo sistema de CompraProducto.
+EXPLICACIÓN PARA PRINCIPIANTES:
+Las pestañas y los filtros de alerta viven en la URL (?tab=cliente&alerta=vencida)
+para poder recargar, compartir el enlace y usar Cmd+clic. Los KPIs «En Front» y
+«Con el cliente» cambian de pestaña; «Por vencer» y «Vencidas» recortan la tabla.
 {% endcomment %}
 
 {% block title %}Panel de Cotizaciones - Almacén{% endblock %}
 
-{% comment %}
-  CSS propio del panel: arregla filas .table-warning / .table-danger y thead.table-light en dark mode.
-  Ver static/css/panel_cotizaciones.css (comentarios EXPLICACIÓN PARA PRINCIPIANTES).
-{% endcomment %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/panel_cotizaciones.css' %}">
 {% endblock extra_css %}
@@ -23,186 +21,149 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
 {% block almacen_content %}
 {# Wrapper .panel-cotizaciones-page: acota los selectores CSS al panel (no a otras tablas) #}
 <div class="container-fluid py-4 panel-cotizaciones-page">
-    <!-- Encabezado -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h2 mb-0">
-                <i class="bi bi-clipboard-check me-2 text-warning"></i>Panel de Cotizaciones
+    {% url 'almacen:panel_cotizaciones' as panel_url %}
+
+    {# --- Encabezado (misma familia visual que lista de solicitudes) --- #}
+    <div class="panel-cot-header">
+        <div class="panel-cot-header-title">
+            <h1>
+                <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+                Panel de Cotizaciones
             </h1>
-            <p class="text-muted mb-0">Gestión de cotizaciones: enviadas a Front y compartidas al cliente</p>
+            <p class="panel-cot-header-subtitle">
+                Torre de control: lo que sigue en Front y lo que ya espera respuesta del cliente
+            </p>
+            <span class="panel-cot-total-chip">
+                <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                {{ total_pendientes }} pendiente{{ total_pendientes|pluralize }}
+            </span>
         </div>
-        <div>
-            <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="btn btn-outline-secondary me-2">
-                <i class="bi bi-list me-1"></i>Ver Todas
+        <div class="panel-cot-header-actions">
+            <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-list me-1" aria-hidden="true"></i>Ver Todas
+            </a>
+            <a href="{% url 'almacen:lista_compras' %}?estado=pendiente_llegada" class="btn btn-outline-secondary">
+                <i class="bi bi-truck me-1" aria-hidden="true"></i>Compras pendientes
             </a>
             <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>Nueva Cotización
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Nueva Cotización
             </a>
         </div>
     </div>
 
-    <!-- KPIs: 5 tarjetas. En móvil 2 por fila (col-6); en xl caben las cinco. -->
-    <div class="row g-4 mb-4">
-        <div class="col-6 col-xl">
-            <div class="card bg-warning bg-opacity-10 border-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="text-warning text-uppercase small mb-1">Pendientes</h6>
-                            <h2 class="mb-0">{{ total_pendientes }}</h2>
-                        </div>
-                        <i class="bi bi-hourglass-split text-warning fs-1 opacity-50"></i>
-                    </div>
-                    <small class="text-muted">{{ total_front }} en Front · {{ total_cliente }} con el cliente</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-xl">
-            <div class="card bg-secondary bg-opacity-10 border-secondary h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="text-secondary text-uppercase small mb-1">En Borrador</h6>
-                            <h2 class="mb-0">{{ cotizaciones_borrador }}</h2>
-                        </div>
-                        <i class="bi bi-pencil text-secondary fs-1 opacity-50"></i>
-                    </div>
-                    <small class="text-muted">Pendientes de envío</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-xl">
-            <div class="card bg-warning bg-opacity-10 border-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="text-warning text-uppercase small mb-1">Por vencer</h6>
-                            <h2 class="mb-0">{{ cotizaciones_por_vencer }}</h2>
-                        </div>
-                        <i class="bi bi-clock text-warning fs-1 opacity-50"></i>
-                    </div>
-                    <small class="text-muted">1 día hábil o menos</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-xl">
-            <div class="card bg-danger bg-opacity-10 border-danger h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="text-danger text-uppercase small mb-1">Vencidas</h6>
-                            <h2 class="mb-0">{{ cotizaciones_vencidas }}</h2>
-                        </div>
-                        <i class="bi bi-exclamation-triangle text-danger fs-1 opacity-50"></i>
-                    </div>
-                    <small class="text-muted">Pasaron 5 días hábiles</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-xl">
-            <div class="card bg-success bg-opacity-10 border-success h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="text-success text-uppercase small mb-1">Tasa Aprobación</h6>
-                            <h2 class="mb-0">{{ estadisticas.tasa_aprobacion }}%</h2>
-                        </div>
-                        <i class="bi bi-graph-up text-success fs-1 opacity-50"></i>
-                    </div>
-                    <small class="text-muted">Este mes</small>
-                </div>
-            </div>
+    {# --- KPIs: Front/Cliente/urgencia son enlaces; la tasa es métrica --- #}
+    <div class="panel-cot-kpi-grid" role="navigation" aria-label="Resumen y filtros del panel">
+
+        {# En Front: abre esa pestaña y quita el filtro de alerta #}
+        <a href="{{ panel_url }}?tab=front"
+           class="panel-cot-kpi panel-cot-kpi--front{% if tab_activa == 'front' and not alerta_filtro %} is-active{% endif %}"
+           data-kpi="front"
+           {% if tab_activa == 'front' and not alerta_filtro %}aria-current="page"{% endif %}
+           title="Ver cotizaciones enviadas a Front">
+            <div class="panel-cot-kpi-icon" aria-hidden="true"><i class="bi bi-person-badge"></i></div>
+            <span class="panel-cot-kpi-label">En Front</span>
+            <span class="panel-cot-kpi-value">{{ total_front }}</span>
+            <small class="panel-cot-kpi-sub">Esperan que Recepción las comparta</small>
+        </a>
+
+        <a href="{{ panel_url }}?tab=cliente"
+           class="panel-cot-kpi panel-cot-kpi--cliente{% if tab_activa == 'cliente' and not alerta_filtro %} is-active{% endif %}"
+           data-kpi="cliente"
+           {% if tab_activa == 'cliente' and not alerta_filtro %}aria-current="page"{% endif %}
+           title="Ver cotizaciones ya compartidas al cliente">
+            <div class="panel-cot-kpi-icon" aria-hidden="true"><i class="bi bi-people"></i></div>
+            <span class="panel-cot-kpi-label">Con el cliente</span>
+            <span class="panel-cot-kpi-value">{{ total_cliente }}</span>
+            <small class="panel-cot-kpi-sub">Esperan respuesta</small>
+        </a>
+
+        <a href="{{ panel_url }}?alerta=urgente{% if tab_activa == 'cliente' %}&amp;tab=cliente{% endif %}"
+           class="panel-cot-kpi panel-cot-kpi--urgente{% if alerta_filtro == 'urgente' %} is-active{% endif %}"
+           data-kpi="por-vencer"
+           {% if alerta_filtro == 'urgente' %}aria-current="page"{% endif %}
+           title="Mostrar solo cotizaciones con 1 día hábil o menos">
+            <div class="panel-cot-kpi-icon" aria-hidden="true"><i class="bi bi-clock"></i></div>
+            <span class="panel-cot-kpi-label">Por vencer</span>
+            <span class="panel-cot-kpi-value">{{ cotizaciones_por_vencer }}</span>
+            <small class="panel-cot-kpi-sub">1 día hábil o menos</small>
+        </a>
+
+        <a href="{{ panel_url }}?alerta=vencida{% if tab_activa == 'cliente' %}&amp;tab=cliente{% endif %}"
+           class="panel-cot-kpi panel-cot-kpi--vencidas{% if alerta_filtro == 'vencida' %} is-active{% endif %}"
+           data-kpi="vencidas"
+           {% if alerta_filtro == 'vencida' %}aria-current="page"{% endif %}
+           title="Mostrar solo cotizaciones que ya pasaron los 5 días hábiles">
+            <div class="panel-cot-kpi-icon" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></div>
+            <span class="panel-cot-kpi-label">Vencidas</span>
+            <span class="panel-cot-kpi-value">{{ cotizaciones_vencidas }}</span>
+            <small class="panel-cot-kpi-sub">Pasaron 5 días hábiles</small>
+        </a>
+
+        {# Tasa: no es filtro. El desglose del mes reemplaza la card de estadísticas #}
+        <div class="panel-cot-kpi panel-cot-kpi--tasa panel-cot-kpi--static" data-kpi="tasa">
+            <div class="panel-cot-kpi-icon" aria-hidden="true"><i class="bi bi-graph-up"></i></div>
+            <span class="panel-cot-kpi-label">Tasa Aprobación</span>
+            <span class="panel-cot-kpi-value">{{ estadisticas.tasa_aprobacion }}%</span>
+            <small class="panel-cot-kpi-sub">
+                {{ estadisticas.aprobadas_mes }} aprob. · {{ estadisticas.rechazadas_mes }} rech. de {{ estadisticas.total_mes }}
+            </small>
         </div>
     </div>
 
-    <!-- Lista por estatus: Front (activa al abrir) vs ya compartidas al cliente -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-warning bg-opacity-10">
-            <h5 class="mb-0">
-                <i class="bi bi-send me-2"></i>Cotizaciones pendientes
-            </h5>
+    {# --- Lista por estatus: Front (default) vs ya compartidas al cliente --- #}
+    <div class="panel-cot-tabla-card">
+        <div class="panel-cot-tabla-header">
+            <h2>
+                <i class="bi bi-send me-2" aria-hidden="true"></i>Cotizaciones pendientes
+            </h2>
+            {% if alerta_filtro %}
+            <a class="panel-cot-filtro-chip"
+               href="{{ panel_url }}{% if tab_activa == 'cliente' %}?tab=cliente{% endif %}"
+               title="Quitar filtro de {{ alerta_filtro_etiqueta }}">
+                <i class="bi bi-funnel-fill" aria-hidden="true"></i>
+                {{ alerta_filtro_etiqueta }}
+                <span class="panel-cot-filtro-chip-x" aria-hidden="true">&times;</span>
+                <span class="visually-hidden">Quitar filtro</span>
+            </a>
+            {% endif %}
         </div>
-        <div class="card-body p-0">
-            <ul class="nav nav-tabs panel-cot-tabs px-3 pt-2" id="panelCotizacionesTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="tab-enviadas-front-btn"
-                            data-bs-toggle="tab" data-bs-target="#tab-enviadas-front"
-                            type="button" role="tab" aria-controls="tab-enviadas-front"
-                            aria-selected="true">
-                        <i class="bi bi-person-badge me-1"></i>Enviadas a Front
-                        <span class="badge bg-info text-dark ms-1">{{ total_front }}</span>
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tab-compartidas-cliente-btn"
-                            data-bs-toggle="tab" data-bs-target="#tab-compartidas-cliente"
-                            type="button" role="tab" aria-controls="tab-compartidas-cliente"
-                            aria-selected="false">
-                        <i class="bi bi-people me-1"></i>Compartidas al cliente
-                        <span class="badge bg-primary ms-1">{{ total_cliente }}</span>
-                    </button>
-                </li>
-            </ul>
 
-            <div class="tab-content" id="panelCotizacionesTabContent">
-                {# Pestaña 1 (default): Compras ya liberó; Recepción aún no comparte al cliente #}
-                <div class="tab-pane fade show active" id="tab-enviadas-front" role="tabpanel"
-                     aria-labelledby="tab-enviadas-front-btn" tabindex="0">
-                    {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_front etiqueta_dias='Días en Front' empty_titulo='No hay cotizaciones enviadas a Front.' empty_detalle='Cuando Compras libere una solicitud, aparecerá aquí.' mostrar_responsable=True only %}
-                </div>
-                {# Pestaña 2: Recepción ya compartió; se espera respuesta del cliente #}
-                <div class="tab-pane fade" id="tab-compartidas-cliente" role="tabpanel"
-                     aria-labelledby="tab-compartidas-cliente-btn" tabindex="0">
-                    {# mostrar_responsable=True: misma columna que Front (seguimiento o creador) #}
-                    {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_cliente etiqueta_dias='Días sin resp.' empty_titulo='No hay cotizaciones compartidas al cliente.' empty_detalle='Cuando Recepción las comparta, aparecerán aquí.' mostrar_responsable=True only %}
-                </div>
-            </div>
-        </div>
-    </div>
+        <ul class="nav nav-tabs panel-cot-tabs px-3 pt-2" id="panelCotizacionesTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                {# Enlaces reales (no botones Bootstrap): la pestaña queda en ?tab= #}
+                <a class="nav-link{% if tab_activa == 'front' %} active{% endif %}"
+                   id="tab-enviadas-front-btn"
+                   href="{{ panel_url }}?tab=front{% if alerta_filtro %}&amp;alerta={{ alerta_filtro }}{% endif %}"
+                   role="tab"
+                   aria-controls="tab-enviadas-front"
+                   aria-selected="{% if tab_activa == 'front' %}true{% else %}false{% endif %}">
+                    <i class="bi bi-person-badge me-1" aria-hidden="true"></i>Enviadas a Front
+                    <span class="badge bg-info text-dark ms-1">{{ total_front }}</span>
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link{% if tab_activa == 'cliente' %} active{% endif %}"
+                   id="tab-compartidas-cliente-btn"
+                   href="{{ panel_url }}?tab=cliente{% if alerta_filtro %}&amp;alerta={{ alerta_filtro }}{% endif %}"
+                   role="tab"
+                   aria-controls="tab-compartidas-cliente"
+                   aria-selected="{% if tab_activa == 'cliente' %}true{% else %}false{% endif %}">
+                    <i class="bi bi-people me-1" aria-hidden="true"></i>Compartidas al cliente
+                    <span class="badge bg-primary ms-1">{{ total_cliente }}</span>
+                </a>
+            </li>
+        </ul>
 
-    <!-- Estadísticas del Mes y Acciones Rápidas -->
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Estadísticas del Mes</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-4">
-                            <div class="h4 mb-0">{{ estadisticas.total_mes }}</div>
-                            <small class="text-muted">Total Creadas</small>
-                        </div>
-                        <div class="col-4">
-                            <div class="h4 mb-0 text-success">{{ estadisticas.aprobadas_mes }}</div>
-                            <small class="text-muted">Aprobadas</small>
-                        </div>
-                        <div class="col-4">
-                            <div class="h4 mb-0 text-danger">{{ estadisticas.rechazadas_mes }}</div>
-                            <small class="text-muted">Rechazadas</small>
-                        </div>
-                    </div>
-                </div>
+        <div class="tab-content" id="panelCotizacionesTabContent">
+            {# Pestaña 1 (default): Compras ya liberó; Recepción aún no comparte al cliente #}
+            <div class="tab-pane fade{% if tab_activa == 'front' %} show active{% endif %}" id="tab-enviadas-front" role="tabpanel"
+                 aria-labelledby="tab-enviadas-front-btn" tabindex="0">
+                {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_front etiqueta_dias='Días en Front' empty_titulo='No hay cotizaciones enviadas a Front.' empty_detalle='Cuando Compras libere una solicitud, aparecerá aquí.' mostrar_responsable=True alerta_filtro=alerta_filtro only %}
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Acciones Rápidas</h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-outline-primary">
-                            <i class="bi bi-plus-lg me-2"></i>Nueva Cotización Multi-Proveedor
-                        </a>
-                        <a href="{% url 'almacen:crear_compra' %}" class="btn btn-outline-secondary">
-                            <i class="bi bi-cart-plus me-2"></i>Nueva Compra Directa
-                        </a>
-                        <a href="{% url 'almacen:lista_compras' %}?estado=pendiente_llegada" class="btn btn-outline-info">
-                            <i class="bi bi-truck me-2"></i>Ver Compras Pendientes de Llegada
-                        </a>
-                    </div>
-                </div>
+            {# Pestaña 2: Recepción ya compartió; se espera respuesta del cliente #}
+            <div class="tab-pane fade{% if tab_activa == 'cliente' %} show active{% endif %}" id="tab-compartidas-cliente" role="tabpanel"
+                 aria-labelledby="tab-compartidas-cliente-btn" tabindex="0">
+                {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_cliente etiqueta_dias='Días sin resp.' empty_titulo='No hay cotizaciones compartidas al cliente.' empty_detalle='Cuando Recepción las comparta, aparecerán aquí.' mostrar_responsable=True alerta_filtro=alerta_filtro only %}
             </div>
         </div>
     </div>

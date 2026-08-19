@@ -1,19 +1,19 @@
 /*
  * panel_cotizaciones.css
  * ======================
- * Estilos del Panel de Cotizaciones (Almacén).
+ * Estilos del Panel de Cotizaciones (Almacén) — «torre de control».
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * -------------------------------
- * Bootstrap pinta las filas «por vencer» con .table-warning (fondo crema)
- * y las vencidas con .table-danger (fondo rosa). En dark mode, base.css
- * fuerza texto claro (#cbd5e1) en las celdas, pero NO ajusta esos fondos
- * → texto ilegible. Aquí se corrigen ambos.
+ * Este archivo hace dos cosas:
+ * 1) Da identidad visual al panel (encabezado, KPIs clicables, tabla),
+ *    en la misma familia que lista_solicitudes_cotizacion.css.
+ * 2) En dark mode, corrige filas .table-warning / .table-danger y thead
+ *    .table-light: Bootstrap las pinta con fondos claros que chocan con
+ *    el texto del tema oscuro.
  *
- * Aquí acotamos los selectores al wrapper .panel-cotizaciones-page
- * para no afectar otras tablas del sistema. En oscuro usamos un tinte
- * ámbar semitransparente + texto claro legible (mismo patrón que
- * lista_compras.css y dashboard_seguimiento_piezas.css).
+ * Los selectores van acotados a .panel-cotizaciones-page para no
+ * afectar otras tablas del sistema.
  */
 
 /* ============================================================
@@ -24,19 +24,570 @@
     padding-bottom: 1rem;
 }
 
-/* Alineación vertical cómoda en la tabla del panel */
 .panel-cotizaciones-page .panel-cot-tabla td {
     vertical-align: middle;
+}
+
+/* --- Encabezado --- */
+.panel-cot-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.panel-cot-header-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.panel-cot-header-title h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+    text-wrap: balance;
+}
+
+.panel-cot-header-title h1 i {
+    color: var(--warning-color);
+    margin-right: 0.35rem;
+}
+
+.panel-cot-header-subtitle {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-bottom: 0.5rem;
+}
+
+.panel-cot-total-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: rgba(245, 158, 11, 0.14);
+    color: var(--warning-dark, #b45309);
+    border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.panel-cot-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.panel-cot-header-actions .btn {
+    min-height: 44px;
+}
+
+/* --- Grid de KPIs --- */
+.panel-cot-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.panel-cot-kpi {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.875rem 1rem;
+    background-color: var(--white);
+    border: 1px solid var(--gray-200);
+    border-left-width: 4px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: inherit;
+    min-height: 44px;
+    animation: panelCotFadeSlideUp 0.45s ease both;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.panel-cot-kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+    color: inherit;
+    text-decoration: none;
+}
+
+.panel-cot-kpi:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.panel-cot-kpi.is-active {
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.panel-cot-kpi--static {
+    cursor: default;
+}
+
+.panel-cot-kpi--static:hover {
+    transform: none;
+}
+
+.panel-cot-kpi-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 0.15rem;
+}
+
+.panel-cot-kpi-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--gray-900);
+    font-variant-numeric: tabular-nums;
+}
+
+.panel-cot-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-500);
+    line-height: 1.2;
+}
+
+.panel-cot-kpi-sub {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    line-height: 1.3;
+}
+
+/* Front = info (recepción); Cliente = primary (ya salió de casa) */
+.panel-cot-kpi--front {
+    border-left-color: var(--info-color);
+}
+.panel-cot-kpi--front .panel-cot-kpi-icon {
+    background-color: var(--info-light, #e0f2fe);
+    color: var(--info-dark, #0e7490);
+}
+.panel-cot-kpi--front.is-active {
+    background-color: var(--info-light, #e0f2fe);
+}
+
+.panel-cot-kpi--cliente {
+    border-left-color: var(--primary-color);
+}
+.panel-cot-kpi--cliente .panel-cot-kpi-icon {
+    background-color: var(--primary-light, #dbeafe);
+    color: var(--primary-dark, #1d4ed8);
+}
+.panel-cot-kpi--cliente.is-active {
+    background-color: var(--primary-light, #dbeafe);
+}
+
+.panel-cot-kpi--urgente {
+    border-left-color: var(--warning-color);
+}
+.panel-cot-kpi--urgente .panel-cot-kpi-icon {
+    background-color: var(--warning-light, #fef3c7);
+    color: var(--warning-dark, #b45309);
+}
+.panel-cot-kpi--urgente.is-active {
+    background-color: var(--warning-light, #fef3c7);
+}
+
+.panel-cot-kpi--vencidas {
+    border-left-color: var(--danger-color);
+}
+.panel-cot-kpi--vencidas .panel-cot-kpi-icon {
+    background-color: var(--danger-light, #fee2e2);
+    color: var(--danger-dark, #b91c1c);
+}
+.panel-cot-kpi--vencidas.is-active {
+    background-color: var(--danger-light, #fee2e2);
+}
+
+.panel-cot-kpi--tasa {
+    border-left-color: var(--success-color, #10b981);
+}
+.panel-cot-kpi--tasa .panel-cot-kpi-icon {
+    background-color: var(--success-light, #d1fae5);
+    color: var(--success-dark, #047857);
+}
+
+.panel-cot-kpi:nth-child(1) { animation-delay: 0.03s; }
+.panel-cot-kpi:nth-child(2) { animation-delay: 0.06s; }
+.panel-cot-kpi:nth-child(3) { animation-delay: 0.09s; }
+.panel-cot-kpi:nth-child(4) { animation-delay: 0.12s; }
+.panel-cot-kpi:nth-child(5) { animation-delay: 0.15s; }
+
+@keyframes panelCotFadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Card de la tabla --- */
+.panel-cot-tabla-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    background-color: var(--white);
+}
+
+.panel-cot-tabla-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background-color: rgba(245, 158, 11, 0.08);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.panel-cot-tabla-header h2 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+
+.panel-cot-filtro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+    background-color: var(--warning-light, #fef3c7);
+    color: var(--warning-dark, #b45309);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    min-height: 32px;
+}
+
+.panel-cot-filtro-chip:hover {
+    color: var(--danger-color);
+    text-decoration: none;
+}
+
+.panel-cot-filtro-chip-x {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* --- Tabla: números, badges, rail de urgencia --- */
+.panel-cotizaciones-page .panel-cot-tabla thead th {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.panel-cot-numero {
+    font-weight: 700;
+    color: var(--primary-color);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.panel-cot-numero:hover {
+    color: var(--primary-dark, #1d4ed8);
+    text-decoration: underline;
+}
+
+.panel-cot-monto {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.panel-cot-badge-orden,
+.panel-cot-badge-dias {
+    display: inline-block;
+    padding: 0.2em 0.5em;
+    border-radius: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background-color: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+}
+
+.panel-cot-badge-vencio {
+    background-color: rgba(239, 68, 68, 0.14);
+    color: var(--danger-dark, #b91c1c);
+}
+
+.panel-cot-fila--urgente td:first-child,
+.panel-cot-fila--vencida td:first-child {
+    box-shadow: inset 4px 0 0 var(--warning-color);
+}
+
+.panel-cot-fila--vencida td:first-child {
+    box-shadow: inset 4px 0 0 var(--danger-color);
+}
+
+.panel-cot-btn-detalle {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.5rem;
+}
+
+.panel-cot-btn-detalle:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* --- Empty state --- */
+.panel-cot-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.panel-cot-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    background-color: var(--gray-100);
+    border: 2px dashed var(--gray-300);
+    margin-bottom: 1rem;
+    font-size: 1.75rem;
+    color: var(--gray-400);
+}
+
+.panel-cot-empty-icon--ok {
+    color: var(--success-color, #10b981);
+    border-color: var(--success-color, #10b981);
+    background-color: var(--success-light, #d1fae5);
+}
+
+.panel-cot-empty-icon--alerta {
+    color: var(--danger-color);
+    border-color: var(--danger-color);
+    background-color: var(--danger-light, #fee2e2);
+}
+
+.panel-cot-empty strong {
+    display: block;
+    font-size: 1.05rem;
+    color: var(--gray-700);
+    margin-bottom: 0.35rem;
+}
+
+.panel-cot-empty p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+/* ============================================================
+   PESTAÑAS Front / Cliente (ahora son <a>, no botones JS)
+   ============================================================ */
+
+.panel-cotizaciones-page .panel-cot-tabs {
+    border-bottom: 1px solid var(--border-color, var(--gray-200));
+}
+
+.panel-cotizaciones-page .panel-cot-tabs .nav-link {
+    color: var(--text-secondary, var(--gray-700));
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.panel-cotizaciones-page .panel-cot-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.panel-cotizaciones-page .panel-cot-tabs .nav-link:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .panel-cot-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .panel-cot-header-actions {
+        width: 100%;
+    }
+
+    .panel-cot-header-actions .btn {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 400px) {
+    .panel-cot-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-cot-kpi {
+        animation: none;
+        transition: none;
+    }
+
+    .panel-cot-kpi:hover {
+        transform: none;
+    }
 }
 
 /* ============================================================
    MODO OSCURO — Overrides para [data-bs-theme="dark"]
    ============================================================ */
 
-/*
- * Thead con .table-light: en oscuro Bootstrap deja un gris claro
- * que choca con el resto del tema. Lo alineamos al color de card.
- */
+[data-bs-theme="dark"] .panel-cot-header-title h1 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .panel-cot-header-subtitle {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .panel-cot-total-chip {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi-value {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi-label,
+[data-bs-theme="dark"] .panel-cot-kpi-sub {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--front.is-active {
+    background-color: rgba(56, 189, 248, 0.12);
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--cliente.is-active {
+    background-color: rgba(96, 165, 250, 0.12);
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--urgente.is-active {
+    background-color: rgba(251, 191, 36, 0.12);
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--vencidas.is-active {
+    background-color: rgba(248, 113, 113, 0.12);
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--front .panel-cot-kpi-icon {
+    background-color: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--cliente .panel-cot-kpi-icon {
+    background-color: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--urgente .panel-cot-kpi-icon {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--vencidas .panel-cot-kpi-icon {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .panel-cot-kpi--tasa .panel-cot-kpi-icon {
+    background-color: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+}
+
+[data-bs-theme="dark"] .panel-cot-tabla-card {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cot-tabla-header {
+    background-color: rgba(234, 179, 8, 0.12);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cot-tabla-header h2 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .panel-cot-filtro-chip {
+    background-color: rgba(251, 191, 36, 0.18);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.35);
+}
+
+[data-bs-theme="dark"] .panel-cot-badge-orden,
+[data-bs-theme="dark"] .panel-cot-badge-dias {
+    background-color: #334155;
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+[data-bs-theme="dark"] .panel-cot-badge-vencio {
+    background-color: rgba(248, 113, 113, 0.22);
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .panel-cot-empty-icon {
+    background-color: #334155;
+    border-color: #475569;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .panel-cot-empty strong {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .panel-cot-empty p {
+    color: #94a3b8;
+}
+
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla thead.table-light > tr > * {
     --bs-table-bg: #1e293b;
     --bs-table-color: #e2e8f0;
@@ -66,11 +617,6 @@
     color: #e2e8f0;
 }
 
-/*
- * Filas vencidas (.table-danger): mismo patrón que table-warning, pero
- * con tinte rojo. Sin esto, el rosa claro de Bootstrap + texto oscuro
- * del tema queda ilegible.
- */
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger > * {
     --bs-table-bg: rgba(248, 113, 113, 0.12);
     --bs-table-color: #e2e8f0;
@@ -87,88 +633,21 @@
     color: #e2e8f0;
 }
 
-[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a {
-    color: #93c5fd;
-}
-
-[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a:hover {
-    color: #bfdbfe;
-}
-
-[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger small,
-[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger .text-muted {
-    color: #94a3b8 !important;
-}
-
-/* Badge «Venció» (bg-danger-subtle): en oscuro el rosa claro pierde contraste */
-[data-bs-theme="dark"] .panel-cotizaciones-page .badge.bg-danger-subtle {
-    background-color: rgba(248, 113, 113, 0.22) !important;
-    color: #fca5a5 !important;
-}
-
-/* Enlaces (número de solicitud) legibles sobre el tinte ámbar */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a,
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning a {
     color: #93c5fd;
 }
 
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a:hover,
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning a:hover {
     color: #bfdbfe;
 }
 
-/* Textos secundarios (nombre, fecha) dentro de la fila urgente */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger small,
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger .text-muted,
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning small,
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning .text-muted {
     color: #94a3b8 !important;
-}
-
-/* Cabecera de la card de la tabla (bg-warning bg-opacity-10) */
-[data-bs-theme="dark"] .panel-cotizaciones-page .card-header.bg-warning.bg-opacity-10 {
-    background-color: rgba(234, 179, 8, 0.12) !important;
-    color: #e2e8f0;
-    border-bottom-color: #334155;
-}
-
-/*
- * KPIs con bg-*-opacity-10: en oscuro el 10% de opacidad sobre blanco
- * del tema claro se ve raro; reforzamos el tinte sobre el fondo slate.
- */
-[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-warning.bg-opacity-10 {
-    background-color: rgba(234, 179, 8, 0.12) !important;
-}
-
-[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-secondary.bg-opacity-10 {
-    background-color: rgba(148, 163, 184, 0.12) !important;
-}
-
-[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-danger.bg-opacity-10 {
-    background-color: rgba(248, 113, 113, 0.12) !important;
-}
-
-[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-success.bg-opacity-10 {
-    background-color: rgba(52, 211, 153, 0.12) !important;
-}
-
-/* Números grandes de los KPIs: contraste explícito en oscuro */
-[data-bs-theme="dark"] .panel-cotizaciones-page .card.bg-opacity-10 .card-body h2 {
-    color: #e2e8f0;
-}
-
-/* ============================================================
-   PESTAÑAS Front / Cliente (Bootstrap nav-tabs)
-   ============================================================ */
-
-.panel-cotizaciones-page .panel-cot-tabs {
-    border-bottom: 1px solid var(--border-color, var(--gray-200));
-}
-
-.panel-cotizaciones-page .panel-cot-tabs .nav-link {
-    color: var(--text-secondary, var(--gray-700));
-    min-height: 44px;
-}
-
-.panel-cotizaciones-page .panel-cot-tabs .nav-link.active {
-    color: var(--primary-color);
-    font-weight: 600;
 }
 
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabs {

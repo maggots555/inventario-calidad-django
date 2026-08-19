@@ -294,11 +294,15 @@ def panel_cotizaciones(request):
 
     Args:
         request: HttpRequest autenticado con permiso view_solicitudcotizacion.
+            Query GET opcionales (UI del panel):
+            - tab: ``front`` (default) o ``cliente`` — pestaña activa.
+            - alerta: ``urgente`` o ``vencida`` — filtra la tabla; los KPIs
+              siguen mostrando el total global.
 
     Efectos secundarios:
-        Ninguno (solo lectura). El template pinta dos pestañas Bootstrap.
-        A cada solicitud se le pega ``alerta_panel`` ('vencida'/'urgente'/'ok')
-        para que la tabla no recalcule la regla de 5 días hábiles.
+        Ninguno (solo lectura). A cada solicitud se le pega
+        ``alerta_panel`` ('vencida'/'urgente'/'ok') para que la tabla no
+        recalcule la regla de 5 días hábiles.
     """
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # select_related trae de un jalón las FKs que la tabla va a mostrar
@@ -337,9 +341,24 @@ def panel_cotizaciones(request):
         if alerta == 'urgente':
             cotizaciones_por_vencer += 1
 
-    cotizaciones_borrador = SolicitudCotizacion.objects.filter(
-        estado='borrador'
-    ).count()
+    # tab/alerta vienen de la URL (?tab=cliente&alerta=vencida). Valores
+    # raros se ignoran para no romper la vista con un enlace mal copiado.
+    tab_activa = request.GET.get('tab', 'front')
+    if tab_activa not in ('front', 'cliente'):
+        tab_activa = 'front'
+    alerta_filtro = request.GET.get('alerta', '')
+    if alerta_filtro not in ('urgente', 'vencida'):
+        alerta_filtro = ''
+    # Los KPIs usan los totales de arriba (sin filtrar). La tabla sí se recorta.
+    if alerta_filtro:
+        cotizaciones_front = [
+            solicitud for solicitud in cotizaciones_front
+            if solicitud.alerta_panel == alerta_filtro
+        ]
+        cotizaciones_cliente = [
+            solicitud for solicitud in cotizaciones_cliente
+            if solicitud.alerta_panel == alerta_filtro
+        ]
 
     # Vencidas: COUNT en BD (el campo ya tiene índice). Misma regla que
     # esta_vencida: fecha límite menor o igual a ahora, estados con reloj.
@@ -359,6 +378,8 @@ def panel_cotizaciones(request):
     rechazadas_mes = cotizaciones_mes.filter(estado='totalmente_rechazada').count()
     tasa_aprobacion = (aprobadas_mes / total_mes * 100) if total_mes > 0 else 0
 
+    etiquetas_alerta = {'urgente': 'Por vencer', 'vencida': 'Vencidas'}
+
     context = {
         'cotizaciones_front': cotizaciones_front,
         'cotizaciones_cliente': cotizaciones_cliente,
@@ -367,7 +388,9 @@ def panel_cotizaciones(request):
         'total_pendientes': total_front + total_cliente,
         'cotizaciones_por_vencer': cotizaciones_por_vencer,
         'cotizaciones_vencidas': cotizaciones_vencidas,
-        'cotizaciones_borrador': cotizaciones_borrador,
+        'tab_activa': tab_activa,
+        'alerta_filtro': alerta_filtro,
+        'alerta_filtro_etiqueta': etiquetas_alerta.get(alerta_filtro, ''),
         'estadisticas': {
             'total_mes': total_mes,
             'aprobadas_mes': aprobadas_mes,

@@ -8,12 +8,16 @@ En vez de copiar el HTML dos veces, este partial se incluye con
 parámetros distintos.
 
 Parámetros (via {% include ... with %}):
-- cotizaciones: queryset de SolicitudCotizacion a listar
+- cotizaciones: queryset/lista de SolicitudCotizacion a listar
 - etiqueta_dias: encabezado de la columna de días (ej. "Días en Front")
-- empty_titulo / empty_detalle: textos si la lista está vacía
+- empty_titulo / empty_detalle: textos si la lista está vacía (sin filtro)
 - mostrar_responsable: True para pintar la columna de seguimiento
   (Front y Cliente). Con orden: responsable ST; sin orden: quien creó.
+- alerta_filtro: '' | 'urgente' | 'vencida' — cambia el empty state cuando
+  el usuario filtró por KPI y esta pestaña no tiene filas de ese tipo.
 {% endcomment %}
+
+{% if cotizaciones %}
 <div class="table-responsive">
     {# .panel-cot-tabla: target de overrides dark (thead + filas urgentes) #}
     <table class="table table-hover mb-0 panel-cot-tabla">
@@ -26,14 +30,17 @@ Parámetros (via {% include ... with %}):
                 {% if mostrar_responsable %}
                 <th>
                     Responsable
-                    {# En Front: seguimiento de la orden; sin orden, quien creó la solicitud #}
-                    <i class="bi bi-info-circle text-muted"
+                    {# Texto para lectores de pantalla; el icono es solo visual #}
+                    <span class="visually-hidden">
+                        Responsable de seguimiento. Si no hay orden activa, quien creó la solicitud.
+                    </span>
+                    <i class="bi bi-info-circle text-muted" aria-hidden="true"
                        title="Responsable de seguimiento. Si no hay orden activa, quien creó la solicitud."></i>
                 </th>
                 {% endif %}
-                <th>Creado por</th>
+                <th class="d-none d-lg-table-cell">Creado por</th>
                 <th class="text-center">{{ etiqueta_dias }}</th>
-                <th>Fecha Envío</th>
+                <th class="d-none d-lg-table-cell">Fecha Envío</th>
                 <th class="text-end">Acciones</th>
             </tr>
         </thead>
@@ -41,23 +48,24 @@ Parámetros (via {% include ... with %}):
             {% for cot in cotizaciones %}
             {# alerta_panel lo pega la vista (vencida / urgente / ok) con la regla de 5 días hábiles #}
             {% with dias_sin_resp=cot.dias_sin_respuesta alerta=cot.alerta_panel %}
-            <tr class="{% if alerta == 'vencida' %}table-danger{% elif alerta == 'urgente' %}table-warning{% endif %}">
+            <tr class="panel-cot-fila{% if alerta == 'vencida' %} table-danger panel-cot-fila--vencida{% elif alerta == 'urgente' %} table-warning panel-cot-fila--urgente{% endif %}">
                 <td>
-                    <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}" class="fw-bold text-decoration-none">
+                    <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}" class="panel-cot-numero">
                         {{ cot.numero_solicitud }}
                     </a>
                 </td>
                 <td>
                     {% if cot.numero_orden_cliente %}
-                        <span class="badge bg-light text-dark">{{ cot.numero_orden_cliente }}</span>
+                        <span class="panel-cot-badge-orden">{{ cot.numero_orden_cliente }}</span>
                     {% else %}
                         <span class="text-muted">Stock General</span>
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    <span class="badge bg-info">{{ cot.lineas.count }} líneas</span>
+                    {# lineas.all|length usa el prefetch de la vista; .count pegaría un query por fila #}
+                    <span class="badge bg-info">{{ cot.lineas.all|length }} líneas</span>
                 </td>
-                <td class="text-end fw-bold">${{ cot.total_estimado|floatformat:2 }}</td>
+                <td class="text-end panel-cot-monto">${{ cot.total_estimado|floatformat:2 }}</td>
                 {% if mostrar_responsable %}
                 <td>
                     {# Con orden: responsable de seguimiento. Sin orden activa: creador. #}
@@ -74,7 +82,7 @@ Parámetros (via {% include ... with %}):
                     {% endif %}
                 </td>
                 {% endif %}
-                <td>
+                <td class="d-none d-lg-table-cell">
                     {% if cot.creado_por %}
                         <small>{{ cot.creado_por.get_full_name|default:cot.creado_por.username }}</small>
                     {% else %}
@@ -82,42 +90,57 @@ Parámetros (via {% include ... with %}):
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    {# Siempre se ven los días que lleva. La alerta extra usa vigencia (5 días hábiles), no el umbral viejo de 3 días calendario. #}
+                    {# Siempre se ven los días que lleva. La alerta extra usa vigencia (5 días hábiles). #}
                     {% if alerta == 'vencida' %}
                         <span class="badge bg-danger">{{ dias_sin_resp }} días</span>
-                        <span class="badge bg-danger-subtle text-danger"
+                        <span class="badge panel-cot-badge-vencio"
                               title="Venció el {{ cot.fecha_vencimiento_vigencia|date:'d/m/Y' }}">Venció</span>
                     {% elif alerta == 'urgente' %}
                         <span class="badge bg-warning text-dark">{{ dias_sin_resp }} días</span>
                         <span class="badge bg-warning text-dark">Por vencer</span>
                     {% else %}
-                        <span class="badge bg-light text-dark">{{ dias_sin_resp|default:"0" }} días</span>
+                        <span class="badge panel-cot-badge-dias">{{ dias_sin_resp|default:"0" }} días</span>
                     {% endif %}
                 </td>
-                <td>
+                <td class="d-none d-lg-table-cell">
                     {# fecha_envio_cliente se llena al liberar a Front; si falta, usamos creación #}
                     <small>{{ cot.fecha_envio_cliente|date:"d/m/Y H:i"|default:cot.fecha_creacion|date:"d/m/Y H:i" }}</small>
                 </td>
                 <td class="text-end">
-                    <div class="btn-group">
-                        <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}"
-                           class="btn btn-sm btn-outline-primary" title="Ver detalle y responder">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                    </div>
+                    <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}"
+                       class="btn btn-outline-primary panel-cot-btn-detalle"
+                       aria-label="Ver detalle de {{ cot.numero_solicitud }}"
+                       title="Ver detalle y responder">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </a>
                 </td>
             </tr>
             {% endwith %}
-            {% empty %}
-            <tr>
-                <td colspan="{% if mostrar_responsable %}9{% else %}8{% endif %}" class="text-center py-5 text-muted">
-                    <i class="bi bi-check-circle display-1 d-block mb-3 text-success"></i>
-                    <strong>{{ empty_titulo }}</strong>
-                    <br>
-                    <small>{{ empty_detalle }}</small>
-                </td>
-            </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+{% else %}
+{# Empty state fuera de la tabla: se lee mejor y no deja un thead huérfano #}
+<div class="panel-cot-empty">
+    {% if alerta_filtro == 'urgente' %}
+        <div class="panel-cot-empty-icon" aria-hidden="true">
+            <i class="bi bi-clock"></i>
+        </div>
+        <strong>No hay cotizaciones por vencer en esta pestaña.</strong>
+        <p>Prueba la otra pestaña o quita el filtro.</p>
+    {% elif alerta_filtro == 'vencida' %}
+        <div class="panel-cot-empty-icon panel-cot-empty-icon--alerta" aria-hidden="true">
+            <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <strong>No hay cotizaciones vencidas en esta pestaña.</strong>
+        <p>Prueba la otra pestaña o quita el filtro.</p>
+    {% else %}
+        <div class="panel-cot-empty-icon panel-cot-empty-icon--ok" aria-hidden="true">
+            <i class="bi bi-check-circle"></i>
+        </div>
+        <strong>{{ empty_titulo }}</strong>
+        <p>{{ empty_detalle }}</p>
+    {% endif %}
+</div>
+{% endif %}
