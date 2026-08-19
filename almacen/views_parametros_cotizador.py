@@ -60,6 +60,7 @@ def panel_parametros_cotizador(request):
         PERFIL_ETIQUETAS,
         PERFILES_PROFIT,
         asegurar_parametros_iniciales,
+        db_alias_parametros,
         puede_editar_parametros_cotizador,
         guardar_profit_perfiles,
         guardar_rangos_profit_minimo,
@@ -124,8 +125,10 @@ def panel_parametros_cotizador(request):
                     'min_1000_1499': form_r.cleaned_data['min_1000_1499'],
                     'min_1500_mas': form_r.cleaned_data['min_1500_mas'],
                 }
-            # Una sola transacción: si falla REAC, no quedan perfiles a medias
-            with transaction.atomic():
+            # Una sola transacción: si falla REAC, no quedan perfiles a medias.
+            # using=: sin esto la transacción se abriría en 'default' mientras
+            # los datos se guardan en la base del país, y no protegería nada.
+            with transaction.atomic(using=db_alias_parametros()):
                 guardar_profit_perfiles(datos_perfiles, usuario=request.user)
                 guardar_rangos_profit_minimo(datos_rangos, usuario=request.user)
                 guardar_reacondicionado(

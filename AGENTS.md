@@ -566,6 +566,50 @@ Todas ya llevan `db_alias` en firma; nuevas igual.
 
 ---
 
+## 11. TRANSACCIONES MULTI-PAÍS — `transaction.atomic(using=...)`
+
+**CRITICAL:** El router dirige queries al país activo, pero **NO elige la conexión de `transaction.atomic()`**. Sin `using=`, Django abre la transacción en `default`, aunque el ORM escriba en `mexico`, `argentina`, etc.
+
+Incluso si `default` y `mexico` apuntan a la misma BD física, son **conexiones distintas** para Django/PostgreSQL. Una transacción abierta en `default` no protege queries ejecutadas por `mexico`.
+
+```python
+# ❌ INCORRECTO: atomic usa default, pero el router puede escribir en mexico
+@transaction.atomic
+def procesar(objeto):
+    Modelo.objects.select_for_update().get(pk=objeto.pk)
+
+# ✅ CORRECTO: obtener el alias del objeto y usarlo en toda la operación
+db_alias = objeto._state.db or router.db_for_write(Modelo, instance=objeto)
+with transaction.atomic(using=db_alias):
+    objeto_bloqueado = (
+        Modelo.objects.using(db_alias)
+        .select_for_update()
+        .get(pk=objeto.pk)
+    )
+    # Lecturas/escrituras de la operación ocurren en esta misma conexión.
+    transaction.on_commit(lambda: encolar_aviso(), using=db_alias)
+```
+
+Reglas obligatorias:
+
+1. Toda operación atómica sobre datos de negocio multi-país debe resolver el alias desde `instancia._state.db` o `router.db_for_write(...)`.
+2. Usar el mismo alias en `transaction.atomic(using=db_alias)`, `.using(db_alias).select_for_update()` y `transaction.on_commit(..., using=db_alias)`.
+3. No asumir que `default` equivale transaccionalmente a `mexico`, aunque compartan `NAME`, host y credenciales.
+4. Si hay varias escrituras relacionadas, confirmar que todas usan la conexión protegida; una transacción en otro alias no hace rollback de ellas.
+5. SQLite puede ignorar `select_for_update()` y ocultar este bug. Al tocar concurrencia/transacciones, incluir un test del resolutor de alias y recordar que PostgreSQL sí lanza `TransactionManagementError` fuera de la transacción correcta.
+6. Patrón de referencia: `servicio_tecnico/services/pagos_orden.py::_db_de` y `almacen/utils/recotizacion.py::resolver_db_alias`.
+
+**Síntoma típico en producción:**
+
+```text
+django.db.transaction.TransactionManagementError:
+select_for_update cannot be used outside of a transaction
+```
+
+No “arreglar” quitando `select_for_update()`: eso elimina la protección contra doble clic/concurrencia. La corrección es abrir la transacción en el alias correcto.
+
+---
+
 **Last Updated**: Agosto 2026  
 **Django Version**: 5.2.14
 **Python Version**: 3.12+

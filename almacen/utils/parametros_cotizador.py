@@ -22,7 +22,7 @@ import logging
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from django.db import transaction
+from django.db import router, transaction
 
 logger = logging.getLogger('almacen')
 
@@ -231,6 +231,34 @@ def obtener_todos_rangos_profit_minimo() -> Dict[str, List[Dict]]:
     }
 
 
+def db_alias_parametros() -> str:
+    """
+    Alias de la base de datos del país activo, para abrir transacciones.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    SIGMA tiene UNA BASE POR PAÍS (México vive en el alias ``mexico``). El
+    router de Django enruta cada consulta sola, pero las TRANSACCIONES no
+    pasan por el router: ``transaction.atomic()`` sin ``using=`` siempre abre
+    la transacción en ``default``. Si los INSERT viajan a ``mexico`` y la
+    transacción está en ``default``, esa transacción no protege nada: al fallar
+    algo a la mitad, no hay nada que revertir.
+
+    Aquí le preguntamos al router en qué base escribiría el modelo, que es lo
+    mismo que hará el ORM al guardar. Fuera de un request HTTP (por ejemplo en
+    ``manage.py``) el router responde ``default``, que es lo correcto.
+
+    Returns:
+        str: Alias de la base (ej. ``'mexico'``, ``'default'``).
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    from almacen.models import ConfiguracionProfitPerfil
+
+    return router.db_for_write(ConfiguracionProfitPerfil)
+
+
 def asegurar_parametros_iniciales(usuario=None) -> bool:
     """
     Si la BD no tiene parámetros, los siembra desde el .env / semilla.
@@ -256,7 +284,8 @@ def asegurar_parametros_iniciales(usuario=None) -> bool:
     env_reac = _cargar_reac_desde_env()
     semilla_rangos = _semilla_rangos_profit_minimo()
 
-    with transaction.atomic():
+    # using=: la transacción debe abrirse en la base del país, no en 'default'
+    with transaction.atomic(using=db_alias_parametros()):
         # Sembrar perfiles con get_or_create (evita carrera si dos gerentes
         # abren el panel a la vez en un tenant vacío)
         for perfil in PERFILES_PROFIT:
@@ -380,7 +409,8 @@ def guardar_profit_perfiles(
     """
     from almacen.models import ConfiguracionProfitPerfil
 
-    with transaction.atomic():
+    # using=: la transacción debe abrirse en la base del país, no en 'default'
+    with transaction.atomic(using=db_alias_parametros()):
         for perfil, datos in datos_por_perfil.items():
             if perfil not in PERFILES_PROFIT:
                 continue
@@ -419,7 +449,8 @@ def guardar_rangos_profit_minimo(
     """
     from almacen.models import ConfiguracionRangoProfitMinimo
 
-    with transaction.atomic():
+    # using=: la transacción debe abrirse en la base del país, no en 'default'
+    with transaction.atomic(using=db_alias_parametros()):
         for perfil, datos in datos_por_perfil.items():
             if perfil not in PERFILES_PROFIT:
                 continue
