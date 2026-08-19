@@ -23,6 +23,7 @@ ni el servidor de correo durante las pruebas.
 
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.messages.storage.fallback import FallbackStorage
@@ -42,6 +43,7 @@ from almacen.tests.helpers_integracion_cotizacion import (
     request_post,
 )
 from almacen.utils.vigencia_cotizacion import (
+    alerta_vigencia_panel,
     contar_dias_habiles_restantes,
     esta_vencida,
     puede_recotizar,
@@ -115,6 +117,56 @@ class SumarDiasHabilesTest(TestCase):
         # El vencimiento debe caer en jueves, no en viernes
         self.assertEqual(resultado.weekday(), 3, 'El plazo debe vencer en jueves')
         self.assertEqual(resultado.date(), date(2026, 8, 20))
+
+
+class AlertaVigenciaPanelTest(TestCase):
+    """
+    Objetivo: el panel clasifica con la regla de 5 días hábiles, no con 3 calendario.
+
+    Efectos secundarios: ninguno (SimpleNamespace, sin base de datos).
+    """
+
+    def _solicitud(self, *, vencimiento, estado='enviada_cliente'):
+        """
+        Arma un objeto mínimo con lo que ``alerta_vigencia_panel`` necesita.
+
+        Args:
+            vencimiento (datetime | None): Fecha límite de vigencia.
+            estado (str): Estado de la solicitud.
+
+        Returns:
+            SimpleNamespace: Falso modelo con estado y fecha de vencimiento.
+        """
+        return SimpleNamespace(
+            estado=estado,
+            fecha_vencimiento_vigencia=vencimiento,
+        )
+
+    def test_ok_cuando_queda_margen(self) -> None:
+        """Feliz: si faltan varios días hábiles, no hay alerta."""
+        solicitud = self._solicitud(
+            vencimiento=timezone.now() + timedelta(days=5),
+        )
+        self.assertEqual(alerta_vigencia_panel(solicitud), 'ok')
+
+    def test_urgente_cuando_vence_en_horas(self) -> None:
+        """Borde: vence hoy (aún no pasa la hora) → por vencer, no vencida."""
+        solicitud = self._solicitud(
+            vencimiento=timezone.now() + timedelta(hours=3),
+        )
+        self.assertEqual(alerta_vigencia_panel(solicitud), 'urgente')
+
+    def test_vencida_cuando_el_plazo_ya_paso(self) -> None:
+        """Borde: fecha límite en el pasado → vencida."""
+        solicitud = self._solicitud(
+            vencimiento=timezone.now() - timedelta(days=1),
+        )
+        self.assertEqual(alerta_vigencia_panel(solicitud), 'vencida')
+
+    def test_ok_en_borrador_sin_reloj(self) -> None:
+        """En borrador el reloj no corre: no alertamos."""
+        solicitud = self._solicitud(vencimiento=None, estado='borrador')
+        self.assertEqual(alerta_vigencia_panel(solicitud), 'ok')
 
 
 class VigenciaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase):

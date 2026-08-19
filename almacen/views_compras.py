@@ -28,6 +28,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from config.constants import ESTADOS_SOLICITUD_CON_VIGENCIA
 from inventario.models import Empleado
 
 from .decorators import permission_required_with_message
@@ -49,6 +50,7 @@ from .models import (
     UnidadInventario,
 )
 from .utils.lista_compras_orden import ordenar_compras_para_lista
+from .utils.vigencia_cotizacion import alerta_vigencia_panel
 
 
 # ============================================================================
@@ -295,9 +297,9 @@ def panel_cotizaciones(request):
 
     Efectos secundarios:
         Ninguno (solo lectura). El template pinta dos pestañas Bootstrap.
+        A cada solicitud se le pega ``alerta_panel`` ('vencida'/'urgente'/'ok')
+        para que la tabla no recalcule la regla de 5 días hábiles.
     """
-    from datetime import timedelta
-
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # select_related trae de un jalón las FKs que la tabla va a mostrar
     # (orden, responsable de seguimiento, quien creó la solicitud).
@@ -309,28 +311,41 @@ def panel_cotizaciones(request):
         'creado_por__empleado',
     )
 
-    # Pestaña 1: todavía en recepción (aún no se compartieron al cliente)
-    cotizaciones_front = SolicitudCotizacion.objects.filter(
-        estado='enviada_front'
-    ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+    # list(): evaluamos una vez para poder anotar alerta_panel y contar
+    # «por vencer» en Python (los días hábiles no se calculan bien en SQL).
+    cotizaciones_front = list(
+        SolicitudCotizacion.objects.filter(
+            estado='enviada_front'
+        ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+    )
+    cotizaciones_cliente = list(
+        SolicitudCotizacion.objects.filter(
+            estado='enviada_cliente'
+        ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+    )
 
-    # Pestaña 2: ya se compartieron al cliente y esperan su respuesta
-    cotizaciones_cliente = SolicitudCotizacion.objects.filter(
-        estado='enviada_cliente'
-    ).select_related(*relaciones).prefetch_related('lineas').order_by('-fecha_creacion')
+    total_front = len(cotizaciones_front)
+    total_cliente = len(cotizaciones_cliente)
 
-    total_front = cotizaciones_front.count()
-    total_cliente = cotizaciones_cliente.count()
+    # EXPLICACIÓN: alerta_vigencia_panel usa el reloj de 5 días hábiles
+    # (no los 3 días calendario viejos). Pegamos el resultado en cada
+    # objeto para que el template solo pregunte cot.alerta_panel.
+    cotizaciones_por_vencer = 0
+    for solicitud in cotizaciones_front + cotizaciones_cliente:
+        alerta = alerta_vigencia_panel(solicitud)
+        solicitud.alerta_panel = alerta
+        if alerta == 'urgente':
+            cotizaciones_por_vencer += 1
 
     cotizaciones_borrador = SolicitudCotizacion.objects.filter(
         estado='borrador'
     ).count()
 
-    # Urgentes: más de 3 días en Front O con el cliente (ambos se “estancan”)
-    fecha_limite = timezone.now() - timedelta(days=3)
-    cotizaciones_urgentes = SolicitudCotizacion.objects.filter(
-        estado__in=['enviada_front', 'enviada_cliente'],
-        fecha_creacion__lt=fecha_limite,
+    # Vencidas: COUNT en BD (el campo ya tiene índice). Misma regla que
+    # esta_vencida: fecha límite menor o igual a ahora, estados con reloj.
+    cotizaciones_vencidas = SolicitudCotizacion.objects.filter(
+        estado__in=ESTADOS_SOLICITUD_CON_VIGENCIA,
+        fecha_vencimiento_vigencia__lte=timezone.now(),
     ).count()
 
     inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -350,7 +365,8 @@ def panel_cotizaciones(request):
         'total_front': total_front,
         'total_cliente': total_cliente,
         'total_pendientes': total_front + total_cliente,
-        'cotizaciones_urgentes': cotizaciones_urgentes,
+        'cotizaciones_por_vencer': cotizaciones_por_vencer,
+        'cotizaciones_vencidas': cotizaciones_vencidas,
         'cotizaciones_borrador': cotizaciones_borrador,
         'estadisticas': {
             'total_mes': total_mes,

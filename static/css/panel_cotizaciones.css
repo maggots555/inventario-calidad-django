@@ -5,9 +5,10 @@
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * -------------------------------
- * Bootstrap pinta las filas urgentes con .table-warning (fondo crema).
- * En dark mode, base.css fuerza texto claro (#cbd5e1) en todas las celdas,
- * pero NO ajusta el fondo crema de .table-warning → texto ilegible.
+ * Bootstrap pinta las filas «por vencer» con .table-warning (fondo crema)
+ * y las vencidas con .table-danger (fondo rosa). En dark mode, base.css
+ * fuerza texto claro (#cbd5e1) en las celdas, pero NO ajusta esos fondos
+ * → texto ilegible. Aquí se corrigen ambos.
  *
  * Aquí acotamos los selectores al wrapper .panel-cotizaciones-page
  * para no afectar otras tablas del sistema. En oscuro usamos un tinte
@@ -63,6 +64,46 @@
 [data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-warning:hover > * {
     background-color: rgba(234, 179, 8, 0.18);
     color: #e2e8f0;
+}
+
+/*
+ * Filas vencidas (.table-danger): mismo patrón que table-warning, pero
+ * con tinte rojo. Sin esto, el rosa claro de Bootstrap + texto oscuro
+ * del tema queda ilegible.
+ */
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger > * {
+    --bs-table-bg: rgba(248, 113, 113, 0.12);
+    --bs-table-color: #e2e8f0;
+    --bs-table-hover-bg: rgba(248, 113, 113, 0.20);
+    --bs-table-hover-color: #e2e8f0;
+    --bs-table-border-color: rgba(248, 113, 113, 0.28);
+    background-color: rgba(248, 113, 113, 0.12);
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger:hover > * {
+    background-color: rgba(248, 113, 113, 0.20);
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger a:hover {
+    color: #bfdbfe;
+}
+
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger small,
+[data-bs-theme="dark"] .panel-cotizaciones-page .panel-cot-tabla tr.table-danger .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Badge «Venció» (bg-danger-subtle): en oscuro el rosa claro pierde contraste */
+[data-bs-theme="dark"] .panel-cotizaciones-page .badge.bg-danger-subtle {
+    background-color: rgba(248, 113, 113, 0.22) !important;
+    color: #fca5a5 !important;
 }
 
 /* Enlaces (número de solicitud) legibles sobre el tinte ámbar */

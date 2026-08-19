@@ -874,6 +874,11 @@ ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelad
 # Este mismo número aparece como texto legal en el PDF y los correos al cliente.
 DIAS_HABILES_VIGENCIA_COTIZACION = 5
 
+# Umbral del Panel de Cotizaciones: si quedan este número de días hábiles
+# (o menos) y la cotización AÚN no venció, se pinta como «Por vencer».
+# 1 = misma regla que el chip de vigencia en el detalle de la solicitud.
+DIAS_HABILES_ALERTA_URGENTE_COTIZACION = 1
+
 # Estados en los que el reloj de vigencia corre (la cotización está "viva"
 # esperando respuesta del cliente). En el resto ya hubo respuesta o cierre.
 ESTADOS_SOLICITUD_CON_VIGENCIA = ('enviada_front', 'enviada_cliente')

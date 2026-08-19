@@ -32,14 +32,19 @@ Fecha: Agosto 2026
 """
 
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Literal, Optional
 
 from django.utils import timezone
 
 from config.constants import (
+    DIAS_HABILES_ALERTA_URGENTE_COTIZACION,
     DIAS_HABILES_VIGENCIA_COTIZACION,
     ESTADOS_SOLICITUD_CON_VIGENCIA,
 )
+
+# Valores que el Panel de Cotizaciones usa para pintar fila y KPIs.
+# 'vencida' = pasaron los 5 días hábiles; 'urgente' = queda 1 día o menos.
+AlertaVigenciaPanel = Literal['vencida', 'urgente', 'ok']
 
 
 # ============================================================================
@@ -294,6 +299,47 @@ def dias_habiles_restantes(solicitud) -> Optional[int]:
         return None
 
     return contar_dias_habiles_restantes(solicitud.fecha_vencimiento_vigencia)
+
+
+def alerta_vigencia_panel(solicitud) -> AlertaVigenciaPanel:
+    """
+    Clasifica una cotización para el Panel (fila + KPI Por vencer / Vencidas).
+
+    Objetivo principal (contexto de negocio):
+        El panel no debe alertar a los 3 días calendario (regla vieja). Debe
+        usar el mismo reloj de 5 días hábiles que el detalle: si venció,
+        hay que recotizar; si queda 1 día hábil o menos, hay que insistir.
+
+    Args:
+        solicitud (SolicitudCotizacion): Cotización a evaluar. Solo necesita
+            ``estado`` y ``fecha_vencimiento_vigencia``.
+
+    Returns:
+        str: ``'vencida'`` si pasaron los 5 días hábiles; ``'urgente'`` si
+        aún no vence y quedan ``DIAS_HABILES_ALERTA_URGENTE_COTIZACION``
+        días hábiles o menos; ``'ok'`` en cualquier otro caso (incluye
+        borrador o sin fecha de vigencia).
+
+    Efectos secundarios:
+        Ninguno. Reutiliza ``esta_vencida`` y ``dias_habiles_restantes``.
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Primero preguntamos si YA venció. Si preguntáramos solo los días
+    # restantes, una vencida devolvería 0 y se pintaría como «por vencer»
+    # en lugar de «vencida».
+    if esta_vencida(solicitud):
+        return 'vencida'
+
+    # Si no hay fecha de vigencia, restantes es None → no alertamos.
+    restantes = dias_habiles_restantes(solicitud)
+    # 1 día hábil o 0 (vence hoy) cuenta como urgente, igual que el detalle.
+    if (
+        restantes is not None
+        and restantes <= DIAS_HABILES_ALERTA_URGENTE_COTIZACION
+    ):
+        return 'urgente'
+
+    return 'ok'
 
 
 def puede_aprobar_por_vigencia(solicitud) -> bool:

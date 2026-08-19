@@ -10,18 +10,23 @@ revisan el HTML para comprobar:
 1) Cada estado cae en su pestaña.
 2) Un borrador no se lista.
 3) La pestaña Front es la activa al abrir.
-4) En Front, con orden se ve el responsable de seguimiento; sin orden
-   activa se ve quien creó la solicitud.
+4) En Front y en Cliente, con orden se ve el responsable de seguimiento;
+   sin orden activa se ve quien creó la solicitud.
+5) La alerta de días usa la vigencia de 5 días hábiles (no 3 calendario):
+   vencida pinta «Venció»; por vencer (1 día hábil o menos) pinta «Por vencer».
 
 RequestFactory (no Client HTTP) evita el middleware multi-país
 (conflicto default vs mexico en tests con dos BD).
 """
+
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from inventario.models import Empleado
 from almacen.tests.helpers_integracion_cotizacion import BaseIntegracionCotizacionMixin
@@ -43,12 +48,12 @@ User = get_user_model()
 )
 class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
     """
-    Integración del panel: pestañas por estatus y columna de responsable.
+    Integración del panel: pestañas, responsable y vigencia de 5 días hábiles.
 
     Objetivo de negocio:
         Que Recepción distinga de un vistazo lo que sigue en Front
-        de lo que ya se compartió al cliente, y sepa a quién dar
-        seguimiento (o, si no hay orden, quién armó la solicitud).
+        de lo que ya se compartió al cliente, sepa a quién dar
+        seguimiento y vea cuáles cotizaciones ya vencieron.
     """
 
     def setUp(self) -> None:
@@ -192,6 +197,9 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('2 en Front', html)
         self.assertIn('1 con el cliente', html)
         self.assertIn(self.sol_sin_orden.numero_solicitud, html_front)
+        # Sin fechas de vigencia no debe pintarse la alerta de vencida
+        self.assertNotIn('Venció', html_front)
+        self.assertNotIn('Venció', html_cliente)
 
     def test_responsable_con_orden_y_creador_sin_orden(self) -> None:
         """
@@ -210,9 +218,58 @@ class PanelCotizacionesPestanasTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('Rosa Seguimiento Panel', html_front)
         self.assertIn('Luis Creador SinOrden', html_front)
 
-        # La pestaña del cliente no trae la columna Responsable
-        self.assertNotIn('Rosa Seguimiento Panel', html_cliente)
+        # La pestaña del cliente TAMBIÉN muestra el responsable de seguimiento
+        self.assertIn('Rosa Seguimiento Panel', html_cliente)
+        # Luis solo creó la de Front sin orden: no debe aparecer en Cliente
         self.assertNotIn('Luis Creador SinOrden', html_cliente)
         self.assertNotIn('Días en Front', html_cliente)
         self.assertIn('Días sin resp.', html_cliente)
         self.assertIn('Días en Front', html_front)
+
+    def test_vigencia_vencida_pinta_alerta_y_kpi(self) -> None:
+        """
+        Borde: pasados los 5 días hábiles, la fila dice Venció y el KPI suma 1.
+
+        EXPLICACIÓN: simulamos que el reloj ya se acabó empujando
+        fecha_vencimiento_vigencia al pasado (igual que los tests de recotización).
+        """
+        self.sol_cliente.fecha_inicio_vigencia = timezone.now() - timedelta(days=10)
+        self.sol_cliente.fecha_vencimiento_vigencia = timezone.now() - timedelta(days=1)
+        self.sol_cliente.save(update_fields=[
+            'fecha_inicio_vigencia',
+            'fecha_vencimiento_vigencia',
+        ])
+
+        respuesta = self._get_panel()
+        html = respuesta.content.decode()
+        _html_front, html_cliente = self._html_por_pestana(html)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('Venció', html_cliente)
+        self.assertIn(self.sol_cliente.numero_solicitud, html_cliente)
+        # KPI de vencidas (el de «por vencer» no debe contar esta)
+        self.assertIn('>Vencidas</h6>', html.replace('\n', ''))
+        self.assertRegex(html, r'Vencidas</h6>\s*<h2 class="mb-0">1</h2>')
+        self.assertRegex(html, r'Por vencer</h6>\s*<h2 class="mb-0">0</h2>')
+
+    def test_vigencia_por_vencer_no_cuenta_como_vencida(self) -> None:
+        """
+        Feliz: si vence hoy (aún no pasa la hora), es «Por vencer», no «Venció».
+        """
+        self.sol_front.fecha_inicio_vigencia = timezone.now() - timedelta(days=4)
+        # Vence en unas horas: restantes = 0 días hábiles, pero aún no venció
+        self.sol_front.fecha_vencimiento_vigencia = timezone.now() + timedelta(hours=6)
+        self.sol_front.save(update_fields=[
+            'fecha_inicio_vigencia',
+            'fecha_vencimiento_vigencia',
+        ])
+
+        respuesta = self._get_panel()
+        html = respuesta.content.decode()
+        html_front, _html_cliente = self._html_por_pestana(html)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn('Por vencer', html_front)
+        self.assertNotIn('Venció', html_front)
+        self.assertRegex(html, r'Por vencer</h6>\s*<h2 class="mb-0">1</h2>')
+        self.assertRegex(html, r'Vencidas</h6>\s*<h2 class="mb-0">0</h2>')

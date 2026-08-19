@@ -11,7 +11,8 @@ Parámetros (via {% include ... with %}):
 - cotizaciones: queryset de SolicitudCotizacion a listar
 - etiqueta_dias: encabezado de la columna de días (ej. "Días en Front")
 - empty_titulo / empty_detalle: textos si la lista está vacía
-- mostrar_responsable: True solo en la pestaña Front
+- mostrar_responsable: True para pintar la columna de seguimiento
+  (Front y Cliente). Con orden: responsable ST; sin orden: quien creó.
 {% endcomment %}
 <div class="table-responsive">
     {# .panel-cot-tabla: target de overrides dark (thead + filas urgentes) #}
@@ -38,8 +39,9 @@ Parámetros (via {% include ... with %}):
         </thead>
         <tbody>
             {% for cot in cotizaciones %}
-            {% with dias_sin_resp=cot.dias_sin_respuesta %}
-            <tr class="{% if dias_sin_resp > 3 %}table-warning{% endif %}">
+            {# alerta_panel lo pega la vista (vencida / urgente / ok) con la regla de 5 días hábiles #}
+            {% with dias_sin_resp=cot.dias_sin_respuesta alerta=cot.alerta_panel %}
+            <tr class="{% if alerta == 'vencida' %}table-danger{% elif alerta == 'urgente' %}table-warning{% endif %}">
                 <td>
                     <a href="{% url 'almacen:detalle_solicitud_cotizacion' cot.pk %}" class="fw-bold text-decoration-none">
                         {{ cot.numero_solicitud }}
@@ -80,10 +82,14 @@ Parámetros (via {% include ... with %}):
                     {% endif %}
                 </td>
                 <td class="text-center">
-                    {% if dias_sin_resp > 3 %}
-                        <span class="badge bg-danger">{{ dias_sin_resp }} días ⚠️</span>
-                    {% elif dias_sin_resp > 1 %}
+                    {# Siempre se ven los días que lleva. La alerta extra usa vigencia (5 días hábiles), no el umbral viejo de 3 días calendario. #}
+                    {% if alerta == 'vencida' %}
+                        <span class="badge bg-danger">{{ dias_sin_resp }} días</span>
+                        <span class="badge bg-danger-subtle text-danger"
+                              title="Venció el {{ cot.fecha_vencimiento_vigencia|date:'d/m/Y' }}">Venció</span>
+                    {% elif alerta == 'urgente' %}
                         <span class="badge bg-warning text-dark">{{ dias_sin_resp }} días</span>
+                        <span class="badge bg-warning text-dark">Por vencer</span>
                     {% else %}
                         <span class="badge bg-light text-dark">{{ dias_sin_resp|default:"0" }} días</span>
                     {% endif %}

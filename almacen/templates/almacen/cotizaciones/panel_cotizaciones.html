@@ -13,7 +13,7 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
 {% block title %}Panel de Cotizaciones - Almacén{% endblock %}
 
 {% comment %}
-  CSS propio del panel: arregla filas .table-warning y thead.table-light en dark mode.
+  CSS propio del panel: arregla filas .table-warning / .table-danger y thead.table-light en dark mode.
   Ver static/css/panel_cotizaciones.css (comentarios EXPLICACIÓN PARA PRINCIPIANTES).
 {% endcomment %}
 {% block extra_css %}
@@ -41,9 +41,9 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
         </div>
     </div>
 
-    <!-- KPIs -->
+    <!-- KPIs: 5 tarjetas. En móvil 2 por fila (col-6); en xl caben las cinco. -->
     <div class="row g-4 mb-4">
-        <div class="col-md-3">
+        <div class="col-6 col-xl">
             <div class="card bg-warning bg-opacity-10 border-warning h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
@@ -57,7 +57,7 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-xl">
             <div class="card bg-secondary bg-opacity-10 border-secondary h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
@@ -71,21 +71,35 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-xl">
+            <div class="card bg-warning bg-opacity-10 border-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-warning text-uppercase small mb-1">Por vencer</h6>
+                            <h2 class="mb-0">{{ cotizaciones_por_vencer }}</h2>
+                        </div>
+                        <i class="bi bi-clock text-warning fs-1 opacity-50"></i>
+                    </div>
+                    <small class="text-muted">1 día hábil o menos</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl">
             <div class="card bg-danger bg-opacity-10 border-danger h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="text-danger text-uppercase small mb-1">Urgentes (+3 días)</h6>
-                            <h2 class="mb-0">{{ cotizaciones_urgentes }}</h2>
+                            <h6 class="text-danger text-uppercase small mb-1">Vencidas</h6>
+                            <h2 class="mb-0">{{ cotizaciones_vencidas }}</h2>
                         </div>
                         <i class="bi bi-exclamation-triangle text-danger fs-1 opacity-50"></i>
                     </div>
-                    <small class="text-muted">Sin respuesta</small>
+                    <small class="text-muted">Pasaron 5 días hábiles</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-xl">
             <div class="card bg-success bg-opacity-10 border-success h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
@@ -139,8 +153,8 @@ múltiples proveedores por cotización, en lugar del antiguo sistema de CompraPr
                 {# Pestaña 2: Recepción ya compartió; se espera respuesta del cliente #}
                 <div class="tab-pane fade" id="tab-compartidas-cliente" role="tabpanel"
                      aria-labelledby="tab-compartidas-cliente-btn" tabindex="0">
-                    {# Sin mostrar_responsable + only: la columna de seguimiento no sale en esta pestaña #}
-                    {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_cliente etiqueta_dias='Días sin resp.' empty_titulo='No hay cotizaciones compartidas al cliente.' empty_detalle='Cuando Recepción las comparta, aparecerán aquí.' only %}
+                    {# mostrar_responsable=True: misma columna que Front (seguimiento o creador) #}
+                    {% include 'almacen/cotizaciones/partials/tabla_panel_cotizaciones.html' with cotizaciones=cotizaciones_cliente etiqueta_dias='Días sin resp.' empty_titulo='No hay cotizaciones compartidas al cliente.' empty_detalle='Cuando Recepción las comparta, aparecerán aquí.' mostrar_responsable=True only %}
                 </div>
             </div>
         </div>
