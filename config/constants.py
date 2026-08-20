@@ -940,6 +940,18 @@ INCLUSIONES_SERVICIO_ADICIONAL = {
         'Instalación de S.O. y drivers',
         'Transferencia de datos',
     ],
+    'limpieza': [
+        'Kit de limpieza',
+    ],
+}
+
+# Notas extra debajo de los bullets (PDF). Distinto de las inclusiones:
+# no es “qué trae el servicio”, es un aviso al cliente (ej. cada 6 meses).
+NOTAS_SERVICIO_ADICIONAL = {
+    'limpieza': (
+        'Se recomienda realizar un mantenimiento al equipo cada 6 meses '
+        'para alargar su vida útil.'
+    ),
 }
 
 # Países donde aplican inclusiones de paquetes (Solución Plata, etc.) en el PDF.
@@ -955,7 +967,7 @@ def obtener_inclusiones_servicio_adicional(tipo_servicio, pais_codigo='MX'):
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Solo México muestra estas inclusiones en el PDF. Si el tipo no tiene
-    catálogo (ej. limpieza suelta) o el país no es MX, regresa None.
+    catálogo (ej. kit de limpieza suelto) o el país no es MX, regresa None.
 
     Args:
         tipo_servicio (str): Código del choice (ej. 'paquete_plata').
@@ -974,6 +986,26 @@ def obtener_inclusiones_servicio_adicional(tipo_servicio, pais_codigo='MX'):
     return list(inclusiones)
 
 
+def obtener_nota_servicio_adicional(tipo_servicio, pais_codigo='MX'):
+    """
+    Devuelve la nota informativa de un servicio adicional (si aplica).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Igual que las inclusiones: solo México. Si el tipo no tiene nota
+    (ej. Solución Plata) o el país no es MX, regresa None.
+
+    Args:
+        tipo_servicio (str): Código del choice (ej. 'limpieza').
+        pais_codigo (str): Código ISO del país activo (ej. 'MX', 'AR').
+
+    Returns:
+        str | None: Texto de la nota, o None si no aplica.
+    """
+    if pais_codigo not in PAISES_INCLUSIONES_SERVICIO_ADICIONAL:
+        return None
+    return NOTAS_SERVICIO_ADICIONAL.get(tipo_servicio)
+
+
 def formatear_descripcion_servicio_con_inclusiones(
     nombre_display,
     tipo_servicio,
@@ -988,15 +1020,19 @@ def formatear_descripcion_servicio_con_inclusiones(
         pais_codigo (str): Código ISO del país activo.
 
     Returns:
-        str: Solo el nombre, o nombre + bullets con <br/> si hay inclusiones.
+        str: Solo el nombre, o nombre + bullets/nota con <br/> si hay detalle.
     """
     inclusiones = obtener_inclusiones_servicio_adicional(tipo_servicio, pais_codigo)
-    if not inclusiones:
+    nota = obtener_nota_servicio_adicional(tipo_servicio, pais_codigo)
+    if not inclusiones and not nota:
         return nombre_display
-    # ReportLab Paragraph acepta HTML básico: negrita en el título + bullets
+    # ReportLab Paragraph acepta HTML básico: negrita, bullets y cursiva
     lineas = [f'<b>{nombre_display}</b>']
-    for item in inclusiones:
-        lineas.append(f'• {item}')
+    if inclusiones:
+        for item in inclusiones:
+            lineas.append(f'• {item}')
+    if nota:
+        lineas.append(f'<i>{nota}</i>')
     return '<br/>'.join(lineas)
 
 
