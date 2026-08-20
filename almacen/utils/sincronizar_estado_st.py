@@ -141,6 +141,8 @@ ESTADO_ST_CLIENTE_ACEPTA = 'cliente_acepta_cotizacion'
 ESTADOS_ST_ANTES_DE_REPARACION_POR_SERVICIO = (
     ESTADO_ST_ESPERANDO_CLIENTE,
     ESTADO_ST_CLIENTE_ACEPTA,
+    # FL- nace en «almacen»; si solo aceptaron servicio, también avanzamos.
+    'almacen',
 )
 
 # Etiquetas legibles para comentarios de historial

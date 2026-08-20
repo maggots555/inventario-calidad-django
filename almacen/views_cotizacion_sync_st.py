@@ -145,6 +145,7 @@ def generar_compras_solicitud(request, pk):
                 )
         
         # Generar VentaMostrador para servicios adicionales (paquetes, limpieza, etc.)
+        venta = None
         if puede_generar_venta:
             venta = solicitud.generar_venta_mostrador()
             if venta:
@@ -154,9 +155,10 @@ def generar_compras_solicitud(request, pk):
 
         # EXPLICACIÓN: sin piezas que pedir no hay «espera de pieza». Front
         # registró el servicio → solicitud completada y orden En reparación.
-        if puede_generar_venta and not puede_generar_compras:
+        # Solo si la VentaMostrador sí se creó: no cerramos a ciegas.
+        if venta and not puede_generar_compras:
             solicitud.refresh_from_db()
-            if solicitud.estado not in ('completada', 'cancelada'):
+            if solicitud.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
                 solicitud.estado = 'completada'
                 solicitud.fecha_completada = timezone.now()
                 solicitud.save(update_fields=['estado', 'fecha_completada'])

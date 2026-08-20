@@ -4156,14 +4156,23 @@ class SolicitudCotizacion(models.Model):
     def puede_generar_venta_mostrador(self):
         """
         Verifica si se puede crear/actualizar VentaMostrador.
-        
+
         Condiciones:
+        - La solicitud ya cerró respuesta del cliente (parcial o total aprobada)
         - Debe tener orden_servicio vinculada
         - Debe haber al menos un servicio adicional aprobado sin procesar
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Sin exigir el cierre, el botón «Generar servicio» aparecería en cuanto
+        el cliente acepte la limpieza, aunque todavía falte responder piezas.
+        Eso completaría la solicitud a medias. Mismo criterio que
+        puede_generar_compras().
         """
+        if self.estado not in ['totalmente_aprobada', 'parcialmente_aprobada']:
+            return False
         if not self.orden_servicio:
             return False
-        
+
         return self.servicios_adicionales.filter(
             estado_cliente='aprobada'
         ).exclude(

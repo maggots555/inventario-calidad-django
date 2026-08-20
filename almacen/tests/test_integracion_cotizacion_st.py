@@ -344,6 +344,36 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
         # La cotización ST no debe verse como rechazada: aceptaron el servicio.
         self.assertIs(self.cotizacion.usuario_acepto, True)
 
+    def test_no_genera_servicio_si_aun_faltan_piezas_por_responder(self) -> None:
+        """
+        Borde: el cliente aceptó la limpieza pero la pieza sigue pendiente.
+
+        EXPLICACIÓN: el botón no debe aparecer (ni el POST cerrar la solicitud)
+        hasta que TODAS las líneas tengan respuesta. Si no, se completaría
+        a medias y la orden saltaría a En reparación con piezas sin decidir.
+        """
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'enviada_cliente')
+        self.assertFalse(self.solicitud.puede_generar_venta_mostrador())
+        self.assertFalse(self.solicitud.puede_generar_compras())
+
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user_front, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        self.solicitud.refresh_from_db()
+        self.orden.refresh_from_db()
+        self.servicio.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'enviada_cliente')
+        self.assertEqual(self.orden.estado, 'cotizacion')
+        self.assertEqual(self.servicio.estado_cliente, 'aprobada')
+        self.assertEqual(VentaMostrador.objects.filter(orden=self.orden).count(), 0)
+
     def test_front_genera_servicio_sin_compra_y_pasa_a_reparacion(self) -> None:
         """
         POST como Front: crea VentaMostrador, no CompraProducto,
