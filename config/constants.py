@@ -942,15 +942,7 @@ INCLUSIONES_SERVICIO_ADICIONAL = {
     ],
 }
 
-# Aviso comercial cuando el documento (PDF/email) es solo de servicios.
-# El diagnóstico se cobra al ingresar el equipo y no forma parte de esta cotización.
-AVISO_DIAGNOSTICO_SOLO_SERVICIOS = (
-    'Este documento no incluye el cargo de diagnóstico. '
-    'El diagnóstico se cobra por separado al ingresar el equipo; '
-    'la reparación se abona en su totalidad.'
-)
-
-# Países donde aplican inclusiones de paquetes y el aviso de diagnóstico.
+# Países donde aplican inclusiones de paquetes (Solución Plata, etc.) en el PDF.
 PAISES_INCLUSIONES_SERVICIO_ADICIONAL = ('MX',)
 
 # ============================================================================
@@ -1006,23 +998,6 @@ def formatear_descripcion_servicio_con_inclusiones(
     for item in inclusiones:
         lineas.append(f'• {item}')
     return '<br/>'.join(lineas)
-
-
-def debe_mostrar_aviso_diagnostico_solo_servicios(pais_codigo, solo_servicios):
-    """
-    Indica si el PDF/email debe mostrar el aviso de diagnóstico (solo servicios).
-
-    Args:
-        pais_codigo (str): Código ISO del país (ej. 'MX').
-        solo_servicios (bool): True si el documento no tiene piezas.
-
-    Returns:
-        bool: True solo en México y cuando el envío es únicamente servicios.
-    """
-    return (
-        bool(solo_servicios)
-        and pais_codigo in PAISES_INCLUSIONES_SERVICIO_ADICIONAL
-    )
 
 
 def obtener_nombre_tipo_producto(codigo_tipo):

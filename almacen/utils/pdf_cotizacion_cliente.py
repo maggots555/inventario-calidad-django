@@ -57,11 +57,6 @@ from django.contrib.staticfiles import finders
 # python-decouple — lectura de variables de entorno
 from decouple import config as env_config
 
-from config.constants import (
-    AVISO_DIAGNOSTICO_SOLO_SERVICIOS,
-    debe_mostrar_aviso_diagnostico_solo_servicios,
-)
-
 logger = logging.getLogger('almacen')
 
 
@@ -1615,10 +1610,6 @@ class PDFCotizacionCliente:
         tabla_totales.setStyle(TableStyle(estilos_totales))
         elementos.append(tabla_totales)
 
-        # Aviso México: documentos solo-servicios no incluyen cargo de diagnóstico
-        # (cubre también el PDF de "Servicios" del modo piezas_vs_servicios)
-        elementos += self._construir_aviso_diagnostico_solo_servicios()
-
         # Nota final: referencia a términos en página siguiente
         elementos.append(Spacer(1, 4 * mm))
         elementos.append(Paragraph(
@@ -1633,60 +1624,6 @@ class PDFCotizacionCliente:
         ))
 
         return elementos
-
-    def _es_documento_solo_servicios(self) -> bool:
-        """
-        True si este PDF no tiene piezas (solo servicios adicionales).
-
-        Returns:
-            bool: Resultado según self.items.
-        """
-        hay_piezas = any(not item.get('es_servicio') for item in self.items)
-        hay_servicios = any(item.get('es_servicio') for item in self.items)
-        return (not hay_piezas) and hay_servicios
-
-    def _construir_aviso_diagnostico_solo_servicios(self) -> List:
-        """
-        Bloque de aviso cuando el PDF es solo servicios (México).
-
-        EXPLICACIÓN PARA PRINCIPIANTES:
-        El diagnóstico se cobra al ingresar el equipo y no forma parte de
-        esta cotización. Aquí lo aclaramos cuando el documento solo trae
-        servicios adicionales (sin piezas).
-
-        Returns:
-            Lista de flowables ReportLab (puede ser vacía).
-        """
-        pais_codigo = (self.pais_config or {}).get('codigo', '')
-        if not debe_mostrar_aviso_diagnostico_solo_servicios(
-            pais_codigo=pais_codigo,
-            solo_servicios=self._es_documento_solo_servicios(),
-        ):
-            return []
-
-        estilo_aviso = ParagraphStyle(
-            'AvisoDiagSoloServicios',
-            fontName='Helvetica',
-            fontSize=8,
-            leading=11,
-            textColor=COLOR_ROJO_TEXTO,
-            alignment=TA_LEFT,
-        )
-        # Tabla de una celda para borde/fondo sin usar gradientes
-        tabla_aviso = Table(
-            [[Paragraph(AVISO_DIAGNOSTICO_SOLO_SERVICIOS, estilo_aviso)]],
-            colWidths=[letter[0] - 2 * MARGEN],
-        )
-        tabla_aviso.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), COLOR_ROJO_BG),
-            ('BOX', (0, 0), (-1, -1), 0.8, COLOR_ROJO_ALERTA),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        return [Spacer(1, 3 * mm), tabla_aviso]
 
     # -------------------------------------------------------------------------
     # SECCIÓN 7: TÉRMINOS Y CONDICIONES (página adicional)

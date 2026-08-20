@@ -217,19 +217,20 @@
         .pdf-notice strong {
             color: #e65100;
         }
-        /* Aviso México: cotización solo servicios (diagnóstico cobrado aparte) */
-        .aviso-solo-servicios {
-            background-color: #FDECEC;
-            border: 1px solid #C00000;
+        /* Aviso informativo: la cotización incluye Solución Plata (detalle en el PDF).
+           Amarillo a propósito: no es una alerta, solo un dato para el cliente. */
+        .aviso-paquete-plata {
+            background-color: #fff8e1;
+            border: 1px solid #ffe082;
             border-radius: 6px;
             padding: 14px 18px;
             font-size: 13px;
-            color: #8B0000;
+            color: #5d4037;
             margin-bottom: 16px;
             line-height: 1.45;
         }
-        .aviso-solo-servicios strong {
-            color: #8B0000;
+        .aviso-paquete-plata strong {
+            color: #e65100;
         }
         /* Mensaje personalizado del usuario */
         .mensaje-personalizado {
@@ -550,18 +551,8 @@
             </div>
         </div>
 
-        {% if mostrar_aviso_diagnostico_solo_servicios %}
-        <div class="aviso-solo-servicios">
-            <strong>Aviso importante:</strong>
-            {{ aviso_diagnostico_solo_servicios }}
-            {% if incluye_paquete_plata %}
-            <br><br>
-            Esta cotización incluye <strong>Solución Plata</strong>.
-            Consulte en el PDF adjunto el detalle de lo que incluye el paquete.
-            {% endif %}
-        </div>
-        {% elif incluye_paquete_plata %}
-        <div class="aviso-solo-servicios">
+        {% if incluye_paquete_plata %}
+        <div class="aviso-paquete-plata">
             Esta cotización incluye <strong>Solución Plata</strong>.
             Consulte en el PDF adjunto el detalle de lo que incluye el paquete.
         </div>
