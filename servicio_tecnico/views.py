@@ -110,6 +110,10 @@ from .views_dashboard_cotizaciones import (  # noqa: F401
 from .views_export_productividad_tecnicos import (  # noqa: F401
     exportar_productividad_tecnicos,
 )
+from .views_export_garantia import (  # noqa: F401
+    exportar_base_garantia,
+    exportar_excel_base_garantia,
+)
 from .views_dashboard_seguimiento_piezas import (  # noqa: F401
     dashboard_seguimiento_piezas,
     exportar_dashboard_seguimiento_piezas,

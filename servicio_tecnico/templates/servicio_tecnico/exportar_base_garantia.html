@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Exportar base garantía - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard_oow_fl.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-1">
+                <i class="bi bi-file-earmark-excel"></i>
+                Exportar base de servicios en garantía
+            </h2>
+            <p class="text-muted mb-0">
+                Descarga el Excel de seguimiento (resumen, responsables, sucursales y lista maestra)
+                solo de órdenes <strong>dentro de garantía</strong>.
+                No incluye el dashboard OOW/FL ni ventas mostrador.
+            </p>
+        </div>
+    </div>
+
+    <div class="filter-section mb-4">
+        <form method="get"
+              action="{% url 'servicio_tecnico:exportar_base_garantia' %}"
+              id="formFiltrosGarantia"
+              class="row g-3">
+
+            <div class="col-md-3">
+                <label for="responsable_id" class="form-label fw-bold">
+                    <i class="bi bi-person-badge"></i> Responsable
+                </label>
+                <select name="responsable_id" id="responsable_id" class="form-select">
+                    <option value="">Todos los responsables</option>
+                    <option value="sin_asignar" {% if filtros.responsable_id == "sin_asignar" %}selected{% endif %}>
+                        Sin asignar
+                    </option>
+                    {% for responsable in lista_responsables %}
+                    <option value="{{ responsable.id }}"
+                            {% if filtros.responsable_id|stringformat:"s" == responsable.id|stringformat:"s" %}selected{% endif %}>
+                        {{ responsable.nombre_completo }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label for="fecha_desde" class="form-label fw-bold">
+                    <i class="bi bi-calendar-event"></i> Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde"
+                       class="form-control" value="{{ filtros.fecha_desde }}">
+            </div>
+
+            <div class="col-md-2">
+                <label for="fecha_hasta" class="form-label fw-bold">
+                    <i class="bi bi-calendar-week"></i> Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta"
+                       class="form-control" value="{{ filtros.fecha_hasta }}">
+            </div>
+
+            <div class="col-md-2">
+                <label for="estado" class="form-label fw-bold">
+                    <i class="bi bi-list-check"></i> Estado
+                </label>
+                <select name="estado" id="estado" class="form-select">
+                    <option value="">Todos los estados</option>
+                    {% for codigo, nombre in lista_estados %}
+                    <option value="{{ codigo }}" {% if filtros.estado == codigo %}selected{% endif %}>
+                        {{ nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label for="sucursal_id" class="form-label fw-bold">
+                    <i class="bi bi-building"></i> Sucursal
+                </label>
+                <select name="sucursal_id" id="sucursal_id" class="form-select">
+                    <option value="">Todas las sucursales</option>
+                    {% for sucursal in lista_sucursales %}
+                    <option value="{{ sucursal.id }}"
+                            {% if filtros.sucursal_id|stringformat:"s" == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                        {{ sucursal.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 d-flex flex-wrap align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Aplicar filtros
+                </button>
+                <a href="{% url 'servicio_tecnico:exportar_base_garantia' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Limpiar
+                </a>
+                {# formaction: el mismo formulario GET se manda a la URL de descarga, sin JavaScript. #}
+                <button type="submit"
+                        class="btn btn-success"
+                        formaction="{% url 'servicio_tecnico:exportar_excel_base_garantia' %}">
+                    <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card metric-card" style="border-left-color: var(--primary-color); max-width: 28rem;">
+        <div class="card-body">
+            <p class="metric-value text-primary mb-1">{{ total_ordenes }}</p>
+            <p class="metric-label mb-0">
+                órdenes en garantía con los filtros actuales
+            </p>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

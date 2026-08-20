@@ -356,6 +356,19 @@ urlpatterns = [
          views.exportar_concentrado_excel,
          name='exportar_concentrado_excel'),
 
+    # ========================================================================
+    # EXPORTAR BASE GARANTÍA (Agosto 2026)
+    # ========================================================================
+    # Página liviana (filtros + conteo) y descarga Excel de órdenes
+    # con es_fuera_garantia=False. No es un dashboard: cuando exista
+    # el tablero de garantía, esta misma URL de export se reutiliza.
+    path('reportes/base-garantia/',
+         views.exportar_base_garantia,
+         name='exportar_base_garantia'),
+    path('reportes/base-garantia/exportar-excel/',
+         views.exportar_excel_base_garantia,
+         name='exportar_excel_base_garantia'),
+
     # Exportación a PDF del concentrado (landscape, 3 tablas)
     path('concentrado-semanal/exportar-pdf/',
          views.exportar_concentrado_pdf,
