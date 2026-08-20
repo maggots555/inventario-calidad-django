@@ -10,6 +10,8 @@ llaman las vistas HTTP (RequestFactory) para recorrer el flujo de negocio:
 2) Sin orden: generar compras debe bloquearse.
 3) Sin orden: vincular orden → entonces sí se pueden generar compras.
 4) Rechazo total: rechazar todas + motivo catálogo → Cotizacion ST coherente.
+5) Solo servicio (piezas rechazadas): Front genera servicio → VentaMostrador
+   + orden En reparación; Front NO puede generar compras de piezas.
 
 Los fixtures compartidos viven en helpers_integracion_cotizacion.py
 (también los usa test_e2e_flujo_dinero.py).
@@ -19,10 +21,16 @@ Celery / envío de correo se mockean (.delay) para no tocar IO real en CI.
 
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
-from almacen.models import CompraProducto
+from decimal import Decimal
+
+from almacen.models import CompraProducto, LineaServicioAdicional, SolicitudCotizacion
 from almacen.tests.helpers_integracion_cotizacion import (
     BaseIntegracionCotizacionMixin,
     request_post,
@@ -36,7 +44,9 @@ from almacen.views import (
     registrar_motivo_rechazo_st,
     vincular_orden_solicitud,
 )
-from servicio_tecnico.models import Cotizacion
+from servicio_tecnico.models import Cotizacion, VentaMostrador
+
+User = get_user_model()
 
 
 class IntegracionCotizacionConOrdenTest(BaseIntegracionCotizacionMixin, TestCase):
@@ -258,3 +268,129 @@ class IntegracionCotizacionSinOrdenTest(BaseIntegracionCotizacionMixin, TestCase
         compra = CompraProducto.objects.get(pk=self.linea.compra_generada_id)
         self.assertEqual(compra.orden_servicio_id, self.orden.pk)
         self.assertEqual(compra.producto_id, self.producto.pk)
+
+
+def _usuario_front_sin_compras(*, username: str):
+    """
+    Usuario con permiso de editar solicitudes, sin permiso de crear compras.
+
+    Simula al Recepcionista (Front): puede pulsar «Generar servicio»
+    pero no «Generar Compras» de piezas.
+
+    Args:
+        username: Nombre único del user de prueba.
+
+    Returns:
+        User recargado (caché de permisos fresca).
+    """
+    user = User.objects.create_user(username=username, password='testpass123')
+    content_type = ContentType.objects.get_for_model(SolicitudCotizacion)
+    permiso = Permission.objects.get(
+        content_type=content_type,
+        codename='change_solicitudcotizacion',
+    )
+    user.user_permissions.add(permiso)
+    return User.objects.get(pk=user.pk)
+
+
+class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCase):
+    """
+    Cliente rechaza todas las piezas y solo acepta un servicio adicional.
+
+    Objetivo de negocio:
+        Front debe poder registrar el servicio (VentaMostrador), completar
+        la solicitud y pasar la orden a En reparación, sin crear CompraProducto.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='SRV')
+        self.orden = self._crear_orden_con_detalle(orden_cliente='OOW-INT-SRV-01')
+        self.solicitud, self.linea = self._crear_solicitud_con_linea(
+            orden=self.orden,
+            sin_orden_activa=False,
+            estado='enviada_cliente',
+            estado_linea='pendiente',
+        )
+        # El servicio debe existir ANTES de responder las piezas: si no, al
+        # rechazar la única línea la solicitud se cierra como totalmente_rechazada.
+        self.servicio = LineaServicioAdicional.objects.create(
+            solicitud=self.solicitud,
+            tipo_servicio='limpieza',
+            costo=Decimal('450.00'),
+            estado_cliente='pendiente',
+        )
+        self.cotizacion = Cotizacion.objects.get(orden=self.orden)
+        self.user_front = _usuario_front_sin_compras(username='front_int_srv')
+
+    def _cerrar_solo_servicio(self) -> None:
+        """Rechaza la pieza y aprueba la limpieza (cierra la solicitud)."""
+        self.assertTrue(self.linea.rechazar(motivo='Cliente no autorizó la pieza'))
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self.orden.refresh_from_db()
+        self.cotizacion.refresh_from_db()
+
+    def test_rechazar_piezas_y_aceptar_servicio_deja_flags_correctos(self) -> None:
+        """
+        Tras responder: parcialmente_aprobada, orden acepta cotización,
+        botón de compras apagado y botón de servicio encendido.
+        """
+        self._cerrar_solo_servicio()
+
+        self.assertEqual(self.solicitud.estado, 'parcialmente_aprobada')
+        self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
+        self.assertFalse(self.solicitud.puede_generar_compras())
+        self.assertTrue(self.solicitud.puede_generar_venta_mostrador())
+        # La cotización ST no debe verse como rechazada: aceptaron el servicio.
+        self.assertIs(self.cotizacion.usuario_acepto, True)
+
+    def test_front_genera_servicio_sin_compra_y_pasa_a_reparacion(self) -> None:
+        """
+        POST como Front: crea VentaMostrador, no CompraProducto,
+        solicitud completada y orden En reparación.
+        """
+        self._cerrar_solo_servicio()
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user_front, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        self.solicitud.refresh_from_db()
+        self.orden.refresh_from_db()
+        self.servicio.refresh_from_db()
+
+        self.assertEqual(CompraProducto.objects.count(), 0)
+        self.assertEqual(self.solicitud.estado, 'completada')
+        self.assertEqual(self.orden.estado, 'reparacion')
+        self.assertEqual(self.servicio.estado_cliente, 'compra_generada')
+
+        venta = VentaMostrador.objects.get(orden=self.orden)
+        self.assertTrue(venta.incluye_limpieza)
+        self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+
+    def test_front_no_puede_generar_compras_de_piezas(self) -> None:
+        """
+        Si hay piezas aprobadas, Front se bloquea y no nace CompraProducto.
+        """
+        self.assertTrue(self.linea.aprobar())
+        self.assertTrue(self.servicio.rechazar(motivo='No lo quiere'))
+        self.solicitud.refresh_from_db()
+        self.assertTrue(self.solicitud.puede_generar_compras())
+
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user_front, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        textos = [str(m.message) for m in get_messages(request)]
+        self.assertTrue(any('Solo Compras' in t for t in textos))
+        self.assertEqual(CompraProducto.objects.count(), 0)
+        self.linea.refresh_from_db()
+        self.assertEqual(self.linea.estado_cliente, 'aprobada')
+        self.assertIsNone(self.linea.compra_generada_id)

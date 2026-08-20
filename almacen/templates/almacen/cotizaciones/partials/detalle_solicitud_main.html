@@ -844,6 +844,14 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             <i class="bi bi-cart-plus me-1"></i>Generar Compras
         </button>
     </form>
+    {% elif solicitud.puede_generar_venta_mostrador %}
+    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}" class="flex-grow-1">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-dock-primary w-100"
+                onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+            <i class="bi bi-wrench me-1"></i>Generar servicio
+        </button>
+    </form>
     {% elif solicitud.compras_pendientes_sin_orden and solicitud.puede_vincular_orden %}
     <button type="button" class="btn btn-success btn-dock-primary flex-grow-1"
             data-solicitud-pk="{{ solicitud.pk }}"
@@ -857,6 +865,20 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             aria-disabled="true"
             title="Primero crea o vincula una orden de servicio">
         <i class="bi bi-cart-plus me-1"></i>Generar Compras
+    </button>
+    {% elif solicitud.servicios_pendientes_sin_orden and solicitud.puede_vincular_orden %}
+    <button type="button" class="btn btn-success btn-dock-primary flex-grow-1"
+            data-solicitud-pk="{{ solicitud.pk }}"
+            data-url-datos="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-url-post="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-bs-toggle="modal" data-bs-target="#modalCrearOrdenFL">
+        <i class="bi bi-plus-circle me-1"></i>Crear Orden
+    </button>
+    {% elif solicitud.servicios_pendientes_sin_orden %}
+    <button type="button" class="btn btn-primary btn-dock-primary flex-grow-1" disabled
+            aria-disabled="true"
+            title="Primero crea o vincula una orden de servicio">
+        <i class="bi bi-wrench me-1"></i>Generar servicio
     </button>
     {% elif solicitud.estado == 'enviada_cliente' and mostrar_enviar_cotizacion_cliente %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">

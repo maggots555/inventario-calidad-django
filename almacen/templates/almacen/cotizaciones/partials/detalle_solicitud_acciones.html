@@ -177,6 +177,15 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
             <i class="bi bi-cart-plus me-2"></i>Generar Compras
         </button>
     </form>
+    {% elif solicitud.puede_generar_venta_mostrador %}
+    {# EXPLICACIÓN: si el cliente solo aceptó servicios (limpieza, respaldo, etc.) no hay piezas que comprar. Front registra el servicio y la orden pasa a En reparación. #}
+    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100"
+                onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+            <i class="bi bi-wrench me-2"></i>Generar servicio
+        </button>
+    </form>
     {% elif solicitud.compras_pendientes_sin_orden %}
     <button type="button" class="btn btn-primary w-100" disabled
             aria-disabled="true"
@@ -186,6 +195,16 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     <p class="detalle-compras-bloqueadas small mb-0">
         <i class="bi bi-info-circle me-1"></i>
         Primero crea o vincula una orden de servicio para dar seguimiento en Servicio Técnico.
+    </p>
+    {% elif solicitud.servicios_pendientes_sin_orden %}
+    <button type="button" class="btn btn-primary w-100" disabled
+            aria-disabled="true"
+            title="Primero crea o vincula una orden de servicio">
+        <i class="bi bi-wrench me-2"></i>Generar servicio
+    </button>
+    <p class="detalle-compras-bloqueadas small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        Primero crea o vincula una orden de servicio para registrar el servicio en Servicio Técnico.
     </p>
     {% endif %}
 

@@ -4031,6 +4031,25 @@ class SolicitudCotizacion(models.Model):
                 estado_cliente='aprobada', compra_generada__isnull=True
             ).exists()
         )
+
+    def servicios_pendientes_sin_orden(self):
+        """
+        Indica si hay servicios adicionales aprobados pero falta crear/vincular orden.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Es el gemelo de compras_pendientes_sin_orden() para el caso «solo
+        aceptó limpieza/respaldo». La UI muestra «Generar servicio» apagado
+        hasta que exista una OrdenServicio donde registrar la VentaMostrador.
+
+        Returns:
+            bool: True si hay servicios aprobados y aún no hay orden vinculada.
+        """
+        return (
+            self.sin_orden_activa
+            and not self.orden_servicio
+            and self.estado in ['totalmente_aprobada', 'parcialmente_aprobada']
+            and self.servicios_adicionales.filter(estado_cliente='aprobada').exists()
+        )
     
     def generar_compras(self, usuario=None):
         """
@@ -4994,8 +5013,8 @@ class LineaCotizacion(models.Model):
         actualiza el campo usuario_acepto de la Cotizacion en ST:
         
         - Si TODAS las piezas tienen respuesta → establece usuario_acepto
-        - Si al menos una fue aceptada → usuario_acepto = True
-        - Si todas fueron rechazadas → usuario_acepto = False
+        - Si al menos una pieza o un servicio adicional fue aceptado → True
+        - Si todas las piezas fueron rechazadas Y no hay servicio aceptado → False
         - Si aún hay pendientes → usuario_acepto = None
         """
         from servicio_tecnico.models import Cotizacion
@@ -5016,8 +5035,13 @@ class LineaCotizacion(models.Model):
         
         # Solo actualizar si todas las piezas tienen respuesta
         if pendientes == 0 and total_piezas > 0:
-            # Si al menos una fue aceptada, la cotización se considera aceptada
-            if aprobadas > 0:
+            # EXPLICACIÓN: un servicio aprobado (limpieza, respaldo, etc.) también
+            # cuenta como aceptación. Si no, el detalle ST mostraría «rechazada»
+            # aunque la orden esté en Cliente Acepta Cotización.
+            servicios_aprobados = self.solicitud.servicios_adicionales.filter(
+                estado_cliente='aprobada',
+            ).exists()
+            if aprobadas > 0 or servicios_aprobados:
                 cotizacion.usuario_acepto = True
             else:
                 cotizacion.usuario_acepto = False

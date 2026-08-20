@@ -6,8 +6,11 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 Cuando el cliente termina de responder (todas las piezas/servicios), la
 solicitud queda en uno de estos estados:
 
-- totalmente_aprobada / parcialmente_aprobada → avisar a Compras
-  (piezas aceptadas, para pedir al proveedor y Generar compras).
+- totalmente_aprobada / parcialmente_aprobada CON piezas aceptadas
+  → avisar a Compras (pedir al proveedor y Generar compras).
+- totalmente_aprobada / parcialmente_aprobada SOLO con servicios
+  (el cliente no aceptó piezas) → avisar al responsable de seguimiento
+  para que pulse «Generar servicio». No se avisa a Compras.
 - totalmente_rechazada → avisar a Compras + técnico asignado +
   responsable de seguimiento (si hay orden ST).
 
@@ -171,16 +174,67 @@ def enviar_push_y_campanita(
     return contador
 
 
+def obtener_responsable_seguimiento_activo(
+    solicitud: 'SolicitudCotizacion',
+) -> Optional['Empleado']:
+    """
+    Responsable de seguimiento de la orden, si tiene usuario de sistema activo.
+
+    Args:
+        solicitud: Solicitud con o sin orden_servicio.
+
+    Returns:
+        Empleado o None.
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is None:
+        return None
+    empleado = getattr(orden, 'responsable_seguimiento', None)
+    if empleado is None:
+        return None
+    user = getattr(empleado, 'user', None)
+    if user is None or not user.is_active:
+        return None
+    return empleado
+
+
+def solicitud_tiene_piezas_aprobadas(solicitud: 'SolicitudCotizacion') -> bool:
+    """
+    True si el cliente aceptó al menos una pieza (hay algo que comprar).
+
+    Args:
+        solicitud: Solicitud ya cerrada (parcial/total aprobada).
+
+    Returns:
+        bool: True si existe LineaCotizacion con estado_cliente='aprobada'.
+    """
+    return solicitud.lineas.filter(estado_cliente='aprobada').exists()
+
+
 def notificar_cotizacion_aceptada(solicitud: 'SolicitudCotizacion') -> None:
     """
-    Avisa a Compras que el cliente aceptó (total o parcial).
+    Avisa quién debe continuar tras una aceptación total o parcial.
 
     Efectos secundarios:
-        - Push + campanita a cada empleado rol=compras
-        - Encola email Celery (multi-tenant con db_alias)
+        - Si hay piezas aprobadas: push + campanita + email Celery a Compras.
+        - Si solo hay servicios aceptados: push + campanita al responsable
+          de seguimiento (Front). No se avisa a Compras.
 
     Args:
         solicitud: Solicitud en totalmente_aprobada o parcialmente_aprobada.
+    """
+    if solicitud_tiene_piezas_aprobadas(solicitud):
+        _notificar_aceptacion_a_compras(solicitud)
+        return
+    _notificar_aceptacion_solo_servicios(solicitud)
+
+
+def _notificar_aceptacion_a_compras(solicitud: 'SolicitudCotizacion') -> None:
+    """
+    Camino clásico: el cliente aceptó piezas y Compras debe pedirlas.
+
+    Args:
+        solicitud: Solicitud con al menos una LineaCotizacion aprobada.
     """
     from config.paises_config import get_pais_actual
     from almacen.tasks import notificar_compras_cotizacion_aceptada_task
@@ -217,6 +271,41 @@ def notificar_cotizacion_aceptada(solicitud: 'SolicitudCotizacion') -> None:
     )
     logger.info(
         '[NOTIF-COTIZ] Aceptación %s: push/campanita a %s compra(s); email encolado',
+        solicitud.numero_solicitud,
+        enviados,
+    )
+
+
+def _notificar_aceptacion_solo_servicios(solicitud: 'SolicitudCotizacion') -> None:
+    """
+    El cliente no aceptó piezas: Front debe registrar el servicio en ST.
+
+    Args:
+        solicitud: Solicitud aprobada/parcial sin líneas de pieza aceptadas.
+    """
+    responsable = obtener_responsable_seguimiento_activo(solicitud)
+    if responsable is None:
+        logger.info(
+            '[NOTIF-COTIZ] Aceptación solo-servicio %s: sin responsable de seguimiento activo',
+            solicitud.numero_solicitud,
+        )
+        return
+
+    url = _url_detalle_solicitud(solicitud)
+    titulo = f'Servicio aceptado: {solicitud.numero_solicitud}'
+    mensaje = (
+        f'{_resumen_cliente_solicitud(solicitud)}. '
+        f'El cliente aceptó solo servicio(s) adicional(es). '
+        f'Usa «Generar servicio» para registrarlos y pasar la orden a En reparación.'
+    )
+    enviados = enviar_push_y_campanita(
+        [responsable],
+        titulo=titulo,
+        mensaje=mensaje,
+        url=url,
+    )
+    logger.info(
+        '[NOTIF-COTIZ] Aceptación solo-servicio %s: push/campanita a responsable (%s)',
         solicitud.numero_solicitud,
         enviados,
     )

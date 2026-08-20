@@ -32,7 +32,7 @@ logger = logging.getLogger('almacen')
 
 
 @login_required
-@permission_required_with_message('almacen.add_compraproducto')
+@permission_required_with_message('almacen.change_solicitudcotizacion')
 def generar_compras_solicitud(request, pk):
     """
     Genera CompraProducto para las líneas aprobadas y VentaMostrador para servicios adicionales.
@@ -54,6 +54,10 @@ def generar_compras_solicitud(request, pk):
     
     3. En órdenes OOW de reparación (no FL-): crea SeguimientoPieza en ST
        agrupados por proveedor y pasa la orden a «Esperando Llegada de Piezas».
+
+    4. Si el cliente SOLO aceptó servicios (sin piezas): registra la VentaMostrador
+       y pasa la orden a «En Reparación». Front puede pulsar este caso; Compras
+       sigue siendo quien genera compras de piezas (permiso add_compraproducto).
     
     Esto integra el flujo de cotizaciones con el flujo existente de compras
     y ventas mostrador.
@@ -68,6 +72,12 @@ def generar_compras_solicitud(request, pk):
                 'Debes crear o vincular una orden de servicio antes de generar las compras.'
             )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+        if solicitud.servicios_pendientes_sin_orden():
+            messages.error(
+                request,
+                'Debes crear o vincular una orden de servicio antes de registrar el servicio.'
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
         puede_generar_compras = solicitud.puede_generar_compras()
         puede_generar_venta = solicitud.puede_generar_venta_mostrador()
@@ -77,6 +87,18 @@ def generar_compras_solicitud(request, pk):
             messages.error(
                 request,
                 'No hay líneas ni servicios aprobados pendientes de procesar.'
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+        # EXPLICACIÓN: Front (Recepcionista) puede confirmar servicios, pero
+        # generar CompraProducto es de Compras (add_compraproducto).
+        if puede_generar_compras and not request.user.has_perm(
+            'almacen.add_compraproducto'
+        ):
+            messages.error(
+                request,
+                'Solo Compras puede generar compras de piezas. '
+                'Si el cliente aceptó únicamente un servicio, usa «Generar servicio».'
             )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         
@@ -129,6 +151,20 @@ def generar_compras_solicitud(request, pk):
                 mensajes_exito.append(
                     f'Venta Mostrador creada/actualizada ({venta.folio_venta})'
                 )
+
+        # EXPLICACIÓN: sin piezas que pedir no hay «espera de pieza». Front
+        # registró el servicio → solicitud completada y orden En reparación.
+        if puede_generar_venta and not puede_generar_compras:
+            solicitud.refresh_from_db()
+            if solicitud.estado not in ('completada', 'cancelada'):
+                solicitud.estado = 'completada'
+                solicitud.fecha_completada = timezone.now()
+                solicitud.save(update_fields=['estado', 'fecha_completada'])
+            from almacen.utils.sincronizar_estado_st import (
+                sincronizar_estado_st_al_confirmar_servicios,
+            )
+            if sincronizar_estado_st_al_confirmar_servicios(solicitud):
+                mensajes_exito.append('orden ST actualizada a «En Reparación»')
         
         # Mostrar mensajes al usuario
         if mensajes_exito:

@@ -134,10 +134,20 @@ MAPEO_RESPUESTA_SOLICITUD_A_ESTADO_ST = {
     'totalmente_rechazada': 'rechazada',
 }
 
+# Destino cuando Front confirma servicios adicionales SIN piezas que comprar.
+# No hay que esperar componente: el técnico puede empezar (limpieza, respaldo, etc.).
+ESTADO_ST_REPARACION = 'reparacion'
+ESTADO_ST_CLIENTE_ACEPTA = 'cliente_acepta_cotizacion'
+ESTADOS_ST_ANTES_DE_REPARACION_POR_SERVICIO = (
+    ESTADO_ST_ESPERANDO_CLIENTE,
+    ESTADO_ST_CLIENTE_ACEPTA,
+)
+
 # Etiquetas legibles para comentarios de historial
 ETIQUETAS_ESTADO_ST = {
     'cliente_acepta_cotizacion': 'Cliente Acepta Cotización',
     'rechazada': 'Cotización Rechazada',
+    'reparacion': 'En Reparación',
 }
 
 ETIQUETAS_RESPUESTA_SOLICITUD = {
@@ -626,6 +636,10 @@ def sincronizar_estado_st_por_respuesta_cliente(
     if not orden:
         return False
 
+    # Alinear Cotizacion.usuario_acepto aunque el estado de la orden no cambie
+    # (por ejemplo si ya estaba en cliente_acepta_cotizacion).
+    marcar_cotizacion_st_segun_respuesta_solicitud(solicitud, estado_sol)
+
     # EXPLICACIÓN: rechazo total también puede venir desde PNC (sin cotización de precios)
     estados_origen_ok = {ESTADO_ST_ESPERANDO_CLIENTE}
     if estado_st_destino == 'rechazada':
@@ -706,6 +720,127 @@ def _enriquecer_historial_respuesta_cliente(
     )
     ultimo.es_sistema = True
     ultimo.save(update_fields=['comentario', 'es_sistema'])
+
+
+def marcar_cotizacion_st_segun_respuesta_solicitud(
+    solicitud: 'SolicitudCotizacion',
+    estado_solicitud: str,
+) -> bool:
+    """
+    Alinea Cotizacion.usuario_acepto con el cierre de la solicitud Almacén.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El flag usuario_acepto de ST se calculaba solo con piezas. Si el cliente
+    rechazaba todas las piezas y aceptaba un servicio (limpieza, respaldo),
+    el detalle de orden mostraba la cotización como rechazada aunque la
+    orden estuviera en «Cliente Acepta Cotización».
+
+    Args:
+        solicitud: Solicitud que acaba de cerrar respuesta del cliente.
+        estado_solicitud: totalmente_aprobada / parcialmente_aprobada / totalmente_rechazada.
+
+    Returns:
+        bool: True si se actualizó la Cotizacion ST.
+
+    Efectos secundarios:
+        Escribe usuario_acepto (y fecha_respuesta si estaba vacía) en Cotizacion.
+    """
+    from django.utils import timezone
+    from servicio_tecnico.models import Cotizacion
+
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    try:
+        cotizacion = Cotizacion.objects.get(orden=orden)
+    except Cotizacion.DoesNotExist:
+        return False
+
+    if estado_solicitud in ('totalmente_aprobada', 'parcialmente_aprobada'):
+        cotizacion.usuario_acepto = True
+    elif estado_solicitud == 'totalmente_rechazada':
+        cotizacion.usuario_acepto = False
+    else:
+        return False
+
+    update_fields = ['usuario_acepto']
+    if not cotizacion.fecha_respuesta:
+        cotizacion.fecha_respuesta = timezone.now()
+        update_fields.append('fecha_respuesta')
+    cotizacion.save(update_fields=update_fields)
+    return True
+
+
+def sincronizar_estado_st_al_confirmar_servicios(
+    solicitud: 'SolicitudCotizacion',
+) -> bool:
+    """
+    Pasa la orden ST a «En Reparación» cuando solo se confirmaron servicios.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Si el cliente no aceptó ninguna pieza, no hay que esperar componentes.
+    Front pulsa «Generar servicio», se crea la VentaMostrador y la orden
+    avanza de «Cliente Acepta Cotización» a «En Reparación».
+
+    No pisa estados posteriores (ya en reparación, calidad, entregada, etc.).
+
+    Args:
+        solicitud: Solicitud con orden_servicio y servicios ya procesados.
+
+    Returns:
+        bool: True si se cambió el estado de la orden.
+
+    Efectos secundarios:
+        Cambia orden.estado y enriquece el HistorialOrden de cambio_estado.
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if not orden:
+        return False
+
+    if orden.estado == ESTADO_ST_REPARACION:
+        return False
+
+    if orden.estado not in ESTADOS_ST_ANTES_DE_REPARACION_POR_SERVICIO:
+        logger.info(
+            f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno} en estado "
+            f"'{orden.estado}'; no se cambia a reparacion por servicios "
+            f"(solicitud {solicitud.numero_solicitud})."
+        )
+        return False
+
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    estado_anterior = orden.estado
+    orden.estado = ESTADO_ST_REPARACION
+    orden.save(update_fields=['estado'])
+
+    ultimo = (
+        orden.historial.filter(
+            tipo_evento='cambio_estado',
+            estado_nuevo=ESTADO_ST_REPARACION,
+        )
+        .order_by('-fecha_evento')
+        .first()
+    )
+    if ultimo:
+        etiqueta_anterior = dict(ESTADO_ORDEN_CHOICES).get(
+            estado_anterior, estado_anterior
+        )
+        ultimo.comentario = (
+            f'Cambio de estado al confirmar servicio(s) adicional(es) desde Almacén: '
+            f'{etiqueta_anterior} → En Reparación '
+            f'(solicitud {solicitud.numero_solicitud})'
+        )
+        ultimo.es_sistema = True
+        ultimo.save(update_fields=['comentario', 'es_sistema'])
+
+    logger.info(
+        f"[SYNC_ESTADO_ST] Orden {orden.numero_orden_interno}: "
+        f"{estado_anterior} → {ESTADO_ST_REPARACION} "
+        f"(solo servicios, solicitud {solicitud.numero_solicitud})"
+    )
+    return True
 
 
 def sincronizar_estado_st_al_recotizar(

@@ -6,7 +6,8 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 Cuando el cliente termina de responder todas las piezas/servicios, el sistema
 debe avisar:
 
-- Aceptación total/parcial → solo rol Compras (push + campanita + email Celery)
+- Aceptación total/parcial CON piezas → solo rol Compras (push + campanita + email Celery)
+- Aceptación SOLO servicios (piezas rechazadas) → responsable de seguimiento; no Compras
 - Rechazo total → Compras + técnico asignado + responsable de seguimiento
 
 Estos tests mockean push/campanita/Celery para no enviar nada real en CI.
@@ -18,7 +19,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from almacen.models import LineaCotizacion, SolicitudCotizacion
+from almacen.models import LineaCotizacion, LineaServicioAdicional, SolicitudCotizacion
 from almacen.tests.helpers_integracion_cotizacion import BaseIntegracionCotizacionMixin
 from almacen.utils.notificar_respuesta_cotizacion import (
     obtener_destinatarios_rechazo,
@@ -358,3 +359,49 @@ class NotificarRespuestaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase)
         solicitud.actualizar_estado_segun_lineas()
         self.assertEqual(mock_delay_aceptada.call_count, 1)
         self.assertEqual(mock_push_campanita.call_count, 1)
+
+    @patch('almacen.utils.notificar_respuesta_cotizacion.enviar_push_y_campanita')
+    @patch(
+        'almacen.tasks.notificar_compras_cotizacion_aceptada_task.delay'
+    )
+    def test_aceptacion_solo_servicio_avisa_responsable_no_compras(
+        self,
+        mock_delay_aceptada,
+        mock_push_campanita,
+    ) -> None:
+        """
+        Piezas rechazadas + limpieza aceptada: no email a Compras;
+        push al responsable de seguimiento para «Generar servicio».
+        """
+        orden = self._crear_orden_con_detalle(
+            orden_cliente='OOW-NOTIF-SRV-01',
+            estado='cotizacion',
+        )
+        orden.responsable_seguimiento = self.empleado_responsable
+        orden.save(update_fields=['responsable_seguimiento'])
+
+        solicitud, linea = self._crear_solicitud_con_linea(
+            orden=orden,
+            estado='enviada_cliente',
+            estado_linea='pendiente',
+        )
+        servicio = LineaServicioAdicional.objects.create(
+            solicitud=solicitud,
+            tipo_servicio='limpieza',
+            costo=Decimal('450.00'),
+            estado_cliente='pendiente',
+        )
+
+        linea.rechazar(motivo='No autorizó la pieza')
+        mock_delay_aceptada.assert_not_called()
+        mock_push_campanita.assert_not_called()
+
+        servicio.aprobar()
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'parcialmente_aprobada')
+
+        mock_delay_aceptada.assert_not_called()
+        mock_push_campanita.assert_called_once()
+        empleados_notif = list(mock_push_campanita.call_args.args[0])
+        self.assertEqual({e.pk for e in empleados_notif}, {self.empleado_responsable.pk})
+        self.assertIn('Generar servicio', mock_push_campanita.call_args.kwargs['mensaje'])
