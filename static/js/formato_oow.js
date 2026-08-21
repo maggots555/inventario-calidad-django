@@ -493,7 +493,7 @@ function dibujarMarcoDiagrama(ctx, w, h, etiqueta, claveVista = '') {
     }
 }
 function inicializarFormatoOow() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
     const app = byId('formatoOowApp');
     if (!app) {
         return;
@@ -652,8 +652,40 @@ function inicializarFormatoOow() {
     // Firma cliente: trazo negro un poco más grueso
     padFirmaCli.ctx.strokeStyle = '#111827';
     padFirmaCli.ctx.lineWidth = 2.2;
+    const vistasGuardadas = new Map();
+    (formatoInicial.vistas_dano || []).forEach((v) => {
+        vistasGuardadas.set(v.clave_vista, v);
+    });
+    const catalogoVistas = (() => {
+        const selInit = byId('vistaActiva');
+        if (!selInit) {
+            return [];
+        }
+        return Array.from(selInit.options).map((opt) => ({
+            value: opt.value,
+            label: opt.textContent || opt.value,
+            grupo: opt.getAttribute('data-grupo') || '',
+        }));
+    })();
+    const vistaTieneImagen = (vista) => {
+        if (!vista) {
+            return false;
+        }
+        return Boolean((vista.imagen_data && vista.imagen_data.length > 0)
+            || (vista.imagen_url && vista.imagen_url.length > 0));
+    };
     /**
-     * Actualiza checklist sticky (firma / condiciones / privacidad).
+     * Etiquetas de vistas del tipo actual que aún no se han guardado.
+     */
+    const etiquetasVistasFaltantes = () => {
+        const tipo = valorInput('tipoDiagrama') || 'laptop';
+        return catalogoVistas
+            .filter((v) => v.grupo === tipo)
+            .filter((v) => !vistaTieneImagen(vistasGuardadas.get(v.value)))
+            .map((v) => v.label);
+    };
+    /**
+     * Actualiza checklist sticky (daños / firma / condiciones / privacidad).
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * Antes de Finalizar, la barra inferior muestra en verde lo listo
@@ -661,7 +693,15 @@ function inicializarFormatoOow() {
      */
     const actualizarChecklistRequeridos = () => {
         const tieneFirma = padFirmaCli.tieneTrazos || Boolean(formatoInicial.firma_cliente_url);
+        const faltantesDanos = etiquetasVistasFaltantes();
+        const totalDanos = catalogoVistas.filter((v) => v.grupo === (valorInput('tipoDiagrama') || 'laptop')).length;
+        const listosDanos = Math.max(0, totalDanos - faltantesDanos.length);
+        const elDanos = byId('checkItemDanos');
+        if (elDanos) {
+            elDanos.textContent = totalDanos > 0 ? `Daños ${listosDanos}/${totalDanos}` : 'Daños';
+        }
         const items = [
+            { id: 'checkItemDanos', listo: faltantesDanos.length === 0 && totalDanos > 0, chipId: 'chipDanos' },
             { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
             { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
             { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
@@ -725,21 +765,6 @@ function inicializarFormatoOow() {
     if (formatoInicial.firma_cliente_url) {
         cargarFirmaEnCanvas(formatoInicial.firma_cliente_url);
     }
-    const vistasGuardadas = new Map();
-    (formatoInicial.vistas_dano || []).forEach((v) => {
-        vistasGuardadas.set(v.clave_vista, v);
-    });
-    const catalogoVistas = (() => {
-        const selInit = byId('vistaActiva');
-        if (!selInit) {
-            return [];
-        }
-        return Array.from(selInit.options).map((opt) => ({
-            value: opt.value,
-            label: opt.textContent || opt.value,
-            grupo: opt.getAttribute('data-grupo') || '',
-        }));
-    })();
     const refrescarDiagrama = () => {
         const vistaSel = byId('vistaActiva');
         const clave = vistaSel ? vistaSel.value : 'pantalla';
@@ -797,6 +822,7 @@ function inicializarFormatoOow() {
             sel.value = delTipo[0].value;
         }
         refrescarDiagrama();
+        actualizarChecklistRequeridos();
     };
     const renderThumbsVistas = () => {
         const cont = byId('vistasGuardadas');
@@ -836,7 +862,14 @@ function inicializarFormatoOow() {
             imagen_data: dataUrl,
         });
         renderThumbsVistas();
-        setStatus(`Vista “${clave}” guardada en memoria (se enviará al guardar).`);
+        actualizarChecklistRequeridos();
+        const faltan = etiquetasVistasFaltantes();
+        if (faltan.length === 0) {
+            setStatus(`Vista “${clave}” guardada. Ya están todas las vistas del tipo elegido.`);
+        }
+        else {
+            setStatus(`Vista “${clave}” guardada. Aún faltan: ${faltan.join(', ')}.`);
+        }
     });
     // Al soltar el dedo/pluma en la firma, refrescar la miniatura preview
     canvasFirmaCli.addEventListener('pointerup', () => {
@@ -908,6 +941,13 @@ function inicializarFormatoOow() {
         }
         // EXPLICACIÓN PARA PRINCIPIANTES:
         // Validamos en orden: si falta algo, scroll a esa sección y no generamos PDF.
+        const faltantesDanos = etiquetasVistasFaltantes();
+        if (faltantesDanos.length > 0) {
+            setStatus('Debes guardar todas las vistas de daños estéticos: ' + faltantesDanos.join(', ') + '.', true, false);
+            enfocarSeccion('seccion-danos');
+            actualizarChecklistRequeridos();
+            return;
+        }
         if (!checked('aceptaCondiciones')) {
             setStatus('Debes aceptar las condiciones de entrega del equipo.', true, false);
             enfocarSeccion('seccion-firma');
@@ -1216,12 +1256,35 @@ function inicializarFormatoOow() {
         void subirEvidencia(t, 'escaneo_oow');
     });
     // EXPLICACIÓN PARA PRINCIPIANTES:
+    // El número y la cámara solo sirven si el cliente SÍ entregó cargador.
+    // Mientras la casilla esté apagada, el textbox y el botón quedan disabled.
+    const actualizarEstadoCargador = () => {
+        const activo = checked('accCargador');
+        const inputNumero = byId('numeroCargador');
+        const btnScan = byId('btnEscanearCargador');
+        const ayuda = byId('ayudaNumeroCargador');
+        if (inputNumero) {
+            inputNumero.disabled = !activo;
+        }
+        if (btnScan) {
+            btnScan.disabled = !activo;
+        }
+        if (ayuda) {
+            ayuda.textContent = activo
+                ? 'Puedes escribirlo a mano o escanearlo con la cámara.'
+                : 'Marca la casilla “Cargador” para escribir o escanear el número.';
+        }
+    };
+    (_s = byId('accCargador')) === null || _s === void 0 ? void 0 : _s.addEventListener('change', actualizarEstadoCargador);
+    actualizarEstadoCargador();
     // Botón de cámara junto a "Número del cargador": reutiliza scanner_codigo.ts
-    // (misma idea que inventario y el formato Dell). Al detectar, solo llena
-    // el textbox — el wizard envía el valor al guardar.
     const btnEscanearCargador = byId('btnEscanearCargador');
     const inputNumeroCargador = byId('numeroCargador');
     btnEscanearCargador === null || btnEscanearCargador === void 0 ? void 0 : btnEscanearCargador.addEventListener('click', () => {
+        if (!checked('accCargador') || btnEscanearCargador.disabled) {
+            setStatus('Marca la casilla “Cargador” para poder escanear el número.', true, false);
+            return;
+        }
         if (!inputNumeroCargador) {
             setStatus('No se encontró el campo del número de cargador.', true, false);
             return;

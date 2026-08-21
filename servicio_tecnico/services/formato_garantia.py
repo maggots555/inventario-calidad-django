@@ -33,6 +33,7 @@ from servicio_tecnico.services.sync_cargador_detalle import (
     db_alias_de,
     sincronizar_cargador_a_detalle,
 )
+from servicio_tecnico.services.vistas_dano import etiquetas_vistas_dano_faltantes
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +521,15 @@ def finalizar_formato(
         )
     if not formato.firma_cliente:
         raise FormatoGarantiaError('La firma del cliente es obligatoria.')
+    # Todas las caras del tipo elegido (laptop / escritorio / AIO) deben
+    # estar guardadas, igual que la firma: si falta una, no se genera el PDF.
+    faltantes = etiquetas_vistas_dano_faltantes(formato)
+    if faltantes:
+        raise FormatoGarantiaError(
+            'Debes guardar todas las vistas de daños estéticos: '
+            + ', '.join(faltantes)
+            + '.'
+        )
 
     version, _texto = texto_aviso_privacidad_actual()
     formato.version_aviso_privacidad = version

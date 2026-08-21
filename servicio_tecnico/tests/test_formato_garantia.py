@@ -52,6 +52,29 @@ def _png_bytes(color=(0, 51, 102)) -> bytes:
     return buf.getvalue()
 
 
+def _adjuntar_vistas_completas(formato) -> None:
+    """
+    Guarda un PNG dummy en cada vista del tipo de equipo del formato.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Finalizar ahora exige todas las caras (pantalla, top cover, etc.).
+    Los tests de PDF no dibujan el canvas; esta función simula que el
+    técnico ya pulsó “Guardar vista” en cada ángulo.
+    """
+    from config.constants import catalogo_vistas_dano_estetico
+
+    for clave, etiqueta in catalogo_vistas_dano_estetico(formato.tipo_diagrama):
+        vista = formato.vistas_dano.create(
+            clave_vista=clave,
+            etiqueta_dano=etiqueta or 'Rayado',
+        )
+        vista.imagen_anotada.save(
+            f'{clave}.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+
+
 class FormatoGarantiaReexportsTest(SimpleTestCase):
     """Humo: views.py reexporta y las URLs resuelven al módulo nuevo."""
 
@@ -110,6 +133,19 @@ class FormatoGarantiaReexportsTest(SimpleTestCase):
         labels = dict(VISTAS_DANO_ESTETICO_ESCRITORIO)
         self.assertEqual(labels['esc_lat_izq'], 'Lateral Izquierdo')
         self.assertEqual(labels['esc_lat_der'], 'Lateral Derecho')
+
+    def test_catalogo_vistas_por_tipo(self):
+        """Laptop, escritorio y AIO tienen ángulos distintos y obligatorios."""
+        from config.constants import catalogo_vistas_dano_estetico
+
+        laptop = [c for c, _ in catalogo_vistas_dano_estetico('laptop')]
+        self.assertIn('top_cover', laptop)
+        self.assertIn('palm', laptop)
+        escritorio = [c for c, _ in catalogo_vistas_dano_estetico('escritorio')]
+        self.assertIn('esc_lat_izq', escritorio)
+        self.assertNotIn('top_cover', escritorio)
+        aio = [c for c, _ in catalogo_vistas_dano_estetico('aio')]
+        self.assertIn('aio_base', aio)
 
 
 class FormatoGarantiaServiceTest(TestCase):
@@ -354,6 +390,7 @@ class FormatoGarantiaServiceTest(TestCase):
             ContentFile(_png_bytes()),
             save=True,
         )
+        _adjuntar_vistas_completas(formato)
 
         final = finalizar_formato(formato, usuario=self.user)
         self.assertEqual(final.estado, 'finalizado')
@@ -449,8 +486,30 @@ class FormatoGarantiaServiceTest(TestCase):
             },
             usuario=self.user,
         )
+        _adjuntar_vistas_completas(formato)
         with self.assertRaises(FormatoGarantiaError):
             finalizar_formato(formato, usuario=self.user)
+
+    def test_finalizar_exige_vistas_dano(self):
+        """Sin todas las caras del tipo (laptop), no se puede finalizar."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+            },
+            usuario=self.user,
+        )
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        with self.assertRaises(FormatoGarantiaError) as ctx:
+            finalizar_formato(formato, usuario=self.user)
+        self.assertIn('vistas de daños', str(ctx.exception).lower())
+        self.assertIn('Top Cover', str(ctx.exception))
 
 
 class FormatoGarantiaWizardViewTest(TestCase):
@@ -540,6 +599,10 @@ class FormatoGarantiaWizardViewTest(TestCase):
         self.assertIn(b'id="btnEscanearCargador"', resp.content)
         self.assertIn(b'scanner_codigo.js', resp.content)
         self.assertIn(b'zxing-wasm', resp.content)
+        html = resp.content.decode('utf-8')
+        self.assertRegex(html, r'id="numeroCargador"[^>]*\bdisabled\b')
+        self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
+        self.assertIn('id="checkItemDanos"', html)
         self.assertTrue(
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )

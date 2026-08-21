@@ -806,8 +806,51 @@ function inicializarFormatoGarantia(): void {
   padFirmaCli.ctx.strokeStyle = '#111827';
   padFirmaCli.ctx.lineWidth = 2.2;
 
+  const vistasGuardadas: Map<string, VistaDanoGuardada> = new Map();
+  (formatoInicial.vistas_dano || []).forEach((v) => {
+    vistasGuardadas.set(v.clave_vista, v);
+  });
+
+  // EXPLICACIÓN PARA PRINCIPIANTES:
+  // En iPad Safari, option.hidden NO oculta opciones del <select>.
+  // Por eso guardamos el catálogo completo y reconstruimos el select
+  // dejando solo las vistas del tipo de equipo elegido.
+  type VistaOpcion = { value: string; label: string; grupo: string };
+  const catalogoVistas: VistaOpcion[] = (() => {
+    const selInit = byId('vistaActiva') as HTMLSelectElement | null;
+    if (!selInit) {
+      return [];
+    }
+    return Array.from(selInit.options).map((opt) => ({
+      value: opt.value,
+      label: opt.textContent || opt.value,
+      grupo: opt.getAttribute('data-grupo') || '',
+    }));
+  })();
+
+  const vistaTieneImagen = (vista: VistaDanoGuardada | undefined): boolean => {
+    if (!vista) {
+      return false;
+    }
+    return Boolean(
+      (vista.imagen_data && vista.imagen_data.length > 0)
+      || (vista.imagen_url && vista.imagen_url.length > 0),
+    );
+  };
+
   /**
-   * Actualiza checklist sticky (firma / condiciones / privacidad).
+   * Etiquetas de vistas del tipo actual que aún no se han guardado.
+   */
+  const etiquetasVistasFaltantes = (): string[] => {
+    const tipo = valorInput('tipoDiagrama') || 'laptop';
+    return catalogoVistas
+      .filter((v) => v.grupo === tipo)
+      .filter((v) => !vistaTieneImagen(vistasGuardadas.get(v.value)))
+      .map((v) => v.label);
+  };
+
+  /**
+   * Actualiza checklist sticky (daños / firma / condiciones / privacidad).
    *
    * EXPLICACIÓN PARA PRINCIPIANTES:
    * Antes de Finalizar, la barra inferior muestra en verde lo listo
@@ -815,7 +858,17 @@ function inicializarFormatoGarantia(): void {
    */
   const actualizarChecklistRequeridos = (): void => {
     const tieneFirma = padFirmaCli.tieneTrazos || Boolean(formatoInicial.firma_cliente_url);
+    const faltantesDanos = etiquetasVistasFaltantes();
+    const totalDanos = catalogoVistas.filter(
+      (v) => v.grupo === (valorInput('tipoDiagrama') || 'laptop'),
+    ).length;
+    const listosDanos = Math.max(0, totalDanos - faltantesDanos.length);
+    const elDanos = byId('checkItemDanos');
+    if (elDanos) {
+      elDanos.textContent = totalDanos > 0 ? `Daños ${listosDanos}/${totalDanos}` : 'Daños';
+    }
     const items: Array<{ id: string; listo: boolean; chipId?: string }> = [
+      { id: 'checkItemDanos', listo: faltantesDanos.length === 0 && totalDanos > 0, chipId: 'chipDanos' },
       { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
       { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
       { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
@@ -886,28 +939,6 @@ function inicializarFormatoGarantia(): void {
     cargarFirmaEnCanvas(formatoInicial.firma_cliente_url);
   }
 
-  const vistasGuardadas: Map<string, VistaDanoGuardada> = new Map();
-  (formatoInicial.vistas_dano || []).forEach((v) => {
-    vistasGuardadas.set(v.clave_vista, v);
-  });
-
-  // EXPLICACIÓN PARA PRINCIPIANTES:
-  // En iPad Safari, option.hidden NO oculta opciones del <select>.
-  // Por eso guardamos el catálogo completo y reconstruimos el select
-  // dejando solo las vistas del tipo de equipo elegido.
-  type VistaOpcion = { value: string; label: string; grupo: string };
-  const catalogoVistas: VistaOpcion[] = (() => {
-    const selInit = byId('vistaActiva') as HTMLSelectElement | null;
-    if (!selInit) {
-      return [];
-    }
-    return Array.from(selInit.options).map((opt) => ({
-      value: opt.value,
-      label: opt.textContent || opt.value,
-      grupo: opt.getAttribute('data-grupo') || '',
-    }));
-  })();
-
   const refrescarDiagrama = (): void => {
     const vistaSel = byId('vistaActiva') as HTMLSelectElement | null;
     const clave = vistaSel ? vistaSel.value : 'pantalla';
@@ -967,6 +998,7 @@ function inicializarFormatoGarantia(): void {
       sel.value = delTipo[0].value;
     }
     refrescarDiagrama();
+    actualizarChecklistRequeridos();
   };
 
   const renderThumbsVistas = (): void => {
@@ -1011,7 +1043,13 @@ function inicializarFormatoGarantia(): void {
       imagen_data: dataUrl,
     });
     renderThumbsVistas();
-    setStatus(`Vista “${clave}” guardada en memoria (se enviará al guardar).`);
+    actualizarChecklistRequeridos();
+    const faltan = etiquetasVistasFaltantes();
+    if (faltan.length === 0) {
+      setStatus(`Vista “${clave}” guardada. Ya están todas las vistas del tipo elegido.`);
+    } else {
+      setStatus(`Vista “${clave}” guardada. Aún faltan: ${faltan.join(', ')}.`);
+    }
   });
 
   // Al soltar el dedo/pluma en la firma, refrescar la miniatura preview
@@ -1096,6 +1134,17 @@ function inicializarFormatoGarantia(): void {
     }
     // EXPLICACIÓN PARA PRINCIPIANTES:
     // Validamos en orden: si falta algo, scroll a esa sección y no generamos PDF.
+    const faltantesDanos = etiquetasVistasFaltantes();
+    if (faltantesDanos.length > 0) {
+      setStatus(
+        'Debes guardar todas las vistas de daños estéticos: ' + faltantesDanos.join(', ') + '.',
+        true,
+        false,
+      );
+      enfocarSeccion('seccion-danos');
+      actualizarChecklistRequeridos();
+      return;
+    }
     if (!checked('aceptaCondiciones')) {
       setStatus('Debes aceptar las condiciones de entrega del equipo.', true, false);
       enfocarSeccion('seccion-firma');
@@ -1451,11 +1500,36 @@ function inicializarFormatoGarantia(): void {
   });
 
   // EXPLICACIÓN PARA PRINCIPIANTES:
+  // El número y la cámara solo sirven si el cliente SÍ entregó cargador.
+  // Mientras la casilla esté apagada, el textbox y el botón quedan disabled.
+  const actualizarEstadoCargador = (): void => {
+    const activo = checked('accCargador');
+    const inputNumero = byId('numeroCargador') as HTMLInputElement | null;
+    const btnScan = byId('btnEscanearCargador') as HTMLButtonElement | null;
+    const ayuda = byId('ayudaNumeroCargador');
+    if (inputNumero) {
+      inputNumero.disabled = !activo;
+    }
+    if (btnScan) {
+      btnScan.disabled = !activo;
+    }
+    if (ayuda) {
+      ayuda.textContent = activo
+        ? 'Puedes escribirlo a mano o escanearlo con la cámara.'
+        : 'Marca la casilla “Cargador” para escribir o escanear el número.';
+    }
+  };
+  byId('accCargador')?.addEventListener('change', actualizarEstadoCargador);
+  actualizarEstadoCargador();
+
   // Botón de cámara junto a "Número del cargador": reutiliza scanner_codigo.ts
-  // (misma idea que inventario). Al detectar, solo llena el textbox — sin AJAX.
-  const btnEscanearCargador = byId('btnEscanearCargador');
+  const btnEscanearCargador = byId('btnEscanearCargador') as HTMLButtonElement | null;
   const inputNumeroCargador = byId('numeroCargador') as HTMLInputElement | null;
   btnEscanearCargador?.addEventListener('click', () => {
+    if (!checked('accCargador') || btnEscanearCargador.disabled) {
+      setStatus('Marca la casilla “Cargador” para poder escanear el número.', true, false);
+      return;
+    }
     if (!inputNumeroCargador) {
       setStatus('No se encontró el campo del número de cargador.', true, false);
       return;

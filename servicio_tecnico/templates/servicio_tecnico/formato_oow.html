@@ -54,7 +54,7 @@
     <nav class="formato-oow-nav-progreso" aria-label="Progreso del formato OOW">
         <a class="formato-oow-nav-chip" href="#seccion-datos"><span class="formato-oow-nav-num">1</span> Datos</a>
         <a class="formato-oow-nav-chip" href="#seccion-accesorios"><span class="formato-oow-nav-num">2</span> Accesorios</a>
-        <a class="formato-oow-nav-chip" href="#seccion-danos"><span class="formato-oow-nav-num">3</span> Daños</a>
+        <a class="formato-oow-nav-chip" href="#seccion-danos" id="chipDanos" data-req="danos"><span class="formato-oow-nav-num">3</span> Daños</a>
         <a class="formato-oow-nav-chip" href="#seccion-observaciones"><span class="formato-oow-nav-num">4</span> Observaciones</a>
         <a class="formato-oow-nav-chip" href="#seccion-firma" id="chipFirma" data-req="firma"><span class="formato-oow-nav-num">5</span> Firma</a>
         <a class="formato-oow-nav-chip" href="#seccion-fotos"><span class="formato-oow-nav-num">6</span> Fotos</a>
@@ -152,20 +152,28 @@
                       Al guardar, el número también se copia a DetalleEquipo.
                     -->
                     <label class="form-label" for="numeroCargador">Número del cargador</label>
-                    <div class="input-group">
+                    <div class="input-group" id="wrapNumeroCargador">
                         <input type="text" class="form-control" id="numeroCargador"
                                value="{{ formato.numero_cargador }}"
                                placeholder="No. serie / descripción del cargador…"
-                               autocomplete="off">
+                               autocomplete="off"
+                               {% if not formato.accesorio_cargador %}disabled{% endif %}>
                         <button type="button"
                                 class="btn btn-outline-secondary formato-garantia-btn-scanner"
                                 id="btnEscanearCargador"
                                 title="Escanear QR o código de barras"
-                                aria-label="Escanear número del cargador con la cámara">
+                                aria-label="Escanear número del cargador con la cámara"
+                                {% if not formato.accesorio_cargador %}disabled{% endif %}>
                             <i class="bi bi-camera" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    <div class="form-text" id="ayudaNumeroCargador">
+                        {% if formato.accesorio_cargador %}
+                        Puedes escribirlo a mano o escanearlo con la cámara.
+                        {% else %}
+                        Marca la casilla “Cargador” para escribir o escanear el número.
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             <div class="row g-3 mt-2">
@@ -185,7 +193,7 @@
 
     {# --- Daños estéticos --- #}
     <section class="card formato-oow-card mb-3" id="seccion-danos">
-        <div class="card-header formato-oow-section-header">3 · Define los daños estéticos</div>
+        <div class="card-header formato-oow-section-header">3 · Define los daños estéticos <span class="text-danger">*</span></div>
         <div class="card-body">
             <div class="row g-3 align-items-end mb-3">
                 <div class="col-md-4">
@@ -224,8 +232,11 @@
             </div>
 
             <p class="text-muted small mb-2">
-                Marca el daño con el dedo o Apple Pencil sobre el diagrama. Luego pulsa
-                <strong>Guardar vista</strong>.
+                Debes guardar <strong>todas las vistas</strong> del tipo de equipo
+                (laptop, escritorio o All in One), igual que la firma.
+                Marca el daño con el dedo o Apple Pencil y pulsa
+                <strong>Guardar vista</strong> en cada ángulo (Top Cover, Palmrest, etc.).
+                Si un lado no tiene daño, igual guarda esa vista.
             </p>
 
             <div class="formato-oow-canvas-wrap">
@@ -391,6 +402,7 @@
     <div class="formato-oow-actions sticky-bottom">
         {# Checklist de requisitos visibles en tablet antes de Finalizar #}
         <div class="formato-oow-checklist" id="formatoOowChecklist" aria-live="polite">
+            <span class="formato-oow-check-item" id="checkItemDanos" data-req="danos">Daños</span>
             <span class="formato-oow-check-item" id="checkItemFirma" data-req="firma">Firma</span>
             <span class="formato-oow-check-item" id="checkItemCondiciones" data-req="condiciones">Condiciones</span>
             <span class="formato-oow-check-item" id="checkItemPrivacidad" data-req="privacidad">Privacidad</span>

@@ -635,3 +635,25 @@
   color: #60a5fa;
 }
 
+.formato-garantia-btn-scanner:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+[data-bs-theme="dark"] .formato-garantia-btn-scanner:disabled:hover,
+[data-bs-theme="dark"] .formato-garantia-btn-scanner:disabled:focus {
+  background-color: transparent;
+  border-color: var(--border-color, #334155);
+  color: var(--text-primary, #e2e8f0);
+}
+
+#numeroCargador:disabled {
+  cursor: not-allowed;
+  background-color: var(--gray-100, #f1f5f9);
+}
+
+[data-bs-theme="dark"] #numeroCargador:disabled {
+  background-color: #0f172a;
+  color: #94a3b8;
+}
+

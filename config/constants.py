@@ -1358,6 +1358,25 @@ VISTAS_DANO_ESTETICO_AIO = [
     ('aio_base', 'Base / Soporte'),
 ]
 
+
+def catalogo_vistas_dano_estetico(tipo_diagrama: str) -> list[tuple[str, str]]:
+    """
+    Vistas (clave, etiqueta) obligatorias según el tipo de equipo del formato.
+
+    Args:
+        tipo_diagrama: ``laptop``, ``escritorio`` o ``aio``.
+
+    Returns:
+        Lista de tuplas. Si el tipo no es válido, usa el catálogo de laptop.
+    """
+    mapa = {
+        'laptop': VISTAS_DANO_ESTETICO_LAPTOP,
+        'escritorio': VISTAS_DANO_ESTETICO_ESCRITORIO,
+        'aio': VISTAS_DANO_ESTETICO_AIO,
+    }
+    return list(mapa.get(tipo_diagrama, VISTAS_DANO_ESTETICO_LAPTOP))
+
+
 COMO_ENTERASTE_OOW_CHOICES = [
     ('google', 'Google'),
     ('facebook', 'Facebook'),

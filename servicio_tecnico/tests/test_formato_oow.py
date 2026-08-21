@@ -51,6 +51,29 @@ def _png_bytes(color=(0, 51, 102)) -> bytes:
     return buf.getvalue()
 
 
+def _adjuntar_vistas_completas(formato) -> None:
+    """
+    Guarda un PNG dummy en cada vista del tipo de equipo del formato.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Finalizar ahora exige todas las caras (pantalla, top cover, etc.).
+    Los tests de PDF no dibujan el canvas; esta función simula que el
+    técnico ya pulsó “Guardar vista” en cada ángulo.
+    """
+    from config.constants import catalogo_vistas_dano_estetico
+
+    for clave, etiqueta in catalogo_vistas_dano_estetico(formato.tipo_diagrama):
+        vista = formato.vistas_dano.create(
+            clave_vista=clave,
+            etiqueta_dano=etiqueta or 'Rayado',
+        )
+        vista.imagen_anotada.save(
+            f'{clave}.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+
+
 class FormatoOowReexportsTest(SimpleTestCase):
     """Humo: views.py reexporta y las URLs resuelven al módulo nuevo."""
 
@@ -337,6 +360,27 @@ class FormatoOowServiceTest(TestCase):
             ['A@x.com', 'b@y.com'],
         )
 
+    def test_finalizar_exige_vistas_dano(self):
+        """Sin todas las caras del tipo (laptop), no se puede finalizar."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+            },
+            usuario=self.user,
+        )
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        with self.assertRaises(FormatoOOWError) as ctx:
+            finalizar_formato(formato, usuario=self.user)
+        self.assertIn('vistas de daños', str(ctx.exception).lower())
+        self.assertIn('Top Cover', str(ctx.exception))
+
     def test_finalizar_genera_pdf(self):
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
         aplicar_payload_borrador(
@@ -354,6 +398,7 @@ class FormatoOowServiceTest(TestCase):
             ContentFile(_png_bytes()),
             save=True,
         )
+        _adjuntar_vistas_completas(formato)
 
         final = finalizar_formato(formato, usuario=self.user)
         self.assertEqual(final.estado, 'finalizado')
@@ -398,6 +443,7 @@ class FormatoOowServiceTest(TestCase):
             ContentFile(_png_bytes()),
             save=True,
         )
+        _adjuntar_vistas_completas(formato)
         final = finalizar_formato(formato, usuario=self.user, forzar_regenerar=True)
         resultado = PDFFormatoServicioOOW(final).generar_pdf()
         self.assertTrue(resultado['success'])
@@ -445,6 +491,7 @@ class FormatoOowServiceTest(TestCase):
             ContentFile(_png_bytes()),
             save=True,
         )
+        _adjuntar_vistas_completas(formato)
         final = finalizar_formato(formato, usuario=self.user)
         self.assertEqual(final.estado, 'finalizado')
 
@@ -523,6 +570,7 @@ class FormatoOowServiceTest(TestCase):
             ContentFile(_png_bytes()),
             save=True,
         )
+        _adjuntar_vistas_completas(formato)
         finalizar_formato(formato, usuario=self.user)
         formato.refresh_from_db()
 
@@ -636,6 +684,11 @@ class FormatoOowVistaTest(TestCase):
         self.assertIn(b'id="btnEscanearCargador"', resp.content)
         self.assertIn(b'scanner_codigo.js', resp.content)
         self.assertIn(b'zxing-wasm', resp.content)
+        # Sin casilla Cargador: el número y la cámara nacen deshabilitados
+        html = resp.content.decode('utf-8')
+        self.assertRegex(html, r'id="numeroCargador"[^>]*\bdisabled\b')
+        self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
+        self.assertIn('id="checkItemDanos"', html)
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )
