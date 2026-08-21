@@ -126,6 +126,16 @@ class EasterEggGansoTest(TestCase):
         # Paso 3: la escena se apaga con prefers-reduced-motion
         self.assertIn('prefers-reduced-motion', codigo)
 
+        # Paso 4: al abortar (cambiar de app / rotar) no se deja el avatar vacío
+        self.assertIn('AbortController', codigo)
+        self.assertIn('pagehide', codigo)
+        self.assertIn('pageshow', codigo)
+        self.assertIn('ganso-egg-devuelto', codigo)
+
+        # Paso 5: el JS compilado existe (producción no corre tsc sola)
+        ruta_js = Path(settings.BASE_DIR) / 'static' / 'js' / 'easter_egg_ganso.js'
+        self.assertTrue(ruta_js.exists(), 'Falta static/js/easter_egg_ganso.js — corre pnpm run build')
+
     def test_easter_egg_funciona_con_dedo(self):
         """
         El easter egg debe seguir disponible en celular, tablet y la PWA.
@@ -154,3 +164,7 @@ class EasterEggGansoTest(TestCase):
 
         # Paso 4: 5 toques rápidos no deben disparar el zoom por doble toque
         self.assertIn('touch-action: manipulation', estilos)
+
+        # Paso 5: la API pública vive en globals.d.ts (no una Window suelta en el .ts)
+        globales = (base / 'ts' / 'globals.d.ts').read_text(encoding='utf-8')
+        self.assertIn('SigmaGansoEasterEgg', globales)

@@ -31,5 +31,13 @@ interface Window {
     toggleKitCosto?: () => void;
     toggleReinstalacionCosto?: () => void;
     toggleRespaldoCosto?: () => void;
+    /**
+     * Easter egg del ganso (static/ts/easter_egg_ganso.ts).
+     * Solo existe en el dashboard de inicio. ejecutar() ignora el azar diario.
+     */
+    SigmaGansoEasterEgg?: {
+        ejecutar: () => void;
+        puedeCorrer: () => boolean;
+    };
 }
 

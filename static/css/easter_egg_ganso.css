@@ -48,19 +48,16 @@
 
 /* El dibujo llena el contenedor; el viewBox lo escala sin deformarlo */
 .ganso-egg svg {
+    display: block;
     width: 100%;
     height: 100%;
+    overflow: visible;
 }
 
-/* Cuando vuelve a devolver la foto camina hacia la izquierda: espejamos
-   solo el dibujo (el botín es hermano para que la foto no salga al revés). */
+/* Cuando sale camina hacia la izquierda: espejamos solo el dibujo
+   (el botín es hermano para que la foto no salga al revés). */
 .ganso-egg--mirando-izq .ganso-egg__flip {
     transform: scaleX(-1);
-}
-
-.ganso-egg svg {
-    display: block;
-    overflow: visible;
 }
 
 /* La cita es el disparador manual (5 clics o 5 toques).
@@ -285,6 +282,12 @@
     background: transparent;
     border-style: dashed;
     border-color: rgba(249, 115, 22, 0.75);
+    box-shadow: none;
+}
+
+/* El hover del navbar (scale+rotate) pelearía con el hueco vacío */
+.navbar-user-avatar.ganso-egg-robado:hover {
+    transform: none;
     box-shadow: none;
 }
 

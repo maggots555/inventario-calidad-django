@@ -25,18 +25,6 @@
  *   que se declara y se ejecuta al instante, creando un ámbito privado.
  */
 
-/** API pública mínima para probar el easter egg desde la consola del navegador. */
-interface SigmaGansoEasterEggApi {
-    /** Corre la escena ya mismo, ignorando el azar y el límite de 1 vez al día. */
-    ejecutar: () => void;
-    /** true si este navegador/pantalla permite la animación. */
-    puedeCorrer: () => boolean;
-}
-
-interface Window {
-    SigmaGansoEasterEgg?: SigmaGansoEasterEggApi;
-}
-
 (function () {
     'use strict';
 
@@ -131,8 +119,29 @@ interface Window {
     /** Evita que dos escenas corran encimadas (ej. clic secreto durante el azar). */
     let escenaActiva = false;
 
-    /** Se pone en true si hay que abortar (usuario cambió de pestaña). */
+    /** Se pone en true si hay que abortar (usuario cambió de pestaña / rotó el teléfono). */
     let cancelado = false;
+
+    /**
+     * AbortController de la escena en curso.
+     * EXPLICACIÓN: visibilitychange solo ponía una bandera; los `await esperar(2800)`
+     * seguían corriendo y el avatar se quedaba vacío hasta 3 s. abort() despierta
+     * esas pausas al instante.
+     */
+    let abortEscena: AbortController | null = null;
+
+    /** Animación Web Animations en curso (para cancelarla al abortar). */
+    let animacionActual: Animation | null = null;
+
+    /** El div del ganso vivo; restaurarTodo lo usa si Safari restaura la página de caché. */
+    let contenedorActivo: HTMLElement | null = null;
+
+    /**
+     * Número de escena. El `finally` solo suelta el candado si sigue siendo
+     * "su" escena: evita que un async viejo (bfcache de Safari) apague el
+     * candado de una escena nueva que ya arrancó.
+     */
+    let generacionEscena = 0;
 
     // ========================================================================
     // HELPERS BÁSICOS
@@ -145,8 +154,50 @@ interface Window {
      *   ms: milisegundos a esperar.
      * Efectos secundarios: ninguno (solo un setTimeout interno).
      */
+    /**
+     * Pausa cancelable: si abortEscena.abort() corre a mitad, esta promesa
+     * se resuelve YA (no espera el resto de los milisegundos).
+     */
     function esperar(ms: number): Promise<void> {
-        return new Promise((resolve) => window.setTimeout(resolve, ms));
+        const signal = abortEscena?.signal;
+        if (signal?.aborted) {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            const id = window.setTimeout(resolve, ms);
+            if (!signal) {
+                return;
+            }
+            const alAbortar = (): void => {
+                window.clearTimeout(id);
+                resolve();
+            };
+            signal.addEventListener('abort', alAbortar, { once: true });
+        });
+    }
+
+    /**
+     * Corta la escena en curso: despierta las pausas, cancela el desplazamiento
+     * y marca cancelado. El `finally` de correrEscena restaura el avatar.
+     *
+     * Efectos secundarios: aborta el AbortController y la Animation actuales.
+     */
+    function abortarEscenaEnCurso(): void {
+        if (!escenaActiva) {
+            return;
+        }
+        cancelado = true;
+        if (abortEscena && !abortEscena.signal.aborted) {
+            abortEscena.abort();
+        }
+        if (animacionActual) {
+            try {
+                animacionActual.cancel();
+            } catch {
+                /* cancel() puede tirar si la animación ya terminó */
+            }
+            animacionActual = null;
+        }
     }
 
     /**
@@ -285,6 +336,9 @@ interface Window {
         ms: number,
         easing: string,
     ): Promise<void> {
+        if (cancelado) {
+            return;
+        }
         const desde = `translate3d(${actor.x}px, ${actor.y}px, 0)`;
         ubicar(actor, x, y);
         const hasta = `translate3d(${actor.x}px, ${actor.y}px, 0)`;
@@ -299,14 +353,16 @@ interface Window {
             [{ transform: desde }, { transform: hasta }],
             { duration: ms, easing: easing },
         );
+        animacionActual = animacion;
 
         // Red de seguridad: si el navegador congela la animación (pestaña en
         // segundo plano), el margen extra evita que la escena quede colgada
-        // con el avatar vacío.
+        // con el avatar vacío. abort() también despierta esta espera.
         await Promise.race([
             animacion.finished.then(() => undefined).catch(() => undefined),
             esperar(ms + 400),
         ]);
+        animacionActual = null;
 
         // Mientras una animación vive, su transform PISA al estilo inline.
         // Si quedó congelada a medio camino, el ganso se vería clavado en el
@@ -409,9 +465,13 @@ interface Window {
         const avatar = obtenerAvatar();
         if (avatar) {
             avatar.classList.remove('ganso-egg-robado');
+            avatar.classList.remove('ganso-egg-devuelto');
         }
         if (contenedor && contenedor.parentNode) {
             contenedor.parentNode.removeChild(contenedor);
+        }
+        if (contenedorActivo === contenedor) {
+            contenedorActivo = null;
         }
     }
 
@@ -439,11 +499,14 @@ interface Window {
         }
         escenaActiva = true;
         cancelado = false;
+        const generacion = ++generacionEscena;
+        abortEscena = new AbortController();
         if (consumirDelDia) {
             marcarCorridoHoy();
         }
 
         const contenedor = crearGanso();
+        contenedorActivo = contenedor;
         const botin = contenedor.querySelector<HTMLElement>('.ganso-egg__botin');
         const honk = contenedor.querySelector<HTMLElement>('.ganso-egg__honk');
         const actor: Actor = { el: contenedor, x: 0, y: 0 };
@@ -546,7 +609,13 @@ interface Window {
         } finally {
             // Red de seguridad: pase lo que pase, el avatar vuelve a la normalidad
             restaurarTodo(contenedor);
-            escenaActiva = false;
+            // Solo soltamos el candado si nadie arrancó otra escena encima
+            if (generacion === generacionEscena) {
+                escenaActiva = false;
+                abortEscena = null;
+                animacionActual = null;
+                contenedorActivo = null;
+            }
         }
     }
 
@@ -601,21 +670,48 @@ interface Window {
     }
 
     /**
-     * Si el usuario se va a otra pestaña, abortamos y devolvemos la foto ya.
+     * Si el usuario se va a otra pestaña, rota el teléfono o Safari restaura
+     * la página desde bfcache, abortamos YA y devolvemos la foto.
      * Así nadie vuelve y encuentra su avatar vacío sin explicación.
      */
-    function activarCancelacionPorPestana(): void {
+    function activarCancelacionPorCicloDeVida(): void {
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && escenaActiva) {
-                cancelado = true;
+            if (document.hidden) {
+                abortarEscenaEnCurso();
             }
+        });
+        // PWA / Safari: al mandar la app al fondo a veces dispara pagehide
+        // y no visibilitychange. Cubrimos los dos.
+        window.addEventListener('pagehide', () => {
+            abortarEscenaEnCurso();
+        });
+        // bfcache: Safari puede "congelar" la página a media escena y
+        // devolverla minutos después con el ganso a medias. Al volver,
+        // restauramos el DOM a mano porque el async pudo quedar congelado.
+        window.addEventListener('pageshow', (evento: PageTransitionEvent) => {
+            if (evento.persisted) {
+                abortarEscenaEnCurso();
+                restaurarTodo(contenedorActivo);
+                escenaActiva = false;
+                abortEscena = null;
+                animacionActual = null;
+                contenedorActivo = null;
+                // Invalida el `finally` de la escena congelada para que no
+                // suelte el candado de una escena que arranque al volver.
+                generacionEscena += 1;
+            }
+        });
+        // Rotar el celular cambia el tamaño del navbar; abortar es más
+        // seguro que recalcular a media caminata.
+        window.addEventListener('orientationchange', () => {
+            abortarEscenaEnCurso();
         });
     }
 
     /** Arranque: tira el dado, prepara el truco manual y expone la API de debug. */
     function inicializar(): void {
         activarTrucoDeClics();
-        activarCancelacionPorPestana();
+        activarCancelacionPorCicloDeVida();
 
         window.SigmaGansoEasterEgg = {
             ejecutar: () => ejecutar(true),
