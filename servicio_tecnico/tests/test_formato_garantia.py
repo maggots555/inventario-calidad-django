@@ -295,6 +295,42 @@ class FormatoGarantiaServiceTest(TestCase):
         self.assertTrue(formato.accesorio_docking)
         self.assertFalse(formato.accesorio_microsd_sim)
         self.assertEqual(formato.numero_cargador, 'CN-0ABC123')
+        # El mismo número debe verse en los detalles del equipo
+        detalle = self.orden.detalle_equipo
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.numero_serie_cargador, 'CN-0ABC123')
+        self.assertTrue(detalle.tiene_cargador)
+
+    def test_prefill_copia_numero_serie_cargador(self):
+        """
+        Si el detalle ya tenía S/N del cargador, el borrador Dell lo muestra.
+        """
+        detalle = self.orden.detalle_equipo
+        detalle.numero_serie_cargador = 'CN01C4XJLOC0056A04CSA02'
+        detalle.save(update_fields=['numero_serie_cargador'])
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        self.assertEqual(formato.numero_cargador, 'CN01C4XJLOC0056A04CSA02')
+
+    def test_guardar_cargador_vacio_no_borra_detalle(self):
+        """
+        Un formato sin número no debe borrar el S/N que ya tenía el equipo.
+        """
+        detalle = self.orden.detalle_equipo
+        detalle.numero_serie_cargador = 'YA-EXISTE'
+        detalle.tiene_cargador = True
+        detalle.save(update_fields=['numero_serie_cargador', 'tiene_cargador'])
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_cargador': True,
+                'numero_cargador': '',
+            },
+            usuario=self.user,
+        )
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.numero_serie_cargador, 'YA-EXISTE')
+        self.assertTrue(detalle.tiene_cargador)
 
     def test_finalizar_genera_pdf_con_falla(self):
         from servicio_tecnico.utils.pdf_formato_garantia import PDFFormatoServicioGarantia

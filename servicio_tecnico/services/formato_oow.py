@@ -31,6 +31,10 @@ from servicio_tecnico.models import (
     FormatoServicioOOW,
     OrdenServicio,
 )
+from servicio_tecnico.services.sync_cargador_detalle import (
+    db_alias_de,
+    sincronizar_cargador_a_detalle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +233,10 @@ def _prefill_desde_detalle(formato: FormatoServicioOOW) -> None:
     """
     detalle = formato.orden.detalle_equipo
     formato.accesorio_cargador = bool(detalle.tiene_cargador)
+    # Si el detalle ya tiene S/N del cargador, el wizard lo muestra de entrada
+    serie = (detalle.numero_serie_cargador or '').strip()
+    if serie:
+        formato.numero_cargador = serie[:100]
     # Prefill: un solo correo del cliente; el usuario puede agregar hasta 2 más en la UI
     aplicar_emails_al_formato(formato, detalle.email_cliente or '')
     # Tipo de diagrama según tipo de equipo
@@ -270,6 +278,7 @@ def serializar_formato(formato: FormatoServicioOOW) -> dict[str, Any]:
         'accesorio_monitor': formato.accesorio_monitor,
         'accesorio_otros': formato.accesorio_otros,
         'accesorios_otros_detalle': formato.accesorios_otros_detalle,
+        'numero_cargador': formato.numero_cargador,
         'contrasena_equipo': formato.contrasena_equipo,
         'observaciones_tecnicas': formato.observaciones_tecnicas,
         'disclaimer_pc_audit': formato.disclaimer_pc_audit,
@@ -373,6 +382,7 @@ def aplicar_payload_borrador(
 
     Efectos secundarios:
         UPDATE FormatoServicioOOW + upsert DanoEsteticoVista + archivos ImageField
+        + sync de cargador hacia DetalleEquipo
     """
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # Tras finalizar, el PDF ya existe. Si el usuario quiere corregir datos,
@@ -385,8 +395,9 @@ def aplicar_payload_borrador(
         )
 
     empleado = _empleado_desde_usuario(usuario)
+    db_alias = db_alias_de(formato)
 
-    with transaction.atomic():
+    with transaction.atomic(using=db_alias):
         # --- Campos simples ---
         for campo in CAMPOS_ACCESORIOS:
             if campo in payload:
@@ -396,9 +407,19 @@ def aplicar_payload_borrador(
             'accesorios_otros_detalle',
             'contrasena_equipo',
             'observaciones_tecnicas',
+            'numero_cargador',
         ):
             if campo in payload and payload[campo] is not None:
-                setattr(formato, campo, str(payload[campo])[:500 if campo != 'observaciones_tecnicas' else 5000])
+                # EXPLICACIÓN PARA PRINCIPIANTES:
+                # Cada campo tiene un tope distinto (el S/N del cargador
+                # comparte max_length=100 con DetalleEquipo).
+                if campo == 'observaciones_tecnicas':
+                    limite = 5000
+                elif campo == 'numero_cargador':
+                    limite = 100
+                else:
+                    limite = 500
+                setattr(formato, campo, str(payload[campo])[:limite])
 
         # Emails: preferir lista emails_envio; si no viene, aceptar email_envio único
         if 'emails_envio' in payload:
@@ -431,6 +452,13 @@ def aplicar_payload_borrador(
 
         formato.actualizado_por = empleado
         formato.save()
+
+        # Puente al detalle del equipo: el S/N del wizard también vive en la ficha
+        sincronizar_cargador_a_detalle(
+            formato.orden,
+            numero_cargador=formato.numero_cargador,
+            accesorio_cargador=formato.accesorio_cargador,
+        )
 
         # --- Vistas de daño anotadas ---
         vistas = payload.get('vistas_dano') or []

@@ -537,6 +537,14 @@ class PDFFormatoServicioOOW:
                 f'<b>Detalle otros:</b> {self._esc(f.accesorios_otros_detalle)}',
                 self._estilos['CeldaValor'],
             ))
+        # Número de serie del cargador (mismo dato que va a DetalleEquipo)
+        num_cargador = (f.numero_cargador or '').strip()
+        if num_cargador:
+            elementos.append(Spacer(1, 2 * mm))
+            elementos.append(Paragraph(
+                f'<b>No. serie cargador:</b> {self._esc(num_cargador)}',
+                self._estilos['CeldaValor'],
+            ))
         return elementos
 
     def _texto_aviso_pc_audit(self) -> str:

@@ -29,6 +29,10 @@ from servicio_tecnico.models import (
     FormatoServicioGarantia,
     OrdenServicio,
 )
+from servicio_tecnico.services.sync_cargador_detalle import (
+    db_alias_de,
+    sincronizar_cargador_a_detalle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +225,10 @@ def _prefill_desde_detalle(formato: FormatoServicioGarantia) -> None:
     """
     detalle = formato.orden.detalle_equipo
     formato.accesorio_cargador = bool(detalle.tiene_cargador)
+    # Si el detalle ya tiene S/N del cargador, el wizard lo muestra de entrada
+    serie = (detalle.numero_serie_cargador or '').strip()
+    if serie:
+        formato.numero_cargador = serie[:100]
     aplicar_emails_al_formato(formato, detalle.email_cliente or '')
     tipo = (detalle.tipo_equipo or '').lower()
     if tipo in ('aio', 'all-in-one', 'all in one'):
@@ -367,6 +375,7 @@ def aplicar_payload_borrador(
 
     Efectos secundarios:
         UPDATE FormatoServicioGarantia + upsert DanoEsteticoVistaGarantia
+        + sync de cargador hacia DetalleEquipo
     """
     if formato.estado == 'finalizado' and not permitir_finalizado:
         raise FormatoGarantiaError(
@@ -375,8 +384,9 @@ def aplicar_payload_borrador(
         )
 
     empleado = _empleado_desde_usuario(usuario)
+    db_alias = db_alias_de(formato)
 
-    with transaction.atomic():
+    with transaction.atomic(using=db_alias):
         for campo in CAMPOS_ACCESORIOS_GARANTIA:
             if campo in payload:
                 setattr(formato, campo, bool(payload[campo]))
@@ -423,6 +433,13 @@ def aplicar_payload_borrador(
 
         formato.actualizado_por = empleado
         formato.save()
+
+        # Puente al detalle del equipo: el S/N del wizard también vive en la ficha
+        sincronizar_cargador_a_detalle(
+            formato.orden,
+            numero_cargador=formato.numero_cargador,
+            accesorio_cargador=formato.accesorio_cargador,
+        )
 
         vistas = payload.get('vistas_dano') or []
         if isinstance(vistas, list):

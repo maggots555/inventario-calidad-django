@@ -145,6 +145,31 @@
             </div>
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
+                    <!--
+                      EXPLICACIÓN PARA PRINCIPIANTES:
+                      input-group = textbox + botón cámara al lado.
+                      El botón abre scanner_codigo.js (zxing-wasm) y llena este campo.
+                      Al guardar, el número también se copia a DetalleEquipo.
+                    -->
+                    <label class="form-label" for="numeroCargador">Número del cargador</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="numeroCargador"
+                               value="{{ formato.numero_cargador }}"
+                               placeholder="No. serie / descripción del cargador…"
+                               autocomplete="off">
+                        <button type="button"
+                                class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                id="btnEscanearCargador"
+                                title="Escanear QR o código de barras"
+                                aria-label="Escanear número del cargador con la cámara">
+                            <i class="bi bi-camera" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                </div>
+            </div>
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
                     <label class="form-label" for="accOtrosDetalle">Detalle de “Otros”</label>
                     <input type="text" class="form-control" id="accOtrosDetalle"
                            value="{{ formato.accesorios_otros_detalle }}">
@@ -447,5 +472,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{# Motor único: zxing-wasm (zxing-cpp) — Data Matrix, QR y barras 1D #}
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.2/dist/iife/reader/index.js"></script>
+<script src="{% static 'js/scanner_codigo.js' %}" defer></script>
 <script src="{% static 'js/formato_oow.js' %}" defer></script>
 {% endblock %}

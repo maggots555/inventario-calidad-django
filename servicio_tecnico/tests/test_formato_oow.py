@@ -258,6 +258,56 @@ class FormatoOowServiceTest(TestCase):
         mismo = obtener_o_crear_borrador(self.orden, usuario=self.user)
         self.assertEqual(formato.pk, mismo.pk)
 
+    def test_prefill_copia_numero_serie_cargador(self):
+        """
+        Si el detalle ya tenía S/N del cargador, el borrador OOW lo muestra.
+        """
+        detalle = self.orden.detalle_equipo
+        detalle.numero_serie_cargador = 'CN01OOWTEST001'
+        detalle.save(update_fields=['numero_serie_cargador'])
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        self.assertEqual(formato.numero_cargador, 'CN01OOWTEST001')
+
+    def test_guardar_numero_cargador_sincroniza_detalle(self):
+        """
+        Al guardar el wizard OOW, el número pasa al detalle del equipo.
+        """
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_cargador': True,
+                'numero_cargador': 'CN-0OOW456',
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertEqual(formato.numero_cargador, 'CN-0OOW456')
+        detalle = self.orden.detalle_equipo
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.numero_serie_cargador, 'CN-0OOW456')
+        self.assertTrue(detalle.tiene_cargador)
+
+    def test_guardar_cargador_vacio_no_borra_detalle(self):
+        """
+        Un formato OOW sin número no debe borrar el S/N que ya tenía el equipo.
+        """
+        detalle = self.orden.detalle_equipo
+        detalle.numero_serie_cargador = 'YA-EXISTE-OOW'
+        detalle.tiene_cargador = True
+        detalle.save(update_fields=['numero_serie_cargador', 'tiene_cargador'])
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_cargador': True,
+                'numero_cargador': '',
+            },
+            usuario=self.user,
+        )
+        detalle.refresh_from_db()
+        self.assertEqual(detalle.numero_serie_cargador, 'YA-EXISTE-OOW')
+
     def test_guardar_hasta_tres_emails(self):
         """
         Se pueden guardar hasta 3 correos; el primero sincroniza email_envio.
@@ -331,6 +381,7 @@ class FormatoOowServiceTest(TestCase):
                 'accesorio_monitor': False,
                 'accesorio_otros': True,
                 'accesorios_otros_detalle': 'Bolsa térmica',
+                'numero_cargador': 'CN-0OOWPDF',
             },
             usuario=self.user,
         )
@@ -340,6 +391,7 @@ class FormatoOowServiceTest(TestCase):
         self.assertFalse(formato.accesorio_maletin)
         self.assertTrue(formato.accesorio_otros)
         self.assertEqual(formato.accesorios_otros_detalle, 'Bolsa térmica')
+        self.assertEqual(formato.numero_cargador, 'CN-0OOWPDF')
 
         formato.firma_cliente.save(
             'firma_cli.png',
@@ -579,6 +631,11 @@ class FormatoOowVistaTest(TestCase):
         resp = views_formato_oow.formato_oow_wizard(request, orden_id=self.orden.pk)
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Formato Digital OOW', resp.content)
+        # Scanner QR/barras junto al número de cargador (igual que Dell)
+        self.assertIn(b'id="numeroCargador"', resp.content)
+        self.assertIn(b'id="btnEscanearCargador"', resp.content)
+        self.assertIn(b'scanner_codigo.js', resp.content)
+        self.assertIn(b'zxing-wasm', resp.content)
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )

@@ -4095,6 +4095,12 @@ class FormatoServicioOOW(models.Model):
         blank=True,
         help_text='Detalle cuando se marca “Otros”',
     )
+    # Mismo campo que el formato Dell: al guardar se copia a DetalleEquipo
+    numero_cargador = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie / descripción del cargador',
+    )
     detalle_equipo = models.CharField(
         max_length=300,
         blank=True,

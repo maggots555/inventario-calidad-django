@@ -880,6 +880,7 @@ function inicializarFormatoOow() {
             accesorio_monitor: checked('accMonitor'),
             accesorio_otros: checked('accOtros'),
             accesorios_otros_detalle: valorInput('accOtrosDetalle'),
+            numero_cargador: valorInput('numeroCargador'),
             contrasena_equipo: valorInput('contrasenaEquipo'),
             observaciones_tecnicas: valorInput('observacionesTecnicas'),
             disclaimer_pc_audit: checked('disclaimerPcAudit'),
@@ -1213,6 +1214,29 @@ function inicializarFormatoOow() {
     (_r = byId('fotoEscaneo')) === null || _r === void 0 ? void 0 : _r.addEventListener('change', (ev) => {
         const t = ev.target;
         void subirEvidencia(t, 'escaneo_oow');
+    });
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Botón de cámara junto a "Número del cargador": reutiliza scanner_codigo.ts
+    // (misma idea que inventario y el formato Dell). Al detectar, solo llena
+    // el textbox — el wizard envía el valor al guardar.
+    const btnEscanearCargador = byId('btnEscanearCargador');
+    const inputNumeroCargador = byId('numeroCargador');
+    btnEscanearCargador === null || btnEscanearCargador === void 0 ? void 0 : btnEscanearCargador.addEventListener('click', () => {
+        if (!inputNumeroCargador) {
+            setStatus('No se encontró el campo del número de cargador.', true, false);
+            return;
+        }
+        if (typeof window.abrirScannerCodigo !== 'function') {
+            setStatus('El scanner no está disponible. Recarga la página o escribe el número a mano.', true, false);
+            return;
+        }
+        window.abrirScannerCodigo({
+            targetInput: inputNumeroCargador,
+            tituloModal: 'Escanear número del cargador',
+            onDetect: () => {
+                setStatus('Número del cargador capturado con el scanner.', false, false);
+            },
+        });
     });
 }
 document.addEventListener('DOMContentLoaded', () => {
