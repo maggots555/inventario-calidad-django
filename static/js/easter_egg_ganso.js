@@ -8,6 +8,9 @@
  *   lleva la foto del avatar del navbar, huye con un HONK y la devuelve.
  *   Sirve para dar personalidad al sistema sin cambiar ningún dato.
  *
+ *   Funciona con mouse y con dedo: escritorio, celular, tablet y la PWA
+ *   instalada. El truco manual son 5 clics o 5 toques en la cita del día.
+ *
  * Efectos secundarios:
  *   - Inserta/quita un <div class="ganso-egg"> en <body> (temporal).
  *   - Añade/quita la clase .ganso-egg-robado en .navbar-user-avatar.
@@ -31,9 +34,9 @@
     const PREFIJO_STORAGE = 'sigma-ganso-robo-';
     /** Probabilidad de que el ganso salga al abrir el home (12%). */
     const PROBABILIDAD_APARICION = 0.12;
-    /** Clics seguidos en la cita diaria que fuerzan la escena (truco manual). */
+    /** Clics (o toques) seguidos en la cita diaria que fuerzan la escena. */
     const CLICS_SECRETOS = 5;
-    /** Máximo de milisegundos entre clic y clic para que cuenten como "seguidos". */
+    /** Máximo de milisegundos entre toque y toque para que cuenten como "seguidos". */
     const VENTANA_CLICS_MS = 2500;
     /** Espera inicial: dejamos que el usuario lea la cita antes del robo. */
     const MS_DEMORA_INICIAL = 2600;
@@ -49,12 +52,27 @@
     /** Distancia horizontal desde donde arranca la caminata (px antes del avatar). */
     const PX_CARRERILLA = 420;
     /**
+     * Ancho mínimo de pantalla para que valga la pena la escena.
+     * Por debajo (relojes, ventanas diminutas) el ganso taparía la barra.
+     */
+    const ANCHO_MINIMO_PANTALLA = 300;
+    /**
+     * Proporción de la pantalla que como máximo usa la carrerilla.
+     * EXPLICACIÓN PARA PRINCIPIANTES: en un celular de 375px no caben los
+     * 420px de carrerilla del escritorio, así que la recortamos a un 60%
+     * del ancho. El ganso entra desde el borde y se ve igual de natural.
+     */
+    const FRACCION_CARRERILLA_MOVIL = 0.6;
+    /**
      * Dibujo del ganso mirando a la DERECHA (blanco, pico naranja, patas naranjas).
      * Mismo lenguaje visual que el cursor "Ganso" de Mi Perfil, pero más grande.
      * Las patas van en grupos separados para animarlas alternadas (paso a paso).
+     *
+     * No lleva width/height: el tamaño lo decide el CSS (más chico en celular)
+     * y el viewBox se encarga de escalar el dibujo sin deformarlo.
      */
     const SVG_GANSO = `
-<svg viewBox="0 0 84 78" width="84" height="78" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<svg viewBox="0 0 84 78" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <filter id="gansoEggSombra" x="-30%" y="-30%" width="180%" height="180%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
@@ -139,26 +157,24 @@
     /**
      * ¿Este dispositivo/navegador puede correr la escena?
      *
-     * Se descarta si: el usuario pidió menos movimiento, es táctil puro
-     * (teléfono/tablet), la ventana es angosta (el navbar se reordena) o
-     * no hay avatar (usuario sin sesión).
+     * Funciona igual con mouse y con dedo (celular, tablet y la PWA
+     * instalada): en móvil el nombre del usuario se oculta, pero el avatar
+     * sigue en la barra, así que el ganso tiene qué robar.
+     *
+     * Solo se descarta si: el usuario pidió menos movimiento, la pantalla es
+     * tan angosta que el ganso taparía media barra, o no hay avatar
+     * (visitante sin sesión).
      */
     function puedeCorrer() {
         // Paso 1: respetar la preferencia de accesibilidad del sistema
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             return false;
         }
-        // Paso 2: exigir mouse/trackpad real, igual que el cursor personalizado
-        const punteroFino = window.matchMedia('(any-pointer: fine)').matches &&
-            window.matchMedia('(any-hover: hover)').matches;
-        if (!punteroFino) {
+        // Paso 2: por debajo de esto no queda espacio para el recorrido
+        if (window.innerWidth < ANCHO_MINIMO_PANTALLA) {
             return false;
         }
-        // Paso 3: en ventanas chicas el navbar cambia de layout → no arriesgamos
-        if (window.innerWidth < 992) {
-            return false;
-        }
-        // Paso 4: sin avatar (visitante anónimo) no hay nada que robar
+        // Paso 3: sin avatar (visitante anónimo) no hay nada que robar
         return obtenerAvatar() !== null;
     }
     // ========================================================================
@@ -240,20 +256,45 @@
     /**
      * Calcula dónde debe pararse el ganso para que su pico toque el avatar.
      *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * En el dibujo, el pico está en el punto (80, 12) de un lienzo de 84x78.
+     * Como en celular el ganso se dibuja más chico, no podemos restar "80px"
+     * a secas: usamos la PROPORCIÓN sobre el tamaño real que tiene ahora.
+     * Así el pico cae en el centro del avatar en cualquier pantalla.
+     *
+     * Args: ganso, el contenedor ya insertado en el DOM (necesita medirse).
      * Returns: {x, y} en coordenadas de viewport, o null si no hay avatar.
      */
-    function posicionJuntoAlAvatar() {
+    function posicionJuntoAlAvatar(ganso) {
         const avatar = obtenerAvatar();
         if (!avatar) {
             return null;
         }
         const caja = avatar.getBoundingClientRect();
-        // El pico está cerca de (80, 12) dentro del SVG de 84x78:
-        // restamos eso para que el pico caiga sobre el centro del avatar.
+        const anchoGanso = ganso.offsetWidth || 84;
+        const altoGanso = ganso.offsetHeight || 78;
+        const picoX = anchoGanso * (80 / 84);
+        const picoY = altoGanso * (12 / 78);
         return {
-            x: caja.left + caja.width / 2 - 74,
-            y: caja.top + caja.height / 2 - 14,
+            x: caja.left + caja.width / 2 - picoX,
+            y: caja.top + caja.height / 2 - picoY,
         };
+    }
+    /**
+     * Punto de entrada del ganso: lo más lejos que convenga por la izquierda.
+     *
+     * Args: ganso; destinoX, la x donde acabará parado.
+     * Returns: x inicial, nunca más lejos de lo que hace falta para entrar
+     *          justo fuera del borde izquierdo.
+     */
+    function xDeEntrada(ganso, destinoX) {
+        const carrerilla = Math.min(PX_CARRERILLA, Math.round(window.innerWidth * FRACCION_CARRERILLA_MOVIL));
+        const fueraPorLaIzquierda = -(ganso.offsetWidth + 40);
+        return Math.max(fueraPorLaIzquierda, destinoX - carrerilla);
+    }
+    /** x fuera de cuadro por la derecha (para la huida con el botín). */
+    function xDeHuida(ganso) {
+        return window.innerWidth + ganso.offsetWidth + 40;
     }
     // ========================================================================
     // EL ROBO (puro DOM: clonamos lo que ya se ve en pantalla)
@@ -332,12 +373,12 @@
         const actor = { el: contenedor, x: 0, y: 0 };
         try {
             // ── Tramo 1: entra caminando desde la izquierda ──────────────────
-            const destino = posicionJuntoAlAvatar();
+            const destino = posicionJuntoAlAvatar(contenedor);
             if (!destino || !botin || !honk) {
                 return;
             }
             // Arranca fuera de cuadro (o lo más lejos que quepa) y camina hacia el avatar
-            ubicar(actor, Math.max(-110, destino.x - PX_CARRERILLA), destino.y);
+            ubicar(actor, xDeEntrada(contenedor, destino.x), destino.y);
             contenedor.classList.add('ganso-egg--caminando');
             await caminarHasta(actor, destino.x, destino.y, MS_CAMINATA, 'linear');
             if (cancelado) {
@@ -363,7 +404,7 @@
             honk.classList.remove('ganso-egg__honk--visible');
             // ── Tramo 4: huye por la derecha con el botín ────────────────────
             contenedor.classList.add('ganso-egg--corriendo');
-            await caminarHasta(actor, window.innerWidth + 140, destino.y, MS_HUIDA, 'ease-in');
+            await caminarHasta(actor, xDeHuida(contenedor), destino.y, MS_HUIDA, 'ease-in');
             if (cancelado) {
                 return;
             }
@@ -375,7 +416,7 @@
             }
             // ── Tramo 5: vuelve arrepentido, de nuevo desde la izquierda ────
             // Recalculamos la posición: el usuario pudo hacer scroll o resize
-            const regreso = posicionJuntoAlAvatar();
+            const regreso = posicionJuntoAlAvatar(contenedor);
             if (!regreso) {
                 return;
             }
@@ -383,7 +424,7 @@
             // ganso volviera "de frente" (espejado), su cuerpo caería fuera del
             // viewport y se vería cortado. Por eso reaparece por la izquierda,
             // igual que en la entrada, y así siempre queda dentro de cuadro.
-            ubicar(actor, Math.max(-110, regreso.x - PX_CARRERILLA), regreso.y);
+            ubicar(actor, xDeEntrada(contenedor, regreso.x), regreso.y);
             contenedor.classList.add('ganso-egg--caminando');
             await caminarHasta(actor, regreso.x, regreso.y, MS_REGRESO, 'ease-out');
             if (cancelado) {
@@ -411,7 +452,7 @@
             contenedor.classList.remove('ganso-egg--robando');
             contenedor.classList.add('ganso-egg--mirando-izq');
             contenedor.classList.add('ganso-egg--corriendo');
-            await caminarHasta(actor, -200, regreso.y, MS_SALIDA, 'ease-in');
+            await caminarHasta(actor, -(contenedor.offsetWidth + 120), regreso.y, MS_SALIDA, 'ease-in');
         }
         finally {
             // Red de seguridad: pase lo que pase, el avatar vuelve a la normalidad
@@ -436,7 +477,13 @@
     // DISPARADORES
     // ========================================================================
     /**
-     * Cuenta clics seguidos en la cita diaria para forzar la escena a voluntad.
+     * Cuenta clics (o toques) seguidos en la cita diaria para forzar la escena.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El evento 'click' también lo disparan los navegadores móviles al tocar
+     * la pantalla, así que este mismo código sirve para mouse y para dedo.
+     * El CSS añade touch-action: manipulation a la cita para que los toques
+     * rápidos no se interpreten como "doble toque para acercar".
      *
      * Efectos secundarios: registra un listener en .cita-diaria.
      */

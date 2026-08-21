@@ -125,3 +125,32 @@ class EasterEggGansoTest(TestCase):
 
         # Paso 3: la escena se apaga con prefers-reduced-motion
         self.assertIn('prefers-reduced-motion', codigo)
+
+    def test_easter_egg_funciona_con_dedo(self):
+        """
+        El easter egg debe seguir disponible en celular, tablet y la PWA.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        La primera versión solo corría con mouse: pedía un puntero "fino"
+        (any-pointer: fine) y una ventana de 992px o más. Eso dejaba fuera
+        a los técnicos que usan SIGMA instalado en el teléfono.
+
+        Estas comprobaciones son un candado: si alguien vuelve a meter esos
+        filtros, el test falla y avisa que la PWA se quedó sin ganso.
+        """
+        base = Path(settings.BASE_DIR) / 'static'
+        codigo = (base / 'ts' / 'easter_egg_ganso.ts').read_text(encoding='utf-8')
+        estilos = (base / 'css' / 'easter_egg_ganso.css').read_text(encoding='utf-8')
+
+        # Paso 1: sin filtros de mouse (esos apagaban el easter egg en táctil)
+        self.assertNotIn('any-pointer: fine', codigo)
+        self.assertNotIn('any-hover: hover', codigo)
+
+        # Paso 2: el CSS ya no esconde el ganso en pantallas de móvil
+        self.assertNotIn('991.98px', estilos)
+
+        # Paso 3: en móvil el ganso se encoge en lugar de desaparecer
+        self.assertIn('max-width: 576px', estilos)
+
+        # Paso 4: 5 toques rápidos no deben disparar el zoom por doble toque
+        self.assertIn('touch-action: manipulation', estilos)

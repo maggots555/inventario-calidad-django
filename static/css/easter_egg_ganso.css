@@ -23,14 +23,17 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 84px;
-    height: 78px;
 
-    /* Por encima del navbar (1000) y sus dropdowns (1001),
-       muy por debajo del cursor personalizado (99998). */
+    /* Solo fijamos el ancho: aspect-ratio calcula el alto y así podemos
+       encogerlo en celular cambiando una sola línea (ver §8). */
+    width: 84px;
+    aspect-ratio: 84 / 78;
+
+    /* Por encima del navbar (1000) y sus dropdowns (1001), y por debajo del
+       panel del menú hamburguesa (1100) para no estorbar en móvil. */
     z-index: 1090;
 
-    /* Nunca debe interceptar clics: el avatar sigue siendo un enlace usable */
+    /* Nunca debe interceptar toques ni clics: el avatar sigue usable */
     pointer-events: none;
 
     /* Avisamos al navegador que este elemento se va a mover mucho */
@@ -39,6 +42,12 @@
 
 .ganso-egg__flip,
 .ganso-egg__cuerpo {
+    width: 100%;
+    height: 100%;
+}
+
+/* El dibujo llena el contenedor; el viewBox lo escala sin deformarlo */
+.ganso-egg svg {
     width: 100%;
     height: 100%;
 }
@@ -52,6 +61,13 @@
 .ganso-egg svg {
     display: block;
     overflow: visible;
+}
+
+/* La cita es el disparador manual (5 clics o 5 toques).
+   touch-action: manipulation quita el zoom por doble toque, para que los
+   toques rápidos cuenten como toques y no como gesto de acercar. */
+.cita-diaria {
+    touch-action: manipulation;
 }
 
 /* -----------------------------------------------------------------------------
@@ -158,9 +174,12 @@
 .ganso-egg__botin {
     position: absolute;
     top: -2px;
-    left: 56px;
-    width: 30px;
-    height: 30px;
+
+    /* En porcentajes del contenedor (56/84 y 30/84) para que la foto robada
+       siga pegada al pico aunque el ganso se dibuje más chico en celular. */
+    left: 66.7%;
+    width: 35.7%;
+    aspect-ratio: 1;
     border-radius: 50%;
     overflow: hidden;
 
@@ -179,7 +198,7 @@
 /* Al mirar a la izquierda, el pico queda del otro lado del contenedor */
 .ganso-egg--mirando-izq .ganso-egg__botin {
     left: auto;
-    right: 56px;
+    right: 66.7%;
 }
 
 .ganso-egg__botin--lleno {
@@ -229,7 +248,7 @@
 .ganso-egg__honk {
     position: absolute;
     top: -22px;
-    left: 58px;
+    left: 69%;
     padding: 0.15rem 0.5rem;
     border-radius: 10px;
 
@@ -249,7 +268,7 @@
 
 .ganso-egg--mirando-izq .ganso-egg__honk {
     left: auto;
-    right: 58px;
+    right: 69%;
 }
 
 .ganso-egg__honk--visible {
@@ -334,10 +353,27 @@
     }
 }
 
-/* En pantallas chicas el navbar se reordena: el easter egg no corre.
-   Igual lo ocultamos por si acaso (defensa en profundidad). */
-@media (max-width: 991.98px) {
+/* -----------------------------------------------------------------------------
+   8. CELULAR / TABLET / PWA INSTALADA
+   --------------------------------------------------------------------------
+   El easter egg TAMBIÉN corre con el dedo: en móvil el navbar oculta el
+   nombre del usuario pero el avatar sigue ahí, así que el ganso tiene qué
+   robar. Solo lo encogemos para que no tape media barra (el avatar también
+   baja de 45px a ~30px en estas pantallas).
+
+   El JavaScript lee el tamaño real del ganso, así que basta cambiar el
+   ancho aquí: el pico sigue cayendo justo sobre el avatar. */
+@media (max-width: 576px) {
     .ganso-egg {
-        display: none;
+        width: 64px;
+    }
+
+    /* Globo más discreto: en 375px de ancho, el de escritorio se ve enorme */
+    .ganso-egg__honk {
+        top: -17px;
+        padding: 0.1rem 0.35rem;
+        font-size: 0.6rem;
+        letter-spacing: 0.5px;
+        border-width: 1.5px;
     }
 }
