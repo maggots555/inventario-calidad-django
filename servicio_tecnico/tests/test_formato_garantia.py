@@ -511,6 +511,33 @@ class FormatoGarantiaServiceTest(TestCase):
         self.assertIn('vistas de daños', str(ctx.exception).lower())
         self.assertIn('Top Cover', str(ctx.exception))
 
+    def test_guardar_borra_vistas_de_otro_tipo(self):
+        """Al guardar con tipo escritorio, las caras de laptop se eliminan."""
+        from config.constants import catalogo_vistas_dano_estetico
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.tipo_diagrama = 'laptop'
+        formato.save(update_fields=['tipo_diagrama'])
+        _adjuntar_vistas_completas(formato)
+
+        aplicar_payload_borrador(
+            formato,
+            {
+                'tipo_diagrama': 'escritorio',
+                'vistas_dano': [
+                    {'clave_vista': 'frente', 'etiqueta_dano': 'Rayado'},
+                    {'clave_vista': 'palm', 'etiqueta_dano': 'No debe guardarse'},
+                ],
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        claves = set(formato.vistas_dano.values_list('clave_vista', flat=True))
+        self.assertIn('frente', claves)
+        self.assertNotIn('palm', claves)
+        escritorio = {c for c, _ in catalogo_vistas_dano_estetico('escritorio')}
+        self.assertTrue(claves.issubset(escritorio))
+
 
 class FormatoGarantiaWizardViewTest(TestCase):
     """GET del wizard responde 200 para orden garantía."""

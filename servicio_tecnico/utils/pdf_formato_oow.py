@@ -45,11 +45,10 @@ from reportlab.platypus import (
 from config.constants import (
     AVISO_PRIVACIDAD_OOW_MX,
     AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS,
-    VISTAS_DANO_ESTETICO_AIO,
-    VISTAS_DANO_ESTETICO_ESCRITORIO,
-    VISTAS_DANO_ESTETICO_LAPTOP,
+    catalogo_vistas_dano_estetico,
 )
 from config.paises_config import get_pais_actual
+from servicio_tecnico.services.vistas_dano import vistas_dano_para_pdf
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -621,9 +620,7 @@ class PDFFormatoServicioOOW:
             self._crear_header_seccion('Registro de daños estéticos'),
             Spacer(1, 2 * mm),
         ]
-        vistas = list(
-            self.formato.vistas_dano.exclude(imagen_anotada='').exclude(imagen_anotada=None)
-        )
+        vistas = vistas_dano_para_pdf(self.formato)
         if not vistas:
             elementos.append(Paragraph(
                 'Sin anotaciones de daños en diagramas.',
@@ -632,31 +629,11 @@ class PDFFormatoServicioOOW:
             return elementos
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Orden fijo del PDF (laptop): Pantalla → Top Cover → Palm → Bottom →
-        # Lateral izq → Lateral der. Si el usuario guardó las vistas en otro
-        # orden, aquí las reordenamos según el catálogo del tipo de diagrama.
+        # vistas_dano_para_pdf ya dejó solo las caras del tipo actual
+        # (laptop / escritorio / AIO) y las ordenó. Así el PDF no mezcla
+        # un Top Cover de laptop si después se cambió a escritorio.
         tipo = (self.formato.tipo_diagrama or 'laptop').lower()
-        if tipo == 'escritorio':
-            catalogo_orden = VISTAS_DANO_ESTETICO_ESCRITORIO
-        elif tipo == 'aio':
-            catalogo_orden = VISTAS_DANO_ESTETICO_AIO
-        else:
-            catalogo_orden = VISTAS_DANO_ESTETICO_LAPTOP
-
-        orden_claves = {clave: idx for idx, (clave, _etiqueta) in enumerate(catalogo_orden)}
-        vistas.sort(
-            key=lambda v: (
-                orden_claves.get(v.clave_vista, 999),
-                v.clave_vista or '',
-            )
-        )
-
-        # Mapa etiqueta amigable
-        labels = dict(
-            VISTAS_DANO_ESTETICO_LAPTOP
-            + VISTAS_DANO_ESTETICO_ESCRITORIO
-            + VISTAS_DANO_ESTETICO_AIO
-        )
+        labels = dict(catalogo_vistas_dano_estetico(tipo))
         bloques_vista = []
         for vista in vistas:
             try:

@@ -35,7 +35,11 @@ from servicio_tecnico.services.sync_cargador_detalle import (
     db_alias_de,
     sincronizar_cargador_a_detalle,
 )
-from servicio_tecnico.services.vistas_dano import etiquetas_vistas_dano_faltantes
+from servicio_tecnico.services.vistas_dano import (
+    claves_vistas_del_tipo,
+    etiquetas_vistas_dano_faltantes,
+    eliminar_vistas_dano_fuera_de_tipo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +388,7 @@ def aplicar_payload_borrador(
     Efectos secundarios:
         UPDATE FormatoServicioOOW + upsert DanoEsteticoVista + archivos ImageField
         + sync de cargador hacia DetalleEquipo
+        + borra vistas_dano que no coincidan con tipo_diagrama actual
     """
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # Tras finalizar, el PDF ya existe. Si el usuario quiere corregir datos,
@@ -463,12 +468,15 @@ def aplicar_payload_borrador(
 
         # --- Vistas de daño anotadas ---
         vistas = payload.get('vistas_dano') or []
+        claves_tipo = claves_vistas_del_tipo(formato.tipo_diagrama)
         if isinstance(vistas, list):
             for item in vistas:
                 if not isinstance(item, dict):
                     continue
                 clave = str(item.get('clave_vista') or '').strip()[:40]
-                if not clave:
+                # Ignorar caras de otro diagrama (el JS ya las limpia;
+                # esto es red de seguridad si llega un payload viejo).
+                if not clave or clave not in claves_tipo:
                     continue
                 etiqueta = str(item.get('etiqueta_dano') or '')[:80]
                 vista, _ = DanoEsteticoVista.objects.get_or_create(
@@ -485,6 +493,8 @@ def aplicar_payload_borrador(
                         save=False,
                     )
                 vista.save()
+        # Si el tipo cambió, las caras del diagrama anterior salen de BD
+        eliminar_vistas_dano_fuera_de_tipo(formato)
 
     return formato
 

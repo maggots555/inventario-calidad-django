@@ -674,6 +674,22 @@
                 grupo: opt.getAttribute('data-grupo') || '',
             }));
         })();
+        const clavesDelTipoActual = () => {
+            const tipo = valorInput('tipoDiagrama') || 'laptop';
+            return new Set(catalogoVistas.filter((v) => v.grupo === tipo).map((v) => v.value));
+        };
+        /**
+         * Quita del Map las caras de otro diagrama (laptop vs escritorio vs AIO).
+         * El PDF y las miniaturas deben mostrar el mismo conjunto.
+         */
+        const limpiarVistasDeOtroTipo = () => {
+            const permitidas = clavesDelTipoActual();
+            Array.from(vistasGuardadas.keys()).forEach((clave) => {
+                if (!permitidas.has(clave)) {
+                    vistasGuardadas.delete(clave);
+                }
+            });
+        };
         const vistaTieneImagen = (vista) => {
             if (!vista) {
                 return false;
@@ -829,6 +845,12 @@
                 sel.value = delTipo[0].value;
             }
             refrescarDiagrama();
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Al pasar de laptop a escritorio (o AIO), las miniaturas de la
+            // otra forma ya no coinciden con el PDF. Las quitamos del Map
+            // y redibujamos la tira para que el operador vea lo mismo.
+            limpiarVistasDeOtroTipo();
+            renderThumbsVistas();
             actualizarChecklistRequeridos();
         };
         const renderThumbsVistas = () => {
@@ -837,23 +859,33 @@
                 return;
             }
             cont.innerHTML = '';
-            if (vistasGuardadas.size === 0) {
+            const permitidas = clavesDelTipoActual();
+            const delTipo = catalogoVistas.filter((opt) => opt.grupo === (valorInput('tipoDiagrama') || 'laptop'));
+            const thumbs = [];
+            delTipo.forEach((opt) => {
+                const guardada = vistasGuardadas.get(opt.value);
+                if (guardada && permitidas.has(opt.value)) {
+                    thumbs.push(guardada);
+                }
+            });
+            if (thumbs.length === 0) {
                 cont.innerHTML = '<p class="text-muted small mb-0">Ninguna vista guardada aún.</p>';
                 return;
             }
-            vistasGuardadas.forEach((v) => {
+            const labels = new Map(delTipo.map((opt) => [opt.value, opt.label]));
+            thumbs.forEach((v) => {
                 const card = document.createElement('div');
                 card.className = 'formato-oow-vista-thumb';
                 const src = v.imagen_data || v.imagen_url || '';
+                const nombre = labels.get(v.clave_vista) || v.clave_vista;
                 card.innerHTML = `
-        <img src="${src}" alt="${v.clave_vista}">
-        <span>${v.clave_vista}${v.etiqueta_dano ? ' — ' + v.etiqueta_dano : ''}</span>
+        <img src="${src}" alt="${nombre}">
+        <span>${nombre}${v.etiqueta_dano ? ' — ' + v.etiqueta_dano : ''}</span>
       `;
                 cont.appendChild(card);
             });
         };
         filtrarVistasPorTipo();
-        renderThumbsVistas();
         (_b = byId('tipoDiagrama')) === null || _b === void 0 ? void 0 : _b.addEventListener('change', filtrarVistasPorTipo);
         (_c = byId('vistaActiva')) === null || _c === void 0 ? void 0 : _c.addEventListener('change', refrescarDiagrama);
         (_d = byId('btnLimpiarVista')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {

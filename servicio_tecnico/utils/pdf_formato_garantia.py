@@ -52,13 +52,12 @@ from config.constants import (
     TEXTO_TIEMPO_RESPUESTA_GARANTIA,
     TEXTOS_LEGALES_FORMATO_GARANTIA_DER,
     TEXTOS_LEGALES_FORMATO_GARANTIA_IZQ,
-    VISTAS_DANO_ESTETICO_AIO,
-    VISTAS_DANO_ESTETICO_ESCRITORIO,
-    VISTAS_DANO_ESTETICO_LAPTOP,
     WHATSAPP_FORMATO_GARANTIA_NUMEROS,
     WHATSAPP_FORMATO_GARANTIA_TEXTO,
+    catalogo_vistas_dano_estetico,
 )
 from config.paises_config import get_pais_actual
+from servicio_tecnico.services.vistas_dano import vistas_dano_para_pdf
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -888,11 +887,7 @@ class PDFFormatoServicioGarantia:
     def _construir_danos(self) -> List:
         """Grid de vistas de daño anotadas (página 2)."""
         elementos: List = []
-        vistas = list(
-            self.formato.vistas_dano.exclude(
-                imagen_anotada='',
-            ).exclude(imagen_anotada=None)
-        )
+        vistas = vistas_dano_para_pdf(self.formato)
         if not vistas:
             elementos.append(Paragraph(
                 'Sin anotaciones de daños en diagramas.',
@@ -900,23 +895,12 @@ class PDFFormatoServicioGarantia:
             ))
             return elementos
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Solo las caras del tipo actual (laptop / escritorio / AIO).
+        # Si el técnico cambió de diagrama a mitad del llenado, las viejas
+        # no salen en el PDF.
         tipo = (self.formato.tipo_diagrama or 'laptop').lower()
-        if tipo == 'escritorio':
-            catalogo_orden = VISTAS_DANO_ESTETICO_ESCRITORIO
-        elif tipo == 'aio':
-            catalogo_orden = VISTAS_DANO_ESTETICO_AIO
-        else:
-            catalogo_orden = VISTAS_DANO_ESTETICO_LAPTOP
-
-        orden_claves = {clave: idx for idx, (clave, _) in enumerate(catalogo_orden)}
-        vistas.sort(
-            key=lambda v: (orden_claves.get(v.clave_vista, 999), v.clave_vista or '')
-        )
-        labels = dict(
-            VISTAS_DANO_ESTETICO_LAPTOP
-            + VISTAS_DANO_ESTETICO_ESCRITORIO
-            + VISTAS_DANO_ESTETICO_AIO
-        )
+        labels = dict(catalogo_vistas_dano_estetico(tipo))
 
         bloques = []
         for vista in vistas:

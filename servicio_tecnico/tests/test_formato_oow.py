@@ -381,6 +381,76 @@ class FormatoOowServiceTest(TestCase):
         self.assertIn('vistas de daños', str(ctx.exception).lower())
         self.assertIn('Top Cover', str(ctx.exception))
 
+    def test_pdf_omite_vistas_de_otro_tipo(self):
+        """
+        Si se guardó un Top Cover de laptop y luego el tipo es escritorio,
+        el PDF (y el helper) no deben incluir esa cara vieja.
+        """
+        from config.constants import catalogo_vistas_dano_estetico
+        from servicio_tecnico.services.vistas_dano import vistas_dano_para_pdf
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.tipo_diagrama = 'laptop'
+        formato.save(update_fields=['tipo_diagrama'])
+        _adjuntar_vistas_completas(formato)
+
+        # Simula cambio de diagrama: ahora es escritorio, pero las caras
+        # de laptop siguen en BD.
+        formato.tipo_diagrama = 'escritorio'
+        formato.save(update_fields=['tipo_diagrama'])
+        _adjuntar_vistas_completas(formato)
+
+        claves = [v.clave_vista for v in vistas_dano_para_pdf(formato)]
+        escritorio = [c for c, _ in catalogo_vistas_dano_estetico('escritorio')]
+        self.assertEqual(claves, escritorio)
+        self.assertNotIn('top_cover', claves)
+        self.assertEqual(
+            formato.vistas_dano.count(),
+            len(catalogo_vistas_dano_estetico('laptop')) + len(escritorio),
+        )
+
+    def test_guardar_borra_vistas_de_otro_tipo(self):
+        """
+        Al cambiar laptop → escritorio y guardar, las caras viejas
+        salen de BD (igual que desaparecen de las miniaturas y del PDF).
+        """
+        from config.constants import catalogo_vistas_dano_estetico
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.tipo_diagrama = 'laptop'
+        formato.save(update_fields=['tipo_diagrama'])
+        _adjuntar_vistas_completas(formato)
+        self.assertGreater(formato.vistas_dano.count(), 0)
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El wizard manda el tipo nuevo y solo las vistas de ese tipo.
+        # El servidor debe borrar palm/pantalla/etc. que ya no aplican.
+        aplicar_payload_borrador(
+            formato,
+            {
+                'tipo_diagrama': 'escritorio',
+                'vistas_dano': [
+                    {
+                        'clave_vista': 'frente',
+                        'etiqueta_dano': 'Rayado',
+                    },
+                    {
+                        'clave_vista': 'palm',
+                        'etiqueta_dano': 'No debe guardarse',
+                    },
+                ],
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        claves = set(formato.vistas_dano.values_list('clave_vista', flat=True))
+        self.assertIn('frente', claves)
+        self.assertNotIn('palm', claves)
+        self.assertNotIn('pantalla', claves)
+        self.assertNotIn('top_cover', claves)
+        escritorio = {c for c, _ in catalogo_vistas_dano_estetico('escritorio')}
+        self.assertTrue(claves.issubset(escritorio))
+
     def test_finalizar_genera_pdf(self):
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
         aplicar_payload_borrador(
