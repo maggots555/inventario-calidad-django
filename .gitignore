@@ -82,6 +82,7 @@ ssl_certs/
 # Settings backups con timestamp
 config/settings.py.backup*
 config/settings.py.bak*
+config/settings.py.backup-*
 
 # Test files
 .coverage
