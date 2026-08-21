@@ -1517,13 +1517,16 @@ PROMPT_CITA_NIHILISMO = (
     "Requisitos de contenido:\n"
     "- Idioma: Español.\n"
     "- Extensión: Entre 1 y 3 oraciones cortas.\n"
-    "- Mensaje central: El universo no tiene un significado inherente, y esa "
-    "ausencia absoluta es la máxima libertad para crear tu propio propósito.\n"
-    "- Tono: Reflexivo, maduro y motivador, evitando caer en clichés ingenuos.\n\n"
-    "Restricciones estrictas de formato:\n"
+    "- Concepto: Transmite la libertad de crear tu propio propósito ante un lienzo en blanco cosmico.\n"
+    "- Tono: Reflexivo, maduro y motivador, evitando caer en clichés ingenuos.\n"
+    "- Enfoque variable: Explora diferentes ángulos cada vez (la hoja en blanco, la ligereza de la existencia, "
+    "la responsabilidad de elegir, la belleza de lo efímero, el juego de vivir).\n\n"
+    "Restricciones de originalidad y formato:\n"
+    "- PROHIBIDO iniciar con frases como 'El universo no tiene...', 'El cosmos carece de...', "
+    "'Dado que nada importa...' o 'Que el universo no tenga...'.\n"
+    "- Varía el inicio gramatical (empieza a veces con un verbo de acción, un sustantivo o una afirmación directa).\n"
     "- Responde EXCLUSIVAMENTE con el texto de la cita.\n"
-    "- Prohibido incluir comillas, guiones, introducciones (como 'Aquí tienes') "
-    "o comentarios finales."
+    "- Prohibido incluir comillas, guiones, introducciones o comentarios finales."
 )
 
 
