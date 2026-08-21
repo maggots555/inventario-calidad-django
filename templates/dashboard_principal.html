@@ -8,6 +8,9 @@
 
 <!-- Estilos específicos del Dashboard Principal - Diseño moderno y minimalista -->
 <link rel="stylesheet" href="{% static 'css/dashboard_principal.css' %}" />
+
+<!-- Easter egg del ganso (solo esta página): se roba el avatar del navbar -->
+<link rel="stylesheet" href="{% static 'css/easter_egg_ganso.css' %}" />
 {% endblock %} {% block content %}
 <!--
 
@@ -498,4 +501,18 @@ Este script agrega funcionalidades adicionales:
     console.log("%c Dashboard Principal — SIGMA", "color: #1f6391; font-size: 14px; font-weight: bold;");
   });
 </script>
+
+<!--
+================================================================================
+EASTER EGG — EL GANSO SE ROBA EL AVATAR (solo en el home)
+================================================================================
+Vive en su propio módulo (static/ts/easter_egg_ganso.ts) para no engordar
+el script de esta página. Aparece al azar (12%, máximo una vez al día) y
+también con 5 clics seguidos en la cita del día.
+
+Es 100% visual: clona la imagen que ya está en el navbar. La foto guardada
+en la base de datos (Empleado.foto_perfil) nunca se toca.
+================================================================================
+-->
+<script src="{% static 'js/easter_egg_ganso.js' %}"></script>
 {% endblock %}
