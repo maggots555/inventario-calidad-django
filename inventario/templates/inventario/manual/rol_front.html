@@ -28,7 +28,7 @@
         <a href="{% url 'manual:acepta' %}">acepta</a>,
         <a href="{% url 'manual:rechaza' %}">rechaza</a>,
         <a href="{% url 'manual:pnc' %}">PNC</a>.</li>
-    <li>Cobra el anticipo del 50% en la orden: al confirmar, piezas y servicios ya están cargados. Si solo aceptó servicios, la orden pasa sola a <strong>En reparación</strong>.</li>
+    <li>Cobra el anticipo del 50% en la orden: al confirmar, piezas y servicios ya están cargados. Compras no puede generar compras (ni pasar a <strong>En reparación</strong> si solo hay servicios) hasta que ese 50% esté registrado.</li>
     <li>Equipo listo: <span class="manual-btn-name">Notificar equipo disponible</span> y, al recoger, <span class="manual-btn-name">Cerrar Orden</span> + encuesta.</li>
 </ol>
 

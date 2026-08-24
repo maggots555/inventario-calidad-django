@@ -838,20 +838,36 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
         <i class="bi bi-send me-1"></i>Enviar al Cliente
     </button>
     {% elif solicitud.puede_generar_compras %}
-    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}" class="flex-grow-1">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-dock-primary w-100" onclick="return confirm('¿Generar compras?')">
+        {% if cubre_anticipo_50 %}
+        <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}" class="flex-grow-1">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-dock-primary w-100" onclick="return confirm('¿Generar compras?')">
+                <i class="bi bi-cart-plus me-1"></i>Generar Compras
+            </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-primary btn-dock-primary flex-grow-1" disabled
+                aria-disabled="true"
+                title="{{ mensaje_falta_anticipo }}">
             <i class="bi bi-cart-plus me-1"></i>Generar Compras
         </button>
-    </form>
-    {% elif solicitud.puede_generar_venta_mostrador %}
-    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}" class="flex-grow-1">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-dock-primary w-100"
-                onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+        {% endif %}
+    {% elif solicitud.puede_generar_venta_mostrador or puede_cerrar_solo_servicios %}
+        {% if cubre_anticipo_50 %}
+        <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}" class="flex-grow-1">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-dock-primary w-100"
+                    onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+                <i class="bi bi-wrench me-1"></i>Generar servicio
+            </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-primary btn-dock-primary flex-grow-1" disabled
+                aria-disabled="true"
+                title="{{ mensaje_falta_anticipo }}">
             <i class="bi bi-wrench me-1"></i>Generar servicio
         </button>
-    </form>
+        {% endif %}
     {% elif solicitud.compras_pendientes_sin_orden and solicitud.puede_vincular_orden %}
     <button type="button" class="btn btn-success btn-dock-primary flex-grow-1"
             data-solicitud-pk="{{ solicitud.pk }}"

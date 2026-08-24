@@ -55,9 +55,12 @@
             <dd>Mismo detalle de la solicitud, botón <span class="manual-btn-name">Generar Compras</span>.</dd>
         </div>
         <div>
-        <div>
             <dt>Qué haces</dt>
-            <dd>Esperas el anticipo del 50% (ya incluye piezas y servicios aceptados) y luego pulsas el botón. Solo el rol Compras tiene este botón.</dd>
+            <dd>
+                El botón permanece apagado hasta que Front cargue en la orden
+                al menos el 50% del total (piezas + servicios, el mismo del PDF).
+                Cuando ya está el anticipo, pulsas el botón. Solo el rol Compras lo enciende.
+            </dd>
         </div>
         <div>
             <dt>Estado de la orden</dt>
@@ -71,8 +74,9 @@
     <p>
         Al registrar palomitas y taches, los <strong>servicios aceptados</strong> (limpieza, respaldo, paquetes)
         ya quedan en la orden, igual que las piezas. Front cobra el 50% con el mismo total del PDF.
-        Si el cliente solo aceptó servicios y no piezas, la orden pasa sola a <strong>En reparación</strong>
-        y el técnico puede empezar, sin esperar paquetería.
+        Si el cliente solo aceptó servicios y no piezas, el técnico <strong>no</strong> arranca hasta
+        ese mismo 50%: entonces sí se confirma y la orden pasa a <strong>En reparación</strong>,
+        sin esperar paquetería.
     </p>
 </article>
 

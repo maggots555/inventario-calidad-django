@@ -858,6 +858,21 @@ def detalle_solicitud_cotizacion(request, pk):
 
     context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
     context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
+
+    # Candado 50%: el HTML solo pinta; aquí se decide si el botón se enciende.
+    # EXPLICACIÓN PARA PRINCIPIANTES: Front cobra en el detalle de la orden.
+    # Compras no pide piezas (ni se pasa a En reparación si solo hay
+    # servicios) hasta que el recuadro de pagos marque el 50% del PDF.
+    from almacen.utils.anticipo_solicitud import (
+        cubre_anticipo_50_solicitud,
+        mensaje_falta_anticipo,
+        puede_cerrar_solo_servicios,
+        resumen_cobro_solicitud,
+    )
+    context['resumen_anticipo'] = resumen_cobro_solicitud(solicitud)
+    context['cubre_anticipo_50'] = cubre_anticipo_50_solicitud(solicitud)
+    context['puede_cerrar_solo_servicios'] = puede_cerrar_solo_servicios(solicitud)
+    context['mensaje_falta_anticipo'] = mensaje_falta_anticipo(solicitud)
     # EXPLICACIÓN: tras PNC (costos en $0) con orden, igual hay que poder abrir
     # el modal para mandar alternativa REAC.
     # Se combina con la vigencia: enviar o reenviar una cotización vencida le

@@ -55,11 +55,12 @@ def generar_compras_solicitud(request, pk):
     3. En órdenes OOW de reparación (no FL-): crea SeguimientoPieza en ST
        agrupados por proveedor y pasa la orden a «Esperando Llegada de Piezas».
 
-    4. Si el cliente SOLO aceptó servicios (sin piezas): al confirmar ya
-       quedó VentaMostrador + orden En reparación. Un segundo POST no duplica.
+    4. Si el cliente SOLO aceptó servicios (sin piezas): la VentaMostrador
+       ya se copió al confirmar. El POST cierra a En reparación solo si
+       ya está el anticipo del 50%.
     
-    Esto integra el flujo de cotizaciones con el flujo existente de compras
-    y ventas mostrador.
+    Candado: no se crean CompraProducto ni se pasa a En reparación si
+    Front aún no cargó el 50% del total (el mismo del PDF / recuadro de pagos).
     """
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
@@ -80,15 +81,20 @@ def generar_compras_solicitud(request, pk):
 
         puede_generar_compras = solicitud.puede_generar_compras()
         puede_generar_venta = solicitud.puede_generar_venta_mostrador()
-        
-        # Validar que haya algo que generar. Si los servicios ya se copiaron
-        # al aceptar (o la solicitud ya está completada), un segundo clic
-        # no es un error: no hay nada pendiente.
-        if not puede_generar_compras and not puede_generar_venta:
-            servicios_ya_en_st = solicitud.servicios_adicionales.filter(
-                estado_cliente='compra_generada',
-            ).exists()
-            if solicitud.estado == 'completada' or servicios_ya_en_st:
+        from almacen.utils.anticipo_solicitud import (
+            cubre_anticipo_50_solicitud,
+            mensaje_falta_anticipo,
+            puede_cerrar_solo_servicios,
+        )
+        puede_cerrar_solo = puede_cerrar_solo_servicios(solicitud)
+
+        # Nada pendiente: compras, VM vieja, o cierre de solo-servicio.
+        if (
+            not puede_generar_compras
+            and not puede_generar_venta
+            and not puede_cerrar_solo
+        ):
+            if solicitud.estado == 'completada':
                 messages.info(
                     request,
                     'Los servicios/compras ya estaban registrados. '
@@ -111,6 +117,14 @@ def generar_compras_solicitud(request, pk):
                 'Solo Compras puede generar compras de piezas. '
                 'Los servicios aceptados ya se cargan al confirmar la respuesta.'
             )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+        # Candado 50%: piezas al proveedor o cierre a En reparación.
+        if (
+            (puede_generar_compras or puede_cerrar_solo)
+            and not cubre_anticipo_50_solicitud(solicitud)
+        ):
+            messages.error(request, mensaje_falta_anticipo(solicitud))
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         
         mensajes_exito = []
@@ -148,11 +162,14 @@ def generar_compras_solicitud(request, pk):
             mensajes_exito.append(
                 f'Venta Mostrador creada/actualizada ({venta.folio_venta})'
             )
-            solicitud.refresh_from_db()
-            if solicitud.orden_servicio_id:
-                solicitud.orden_servicio.refresh_from_db()
-                if solicitud.orden_servicio.estado == 'reparacion':
-                    mensajes_exito.append('orden ST actualizada a «En Reparación»')
+
+        # Solo servicios: VM ya estaba; con el 50% se cierra a En reparación.
+        if puede_cerrar_solo:
+            from almacen.utils.sincronizar_servicios_venta_mostrador import (
+                cerrar_solicitud_solo_servicios,
+            )
+            if cerrar_solicitud_solo_servicios(solicitud):
+                mensajes_exito.append('orden ST actualizada a «En Reparación»')
 
         # Generar compras para piezas (CompraProducto para control de inventario/almacén)
         if puede_generar_compras:

@@ -67,8 +67,9 @@ def materializar_servicios_aprobados_en_st(
 
     Efectos secundarios:
         - Crea/actualiza VentaMostrador y marca servicios como compra_generada.
-        - Si no hay piezas pendientes de compra y la solicitud sigue
-          aprobada/parcial: pasa a completada y la orden ST a «En reparación».
+        - Si no hay piezas pendientes de compra Y ya está el anticipo del 50%:
+          pasa a completada y la orden ST a «En reparación».
+        - Si falta el 50%, deja la Venta Mostrador para el cobro y no cierra.
         - No crea CompraProducto. Si falla, no revierte la aceptación del
           cliente (se registra el error y «Generar Compras» puede reintentar).
     """
@@ -118,11 +119,7 @@ def _completar_solicitud_si_solo_servicios(
     venta: Optional['VentaMostrador'],
 ) -> None:
     """
-    Marca la solicitud completada y pasa la orden a reparación.
-
-    Solo aplica cuando el cliente aceptó servicio(s) y NO hay piezas
-    pendientes de CompraProducto. Si hay piezas, Compras debe pulsar
-    «Generar Compras» después del anticipo.
+    Cierra solo-servicio si NO hay piezas por comprar y YA está el 50%.
 
     Args:
         solicitud: Solicitud con respuesta del cliente ya cerrada.
@@ -130,20 +127,45 @@ def _completar_solicitud_si_solo_servicios(
             nuevos que copiar.
 
     Efectos secundarios:
-        Cambia solicitud.estado a completada y puede cambiar orden.estado
-        a reparacion. No hace nada si aún se pueden generar compras.
+        Puede pasar la solicitud a completada y la orden a reparación.
+        No hace nada si faltan piezas, si no hay VM nueva, o si falta el 50%.
     """
-    # Paso: con piezas aprobadas sin compra, Compras todavía tiene trabajo.
     if solicitud.puede_generar_compras():
         return
-
-    # Paso: si no acabamos de crear VM, no hay servicio que confirmar.
-    # Evita completar una solicitud que solo tiene piezas rechazadas
-    # y ningún servicio (eso es rechazo, no «solo servicio»).
     if venta is None:
         return
+    cerrar_solicitud_solo_servicios(solicitud)
 
-    # Paso: no re-cerrar si Generar Compras ya dejó la solicitud completada.
+
+def cerrar_solicitud_solo_servicios(solicitud: 'SolicitudCotizacion') -> bool:
+    """
+    Completa la solicitud y pasa la orden a En reparación (solo servicios).
+
+    Objetivo de negocio:
+        El técnico no arranca hasta que Front cargó el anticipo del 50%.
+        Si aún no alcanza, no cierra: el botón «Generar servicio» espera.
+
+    Args:
+        solicitud: Debe tener servicios ya en ST y ninguna pieza por comprar.
+
+    Returns:
+        bool: True si se cambió el estado de la orden a reparación.
+
+    Efectos secundarios:
+        solicitud.estado → completada; orden.estado → reparacion.
+    """
+    from almacen.utils.anticipo_solicitud import cubre_anticipo_50_solicitud
+
+    if solicitud.puede_generar_compras():
+        return False
+    if not cubre_anticipo_50_solicitud(solicitud):
+        logger.info(
+            '[SYNC-SERVICIOS-ST] Solicitud %s: servicios en ST, pero falta '
+            'el anticipo del 50%%; no se pasa a En reparación.',
+            solicitud.numero_solicitud,
+        )
+        return False
+
     solicitud.refresh_from_db()
     if solicitud.estado in ESTADOS_SOLICITUD_CON_ACEPTACION:
         solicitud.estado = 'completada'
@@ -153,4 +175,4 @@ def _completar_solicitud_si_solo_servicios(
     from almacen.utils.sincronizar_estado_st import (
         sincronizar_estado_st_al_confirmar_servicios,
     )
-    sincronizar_estado_st_al_confirmar_servicios(solicitud)
+    return sincronizar_estado_st_al_confirmar_servicios(solicitud)

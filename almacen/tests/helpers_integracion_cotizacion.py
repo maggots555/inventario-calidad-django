@@ -194,6 +194,40 @@ class BaseIntegracionCotizacionMixin:
         )
         return solicitud, linea
 
+    def _registrar_anticipo_50(self, orden):
+        """
+        Carga en la orden un abono igual al 50% del total a cobrar.
+
+        EXPLICACIÓN: el candado de Generar Compras exige este anticipo.
+        Usamos efectivo para no disparar avisos a Facturación en CI.
+
+        Args:
+            orden: OrdenServicio con cotización/VM ya sincronizadas.
+
+        Returns:
+            PagoOrden creado, o None si el total es $0 (nada que cobrar).
+        """
+        from servicio_tecnico.models import OrdenServicio
+        from servicio_tecnico.services.pagos_orden import (
+            calcular_resumen_cobro,
+            registrar_pago,
+        )
+
+        # Recargamos la orden: el cobro usa piezas/VM que pudieron nacer al aceptar.
+        orden = OrdenServicio.objects.get(pk=orden.pk)
+        resumen = calcular_resumen_cobro(orden, codigo_pais='MX')
+        # Total $0 (p. ej. FL sin piezas en cobro): el candado deja pasar.
+        if resumen.anticipo_minimo <= 0:
+            return None
+        return registrar_pago(
+            orden=orden,
+            empleado=self.empleado,
+            monto=resumen.anticipo_minimo,
+            tipo='anticipo',
+            metodo='efectivo',
+            codigo_pais='MX',
+        )
+
 
 # Alias con guion bajo: compatibilidad con imports antiguos del mixin privado
 _BaseIntegracionCotizacionMixin = BaseIntegracionCotizacionMixin

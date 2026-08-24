@@ -116,6 +116,7 @@ class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
         )
 
         # Paso 3: generar compras → PiezaVentaMostrador + SeguimientoPieza
+        self._registrar_anticipo_50(orden)
         url_compras = reverse(
             'almacen:generar_compras_solicitud',
             kwargs={'pk': solicitud.pk},
@@ -233,6 +234,7 @@ class SeguimientoPiezasOowRegresionTest(BaseIntegracionCotizacionMixin, TestCase
             estado_linea='pendiente',
         )
         self.assertTrue(linea.aprobar())
+        self._registrar_anticipo_50(orden)
 
         url_compras = reverse(
             'almacen:generar_compras_solicitud',

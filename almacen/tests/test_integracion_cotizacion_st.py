@@ -10,10 +10,11 @@ llaman las vistas HTTP (RequestFactory) para recorrer el flujo de negocio:
 2) Sin orden: generar compras debe bloquearse.
 3) Sin orden: vincular orden → entonces sí se pueden generar compras.
 4) Rechazo total: rechazar todas + motivo catálogo → Cotizacion ST coherente.
-5) Solo servicio (piezas rechazadas): al aceptar se crea VentaMostrador
-   + orden En reparación; Front NO puede generar compras de piezas.
+5) Solo servicio (piezas rechazadas): al aceptar se crea VentaMostrador;
+   la orden NO pasa a En reparación hasta el 50% + POST. Front NO puede
+   generar compras de piezas.
 6) Pieza + servicio: al aceptar ya está VentaMostrador (cobro 50% correcto)
-   y CompraProducto sigue en 0 hasta «Generar Compras».
+   y CompraProducto sigue en 0 hasta «Generar Compras» (con el 50% cargado).
 
 Los fixtures compartidos viven en helpers_integracion_cotizacion.py
 (también los usa test_e2e_flujo_dinero.py).
@@ -27,7 +28,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
-from django.test import TestCase
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.sessions.backends.db import SessionStore
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -90,6 +93,8 @@ class IntegracionCotizacionConOrdenTest(BaseIntegracionCotizacionMixin, TestCase
             ('totalmente_aprobada', 'parcialmente_aprobada'),
         )
         self.assertTrue(self.solicitud.puede_generar_compras())
+
+        self._registrar_anticipo_50(self.orden)
 
         # Paso 2: vista HTTP generar_compras_solicitud (POST)
         url = reverse(
@@ -253,6 +258,8 @@ class IntegracionCotizacionSinOrdenTest(BaseIntegracionCotizacionMixin, TestCase
         self.assertTrue(self.solicitud.puede_generar_compras())
         self.assertFalse(self.solicitud.compras_pendientes_sin_orden())
 
+        self._registrar_anticipo_50(self.orden)
+
         # Paso 2: ahora sí generar compras
         url_compras = reverse(
             'almacen:generar_compras_solicitud',
@@ -301,8 +308,9 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
     Cliente rechaza todas las piezas y solo acepta un servicio adicional.
 
     Objetivo de negocio:
-        Al cerrar la respuesta, el servicio ya debe estar en VentaMostrador,
-        la solicitud completada y la orden En reparación, sin CompraProducto.
+        Al cerrar la respuesta, el servicio ya debe estar en VentaMostrador
+        para cobrar el 50%. La orden NO pasa a En reparación hasta ese
+        anticipo (y el POST de confirmar). Sin CompraProducto.
     """
 
     def setUp(self) -> None:
@@ -335,21 +343,47 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
 
     def test_rechazar_piezas_y_aceptar_servicio_deja_flags_correctos(self) -> None:
         """
-        Tras responder: el servicio ya está en ST, solicitud completada
-        y orden En reparación. No hay compras ni botón de servicio pendiente.
+        Tras responder: el servicio ya está en ST para cobrar, pero la
+        solicitud sigue aprobada y la orden NO salta a En reparación.
         """
+        from almacen.utils.anticipo_solicitud import puede_cerrar_solo_servicios
+
         self._cerrar_solo_servicio()
 
-        self.assertEqual(self.solicitud.estado, 'completada')
-        self.assertEqual(self.orden.estado, 'reparacion')
+        self.assertEqual(self.solicitud.estado, 'parcialmente_aprobada')
+        self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
         self.assertFalse(self.solicitud.puede_generar_compras())
         self.assertFalse(self.solicitud.puede_generar_venta_mostrador())
+        self.assertTrue(puede_cerrar_solo_servicios(self.solicitud))
         # La cotización ST no debe verse como rechazada: aceptaron el servicio.
         self.assertIs(self.cotizacion.usuario_acepto, True)
 
         venta = VentaMostrador.objects.get(orden=self.orden)
         self.assertTrue(venta.incluye_limpieza)
         self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+        self.assertEqual(CompraProducto.objects.count(), 0)
+
+    def test_solo_servicio_con_anticipo_previo_cierra_al_aceptar(self) -> None:
+        """
+        Si Front ya había cargado el 50% antes de confirmar, al aceptar
+        se copia VM y sí pasa a En reparación en ese momento.
+        """
+        from servicio_tecnico.services.pagos_orden import registrar_pago
+
+        # El 50% del servicio ($450) son $225. Lo cargamos ANTES de confirmar.
+        registrar_pago(
+            orden=self.orden,
+            empleado=self.empleado,
+            monto=Decimal('225.00'),
+            tipo='anticipo',
+            metodo='efectivo',
+            codigo_pais='MX',
+        )
+        self._cerrar_solo_servicio()
+
+        self.assertEqual(self.solicitud.estado, 'completada')
+        self.assertEqual(self.orden.estado, 'reparacion')
+        self.assertEqual(VentaMostrador.objects.filter(orden=self.orden).count(), 1)
         self.assertEqual(CompraProducto.objects.count(), 0)
 
     def test_no_genera_servicio_si_aun_faltan_piezas_por_responder(self) -> None:
@@ -382,13 +416,38 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
         self.assertEqual(self.servicio.estado_cliente, 'aprobada')
         self.assertEqual(VentaMostrador.objects.filter(orden=self.orden).count(), 0)
 
-    def test_front_genera_servicio_sin_compra_y_pasa_a_reparacion(self) -> None:
+    def test_post_sin_anticipo_no_pasa_a_reparacion(self) -> None:
         """
-        POST como Front tras aceptar: no duplica VentaMostrador ni crea
-        CompraProducto (idempotente; el servicio ya se copió al confirmar).
+        Sin el 50%, el POST no completa ni pasa la orden a En reparación.
         """
         self._cerrar_solo_servicio()
         vm_id = VentaMostrador.objects.get(orden=self.orden).pk
+
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user_front, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        textos = [str(m.message) for m in get_messages(request)]
+        self.assertTrue(any('anticipo' in t.lower() for t in textos))
+
+        self.solicitud.refresh_from_db()
+        self.orden.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'parcialmente_aprobada')
+        self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
+        self.assertEqual(CompraProducto.objects.count(), 0)
+        self.assertEqual(VentaMostrador.objects.get(orden=self.orden).pk, vm_id)
+
+    def test_post_con_anticipo_50_pasa_a_reparacion(self) -> None:
+        """
+        Con el 50% cargado, el POST cierra a En reparación sin CompraProducto.
+        """
+        self._cerrar_solo_servicio()
+        vm_id = VentaMostrador.objects.get(orden=self.orden).pk
+        self._registrar_anticipo_50(self.orden)
 
         url = reverse(
             'almacen:generar_compras_solicitud',
@@ -511,6 +570,95 @@ class IntegracionPiezaYServicioAceptadoTest(BaseIntegracionCotizacionMixin, Test
         self.assertEqual(resumen.total_a_cobrar, total_esperado)
         self.assertEqual(resumen.anticipo_minimo, anticipo_esperado)
         self.assertGreater(resumen.anticipo_minimo, anticipo_solo_piezas)
+
+    def test_generar_compras_sin_pago_no_crea_compra_producto(self) -> None:
+        """
+        Pieza + servicio aceptados, sin abono: el POST no crea CompraProducto.
+        """
+        self.assertTrue(self.linea.aprobar())
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self.assertTrue(self.solicitud.puede_generar_compras())
+
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        textos = [str(m.message) for m in get_messages(request)]
+        self.assertTrue(any('anticipo' in t.lower() for t in textos))
+
+        self.linea.refresh_from_db()
+        self.solicitud.refresh_from_db()
+        self.assertIsNone(self.linea.compra_generada_id)
+        self.assertEqual(self.linea.estado_cliente, 'aprobada')
+        self.assertEqual(self.solicitud.estado, 'totalmente_aprobada')
+        self.assertEqual(CompraProducto.objects.count(), 0)
+
+    def test_generar_compras_con_anticipo_50_crea_compra_producto(self) -> None:
+        """
+        Mismo caso, Front carga el 50%: sí se generan las compras.
+        """
+        self.assertTrue(self.linea.aprobar())
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self._registrar_anticipo_50(self.orden)
+
+        url = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = request_post(self.factory, self.user, url, {})
+        respuesta = generar_compras_solicitud(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 302)
+
+        self.linea.refresh_from_db()
+        self.solicitud.refresh_from_db()
+        self.assertIsNotNone(self.linea.compra_generada_id)
+        self.assertEqual(self.linea.estado_cliente, 'compra_generada')
+        self.assertEqual(self.solicitud.estado, 'completada')
+        self.assertEqual(CompraProducto.objects.count(), 1)
+
+    @override_settings(STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    })
+    def test_detalle_boton_compras_apagado_sin_anticipo(self) -> None:
+        """
+        UI: el botón Generar Compras se ve, pero está deshabilitado
+        hasta el 50%, con el texto de pagado vs mínimo.
+        """
+        from almacen.views import detalle_solicitud_cotizacion
+
+        self.assertTrue(self.linea.aprobar())
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self.assertTrue(self.solicitud.puede_generar_compras())
+
+        url = reverse(
+            'almacen:detalle_solicitud_cotizacion',
+            kwargs={'pk': self.solicitud.pk},
+        )
+        request = self.factory.get(url)
+        request.user = self.user
+        request.session = SessionStore()
+        request._messages = FallbackStorage(request)
+        respuesta = detalle_solicitud_cotizacion(request, self.solicitud.pk)
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.content.decode('utf-8')
+        self.assertIn('Generar Compras', html)
+        self.assertIn('Falta anticipo', html)
+        self.assertIn('disabled', html)
+        # El formulario de POST no debe estar activo todavía.
+        self.assertNotIn(
+            '¿Generar compras para las líneas aprobadas?',
+            html,
+        )
 
     def test_vincular_orden_copia_servicio_ya_aceptado(self) -> None:
         """

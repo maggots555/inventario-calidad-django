@@ -112,6 +112,8 @@ class E2eFlujoDineroAlmacenStTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(linea.estado_cliente, 'aprobada')
         self.assertTrue(solicitud.puede_generar_compras())
 
+        self._registrar_anticipo_50(orden)
+
         # Paso 2: generar compras (crea CompraProducto + sync seguimiento ST)
         url_compras = reverse(
             'almacen:generar_compras_solicitud',
@@ -213,6 +215,8 @@ class E2eFlujoDineroAlmacenStTest(BaseIntegracionCotizacionMixin, TestCase):
         cotizacion = Cotizacion.objects.get(orden=orden)
         self.assertEqual(cotizacion.orden_id, orden.pk)
         self.assertTrue(solicitud.puede_generar_compras())
+
+        self._registrar_anticipo_50(orden)
 
         # Ahora sí generar compras (linea.save interno sincroniza PiezaCotizada)
         resp_compras = generar_compras_solicitud(

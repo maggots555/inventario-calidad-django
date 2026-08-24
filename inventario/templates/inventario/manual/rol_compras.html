@@ -30,7 +30,7 @@
         </ul>
     </li>
     <li>Eso deja la ficha en el panel «En Front» y la orden en <strong>Se Recibe Cotización de Proveedores</strong>. Arrancan 5 días hábiles.</li>
-    <li>Si Front registró aceptación con piezas: <span class="manual-btn-name">Generar Compras</span>. Ver <a href="{% url 'manual:acepta' %}#paso-compras">generar compras</a>.</li>
+    <li>Si Front registró aceptación con piezas <strong>y ya cargó el 50% en la orden</strong>: <span class="manual-btn-name">Generar Compras</span>. Sin ese anticipo el botón queda apagado. Ver <a href="{% url 'manual:acepta' %}#paso-compras">generar compras</a>.</li>
     <li>Cuando lleguen: <a href="{% url 'almacen:lista_compras' %}">Ver compras</a> → <span class="manual-btn-name">Recibir</span>.</li>
 </ol>
 
@@ -44,8 +44,9 @@
 <div class="manual-callout">
     <p>
         <strong>Generar Compras es solo Compras.</strong> Front no puede pulsar ese botón.
-        Los servicios adicionales ya se cargan en la orden cuando Front confirma la respuesta
-        del cliente; tú solo generas compras si hay piezas que pedir al proveedor.
+        Además, el sistema no deja generar hasta que Front haya cargado el anticipo del 50%
+        en el detalle de la orden. Los servicios adicionales ya se copian al confirmar la
+        respuesta; tú solo pides piezas al proveedor cuando hay palomitas y ya está el dinero.
     </p>
 </div>
 {% endblock %}

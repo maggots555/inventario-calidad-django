@@ -296,7 +296,8 @@ def _notificar_aceptacion_solo_servicios(solicitud: 'SolicitudCotizacion') -> No
     mensaje = (
         f'{_resumen_cliente_solicitud(solicitud)}. '
         f'El cliente aceptó solo servicio(s) adicional(es). '
-        f'Ya quedaron registrados en la orden; pasa a En reparación.'
+        f'Ya quedaron registrados en la orden. '
+        f'Cuando Front cargue el anticipo del 50%, se puede pasar a En reparación.'
     )
     enviados = enviar_push_y_campanita(
         [responsable],

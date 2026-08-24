@@ -170,22 +170,45 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     {% endif %}
 
     {% if solicitud.puede_generar_compras %}
-    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary w-100"
-                onclick="return confirm('¿Generar compras para las líneas aprobadas?')">
+        {% if cubre_anticipo_50 %}
+        <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary w-100"
+                    onclick="return confirm('¿Generar compras para las líneas aprobadas?')">
+                <i class="bi bi-cart-plus me-2"></i>Generar Compras
+            </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-primary w-100" disabled
+                aria-disabled="true"
+                title="{{ mensaje_falta_anticipo }}">
             <i class="bi bi-cart-plus me-2"></i>Generar Compras
         </button>
-    </form>
-    {% elif solicitud.puede_generar_venta_mostrador %}
-    {# Red de seguridad: solicitudes viejas donde el servicio no se copió al aceptar. #}
-    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary w-100"
-                onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+        <p class="detalle-compras-bloqueadas small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            {{ mensaje_falta_anticipo }}
+        </p>
+        {% endif %}
+    {% elif solicitud.puede_generar_venta_mostrador or puede_cerrar_solo_servicios %}
+        {% if cubre_anticipo_50 %}
+        <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary w-100"
+                    onclick="return confirm('¿Registrar el servicio aceptado y pasar la orden a En reparación?')">
+                <i class="bi bi-wrench me-2"></i>Generar servicio
+            </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-primary w-100" disabled
+                aria-disabled="true"
+                title="{{ mensaje_falta_anticipo }}">
             <i class="bi bi-wrench me-2"></i>Generar servicio
         </button>
-    </form>
+        <p class="detalle-compras-bloqueadas small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            {{ mensaje_falta_anticipo }}
+        </p>
+        {% endif %}
     {% elif solicitud.compras_pendientes_sin_orden %}
     <button type="button" class="btn btn-primary w-100" disabled
             aria-disabled="true"

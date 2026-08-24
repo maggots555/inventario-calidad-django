@@ -398,11 +398,11 @@ class NotificarRespuestaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase)
 
         servicio.aprobar()
         solicitud.refresh_from_db()
-        # Solo servicio: al aceptar ya se copia a ST y la solicitud se completa.
-        self.assertEqual(solicitud.estado, 'completada')
+        # Solo servicio: se copia a ST, pero falta el 50% para completar.
+        self.assertEqual(solicitud.estado, 'parcialmente_aprobada')
 
         mock_delay_aceptada.assert_not_called()
         mock_push_campanita.assert_called_once()
         empleados_notif = list(mock_push_campanita.call_args.args[0])
         self.assertEqual({e.pk for e in empleados_notif}, {self.empleado_responsable.pk})
-        self.assertIn('En reparación', mock_push_campanita.call_args.kwargs['mensaje'])
+        self.assertIn('50%', mock_push_campanita.call_args.kwargs['mensaje'])
