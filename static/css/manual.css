@@ -587,6 +587,11 @@
     border-left-color: var(--success-color);
 }
 
+.flujo-nodo--facturacion {
+    border-left-color: var(--info-color);
+    border-style: dashed;
+}
+
 .flujo-columna--cierre {
     margin-top: 0.85rem;
 }

@@ -18,6 +18,7 @@ from inventario.models import Empleado
 from inventario.views_manual import (
     VISTAS_MANUAL_HUMOS,
     manual_indice,
+    manual_rol_facturacion,
     manual_rol_front,
     resolver_area_manual,
 )
@@ -139,3 +140,28 @@ class ManualUsuarioHumoTests(TestCase):
         self.assertIn('Venta mostrador (FL)', html)
         self.assertIn(reverse('manual:acepta'), html)
         self.assertIn(reverse('manual:recotizacion'), html)
+
+    def test_facturacion_ve_chip_tu_area(self) -> None:
+        """El rol Facturación tiene capítulo propio y marca «Tu área»."""
+        usuario_fact = User.objects.create_user(
+            username='manual_fact',
+            password='testpass123',
+        )
+        Empleado.objects.create(
+            nombre_completo='Facturación de prueba',
+            cargo='Facturación',
+            area='Administración',
+            email='manual.fact@example.com',
+            activo=True,
+            user=usuario_fact,
+            rol='facturacion',
+        )
+        self.assertEqual(resolver_area_manual(usuario_fact), 'facturacion')
+        path = reverse('manual:rol_facturacion')
+        request = _request(self.factory, usuario_fact, path)
+        response = manual_rol_facturacion(request)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('Tu área', html)
+        self.assertIn('Pagos por validar', html)
+        self.assertIn('Ya aparece', html)

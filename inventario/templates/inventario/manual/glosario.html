@@ -141,11 +141,12 @@
     <li><strong>REAC</strong> — Reacondicionado: oferta alternativa cuando no hay pieza de reparación.</li>
     <li><strong>Profit</strong> — El margen que Front ajusta antes de mandar el PDF al cliente.</li>
     <li><strong>Anticipo 50%</strong> — Mínimo que Front registra en Cobros y facturación para que Compras pueda pulsar Generar Compras. Las palomitas no lo exigen.</li>
+    <li><strong>Pagos por validar</strong> — Bandeja de Facturación (Servicio Técnico). Solo transferencias y tarjetas; confirman si el abono ya está en la cuenta. No bloquea el candado del 50%.</li>
     <li><strong>Vigencia</strong> — 5 días hábiles desde Notificar a Front. Si vence sin respuesta, Front solicita recotización.</li>
 </ul>
 {% endblock %}
 
 {% block manual_pager %}
-<a href="{% url 'manual:rol_compras' %}">← Compras / Almacén</a>
+<a href="{% url 'manual:rol_facturacion' %}">← Facturación</a>
 <a href="{% url 'manual:indice' %}">Volver a la portada</a>
 {% endblock %}

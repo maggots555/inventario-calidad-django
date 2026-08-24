@@ -2165,6 +2165,7 @@ from inventario.views_manual import (  # noqa: E402, F401
     manual_recotizacion,
     manual_rol_calidad,
     manual_rol_compras,
+    manual_rol_facturacion,
     manual_rol_front,
     manual_rol_tecnico,
 )

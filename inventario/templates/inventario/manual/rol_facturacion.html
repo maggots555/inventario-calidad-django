@@ -1,0 +1,113 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Facturación — OOW{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Tu área · rol Facturación</p>
+<h1>Facturación</h1>
+<p class="manual-lead">
+    Cuando Front registra un pago por <strong>transferencia</strong> o <strong>tarjeta</strong>,
+    tú confirmas si ese dinero ya aparece en la cuenta de la empresa.
+    El efectivo de caja <strong>no</strong> pasa por ti: SIGMA lo da por cobrado al instante.
+</p>
+
+{% if manual_area_usuario == 'facturacion' %}
+<div class="manual-callout">
+    <p>Este capítulo está marcado como <strong>Tu área</strong> según tu rol en SIGMA.</p>
+</div>
+{% endif %}
+
+<h2>Checklist de este flujo</h2>
+<ol>
+    <li>Front registra el anticipo (u otro abono) en la orden. Ver <a href="{% url 'manual:acepta' %}#paso-anticipo">anticipo 50%</a>.</li>
+    <li>Si el método fue transferencia o tarjeta, te llega aviso (campana, push y correo) y el pago entra a la bandeja.</li>
+    <li>Abre <strong>Servicio Técnico → Pagos por validar</strong> (menú de órdenes).</li>
+    <li>Revisa la fila: orden, monto, comprobante y quién registró el cobro.</li>
+    <li>Pulsa <span class="manual-btn-name">Ya aparece</span> si el abono ya está en la cuenta, o
+        <span class="manual-btn-name">No aparece</span> si aún no lo ves (puedes dejar una nota).</li>
+    <li>Repites con cada pago nuevo que vaya apareciendo en la pestaña <strong>Pendientes</strong>.</li>
+</ol>
+
+<article class="manual-paso" id="paso-bandeja">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">1</span>
+        <h2>Abrir la bandeja Pagos por validar</h2>
+        <span class="manual-badge manual-badge--rol">Facturación</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                Menú <strong>Servicio Técnico</strong> → columna de órdenes →
+                <span class="manual-btn-name">Pagos por validar</span>.
+                También puedes entrar desde el enlace de la campana cuando te avisen.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué ves</dt>
+            <dd>
+                Una tabla con transferencias y tarjetas pendientes de conciliar.
+                Tres filtros: <strong>Pendientes</strong>, <strong>No aparecen</strong> y
+                <strong>Todos abiertos</strong>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué no entra aquí</dt>
+            <dd>Pagos en <strong>efectivo</strong> u otros métodos de caja. Esos no piden validación bancaria.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-validar">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">2</span>
+        <h2>Validar cada pago</h2>
+        <span class="manual-badge manual-badge--rol">Facturación</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                En la columna <strong>Validar</strong>, elige
+                <span class="manual-btn-name">Ya aparece</span> o
+                <span class="manual-btn-name">No aparece</span>.
+                La nota es opcional pero ayuda si el banco aún no refleja el depósito.
+            </dd>
+        </div>
+        <div>
+            <dt>Atajo en la orden</dt>
+            <dd>
+                También puedes validar desde el detalle de la orden, sección
+                <strong>Cobros y facturación</strong>, en la misma fila del pago
+                (mismos botones).
+            </dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>
+                Si marcas <strong>Ya aparece</strong>, avisa a quien lleva la orden (responsable o Front).
+                Si marcas <strong>No aparece</strong>, avisa a quien registró el cobro para que revise con el cliente.
+            </dd>
+        </div>
+    </dl>
+    <div class="manual-callout manual-callout--info">
+        <p>
+            <strong>No bloquea a Compras.</strong> Front puede registrar el 50% y Compras puede pulsar
+            <span class="manual-btn-name">Generar Compras</span> aunque tú aún no hayas validado la transferencia.
+            Tu trabajo es conciliar la cuenta, no abrir el candado del anticipo.
+        </p>
+    </div>
+</article>
+
+<h2>Cómo te llegan los avisos</h2>
+<ul>
+    <li><strong>Pago nuevo por transferencia o tarjeta:</strong> campana, push y correo con monto y referencia de la orden.</li>
+    <li><strong>Si tú misma registraste el cobro:</strong> no te mandamos el aviso de “pendiente”; igual puedes validarlo en la bandeja.</li>
+    <li><strong>Después de validar:</strong> el pago sale de Pendientes; Front y el responsable ven el estado actualizado en la orden.</li>
+</ul>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:rol_compras' %}">← Compras / Almacén</a>
+<a href="{% url 'manual:glosario' %}">Siguiente: glosario →</a>
+{% endblock %}

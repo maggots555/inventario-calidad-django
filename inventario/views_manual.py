@@ -28,6 +28,7 @@ ROL_A_AREA_MANUAL = {
     'tecnico': 'tecnico',
     'compras': 'compras',
     'almacenista': 'compras',
+    'facturacion': 'facturacion',
 }
 
 # Tabla de contenidos. `slug` coincide con `manual_slug` de cada vista.
@@ -103,6 +104,13 @@ MANUAL_PAGINAS = [
         'area': 'compras',
     },
     {
+        'slug': 'facturacion',
+        'titulo': 'Facturación',
+        'grupo': 'roles',
+        'url_name': 'manual:rol_facturacion',
+        'area': 'facturacion',
+    },
+    {
         'slug': 'glosario',
         'titulo': 'Glosario',
         'grupo': 'referencia',
@@ -128,8 +136,8 @@ def resolver_area_manual(user):
         user: usuario de Django (puede no tener perfil Empleado).
 
     Returns:
-        str | None: clave de área (`front`, `tecnico`, `calidad`, `compras`)
-        o None si el rol no tiene capítulo propio (gerente, facturación, etc.).
+        str | None: clave de área (`front`, `tecnico`, `calidad`, `compras`, `facturacion`)
+        o None si el rol no tiene capítulo propio (gerente, etc.).
 
     Efectos secundarios: ninguno (solo lectura).
     """
@@ -335,6 +343,23 @@ def manual_rol_compras(request):
 
 
 @login_required
+def manual_rol_facturacion(request):
+    """
+    Objetivo: checklist de Facturación (validar pagos en la bandeja).
+
+    Args:
+        request: HttpRequest autenticado.
+
+    Efectos secundarios: ninguno.
+    """
+    return render(
+        request,
+        'inventario/manual/rol_facturacion.html',
+        _contexto_manual(request, 'facturacion'),
+    )
+
+
+@login_required
 def manual_glosario(request):
     """
     Objetivo: estados de la orden vs estados de la cotización y siglas.
@@ -363,5 +388,6 @@ VISTAS_MANUAL_HUMOS = (
     ('manual:rol_tecnico', manual_rol_tecnico, 'tecnico'),
     ('manual:rol_calidad', manual_rol_calidad, 'calidad'),
     ('manual:rol_compras', manual_rol_compras, 'compras'),
+    ('manual:rol_facturacion', manual_rol_facturacion, 'facturacion'),
     ('manual:glosario', manual_glosario, 'glosario'),
 )

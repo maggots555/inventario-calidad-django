@@ -73,7 +73,50 @@
     <p>
         Las palomitas <strong>no</strong> exigen pago. El 50% sí es obligatorio para pedir las piezas al proveedor.
         Si falta, Compras ve el botón apagado con el texto de falta de anticipo (pagado $X de $Y).
-        Facturación puede validar después si la transferencia ya aparece en la cuenta; eso no retrasa este paso.
+        Facturación concilia transferencias y tarjetas en
+        <a href="{% url 'manual:rol_facturacion' %}">Pagos por validar</a>;
+        eso <strong>no</strong> retrasa el candado del 50% ni a Compras.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-validacion-facturacion">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">B2</span>
+        <h2>Validar el pago en cuenta (Facturación)</h2>
+        <span class="manual-badge manual-badge--rol">Facturación</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                Menú <strong>Servicio Técnico</strong> →
+                <span class="manual-btn-name">Pagos por validar</span>
+                (o la sección Cobros y facturación de la misma orden).
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Solo si Front registró <strong>transferencia</strong> o <strong>tarjeta</strong>:
+                revisas el comprobante y pulsas
+                <span class="manual-btn-name">Ya aparece</span> o
+                <span class="manual-btn-name">No aparece</span>.
+                El efectivo no entra a esta bandeja.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>No cambia. Es conciliación bancaria, no un paso de taller.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front o quien registró el cobro, según marques validado o no aparece.</dd>
+        </div>
+    </dl>
+    <p>
+        Detalle del rol en <a href="{% url 'manual:rol_facturacion' %}">Facturación</a>.
+        Compras puede seguir con <span class="manual-btn-name">Generar Compras</span> en cuanto Front
+        registró el 50%, aunque Facturación aún no haya validado el SPEI.
     </p>
     <div class="manual-callout">
         <p>

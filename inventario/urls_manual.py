@@ -24,5 +24,6 @@ urlpatterns = [
     path('rol/tecnico/', views.manual_rol_tecnico, name='rol_tecnico'),
     path('rol/calidad/', views.manual_rol_calidad, name='rol_calidad'),
     path('rol/compras/', views.manual_rol_compras, name='rol_compras'),
+    path('rol/facturacion/', views.manual_rol_facturacion, name='rol_facturacion'),
     path('glosario/', views.manual_glosario, name='glosario'),
 ]

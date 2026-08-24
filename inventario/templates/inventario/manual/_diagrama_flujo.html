@@ -41,7 +41,9 @@
     <p class="flujo-cierre-nota">Si aceptó (con piezas), el taller sigue así. Rechazo, PNC y recotización cierran o vuelven a Compras en su propio capítulo.</p>
 
     <ol class="flujo-columna flujo-columna--cierre">
-        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">Anticipo 50% y generar compras<small>candado de Compras</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">Anticipo 50%<small>Front registra el cobro</small></a></li>
+        <li><a class="flujo-nodo flujo-nodo--facturacion" href="{% url 'manual:rol_facturacion' %}">Validar pagos<small>Facturación · transferencia/tarjeta</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-compras">Generar compras<small>Compras · candado del 50%</small></a></li>
         <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-recibir">Recibir piezas → fotos reparación<small>Control de Calidad</small></a></li>
         <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-egreso">Fotos de egreso<small>Finalizado</small></a></li>
         <li><a class="flujo-nodo flujo-nodo--fin" href="{% url 'manual:acepta' %}#paso-entrega">Entrega y encuesta<small>Entregado al Cliente</small></a></li>
