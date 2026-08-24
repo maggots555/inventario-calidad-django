@@ -1,5 +1,5 @@
 /**
- * Manual interno SIGMA — fase 1
+ * Manual órdenes con diagnóstico (OOW)
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Este CSS solo se carga en las páginas /manual/. El aspecto es de
@@ -455,6 +455,146 @@
 
 .manual-pager a:hover {
     text-decoration: underline;
+}
+
+/* ----- Diagrama de flujo (portada OOW) ----- */
+.flujo {
+    margin: 0 0 1.75rem;
+    padding: 1rem 0.75rem 1.25rem;
+    border: 1px dashed var(--manual-rule);
+    background: var(--hover-bg);
+}
+
+.flujo-caption {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--manual-muted);
+    margin: 0 0 1rem;
+    text-align: center;
+}
+
+.flujo-columna {
+    list-style: none;
+    margin: 0 auto;
+    padding: 0;
+    max-width: 22rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+
+.flujo-columna li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.flujo-columna li:not(:last-child)::after {
+    content: "";
+    width: 2px;
+    height: 0.85rem;
+    background: var(--manual-stamp);
+    opacity: 0.55;
+}
+
+.flujo-nodo {
+    display: block;
+    width: 100%;
+    text-align: center;
+    text-decoration: none;
+    color: var(--manual-ink);
+    background: var(--manual-paper);
+    border: 1px solid var(--manual-rule);
+    border-left: 4px solid var(--manual-stamp);
+    padding: 0.55rem 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    min-height: 44px;
+    line-height: 1.25;
+}
+
+.flujo-nodo small {
+    display: block;
+    font-weight: 500;
+    font-size: 0.72rem;
+    color: var(--manual-muted);
+    margin-top: 0.15rem;
+}
+
+.flujo-nodo:hover,
+.flujo-nodo:focus-visible {
+    border-color: var(--manual-stamp);
+    background: var(--manual-stamp-bg);
+    color: var(--manual-ink);
+}
+
+.flujo-nodo:focus-visible {
+    outline: 2px solid var(--manual-stamp);
+    outline-offset: 2px;
+}
+
+.flujo-pregunta {
+    display: block;
+    max-width: 22rem;
+    margin: 1.15rem auto 0.7rem;
+    padding: 0.7rem 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--manual-stamp);
+    background: var(--manual-stamp-bg);
+    border: 1px dashed var(--manual-stamp);
+}
+
+.flujo-cierre-nota {
+    max-width: 36rem;
+    margin: 0.85rem auto 0.35rem;
+    font-size: 0.85rem;
+    color: var(--manual-muted);
+    text-align: center;
+    line-height: 1.4;
+}
+
+.flujo-ramas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.flujo-nodo--ok {
+    border-left-color: var(--success-color);
+}
+
+.flujo-nodo--no {
+    border-left-color: var(--danger-color);
+}
+
+.flujo-nodo--pnc {
+    border-left-color: var(--warning-color);
+}
+
+.flujo-nodo--vence {
+    border-left-color: var(--primary-color);
+}
+
+.flujo-nodo--fin {
+    border-left-color: var(--success-color);
+}
+
+.flujo-columna--cierre {
+    margin-top: 0.85rem;
+}
+
+@media (min-width: 700px) {
+    .flujo-ramas {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .manual-toc--movil {

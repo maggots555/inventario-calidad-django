@@ -2150,7 +2150,7 @@ def acceso_denegado(request):
 
 
 # =============================================================================
-# Manual interno de operación — reexport de fachada
+# Manual órdenes con diagnóstico (OOW) — reexport de fachada
 # EXPLICACIÓN PARA PRINCIPIANTES: el cerebro vive en views_manual.py para no
 # hinchar este archivo. Celery no aplica aquí; urls_manual importa directo
 # del módulo nuevo. El reexport deja las vistas visibles desde `from . import views`.

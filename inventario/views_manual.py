@@ -1,5 +1,5 @@
 """
-Vistas del manual interno de operación de SIGMA (fase 1).
+Vistas del manual de órdenes con diagnóstico (OOW).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
@@ -167,7 +167,7 @@ def _contexto_manual(request, slug):
 @login_required
 def manual_indice(request):
     """
-    Objetivo: portada del manual (qué cubre la fase 1 y mapa clicable).
+    Objetivo: portada del manual OOW (diagrama de flujo y mapa clicable).
 
     Args:
         request: HttpRequest autenticado.

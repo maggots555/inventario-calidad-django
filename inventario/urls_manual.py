@@ -1,5 +1,5 @@
 """
-URLs del manual interno. Se montan en /manual/ desde config/urls.py.
+URLs del manual de órdenes con diagnóstico (OOW). Se montan en /manual/ desde config/urls.py.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 El app_name `manual` permite escribir {% url 'manual:indice' %} en las

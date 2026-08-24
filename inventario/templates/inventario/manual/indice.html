@@ -1,14 +1,14 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Portada — Manual SIGMA{% endblock %}
+{% block title %}Portada — Órdenes con diagnóstico (OOW){% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Fase 1 · Fuera de garantía (OOW)</p>
-<h1>Manual de operación interno</h1>
+<p class="manual-kicker">Fuera de garantía · con diagnóstico</p>
+<h1>Manual órdenes con diagnóstico (OOW)</h1>
 <p class="manual-lead">
-    Esta es la guía de taller para el flujo más común: un equipo que entra a
-    reparación, se diagnostica, se cotiza con piezas y se entrega. Está escrita
-    con los nombres reales de botones y estados de SIGMA, no con el apodo del piso.
+    Guía de taller para órdenes que <strong>sí pasan por diagnóstico</strong>
+    (folio OOW-): el equipo entra, se diagnostica, se cotiza con piezas y se entrega.
+    Es distinto al flujo de <strong>Venta mostrador (FL)</strong>, que irá en su propio manual.
 </p>
 
 <div class="manual-callout manual-callout--info">
@@ -18,6 +18,10 @@
         pero puedes abrir todos los capítulos: a veces el paso siguiente es de otra área.
     </p>
 </div>
+
+<h2>Diagrama de flujo</h2>
+<p>Cada caja abre el capítulo. Las cuatro salidas (acepta, rechaza, PNC, recotización) aparecen cuando ya se mandó la cotización al cliente.</p>
+{% include 'inventario/manual/_diagrama_flujo.html' %}
 
 <h2>Cómo se llaman los roles aquí</h2>
 <p>
@@ -107,16 +111,16 @@
     </a>
 </div>
 
-<h2>Qué no cubre esta fase</h2>
-<p>Estas fichas vendrán después. Si tu caso es uno de estos, pregunta a tu supervisor; no está en este manual todavía:</p>
+<h2>Qué no cubre este manual</h2>
+<p>Estas fichas vendrán en otros manuales o más adelante:</p>
 <ul class="manual-fuera">
+    <li><strong>Venta mostrador (FL)</strong> — otro flujo, sin este diagnóstico; tendrá su propio manual</li>
     <li>Garantía Dell (formato distinto; interviene Dispatcher)</li>
-    <li>Venta mostrador (la orden nace en Recepción y se salta el diagnóstico formal)</li>
     <li>Cotización sin orden de servicio / crear orden FL desde Almacén</li>
     <li>WPB / DOA (pieza incorrecta o dañada)</li>
     <li>Envío a RHITSO</li>
     <li>Lo que ve el cliente en el portal de seguimiento</li>
-    <li>Capturas de pantalla de cada modal (esta fase es texto + mapa)</li>
+    <li>Capturas de pantalla de cada modal (esta versión es texto + diagrama)</li>
 </ul>
 {% endblock %}
 

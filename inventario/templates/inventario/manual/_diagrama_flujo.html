@@ -1,0 +1,49 @@
+<!--
+  Diagrama de flujo OOW (órdenes con diagnóstico).
+  EXPLICACIÓN PARA PRINCIPIANTES: es HTML + CSS, no una imagen.
+  Cada caja es un enlace al capítulo. En celular se apila; las cuatro
+  salidas van en una cuadrícula. El tramo de abajo SOLO aplica si aceptó.
+ -->
+<figure class="flujo" aria-label="Diagrama de flujo de órdenes con diagnóstico OOW">
+    <figcaption class="flujo-caption">De la recepción a la cotización. Cada caja abre el capítulo.</figcaption>
+
+    <ol class="flujo-columna">
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-1">Alta de la orden<small>En Espera</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-2">Formato digital OOW<small>PDF, correo e impresión</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-3">Fotos de ingreso<small>En Diagnóstico</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-4">Diagnóstico SIC<small>Equipo Diagnosticado</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-5">Enviar diagnóstico<small>al cliente</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-7">Cotizar y notificar a Front<small>5 días hábiles</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso' %}#paso-8">Enviar cotización al cliente<small>Esperando aprobación</small></a></li>
+    </ol>
+
+    <p class="flujo-pregunta">¿Qué contestó el cliente?</p>
+
+    <div class="flujo-ramas">
+        <a class="flujo-nodo flujo-nodo--ok" href="{% url 'manual:acepta' %}">
+            Acepta
+            <small>Palomitas + anticipo 50%</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--no" href="{% url 'manual:rechaza' %}">
+            Rechaza
+            <small>Motivo + fotos de egreso</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--pnc" href="{% url 'manual:pnc' %}">
+            PNC
+            <small>Sin piezas (dos avisos)</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--vence" href="{% url 'manual:recotizacion' %}">
+            No contestó
+            <small>Recotización a Compras</small>
+        </a>
+    </div>
+
+    <p class="flujo-cierre-nota">Si aceptó (con piezas), el taller sigue así. Rechazo, PNC y recotización cierran o vuelven a Compras en su propio capítulo.</p>
+
+    <ol class="flujo-columna flujo-columna--cierre">
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">Anticipo 50% y generar compras<small>candado de Compras</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-recibir">Recibir piezas → fotos reparación<small>Control de Calidad</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-egreso">Fotos de egreso<small>Finalizado</small></a></li>
+        <li><a class="flujo-nodo flujo-nodo--fin" href="{% url 'manual:acepta' %}#paso-entrega">Entrega y encuesta<small>Entregado al Cliente</small></a></li>
+    </ol>
+</figure>
