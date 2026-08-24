@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Manual de operación — SIGMA{% endblock %}
+{#
+  Plantilla base del manual interno.
+  EXPLICACIÓN PARA PRINCIPIANTES: cada capítulo solo llena el bloque
+  `manual_contenido`. Hay dos índices: uno fijo en escritorio y un
+  acordeón (`details`) en celular, para no tapar el contenido.
+#}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/manual.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="manual-shell">
+    <div class="manual-layout">
+        {% include 'inventario/manual/_indice.html' with variante='escritorio' %}
+        {% include 'inventario/manual/_indice.html' with variante='movil' %}
+
+        <article class="manual-sheet">
+            <div class="manual-sheet-inner">
+                {% block manual_contenido %}{% endblock %}
+
+                <nav class="manual-pager" aria-label="Capítulo anterior y siguiente">
+                    {% block manual_pager %}{% endblock %}
+                </nav>
+            </div>
+        </article>
+    </div>
+</div>
+{% endblock %}

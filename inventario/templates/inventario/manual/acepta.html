@@ -1,0 +1,203 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}El cliente acepta — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Camino 10.1</p>
+<h1>El cliente acepta</h1>
+<p class="manual-lead">
+    Aceptar puede ser <strong>todo</strong> o <strong>solo algunas piezas/servicios</strong>.
+    En ambos casos Front registra la respuesta en SIGMA; el cliente no pulsa nada dentro del sistema.
+</p>
+
+<article class="manual-paso" id="paso-acepta">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">A</span>
+        <h2>Registrar palomitas y taches</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Cliente Acepta Cotización</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud de cotización (panel En Cliente o enlace).</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Por cada línea: botón de aprobar (palomita) o rechazar (tache). Si rechazas una pieza, tipificas el motivo.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Cuando ya no quedan líneas pendientes cambia a: <strong>Cliente Acepta Cotización</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Si hay piezas aceptadas: Compras recibe push, campana y correo. Si solo hay servicios: avisa al responsable de seguimiento, no a Compras.</dd>
+        </div>
+    </dl>
+    <p>
+        La solicitud queda <em>totalmente aprobada</em> o <em>parcialmente aprobada</em>.
+        Las dos sirven para seguir: Compras solo compra lo que tiene palomita.
+        Hay atajos <span class="manual-btn-name">Aprobar todas</span> / rechazar todas; úsalos solo si el cliente fue claro.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-compras">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">B</span>
+        <h2>Generar las compras</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+        <span class="manual-badge manual-badge--estado">Esperando Llegada de Piezas</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Mismo detalle de la solicitud, botón <span class="manual-btn-name">Generar Compras</span>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Confirmas con los proveedores y generas en SIGMA. Solo el rol Compras tiene este botón.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Cambia a: <strong>Esperando Llegada de Piezas</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El seguimiento de piezas aparece en la orden. El técnico espera el aviso de recepción.</dd>
+        </div>
+    </dl>
+    <p>
+        Si el cliente solo aceptó servicios (limpieza, respaldo, etc.) y no piezas,
+        Front usa <span class="manual-btn-name">Generar servicio</span> y el técnico
+        puede empezar a trabajar, sin esperar paquetería.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-recibir">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">C</span>
+        <h2>Confirmar que llegaron las piezas</h2>
+        <span class="manual-badge manual-badge--rol">Almacén</span>
+        <span class="manual-badge manual-badge--estado">Piezas Recibidas</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd><a href="{% url 'almacen:lista_compras' %}">Almacén → Ver compras</a> → <span class="manual-btn-name">Recibir</span>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Confirmas el ingreso. Cuando <strong>todas</strong> las piezas del seguimiento están recibidas, la orden cambia.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Cambia a: <strong>Piezas Recibidas</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El técnico asignado (push). Opcional: correo al recibir la compra.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-reparar">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">D</span>
+        <h2>Reparar y subir fotos de reparación</h2>
+        <span class="manual-badge manual-badge--rol">Técnico</span>
+        <span class="manual-badge manual-badge--estado">Control de Calidad</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden, cuando ya están las <strong>Piezas Recibidas</strong>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Reparás. Al terminar subes fotos tipo <strong>Durante Reparación</strong>.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Las fotos de reparación pasan la orden <strong>solas</strong> a <strong>Control de Calidad</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Inspectores (push) para que puedan ir por el equipo/ el equipo ya está en calidad.</dd>
+        </div>
+    </dl>
+    <div class="manual-callout">
+        <p>
+            <strong>No olvides subir las fotos durante la reparación.</strong>
+            Las fotos tipo "Durante Reparación" son la evidencia de que
+            el trabajo realizado al equipo; al subirlas, la orden pasa a Control de Calidad.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-egreso">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">E</span>
+        <h2>Fotos de egreso</h2>
+        <span class="manual-badge manual-badge--rol">Calidad</span>
+        <span class="manual-badge manual-badge--estado">Finalizado - Listo para Entrega</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden → galería, tipo <strong>Egreso - Estado Final</strong>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Fotos finales del equipo ya reparado.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Pasa <strong>solo</strong> a <strong>Finalizado - Listo para Entrega</strong> y se guarda la fecha de finalización.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Recepcionistas (OOW) por push de equipo listo.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-entrega">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">F</span>
+        <h2>Avisar, entregar y encuesta</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Entregado al Cliente</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                Galería: <span class="manual-btn-name">Notificar equipo disponible</span>.
+                Lista de finalizadas: <span class="manual-btn-name">Cerrar Orden</span>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Avisas al cliente. Cuando viene, cierras la orden. Confirmas el envío de la encuesta si aplica.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>El aviso al cliente <strong>no</strong> cambia el estado. Cerrar sí: <strong>Entregado al Cliente</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El cliente (correo de disponible + encuesta de satisfacción si la cotización se aceptó y hay email).</dd>
+        </div>
+    </dl>
+    <p>
+        Ahí termina el servicio con cotización aceptada. La encuesta vive en un enlace público;
+        el cliente no necesita entrar a SIGMA.
+    </p>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:proceso' %}">← Proceso paso a paso</a>
+<a href="{% url 'manual:rechaza' %}">Siguiente: el cliente rechaza →</a>
+{% endblock %}

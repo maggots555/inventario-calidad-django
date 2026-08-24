@@ -2147,3 +2147,23 @@ def acceso_denegado(request):
     }
     
     return render(request, 'inventario/acceso_denegado.html', context)
+
+
+# =============================================================================
+# Manual interno de operación — reexport de fachada
+# EXPLICACIÓN PARA PRINCIPIANTES: el cerebro vive en views_manual.py para no
+# hinchar este archivo. Celery no aplica aquí; urls_manual importa directo
+# del módulo nuevo. El reexport deja las vistas visibles desde `from . import views`.
+# =============================================================================
+from inventario.views_manual import (  # noqa: E402, F401
+    manual_acepta,
+    manual_glosario,
+    manual_indice,
+    manual_pnc,
+    manual_proceso,
+    manual_rechaza,
+    manual_rol_calidad,
+    manual_rol_compras,
+    manual_rol_front,
+    manual_rol_tecnico,
+)

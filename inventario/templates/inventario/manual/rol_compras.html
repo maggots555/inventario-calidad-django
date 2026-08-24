@@ -1,0 +1,56 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Compras / Almacén — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Tu área · rol Compras (y Almacenista al recibir)</p>
+<h1>Compras / Almacén</h1>
+<p class="manual-lead">
+    Tú armas la cotización de proveedores, liberas a Front y, si el cliente aceptó,
+    generas las compras y confirmas que las piezas llegaron. No mandas el PDF de venta al cliente.
+</p>
+
+{% if manual_area_usuario == 'compras' %}
+<div class="manual-callout">
+    <p>Este capítulo está marcado como <strong>Tu área</strong> según tu rol en SIGMA.</p>
+</div>
+{% endif %}
+
+<h2>Checklist de este flujo</h2>
+<ol>
+    <li>Cuando el diagnóstico ya está enviado, cotiza con proveedores (fuera de SIGMA). Ver <a href="{% url 'manual:proceso' %}#paso-6">paso 6</a>.</li>
+    <li>Entra a <a href="{% url 'almacen:crear_solicitud_cotizacion' %}">Almacén → Nueva cotización</a>.</li>
+    <li>Busca el servicio (folio OOW, serie) y <strong>vincúlalo</strong>. No crees otra orden de servicio.</li>
+    <li>Carga líneas (producto, proveedor, costo). Sube fotos de referencia si las tienes.</li>
+    <li>Al guardar con orden vinculada, la orden pasa a <strong>Envío de Cotización al Proveedor</strong>.</li>
+    <li>Pulsa <span class="manual-btn-name">Notificar a Front</span>:
+        <ul>
+            <li>Plantilla <strong>Cotización lista</strong> si sí hay piezas.</li>
+            <li>Plantilla <strong>PNC</strong> si no hay. Ver <a href="{% url 'manual:pnc' %}">PNC</a>.</li>
+        </ul>
+    </li>
+    <li>Eso deja la ficha en el panel «En Front» y la orden en <strong>Se Recibe Cotización de Proveedores</strong>. Arrancan 5 días hábiles.</li>
+    <li>Si Front registró aceptación con piezas: <span class="manual-btn-name">Generar Compras</span>. Ver <a href="{% url 'manual:acepta' %}#paso-compras">generar compras</a>.</li>
+    <li>Cuando lleguen: <a href="{% url 'almacen:lista_compras' %}">Ver compras</a> → <span class="manual-btn-name">Recibir</span>.</li>
+</ol>
+
+<h2>Cómo te llegan los avisos</h2>
+<ul>
+    <li><strong>Cliente aceptó piezas:</strong> push, campana y correo.</li>
+    <li><strong>Rechazo total:</strong> también te llega (por si habías apartado material).</li>
+    <li><strong>Notificar a Front</strong> no te avisa a ti: tú lo disparas. Front recibe correo, no campana.</li>
+</ul>
+
+<div class="manual-callout">
+    <p>
+        <strong>Generar Compras es solo Compras.</strong> Front no puede pulsar ese botón.
+        Front sí puede <span class="manual-btn-name">Generar servicio</span> cuando no hay piezas,
+        solo servicios adicionales.
+    </p>
+</div>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:rol_calidad' %}">← Calidad</a>
+<a href="{% url 'manual:glosario' %}">Siguiente: glosario →</a>
+{% endblock %}

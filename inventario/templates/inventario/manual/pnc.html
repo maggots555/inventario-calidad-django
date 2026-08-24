@@ -1,0 +1,98 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}PNC sin piezas — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Camino 10.3</p>
+<h1>PNC: no hay piezas</h1>
+<p class="manual-lead">
+    PNC significa <strong>parte no disponible</strong>. No es un solo botón.
+    Primero Compras avisa a Front (interno). Después Front avisa al cliente.
+    Solo el segundo aviso pone la orden en estado PNC.
+</p>
+
+<article class="manual-paso" id="paso-pnc-front">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">1</span>
+        <h2>Aviso interno a Front</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud → <span class="manual-btn-name">Notificar a Front</span>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Eliges la plantilla <strong>Partes no disponibles (PNC)</strong>, no la de «Cotización lista».</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd><strong>No cambia a PNC.</strong> La solicitud sí pasa a Enviada a Front.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front por correo interno, sin precios de venta.</dd>
+        </div>
+    </dl>
+    <div class="manual-callout manual-callout--warn">
+        <p>
+            Si usas la plantilla «Cotización lista» por error, Front va a intentar vender
+            algo que no existe. El PNC interno y la cotización lista son plantillas distintas
+            del mismo botón.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-pnc-cliente">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">2</span>
+        <h2>Avisar al cliente</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">PNC - Parte No Disponible</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud → <strong>Notificar cliente: sin piezas (PNC)</strong>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>El botón solo aparece si Compras ya mandó la plantilla PNC a Front. Confirmas y envías.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Ahora sí cambia a: <strong>PNC - Parte No Disponible</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El cliente (correo sin precios). La solicitud queda enviada a cliente.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-pnc-despues">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">3</span>
+        <h2>Qué sigue: REAC o rechazo</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <p>Después del aviso PNC al cliente aplican estas reglas:</p>
+    <ul>
+        <li>Puedes <strong>rechazar</strong> las líneas (el cliente no quiere esperar ni alternativa).</li>
+        <li><strong>Aprobar piezas queda bloqueado</strong> hasta que exista una cotización con precios (reparación nueva o reacondicionado).</li>
+        <li>Si hay equipo reacondicionado, Front puede enviar una cotización <strong>REAC</strong> con PDF. Eso saca la orden de PNC hacia <strong>Esperando Aprobación Cliente</strong>.</li>
+    </ul>
+    <p>
+        A partir de una oferta con precios, el flujo vuelve a ser
+        <a href="{% url 'manual:acepta' %}">acepta</a> o
+        <a href="{% url 'manual:rechaza' %}">rechaza</a>.
+        Si rechaza, Calidad toma fotos de egreso y Front cierra, igual que en el rechazo simple.
+    </p>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:rechaza' %}">← El cliente rechaza</a>
+<a href="{% url 'manual:rol_front' %}">Siguiente: Front / Recepción →</a>
+{% endblock %}

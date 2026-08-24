@@ -1,0 +1,16 @@
+<p class="manual-toc-title">Manual SIGMA</p>
+{% for grupo in manual_grupos %}
+<div class="manual-toc-group">
+    <p class="manual-toc-group-title">{{ grupo.titulo }}</p>
+    {% for pagina in manual_paginas %}
+    {% if pagina.grupo == grupo.id %}
+    <a href="{% url pagina.url_name %}" class="{% if pagina.slug == manual_slug %}is-active{% endif %}">
+        <span>{{ pagina.titulo }}</span>
+        {% if manual_area_usuario and pagina.area == manual_area_usuario %}
+        <span class="manual-toc-chip">Tu área</span>
+        {% endif %}
+    </a>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endfor %}

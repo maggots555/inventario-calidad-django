@@ -1,0 +1,54 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Front / Recepción — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Tu área · rol Recepcionista</p>
+<h1>Front / Recepción</h1>
+<p class="manual-lead">
+    Eres el hilo con el cliente: das de alta, mandas papeles, traduces la cotización a una oferta
+    y registras lo que el cliente dijo. No compras las piezas; no diagnosticas el equipo.
+</p>
+
+{% if manual_area_usuario == 'front' %}
+<div class="manual-callout">
+    <p>Este capítulo está marcado como <strong>Tu área</strong> según tu rol en SIGMA.</p>
+</div>
+{% endif %}
+
+<h2>Checklist de este flujo</h2>
+<ol>
+    <li>Crear u importar la orden → queda <strong>En Espera</strong>. Ver <a href="{% url 'manual:proceso' %}#paso-1">paso 1</a>.</li>
+    <li>Completar el formato digital OOW, enviarlo e imprimirlo. Ver <a href="{% url 'manual:proceso' %}#paso-2">paso 2</a>.</li>
+    <li>Cuando el técnico ya guardó el diagnóstico: <span class="manual-btn-name">Enviar Diagnóstico</span>. Ver <a href="{% url 'manual:proceso' %}#paso-5">paso 5</a>.</li>
+    <li>Cuando Compras avisa «cotización lista»: abre el <a href="{% url 'almacen:panel_cotizaciones' %}">panel</a>, pestaña <strong>En Front</strong>.</li>
+    <li>Agrega servicios con <span class="manual-btn-name">Agregar Servicio Adicional</span>.</li>
+    <li>Ajusta profit y pulsa <span class="manual-btn-name">Enviar Cotización al Cliente</span>.</li>
+    <li>Registra la respuesta: palomitas, taches y motivos. Tres caminos:
+        <a href="{% url 'manual:acepta' %}">acepta</a>,
+        <a href="{% url 'manual:rechaza' %}">rechaza</a>,
+        <a href="{% url 'manual:pnc' %}">PNC</a>.</li>
+    <li>Si solo hay servicios aceptados (sin piezas): <span class="manual-btn-name">Generar servicio</span>.</li>
+    <li>Equipo listo: <span class="manual-btn-name">Notificar equipo disponible</span> y, al recoger, <span class="manual-btn-name">Cerrar Orden</span> + encuesta.</li>
+</ol>
+
+<h2>Cómo te llegan los avisos</h2>
+<ul>
+    <li><strong>Diagnóstico listo:</strong> busca la orden o entra por el detalle; el técnico no te manda el PDF al cliente, lo mandas tú.</li>
+    <li><strong>Cotización lista:</strong> correo de Compras (no campana). El panel «En Front» es tu bandeja.</li>
+    <li><strong>PNC interno:</strong> mismo botón Notificar a Front, otra plantilla. Luego tú avisas al cliente.</li>
+    <li><strong>Equipo finalizado:</strong> push / campana de listo para entrega (OOW).</li>
+</ul>
+
+<div class="manual-callout manual-callout--info">
+    <p>
+        <strong>El cliente no entra a SIGMA a aceptar.</strong> Tú traduces la llamada o el WhatsApp
+        a palomitas y taches. Si dejas una línea en «pendiente», la cotización no cierra.
+    </p>
+</div>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:pnc' %}">← PNC</a>
+<a href="{% url 'manual:rol_tecnico' %}">Siguiente: Técnico →</a>
+{% endblock %}

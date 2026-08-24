@@ -1,0 +1,15 @@
+{# Índice del manual: escritorio (nav fijo) o móvil (acordeón). #}
+{% if variante == 'movil' %}
+<details class="manual-toc manual-toc--movil">
+    <summary class="manual-toc-summary">Índice del manual</summary>
+    <nav class="manual-toc-body" aria-label="Capítulos del manual">
+        {% include 'inventario/manual/_indice_enlaces.html' %}
+    </nav>
+</details>
+{% else %}
+<nav class="manual-toc manual-toc--escritorio" aria-label="Capítulos del manual">
+    <div class="manual-toc-body">
+        {% include 'inventario/manual/_indice_enlaces.html' %}
+    </div>
+</nav>
+{% endif %}

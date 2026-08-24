@@ -1,0 +1,147 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Glosario — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Referencia rápida</p>
+<h1>Glosario</h1>
+<p class="manual-lead">
+    Dos tableros conviven: el estado de la <strong>orden de servicio</strong> y el estado
+    de la <strong>solicitud de cotización</strong> en Almacén. Mezclarlos es el error más común.
+</p>
+
+<h2>Estados de la orden (los que ves en Servicio Técnico)</h2>
+<div class="table-responsive">
+<table class="manual-glosario">
+    <thead>
+        <tr>
+            <th>Estado</th>
+            <th>Cuándo llega</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>En Espera</td>
+            <td>Al crear u importar la orden OOW.</td>
+        </tr>
+        <tr>
+            <td>En Diagnóstico</td>
+            <td>Al subir fotos tipo Ingreso.</td>
+        </tr>
+        <tr>
+            <td>Equipo Diagnosticado</td>
+            <td>El técnico guarda la fecha fin de diagnóstico.</td>
+        </tr>
+        <tr>
+            <td>Diagnóstico Enviado al Cliente</td>
+            <td>Front envía el PDF de diagnóstico.</td>
+        </tr>
+        <tr>
+            <td>Envío de Cotización al Proveedor</td>
+            <td>Compras crea la solicitud vinculada a la orden.</td>
+        </tr>
+        <tr>
+            <td>Se Recibe Cotización de Proveedores</td>
+            <td>Compras pulsa Notificar a Front (plantilla cotización lista).</td>
+        </tr>
+        <tr>
+            <td>Esperando Aprobación Cliente</td>
+            <td>Front envía el PDF de cotización al cliente.</td>
+        </tr>
+        <tr>
+            <td>Cliente Acepta Cotización</td>
+            <td>Front registra aceptación total o parcial.</td>
+        </tr>
+        <tr>
+            <td>Cotización Rechazada</td>
+            <td>Front registra rechazo de todas las líneas.</td>
+        </tr>
+        <tr>
+            <td>PNC - Parte No Disponible</td>
+            <td>Front notifica al cliente que no hay piezas (segundo paso del PNC).</td>
+        </tr>
+        <tr>
+            <td>Esperando Llegada de Piezas</td>
+            <td>Compras genera las compras de las líneas aceptadas.</td>
+        </tr>
+        <tr>
+            <td>Piezas Recibidas</td>
+            <td>Todas las piezas del seguimiento ya están recibidas.</td>
+        </tr>
+        <tr>
+            <td>Control de Calidad</td>
+            <td>Al subir fotos tipo Durante Reparación.</td>
+        </tr>
+        <tr>
+            <td>Finalizado - Listo para Entrega</td>
+            <td>Al subir fotos tipo Egreso.</td>
+        </tr>
+        <tr>
+            <td>Entregado al Cliente</td>
+            <td>Front pulsa Cerrar Orden.</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<div class="manual-callout">
+    <p>
+        <strong>«En Front» no es un estado de la orden.</strong> Es la pestaña del
+        <a href="{% url 'almacen:panel_cotizaciones' %}">Panel de cotizaciones</a>.
+        En ese momento la orden suele decir «Se Recibe Cotización de Proveedores».
+    </p>
+</div>
+
+<h2>Estados de la solicitud de cotización (Almacén)</h2>
+<div class="table-responsive">
+<table class="manual-glosario">
+    <thead>
+        <tr>
+            <th>Estado</th>
+            <th>Significado</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Borrador</td>
+            <td>Compras todavía está armando líneas y costos.</td>
+        </tr>
+        <tr>
+            <td>Enviada a Front</td>
+            <td>Pestaña «En Front». Front ya puede agregar servicios y mandar al cliente.</td>
+        </tr>
+        <tr>
+            <td>Enviada a Cliente</td>
+            <td>Pestaña «En Cliente». Ya salió el PDF.</td>
+        </tr>
+        <tr>
+            <td>Parcialmente Aprobada / Totalmente Aprobada</td>
+            <td>Front ya registró la respuesta del cliente.</td>
+        </tr>
+        <tr>
+            <td>Totalmente Rechazada</td>
+            <td>Todas las líneas y servicios se rechazaron.</td>
+        </tr>
+        <tr>
+            <td>En Proceso de Compra / Completada</td>
+            <td>Compras ya generó compras (todas o algunas).</td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
+<h2>Siglas y palabras del piso</h2>
+<ul>
+    <li><strong>OOW</strong> — Fuera de garantía (out of warranty). El folio suele empezar con OOW-.</li>
+    <li><strong>SICSER</strong> — Sistema externo de registro. SIGMA solo consulta e importa; no escribe allá.</li>
+    <li><strong>Diagnóstico SIC</strong> — El texto técnico que el técnico escribe en Configuración Adicional.</li>
+    <li><strong>PNC</strong> — Parte no disponible. Son <em>dos</em> avisos: uno interno a Front y otro al cliente.</li>
+    <li><strong>REAC</strong> — Reacondicionado: oferta alternativa cuando no hay pieza de reparación.</li>
+    <li><strong>Profit</strong> — El margen que Front ajusta antes de mandar el PDF al cliente.</li>
+</ul>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:rol_compras' %}">← Compras / Almacén</a>
+<a href="{% url 'manual:indice' %}">Volver a la portada</a>
+{% endblock %}

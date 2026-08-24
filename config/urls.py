@@ -74,6 +74,9 @@ urlpatterns = [
     
     # Módulos de la aplicación
     path('inventario/', include('inventario.urls')),  # URLs del módulo de inventario
+    # Manual interno de operación (staff autenticado). URL corta a propósito:
+    # /manual/ es más fácil de recordar que /inventario/manual/.
+    path('manual/', include('inventario.urls_manual')),
     path('scorecard/', include('scorecard.urls')),  # URLs del módulo de control de calidad
     path('servicio-tecnico/', include('servicio_tecnico.urls')),  # URLs del módulo de servicio técnico
     path('almacen/', include('almacen.urls')),  # URLs del módulo de almacén central - Dic 2025

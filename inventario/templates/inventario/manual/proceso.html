@@ -1,0 +1,304 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Proceso paso a paso — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Caso feliz · OOW con piezas</p>
+<h1>Proceso paso a paso</h1>
+<p class="manual-lead">
+    Recorrido lineal hasta que Front manda la cotización al cliente.
+    Ahí el flujo se parte en tres: el cliente acepta, rechaza, o no hay piezas (PNC).
+    Cada paso indica quién, dónde entrar, qué botón y qué estado queda la orden.
+</p>
+
+<article class="manual-paso" id="paso-1">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">01</span>
+        <h2>Registrar la orden</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">En Espera</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}">Servicio → Nueva orden</a>
+                o <a href="{% url 'servicio_tecnico:consultar_sicser' %}">Consultar SICSER</a>
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Capturas los datos del cliente y del equipo, o importas el folio de SICSER.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Nace en <strong>En Espera</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Nadie automático de este alta, salvo que el cliente tenga enlace de seguimiento.</dd>
+        </div>
+    </dl>
+    <p>
+        Hay dos entradas válidas. En SIGMA: <span class="manual-btn-name">Nueva orden</span> y capturas todo.
+        En SICSER: el formato ya existe allá; tú <strong>consultas e importas</strong> a SIGMA.
+        SIGMA no escribe de vuelta a SICSER. El folio típico empieza con OOW- y los dígitos del folio.
+    </p>
+    <div class="manual-callout">
+        <p>
+            La orden OOW empieza en <strong>En Espera</strong>.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-2">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">02</span>
+        <h2>Llenar el formato digital</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden → asistente (wizard) de formato OOW.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Condiciones, daños, firma del cliente y aviso de privacidad. Luego finalizas.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>No cambia. Sigue en En Espera hasta las fotos de ingreso.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El cliente recibe el PDF por correo si marcas envío. También puedes imprimirlo.</dd>
+        </div>
+    </dl>
+    <p>
+        El formato de SIGMA es un asistente pensado para iPad/PWA. Al finalizar se genera un PDF.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-3">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">03</span>
+        <h2>Fotos de ingreso</h2>
+        <span class="manual-badge manual-badge--rol">Calidad</span>
+        <span class="manual-badge manual-badge--estado">En Diagnóstico</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden → galería / subir imágenes.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Subes las fotos con tipo <strong>Ingreso - Estado Inicial</strong>.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Pasa <strong>solo</strong> a <strong>En Diagnóstico</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Cliente: <strong>correo de fotos de ingreso al cliente</strong>. El técnico ya puede diagnosticar.</dd>
+        </div>
+    </dl>
+    <p>
+        Toma fotos de todos los detalles estéticos importantes y del cargador si tiene.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-4">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">04</span>
+        <h2>Registrar el diagnóstico</h2>
+        <span class="manual-badge manual-badge--rol">Técnico</span>
+        <span class="manual-badge manual-badge--estado">Equipo Diagnosticado</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Busca la orden (número o service tag) → sección <strong>Configuración Adicional</strong>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Llenas <strong>Falla principal (si aún no está)</strong> y <strong>Diagnóstico SIC</strong>. Guardas. Si quieres, <span class="manual-btn-name">Mejorar Diag. con IA</span>.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Al guardar la fecha fin de diagnóstico por primera vez, cambia a: <strong>Equipo Diagnosticado</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front debe enviar el diagnóstico (paso 5). Este guardado no manda el correo al cliente.</dd>
+        </div>
+    </dl>
+    <p>
+        También puedes dictar el diagnóstico por voz. La IA solo pulé el texto (gramatica); tú confirmas
+        antes de guardar el resultado.
+    </p>
+    <div class="manual-callout manual-callout--info">
+        <p>
+            <strong>Sin falla principal no hay envío.</strong> Front no podrá pulsar
+            <span class="manual-btn-name">Enviar Diagnóstico</span> si faltan falla principal,
+            diagnóstico SIC o un correo válido del cliente.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-5">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">05</span>
+        <h2>Enviar el diagnóstico al cliente</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Diagnóstico Enviado al Cliente</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden (correo, push, campana o búsqueda manual).</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                <span class="manual-btn-name">Enviar Diagnóstico</span> → confirmas folio →
+                <span class="manual-btn-name">Detectar</span> piezas → marcas necesarias/opcionales →
+                fotos y copias → revisas el preview → envías.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Cambia a <strong>Diagnóstico Enviado al Cliente</strong> cuando el correo sale bien.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El cliente por correo (PDF). Compras usa las piezas detectadas como sugerencia.</dd>
+        </div>
+    </dl>
+    <p>
+        El botón de para detectar las piezas se llama<span class="manual-btn-name">Detectar</span> <strong>No crea las piezas en Almacén.</strong>
+        Solo lee el texto del diagnóstico y las deja como sugerencias para Compras.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-6">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">06</span>
+        <h2>Buscar las piezas con proveedores</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Fuera de SIGMA: proveedores. En SIGMA, el diagnóstico ya debe estar cerrado.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Armas costos, disponibilidad y fotos de las piezas cotizadas.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Todavía no cambia. El cambio ocurre al crear la solicitud (paso 7).</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Nadie en SIGMA hasta que creas la solicitud de cotización.</dd>
+        </div>
+    </dl>
+    <p>
+        Si no hay piezas, no inventes una cotización vacía: usa el
+        <a href="{% url 'manual:pnc' %}">flujo PNC</a>.
+    </p>
+</article>
+
+<article class="manual-paso" id="paso-7">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">07</span>
+        <h2>Crear la solicitud y avisar a Front</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+        <span class="manual-badge manual-badge--estado">Se Recibe Cotización de Proveedores</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}">Almacén → Nueva cotización</a>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Buscas el servicio, lo vinculas, cargas líneas, subes fotos si hay, y pulsas <span class="manual-btn-name">Notificar a Front</span> con plantilla «Cotización lista».</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>
+                Al crear con orden vinculada: <strong>Envío de Cotización al Proveedor</strong>.
+                Al notificar a Front: <strong>Se Recibe Cotización de Proveedores</strong>.
+            </dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front recibe <strong>correo</strong> (en este paso no hay push ni campana).</dd>
+        </div>
+    </dl>
+    <p>
+        Compras <strong>no crea la orden de servicio</strong>. La busca y la vincula.
+        En el panel de cotizaciones el registro aparece en la pestaña <strong>En Front</strong>.
+    </p>
+    <div class="manual-callout">
+        <p>
+            <strong>Vigencia.</strong> Al notificar a Front arrancan <strong>5 días hábiles</strong>.
+            Si se vencen sin respuesta del cliente, hay recotización (ficha de una fase siguiente).
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-8">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">08</span>
+        <h2>Armar la oferta y enviarla al cliente</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Esperando Aprobación Cliente</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'almacen:panel_cotizaciones' %}">Almacén → Panel de cotizaciones</a>
+                → pestaña <strong>En Front</strong>, o el enlace del correo.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Agregas servicios con <span class="manual-btn-name">Agregar Servicio Adicional</span>.
+                Luego <span class="manual-btn-name">Enviar Cotización al Cliente</span> y ajustas el profit.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd><strong>Cambia a: Esperando Aprobación Cliente</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El cliente recibe correo con PDF. En el panel la ficha se mueve a «En Cliente».</dd>
+        </div>
+    </dl>
+    <p>
+        El cliente <strong>no acepta dentro de SIGMA</strong>. Una vez obtengas la respuesta por teléfono, WhatsApp o correo.
+        Front registra la respuesta con palomitas o taches en el detalle de la solicitud. A partir de aquí elige un camino:
+    </p>
+    <ul>
+        <li><a href="{% url 'manual:acepta' %}">El cliente acepta</a> (todo o una parte)</li>
+        <li><a href="{% url 'manual:rechaza' %}">El cliente rechaza</a></li>
+        <li><a href="{% url 'manual:pnc' %}">No hay piezas (PNC)</a></li>
+    </ul>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:indice' %}">← Portada</a>
+<a href="{% url 'manual:acepta' %}">Siguiente: el cliente acepta →</a>
+{% endblock %}

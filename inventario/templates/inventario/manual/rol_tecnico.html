@@ -1,0 +1,50 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Técnico — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Tu área · rol Técnico</p>
+<h1>Técnico</h1>
+<p class="manual-lead">
+    Tu trabajo en este flujo es diagnosticar bien, dejar el texto listo para Front
+    y, si el cliente aceptó, reparar y evidenciar con fotos de reparación.
+</p>
+
+{% if manual_area_usuario == 'tecnico' %}
+<div class="manual-callout">
+    <p>Este capítulo está marcado como <strong>Tu área</strong> según tu rol en SIGMA.</p>
+</div>
+{% endif %}
+
+<h2>Checklist de este flujo</h2>
+<ol>
+    <li>Busca la orden por número o service tag (lista de activas o el buscador del detalle).</li>
+    <li>Entra a <strong>Configuración Adicional</strong>.</li>
+    <li>Escribe <strong>Falla principal</strong> y <strong>Diagnóstico SIC</strong>. Pon fechas de inicio/fin.</li>
+    <li>Opcional: dictado por voz o <span class="manual-btn-name">Mejorar Diag. con IA</span>. Revisa el texto antes de aceptar.</li>
+    <li>Guarda. La orden pasa a <strong>Equipo Diagnosticado</strong>. Front se encarga de enviarlo. Ver <a href="{% url 'manual:proceso' %}#paso-4">paso 4</a>.</li>
+    <li>Si el cliente aceptó y ya hay <strong>Piezas Recibidas</strong>: repara el equipo.</li>
+    <li>Al terminar, sube fotos tipo <strong>Durante Reparación</strong>. Eso manda el equipo a Control de Calidad. Ver <a href="{% url 'manual:acepta' %}#paso-reparar">reparación</a>.</li>
+    <li>Si el cliente rechazó: te llega aviso. El equipo va a calidad para fotos de <em>egreso</em>, no a reparación. Ver <a href="{% url 'manual:rechaza' %}">rechazo</a>.</li>
+</ol>
+
+<h2>Cómo te llegan los avisos</h2>
+<ul>
+    <li><strong>Cliente aceptó:</strong> push al técnico asignado.</li>
+    <li><strong>Piezas recibidas:</strong> push (y a veces correo si Compras lo marca al recibir).</li>
+    <li><strong>Cotización rechazada:</strong> push / campana / correo. No armes compras ni sigas diagnosticando de más: el ciclo comercial se cerró.</li>
+</ul>
+
+<div class="manual-callout">
+    <p>
+        <strong>Tú no envías el diagnóstico al cliente.</strong> El botón
+        <span class="manual-btn-name">Enviar Diagnóstico</span> es de Front.
+        Si el texto está mal, Front va a mandar un PDF malo: corrígelo en Configuración Adicional antes.
+    </p>
+</div>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:rol_front' %}">← Front / Recepción</a>
+<a href="{% url 'manual:rol_calidad' %}">Siguiente: Calidad →</a>
+{% endblock %}

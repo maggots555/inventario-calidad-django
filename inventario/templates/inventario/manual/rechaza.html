@@ -1,0 +1,86 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}El cliente rechaza — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Camino 10.2</p>
+<h1>El cliente rechaza</h1>
+<p class="manual-lead">
+    Rechazo total: el cliente no quiere ninguna pieza ni servicio de la propuesta.
+    El equipo no se repara; igual hay que documentar el egreso y cerrar la orden.
+</p>
+
+<article class="manual-paso" id="paso-rechazo">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">1</span>
+        <h2>Tipificar el rechazo de cada línea</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Cotización Rechazada</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud de cotización.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Rechazas cada pieza y cada servicio. Registras el motivo con el catálogo (lo que dijo el cliente, no un texto libre suelto).</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd><strong>Cotización Rechazada</strong>. La solicitud queda <em>totalmente rechazada</em>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Compras, el técnico y el responsable de seguimiento (push, campana y correo).</dd>
+        </div>
+    </dl>
+    <p>
+        Si la orden está vinculada, SIGMA pide <strong>Registrar motivo ST</strong> (el motivo que
+        queda en Servicio Técnico). No lo saltes: después se usa en reportes de rechazo.
+        En algunos motivos el cliente también recibe una mini-encuesta de por qué no aceptó.
+    </p>
+    <div class="manual-callout manual-callout--info">
+        <p>
+            Si el cliente aceptó <em>alguna</em> pieza, no es este camino: es
+            <a href="{% url 'manual:acepta' %}">aceptación parcial</a>.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-egreso-rechazo">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">2</span>
+        <h2>Fotos de egreso y cierre</h2>
+        <span class="manual-badge manual-badge--rol">Técnico / Calidad / Front</span>
+        <span class="manual-badge manual-badge--estado">Entregado al Cliente</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la orden → galería tipo Egreso, luego Cerrar Orden.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>El técnico (o Calidad) documenta cómo se entrega el equipo <em>sin reparación</em>. Front avisa y cierra cuando el cliente recoge.</dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Fotos de egreso → <strong>Finalizado</strong>. Cerrar → <strong>Entregado al Cliente</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front (equipo listo). La encuesta de satisfacción de reparación aceptada <strong>no</strong> aplica aquí.</dd>
+        </div>
+    </dl>
+    <p>
+        No generes compras. No pases a reparación. El rechazo ya cerró el ciclo comercial;
+        lo que queda es devolver el equipo en el mismo estado estético documentado.
+    </p>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:acepta' %}">← El cliente acepta</a>
+<a href="{% url 'manual:pnc' %}">Siguiente: PNC →</a>
+{% endblock %}
