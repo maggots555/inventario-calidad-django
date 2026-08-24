@@ -178,7 +178,7 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
         </button>
     </form>
     {% elif solicitud.puede_generar_venta_mostrador %}
-    {# EXPLICACIÓN: si el cliente solo aceptó servicios (limpieza, respaldo, etc.) no hay piezas que comprar. Front registra el servicio y la orden pasa a En reparación. #}
+    {# Red de seguridad: solicitudes viejas donde el servicio no se copió al aceptar. #}
     <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-primary w-100"

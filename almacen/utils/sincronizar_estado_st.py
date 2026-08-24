@@ -782,7 +782,7 @@ def sincronizar_estado_st_al_confirmar_servicios(
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Si el cliente no aceptó ninguna pieza, no hay que esperar componentes.
-    Front pulsa «Generar servicio», se crea la VentaMostrador y la orden
+    Al confirmar solo servicios se crea la VentaMostrador y la orden
     avanza de «Cliente Acepta Cotización» a «En Reparación».
 
     No pisa estados posteriores (ya en reparación, calidad, entregada, etc.).

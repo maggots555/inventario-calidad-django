@@ -10,8 +10,10 @@ llaman las vistas HTTP (RequestFactory) para recorrer el flujo de negocio:
 2) Sin orden: generar compras debe bloquearse.
 3) Sin orden: vincular orden → entonces sí se pueden generar compras.
 4) Rechazo total: rechazar todas + motivo catálogo → Cotizacion ST coherente.
-5) Solo servicio (piezas rechazadas): Front genera servicio → VentaMostrador
+5) Solo servicio (piezas rechazadas): al aceptar se crea VentaMostrador
    + orden En reparación; Front NO puede generar compras de piezas.
+6) Pieza + servicio: al aceptar ya está VentaMostrador (cobro 50% correcto)
+   y CompraProducto sigue en 0 hasta «Generar Compras».
 
 Los fixtures compartidos viven en helpers_integracion_cotizacion.py
 (también los usa test_e2e_flujo_dinero.py).
@@ -28,7 +30,7 @@ from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from almacen.models import CompraProducto, LineaServicioAdicional, SolicitudCotizacion
 from almacen.tests.helpers_integracion_cotizacion import (
@@ -44,7 +46,8 @@ from almacen.views import (
     registrar_motivo_rechazo_st,
     vincular_orden_solicitud,
 )
-from servicio_tecnico.models import Cotizacion, VentaMostrador
+from servicio_tecnico.models import Cotizacion, OrdenServicio, VentaMostrador
+from servicio_tecnico.services.pagos_orden import calcular_resumen_cobro
 
 User = get_user_model()
 
@@ -274,8 +277,8 @@ def _usuario_front_sin_compras(*, username: str):
     """
     Usuario con permiso de editar solicitudes, sin permiso de crear compras.
 
-    Simula al Recepcionista (Front): puede pulsar «Generar servicio»
-    pero no «Generar Compras» de piezas.
+    Simula al Recepcionista (Front): no puede pulsar «Generar Compras»
+    de piezas (falta add_compraproducto).
 
     Args:
         username: Nombre único del user de prueba.
@@ -298,8 +301,8 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
     Cliente rechaza todas las piezas y solo acepta un servicio adicional.
 
     Objetivo de negocio:
-        Front debe poder registrar el servicio (VentaMostrador), completar
-        la solicitud y pasar la orden a En reparación, sin crear CompraProducto.
+        Al cerrar la respuesta, el servicio ya debe estar en VentaMostrador,
+        la solicitud completada y la orden En reparación, sin CompraProducto.
     """
 
     def setUp(self) -> None:
@@ -332,17 +335,22 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
 
     def test_rechazar_piezas_y_aceptar_servicio_deja_flags_correctos(self) -> None:
         """
-        Tras responder: parcialmente_aprobada, orden acepta cotización,
-        botón de compras apagado y botón de servicio encendido.
+        Tras responder: el servicio ya está en ST, solicitud completada
+        y orden En reparación. No hay compras ni botón de servicio pendiente.
         """
         self._cerrar_solo_servicio()
 
-        self.assertEqual(self.solicitud.estado, 'parcialmente_aprobada')
-        self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
+        self.assertEqual(self.solicitud.estado, 'completada')
+        self.assertEqual(self.orden.estado, 'reparacion')
         self.assertFalse(self.solicitud.puede_generar_compras())
-        self.assertTrue(self.solicitud.puede_generar_venta_mostrador())
+        self.assertFalse(self.solicitud.puede_generar_venta_mostrador())
         # La cotización ST no debe verse como rechazada: aceptaron el servicio.
         self.assertIs(self.cotizacion.usuario_acepto, True)
+
+        venta = VentaMostrador.objects.get(orden=self.orden)
+        self.assertTrue(venta.incluye_limpieza)
+        self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+        self.assertEqual(CompraProducto.objects.count(), 0)
 
     def test_no_genera_servicio_si_aun_faltan_piezas_por_responder(self) -> None:
         """
@@ -376,10 +384,12 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
 
     def test_front_genera_servicio_sin_compra_y_pasa_a_reparacion(self) -> None:
         """
-        POST como Front: crea VentaMostrador, no CompraProducto,
-        solicitud completada y orden En reparación.
+        POST como Front tras aceptar: no duplica VentaMostrador ni crea
+        CompraProducto (idempotente; el servicio ya se copió al confirmar).
         """
         self._cerrar_solo_servicio()
+        vm_id = VentaMostrador.objects.get(orden=self.orden).pk
+
         url = reverse(
             'almacen:generar_compras_solicitud',
             kwargs={'pk': self.solicitud.pk},
@@ -396,8 +406,9 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
         self.assertEqual(self.solicitud.estado, 'completada')
         self.assertEqual(self.orden.estado, 'reparacion')
         self.assertEqual(self.servicio.estado_cliente, 'compra_generada')
-
+        self.assertEqual(VentaMostrador.objects.filter(orden=self.orden).count(), 1)
         venta = VentaMostrador.objects.get(orden=self.orden)
+        self.assertEqual(venta.pk, vm_id)
         self.assertTrue(venta.incluye_limpieza)
         self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
 
@@ -424,3 +435,133 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
         self.linea.refresh_from_db()
         self.assertEqual(self.linea.estado_cliente, 'aprobada')
         self.assertIsNone(self.linea.compra_generada_id)
+
+
+class IntegracionPiezaYServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCase):
+    """
+    Cliente acepta pieza Y servicio adicional.
+
+    Objetivo de negocio:
+        Al confirmar, Front debe ver el servicio en el cobro (50% correcto)
+        sin que exista CompraProducto. Compras genera las compras después.
+    """
+
+    def setUp(self) -> None:
+        self._crear_contexto_base(sufijo='MIX')
+        self.orden = self._crear_orden_con_detalle(orden_cliente='OOW-INT-MIX-01')
+        self.solicitud, self.linea = self._crear_solicitud_con_linea(
+            orden=self.orden,
+            sin_orden_activa=False,
+            estado='enviada_cliente',
+            estado_linea='pendiente',
+        )
+        self.servicio = LineaServicioAdicional.objects.create(
+            solicitud=self.solicitud,
+            tipo_servicio='limpieza',
+            costo=Decimal('450.00'),
+            estado_cliente='pendiente',
+        )
+        self.cotizacion = Cotizacion.objects.get(orden=self.orden)
+
+    def test_al_aceptar_pieza_y_servicio_vm_entra_al_cobro_sin_compra(self) -> None:
+        """
+        Feliz: aprobar pieza + limpieza → VentaMostrador y 50% con servicio;
+        CompraProducto sigue en 0 y Compras aún puede generar compras.
+        """
+        self.assertTrue(self.linea.aprobar())
+        self.assertTrue(self.servicio.aprobar())
+        self.solicitud.refresh_from_db()
+        self.orden.refresh_from_db()
+        self.cotizacion.refresh_from_db()
+        self.servicio.refresh_from_db()
+
+        # Paso: solicitud cerrada, piezas listas para Compras, servicio ya en ST.
+        self.assertEqual(self.solicitud.estado, 'totalmente_aprobada')
+        self.assertEqual(self.orden.estado, 'cliente_acepta_cotizacion')
+        self.assertTrue(self.solicitud.puede_generar_compras())
+        self.assertFalse(self.solicitud.puede_generar_venta_mostrador())
+        self.assertEqual(self.servicio.estado_cliente, 'compra_generada')
+        self.assertEqual(CompraProducto.objects.count(), 0)
+
+        venta = VentaMostrador.objects.get(orden=self.orden)
+        self.assertTrue(venta.incluye_limpieza)
+        self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+
+        # Los precios al cliente se congelan al responder (no el 300 del fixture).
+        # Lo que importa: el 50% incluye la limpieza, no solo las piezas.
+        self.linea.refresh_from_db()
+        precio_pieza = self.linea.precio_unitario_cliente
+        iva = (precio_pieza * Decimal('0.16')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        total_esperado = precio_pieza + iva + Decimal('450.00')
+        anticipo_esperado = (total_esperado * Decimal('0.50')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        anticipo_solo_piezas = ((precio_pieza + iva) * Decimal('0.50')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+
+        orden = OrdenServicio.objects.get(pk=self.orden.pk)
+        resumen = calcular_resumen_cobro(orden, codigo_pais='MX')
+        self.assertFalse(resumen.es_estimado)
+        self.assertEqual(resumen.subtotal_cotizacion, precio_pieza)
+        self.assertEqual(resumen.iva_cotizacion, iva)
+        self.assertEqual(resumen.total_venta_mostrador, Decimal('450.00'))
+        self.assertEqual(resumen.total_a_cobrar, total_esperado)
+        self.assertEqual(resumen.anticipo_minimo, anticipo_esperado)
+        self.assertGreater(resumen.anticipo_minimo, anticipo_solo_piezas)
+
+    def test_vincular_orden_copia_servicio_ya_aceptado(self) -> None:
+        """
+        Sin orden: al aceptar no hay VM; al vincular sí se copia el servicio.
+        """
+        orden = self._crear_orden_con_detalle(orden_cliente='OOW-INT-MIX-VIN')
+        solicitud, linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='enviada_cliente',
+            estado_linea='pendiente',
+        )
+        servicio = LineaServicioAdicional.objects.create(
+            solicitud=solicitud,
+            tipo_servicio='limpieza',
+            costo=Decimal('450.00'),
+            estado_cliente='pendiente',
+        )
+
+        self.assertTrue(linea.aprobar())
+        self.assertTrue(servicio.aprobar())
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'totalmente_aprobada')
+        self.assertEqual(VentaMostrador.objects.filter(orden=orden).count(), 0)
+
+        url_vincular = reverse(
+            'almacen:vincular_orden_solicitud',
+            kwargs={'pk': solicitud.pk},
+        )
+        resp = vincular_orden_solicitud(
+            request_post(
+                self.factory,
+                self.user,
+                url_vincular,
+                {'orden_pk': str(orden.pk)},
+            ),
+            solicitud.pk,
+        )
+        self.assertEqual(resp.status_code, 302)
+
+        solicitud.refresh_from_db()
+        servicio.refresh_from_db()
+        orden.refresh_from_db()
+        self.assertEqual(solicitud.orden_servicio_id, orden.pk)
+        self.assertTrue(solicitud.puede_generar_compras())
+        self.assertEqual(servicio.estado_cliente, 'compra_generada')
+        self.assertEqual(CompraProducto.objects.count(), 0)
+        venta = VentaMostrador.objects.get(orden=orden)
+        self.assertTrue(venta.incluye_limpieza)
+        self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+        self.assertEqual(orden.estado, 'cliente_acepta_cotizacion')
+        cotizacion = Cotizacion.objects.get(orden=orden)
+        self.assertIs(cotizacion.usuario_acepto, True)
+

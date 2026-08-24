@@ -10,7 +10,7 @@ solicitud queda en uno de estos estados:
   → avisar a Compras (pedir al proveedor y Generar compras).
 - totalmente_aprobada / parcialmente_aprobada SOLO con servicios
   (el cliente no aceptó piezas) → avisar al responsable de seguimiento
-  para que pulse «Generar servicio». No se avisa a Compras.
+  (el servicio ya quedó en la orden; no se avisa a Compras).
 - totalmente_rechazada → avisar a Compras + técnico asignado +
   responsable de seguimiento (si hay orden ST).
 
@@ -278,7 +278,7 @@ def _notificar_aceptacion_a_compras(solicitud: 'SolicitudCotizacion') -> None:
 
 def _notificar_aceptacion_solo_servicios(solicitud: 'SolicitudCotizacion') -> None:
     """
-    El cliente no aceptó piezas: Front debe registrar el servicio en ST.
+    El cliente no aceptó piezas: el servicio ya quedó en la orden ST.
 
     Args:
         solicitud: Solicitud aprobada/parcial sin líneas de pieza aceptadas.
@@ -296,7 +296,7 @@ def _notificar_aceptacion_solo_servicios(solicitud: 'SolicitudCotizacion') -> No
     mensaje = (
         f'{_resumen_cliente_solicitud(solicitud)}. '
         f'El cliente aceptó solo servicio(s) adicional(es). '
-        f'Usa «Generar servicio» para registrarlos y pasar la orden a En reparación.'
+        f'Ya quedaron registrados en la orden; pasa a En reparación.'
     )
     enviados = enviar_push_y_campanita(
         [responsable],

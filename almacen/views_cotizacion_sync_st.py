@@ -48,16 +48,15 @@ def generar_compras_solicitud(request, pk):
        - Hereda el producto, proveedor, cantidad y costo de la línea
        - Se vincula a la misma orden de servicio
     
-    2. VentaMostrador (o actualiza si ya existe) para servicios adicionales aprobados
-       - Mapea cada servicio a su campo correspondiente en VentaMostrador
-       - Ejemplo: 'limpieza' → incluye_limpieza=True, costo_limpieza=$450
+    2. VentaMostrador para servicios adicionales (RED DE SEGURIDAD):
+       al cerrar la respuesta del cliente ya se copian a ST. Si por algún
+       motivo quedaron pendientes, este POST los materializa igual.
     
     3. En órdenes OOW de reparación (no FL-): crea SeguimientoPieza en ST
        agrupados por proveedor y pasa la orden a «Esperando Llegada de Piezas».
 
-    4. Si el cliente SOLO aceptó servicios (sin piezas): registra la VentaMostrador
-       y pasa la orden a «En Reparación». Front puede pulsar este caso; Compras
-       sigue siendo quien genera compras de piezas (permiso add_compraproducto).
+    4. Si el cliente SOLO aceptó servicios (sin piezas): al confirmar ya
+       quedó VentaMostrador + orden En reparación. Un segundo POST no duplica.
     
     Esto integra el flujo de cotizaciones con el flujo existente de compras
     y ventas mostrador.
@@ -82,12 +81,24 @@ def generar_compras_solicitud(request, pk):
         puede_generar_compras = solicitud.puede_generar_compras()
         puede_generar_venta = solicitud.puede_generar_venta_mostrador()
         
-        # Validar que haya algo que generar
+        # Validar que haya algo que generar. Si los servicios ya se copiaron
+        # al aceptar (o la solicitud ya está completada), un segundo clic
+        # no es un error: no hay nada pendiente.
         if not puede_generar_compras and not puede_generar_venta:
-            messages.error(
-                request,
-                'No hay líneas ni servicios aprobados pendientes de procesar.'
-            )
+            servicios_ya_en_st = solicitud.servicios_adicionales.filter(
+                estado_cliente='compra_generada',
+            ).exists()
+            if solicitud.estado == 'completada' or servicios_ya_en_st:
+                messages.info(
+                    request,
+                    'Los servicios/compras ya estaban registrados. '
+                    'No hay nada pendiente por generar.',
+                )
+            else:
+                messages.error(
+                    request,
+                    'No hay líneas ni servicios aprobados pendientes de procesar.'
+                )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
         # EXPLICACIÓN: Front (Recepcionista) puede confirmar servicios, pero
@@ -98,7 +109,7 @@ def generar_compras_solicitud(request, pk):
             messages.error(
                 request,
                 'Solo Compras puede generar compras de piezas. '
-                'Si el cliente aceptó únicamente un servicio, usa «Generar servicio».'
+                'Los servicios aceptados ya se cargan al confirmar la respuesta.'
             )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         
@@ -125,6 +136,24 @@ def generar_compras_solicitud(request, pk):
                     f'{n_piezas} pieza(s) registrada(s) en sección Venta Mostrador'
                 )
 
+        # Red de seguridad: misma puerta que al aceptar. Si los servicios
+        # ya estaban en ST, es no-op. Si quedaron pendientes (solicitud
+        # vieja), los copia ANTES de generar compras para no perderlos
+        # cuando generar_compras() pase la solicitud a completada.
+        from almacen.utils.sincronizar_servicios_venta_mostrador import (
+            materializar_servicios_aprobados_en_st,
+        )
+        venta = materializar_servicios_aprobados_en_st(solicitud)
+        if venta:
+            mensajes_exito.append(
+                f'Venta Mostrador creada/actualizada ({venta.folio_venta})'
+            )
+            solicitud.refresh_from_db()
+            if solicitud.orden_servicio_id:
+                solicitud.orden_servicio.refresh_from_db()
+                if solicitud.orden_servicio.estado == 'reparacion':
+                    mensajes_exito.append('orden ST actualizada a «En Reparación»')
+
         # Generar compras para piezas (CompraProducto para control de inventario/almacén)
         if puede_generar_compras:
             compras = solicitud.generar_compras(usuario=request.user)
@@ -143,30 +172,6 @@ def generar_compras_solicitud(request, pk):
                 mensajes_exito.append(
                     'orden ST actualizada a «Esperando Llegada de Piezas»'
                 )
-        
-        # Generar VentaMostrador para servicios adicionales (paquetes, limpieza, etc.)
-        venta = None
-        if puede_generar_venta:
-            venta = solicitud.generar_venta_mostrador()
-            if venta:
-                mensajes_exito.append(
-                    f'Venta Mostrador creada/actualizada ({venta.folio_venta})'
-                )
-
-        # EXPLICACIÓN: sin piezas que pedir no hay «espera de pieza». Front
-        # registró el servicio → solicitud completada y orden En reparación.
-        # Solo si la VentaMostrador sí se creó: no cerramos a ciegas.
-        if venta and not puede_generar_compras:
-            solicitud.refresh_from_db()
-            if solicitud.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
-                solicitud.estado = 'completada'
-                solicitud.fecha_completada = timezone.now()
-                solicitud.save(update_fields=['estado', 'fecha_completada'])
-            from almacen.utils.sincronizar_estado_st import (
-                sincronizar_estado_st_al_confirmar_servicios,
-            )
-            if sincronizar_estado_st_al_confirmar_servicios(solicitud):
-                mensajes_exito.append('orden ST actualizada a «En Reparación»')
         
         # Mostrar mensajes al usuario
         if mensajes_exito:

@@ -371,7 +371,7 @@ class NotificarRespuestaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase)
     ) -> None:
         """
         Piezas rechazadas + limpieza aceptada: no email a Compras;
-        push al responsable de seguimiento para «Generar servicio».
+        push al responsable de seguimiento (servicio ya en la orden).
         """
         orden = self._crear_orden_con_detalle(
             orden_cliente='OOW-NOTIF-SRV-01',
@@ -398,10 +398,11 @@ class NotificarRespuestaCotizacionTest(BaseIntegracionCotizacionMixin, TestCase)
 
         servicio.aprobar()
         solicitud.refresh_from_db()
-        self.assertEqual(solicitud.estado, 'parcialmente_aprobada')
+        # Solo servicio: al aceptar ya se copia a ST y la solicitud se completa.
+        self.assertEqual(solicitud.estado, 'completada')
 
         mock_delay_aceptada.assert_not_called()
         mock_push_campanita.assert_called_once()
         empleados_notif = list(mock_push_campanita.call_args.args[0])
         self.assertEqual({e.pk for e in empleados_notif}, {self.empleado_responsable.pk})
-        self.assertIn('Generar servicio', mock_push_campanita.call_args.kwargs['mensaje'])
+        self.assertIn('En reparación', mock_push_campanita.call_args.kwargs['mensaje'])

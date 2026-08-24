@@ -3911,6 +3911,8 @@ class SolicitudCotizacion(models.Model):
         - No se marca como "totalmente_aprobada" hasta que servicios también respondan
         - Al quedar aprobada/parcial/rechazada, sincroniza el estado de la orden ST
           (Cliente Acepta Cotización / Cotización Rechazada) si aún está en cotizacion
+        - Si hay servicios aceptados y orden vinculada, copia VentaMostrador a ST
+          para que Front cobre el 50% antes de Generar Compras
         
         Returns:
             str: Nuevo estado de la solicitud
@@ -3991,6 +3993,17 @@ class SolicitudCotizacion(models.Model):
                     self.estado,
                     notif_err,
                 )
+
+        # EXPLICACIÓN: las piezas ya están en ST al aprobar. Los servicios
+        # adicionales también deben copiarse a Venta Mostrador AHORA, para
+        # que Front vea el total (y el 50%) antes de Generar Compras.
+        # Va DESPUÉS de notificar para no cambiar a «completada» (solo
+        # servicios) antes del correo/push de aceptación.
+        if self.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
+            from almacen.utils.sincronizar_servicios_venta_mostrador import (
+                materializar_servicios_aprobados_en_st,
+            )
+            materializar_servicios_aprobados_en_st(self)
 
         return self.estado
     
@@ -4186,7 +4199,9 @@ class SolicitudCotizacion(models.Model):
         EXPLICACIÓN PARA PRINCIPIANTES:
         --------------------------------
         Este método toma los servicios adicionales aprobados y los "traslada"
-        al modelo VentaMostrador de servicio_tecnico.
+        al modelo VentaMostrador de servicio_tecnico. Lo llama el util
+        materializar_servicios_aprobados_en_st() al cerrar la respuesta del
+        cliente (y «Generar Compras» lo deja como red de seguridad).
         
         Por ejemplo, si el cliente aprobó:
         - paquete_premium ($5,500)
@@ -4491,6 +4506,26 @@ class SolicitudCotizacion(models.Model):
             self.observaciones = nota
         
         self.save()
+
+        # EXPLICACIÓN: al aceptar SIN orden, no había Cotizacion/estado ST
+        # que actualizar. Ahora que hay orden: alinear usuario_acepto y
+        # «Cliente Acepta Cotización», y copiar servicios a Venta Mostrador.
+        if self.estado in (
+            'totalmente_aprobada',
+            'parcialmente_aprobada',
+            'totalmente_rechazada',
+        ):
+            from almacen.utils.sincronizar_estado_st import (
+                sincronizar_estado_st_por_respuesta_cliente,
+            )
+            sincronizar_estado_st_por_respuesta_cliente(
+                self, estado_solicitud=self.estado
+            )
+        if self.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
+            from almacen.utils.sincronizar_servicios_venta_mostrador import (
+                materializar_servicios_aprobados_en_st,
+            )
+            materializar_servicios_aprobados_en_st(self)
         
         logger.info(
             f"SolicitudCotizacion {self.numero_solicitud} vinculada a "
@@ -5881,7 +5916,9 @@ class LineaServicioAdicional(models.Model):
     1. Almacén agrega servicios adicionales a la cotización (junto con las piezas)
     2. El cliente ve TODO junto: piezas + servicios
     3. El cliente aprueba/rechaza cada línea por separado
-    4. Al generar compras, los servicios aprobados crean/actualizan VentaMostrador
+    4. Al CERRAR la respuesta (todas las líneas respondidas), los servicios
+       aprobados crean/actualizan VentaMostrador para el cobro del 50%.
+       «Generar Compras» sigue pidiendo las piezas al proveedor.
     
     RELACIÓN CON VentaMostrador:
     ----------------------------
