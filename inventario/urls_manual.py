@@ -19,6 +19,7 @@ urlpatterns = [
     path('acepta/', views.manual_acepta, name='acepta'),
     path('rechaza/', views.manual_rechaza, name='rechaza'),
     path('pnc/', views.manual_pnc, name='pnc'),
+    path('recotizacion/', views.manual_recotizacion, name='recotizacion'),
     path('rol/front/', views.manual_rol_front, name='rol_front'),
     path('rol/tecnico/', views.manual_rol_tecnico, name='rol_tecnico'),
     path('rol/calidad/', views.manual_rol_calidad, name='rol_calidad'),

@@ -6,8 +6,8 @@
 <p class="manual-kicker">Tu área · rol Recepcionista</p>
 <h1>Front / Recepción</h1>
 <p class="manual-lead">
-    Eres el hilo con el cliente: das de alta, mandas papeles, traduces la cotización a una oferta
-    y registras lo que el cliente dijo. No compras las piezas; no diagnosticas el equipo.
+    Eres el hilo con el cliente: das de alta, mandas papeles, traduces la cotización a una oferta,
+    registras lo que el cliente dijo y cobras el anticipo. No compras las piezas; no diagnosticas el equipo.
 </p>
 
 {% if manual_area_usuario == 'front' %}
@@ -24,18 +24,101 @@
     <li>Cuando Compras avisa «cotización lista»: abre el <a href="{% url 'almacen:panel_cotizaciones' %}">panel</a>, pestaña <strong>En Front</strong>.</li>
     <li>Agrega servicios con <span class="manual-btn-name">Agregar Servicio Adicional</span>.</li>
     <li>Ajusta profit y pulsa <span class="manual-btn-name">Enviar Cotización al Cliente</span>.</li>
+    <li>Si pasaron <strong>5 días hábiles</strong> sin respuesta: <a href="{% url 'manual:recotizacion' %}">solicita recotización</a>. Si el cliente ya contestó, sigue el camino que toque.</li>
     <li>Registra la respuesta: palomitas, taches y motivos. Tres caminos:
         <a href="{% url 'manual:acepta' %}">acepta</a>,
         <a href="{% url 'manual:rechaza' %}">rechaza</a>,
         <a href="{% url 'manual:pnc' %}">PNC</a>.</li>
-    <li>Cobra el anticipo del 50% en la orden: al confirmar, piezas y servicios ya están cargados. Compras no puede generar compras (ni pasar a <strong>En reparación</strong> si solo hay servicios) hasta que ese 50% esté registrado.</li>
+    <li>Si aceptó: cobra el anticipo del <strong>50%</strong> en la orden (sección Cobros y facturación). Sin ese dinero Compras no puede pulsar <span class="manual-btn-name">Generar Compras</span>.</li>
     <li>Equipo listo: <span class="manual-btn-name">Notificar equipo disponible</span> y, al recoger, <span class="manual-btn-name">Cerrar Orden</span> + encuesta.</li>
 </ol>
+
+<h2 id="pagos">Pagos: el anticipo del 50%</h2>
+<p>
+    Primero las palomitas, <strong>después</strong> el dinero. El cliente no tiene que pagar para que
+    puedas marcar las piezas; el 50% es el candado de Compras para pedir al proveedor.
+</p>
+<dl class="manual-meta">
+    <div>
+        <dt>Dónde</dt>
+        <dd>Detalle de la <strong>orden</strong> (no de la solicitud) → sección <strong>Cobros y facturación</strong>.</dd>
+    </div>
+    <div>
+        <dt>Qué haces</dt>
+        <dd>
+            <span class="manual-btn-name">Registrar pago</span>: tipo Anticipo, método (efectivo, transferencia, tarjeta)
+            y el monto. El mínimo es el 50% del total a cobrar (piezas aceptadas + servicios, el mismo del PDF).
+        </dd>
+    </div>
+    <div>
+        <dt>Qué cambia</dt>
+        <dd>Cuando el pagado cubre el 50%, el badge pasa a <strong>Anticipo 50% cubierto</strong>. Compras ya puede generar.</dd>
+    </div>
+    <div>
+        <dt>Quién se entera</dt>
+        <dd>Compras ve el botón <span class="manual-btn-name">Generar Compras</span> encendido. Si falta, queda apagado con el texto de falta de anticipo.</dd>
+    </div>
+</dl>
+<div class="manual-callout">
+    <p>
+        <strong>Orden real.</strong> 1) Registras palomitas. 2) Compras ya recibe aviso, pero el botón
+        del sistema sigue apagado. 3) Tú cargas el 50% en la orden. 4) Compras pulsa
+        <span class="manual-btn-name">Generar Compras</span>.
+        Facturación puede confirmar después si la transferencia ya aparece en la cuenta; eso
+        <strong>no</strong> retrasa el candado del 50%.
+    </p>
+</div>
+<p>
+    Si el cliente solo aceptó servicios (sin piezas), el botón que espera el mismo 50% es
+    <span class="manual-btn-name">Generar servicio</span>. Detalle del cobro en
+    <a href="{% url 'manual:acepta' %}#paso-anticipo">el cliente acepta</a>.
+</p>
+
+<h2 id="recotizacion">Recotización: se vencieron los 5 días</h2>
+<p>
+    El reloj de <strong>5 días hábiles</strong> arranca cuando Compras pulsa
+    <span class="manual-btn-name">Notificar a Front</span>, no cuando tú mandas el PDF al cliente.
+    Si el cliente no contestó ninguna pieza ni servicio, tú pides a Compras que vuelva a cotizar.
+</p>
+<dl class="manual-meta">
+    <div>
+        <dt>Dónde</dt>
+        <dd>
+            <a href="{% url 'almacen:panel_cotizaciones' %}">Panel de cotizaciones</a>
+            → KPI <strong>Vencidas</strong> o la fila en rojo → <span class="manual-btn-name">Ver detalle</span>.
+            El botón <strong>no</strong> está en el detalle de la orden de Servicio Técnico.
+        </dd>
+    </div>
+    <div>
+        <dt>Qué haces</dt>
+        <dd>
+            Panel Acciones → <span class="manual-btn-name">Solicitar Recotización</span>
+            (nota opcional para Compras) → <span class="manual-btn-name">Confirmar Recotización</span>.
+        </dd>
+    </div>
+    <div>
+        <dt>Qué cambia</dt>
+        <dd>La solicitud vuelve a Borrador. Compras actualiza precios y vuelve a <span class="manual-btn-name">Notificar a Front</span>.</dd>
+    </div>
+    <div>
+        <dt>Quién se entera</dt>
+        <dd>Compras: push, campana y correo. Luego el flujo vuelve a ser el de siempre: tú mandas la cotización nueva al cliente.</dd>
+    </div>
+</dl>
+<div class="manual-callout manual-callout--warn">
+    <p>
+        Si el cliente <strong>ya respondió alguna</strong> línea, no aparece el botón de recotizar.
+        Cierra el caso o levanta una solicitud nueva. Mientras esté vencida no se puede
+        enviar ni aprobar; sí se puede rechazar. Paso a paso en
+        <a href="{% url 'manual:recotizacion' %}">Recotización</a>.
+    </p>
+</div>
 
 <h2>Cómo te llegan los avisos</h2>
 <ul>
     <li><strong>Diagnóstico listo:</strong> busca la orden o entra por el detalle; el técnico no te manda el PDF al cliente, lo mandas tú.</li>
     <li><strong>Cotización lista:</strong> correo de Compras (no campana). El panel «En Front» es tu bandeja.</li>
+    <li><strong>Cotización vencida:</strong> push / campana (aviso diario). Entras al detalle de la solicitud, no a la orden.</li>
     <li><strong>PNC interno:</strong> mismo botón Notificar a Front, otra plantilla. Luego tú avisas al cliente.</li>
     <li><strong>Equipo finalizado:</strong> push / campana de listo para entrega (OOW).</li>
 </ul>
@@ -49,6 +132,6 @@
 {% endblock %}
 
 {% block manual_pager %}
-<a href="{% url 'manual:pnc' %}">← PNC</a>
+<a href="{% url 'manual:recotizacion' %}">← Recotización</a>
 <a href="{% url 'manual:rol_tecnico' %}">Siguiente: Técnico →</a>
 {% endblock %}

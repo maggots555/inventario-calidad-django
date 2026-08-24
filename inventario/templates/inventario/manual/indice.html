@@ -77,12 +77,12 @@
     </a>
     <a href="{% url 'manual:acepta' %}">
         <span class="manual-mapa-num">09</span>
-        <span>Tres caminos: acepta, rechaza o PNC</span>
+        <span>Cuatro caminos: acepta, rechaza, PNC o recotización</span>
         <span class="manual-mapa-meta">Ver capítulos</span>
     </a>
-    <a href="{% url 'manual:acepta' %}#paso-entrega">
+    <a href="{% url 'manual:acepta' %}#paso-anticipo">
         <span class="manual-mapa-num">10</span>
-        <span>Si aceptó: piezas, reparación, calidad, entrega y encuesta</span>
+        <span>Si aceptó: anticipo 50%, piezas, calidad, entrega y encuesta</span>
         <span class="manual-mapa-meta">Entregado</span>
     </a>
 </nav>
@@ -91,7 +91,7 @@
 <div class="manual-cards">
     <a class="manual-card{% if manual_area_usuario == 'front' %} is-tu-area{% endif %}" href="{% url 'manual:rol_front' %}">
         <h3>Front / Recepción</h3>
-        <p>Alta, formato, enviar diagnóstico, panel En Front, respuesta del cliente.</p>
+        <p>Alta, formato, cotización al cliente, anticipo 50% y recotización.</p>
     </a>
     <a class="manual-card{% if manual_area_usuario == 'tecnico' %} is-tu-area{% endif %}" href="{% url 'manual:rol_tecnico' %}">
         <h3>Técnico</h3>
@@ -103,7 +103,7 @@
     </a>
     <a class="manual-card{% if manual_area_usuario == 'compras' %} is-tu-area{% endif %}" href="{% url 'manual:rol_compras' %}">
         <h3>Compras / Almacén</h3>
-        <p>Solicitud de cotización, notificar a Front, generar compras, recibir.</p>
+        <p>Solicitud de cotización, notificar a Front, esperar el 50%, generar compras, recibir.</p>
     </a>
 </div>
 
@@ -113,10 +113,8 @@
     <li>Garantía Dell (formato distinto; interviene Dispatcher)</li>
     <li>Venta mostrador (la orden nace en Recepción y se salta el diagnóstico formal)</li>
     <li>Cotización sin orden de servicio / crear orden FL desde Almacén</li>
-    <li>Recotización cuando se vencen los 5 días hábiles</li>
     <li>WPB / DOA (pieza incorrecta o dañada)</li>
     <li>Envío a RHITSO</li>
-    <li>Pagos y anticipos</li>
     <li>Lo que ve el cliente en el portal de seguimiento</li>
     <li>Capturas de pantalla de cada modal (esta fase es texto + mapa)</li>
 </ul>

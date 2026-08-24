@@ -30,13 +30,15 @@
         </ul>
     </li>
     <li>Eso deja la ficha en el panel «En Front» y la orden en <strong>Se Recibe Cotización de Proveedores</strong>. Arrancan 5 días hábiles.</li>
+    <li>Si Front pide recotización (cotización vencida sin respuesta): actualizas costos y vuelves a <span class="manual-btn-name">Notificar a Front</span>. Ver <a href="{% url 'manual:recotizacion' %}">Recotización</a>.</li>
     <li>Si Front registró aceptación con piezas <strong>y ya cargó el 50% en la orden</strong>: <span class="manual-btn-name">Generar Compras</span>. Sin ese anticipo el botón queda apagado. Ver <a href="{% url 'manual:acepta' %}#paso-compras">generar compras</a>.</li>
     <li>Cuando lleguen: <a href="{% url 'almacen:lista_compras' %}">Ver compras</a> → <span class="manual-btn-name">Recibir</span>.</li>
 </ol>
 
 <h2>Cómo te llegan los avisos</h2>
 <ul>
-    <li><strong>Cliente aceptó piezas:</strong> push, campana y correo.</li>
+    <li><strong>Cliente aceptó piezas:</strong> push, campana y correo. El botón <span class="manual-btn-name">Generar Compras</span> espera el 50% en la orden.</li>
+    <li><strong>Recotización:</strong> Front pulsó <span class="manual-btn-name">Solicitar Recotización</span>. Te llega push, campana y correo para volver a cotizar.</li>
     <li><strong>Rechazo total:</strong> también te llega (por si habías apartado material).</li>
     <li><strong>Notificar a Front</strong> no te avisa a ti: tú lo disparas. Front recibe correo, no campana.</li>
 </ul>

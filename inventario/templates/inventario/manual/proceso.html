@@ -249,8 +249,9 @@
     </p>
     <div class="manual-callout">
         <p>
-            <strong>Vigencia.</strong> Al notificar a Front arrancan <strong>5 días hábiles</strong>.
-            Si se vencen sin respuesta del cliente, hay recotización (ficha de una fase siguiente).
+            <strong>Vigencia.</strong> Al notificar a Front arrancan <strong>5 días hábiles</strong>
+            (lun–vie). Si se vencen sin respuesta del cliente, Front solicita recotización.
+            Ver <a href="{% url 'manual:recotizacion' %}">Recotización</a>.
         </p>
     </div>
 </article>
@@ -294,6 +295,7 @@
         <li><a href="{% url 'manual:acepta' %}">El cliente acepta</a> (todo o una parte)</li>
         <li><a href="{% url 'manual:rechaza' %}">El cliente rechaza</a></li>
         <li><a href="{% url 'manual:pnc' %}">No hay piezas (PNC)</a></li>
+        <li><a href="{% url 'manual:recotizacion' %}">No contestó en 5 días hábiles (recotización)</a></li>
     </ul>
 </article>
 {% endblock %}

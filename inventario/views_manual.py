@@ -68,6 +68,13 @@ MANUAL_PAGINAS = [
         'area': None,
     },
     {
+        'slug': 'recotizacion',
+        'titulo': 'Recotización',
+        'grupo': 'caminos',
+        'url_name': 'manual:recotizacion',
+        'area': None,
+    },
+    {
         'slug': 'front',
         'titulo': 'Front / Recepción',
         'grupo': 'roles',
@@ -107,7 +114,7 @@ MANUAL_PAGINAS = [
 MANUAL_GRUPOS = [
     {'id': 'inicio', 'titulo': 'Inicio'},
     {'id': 'proceso', 'titulo': 'El proceso'},
-    {'id': 'caminos', 'titulo': 'Tres caminos'},
+    {'id': 'caminos', 'titulo': 'Caminos'},
     {'id': 'roles', 'titulo': 'Por área'},
     {'id': 'referencia', 'titulo': 'Referencia'},
 ]
@@ -243,6 +250,23 @@ def manual_pnc(request):
 
 
 @login_required
+def manual_recotizacion(request):
+    """
+    Objetivo: camino cuando la cotización vence a los 5 días hábiles sin respuesta.
+
+    Args:
+        request: HttpRequest autenticado.
+
+    Efectos secundarios: ninguno.
+    """
+    return render(
+        request,
+        'inventario/manual/recotizacion.html',
+        _contexto_manual(request, 'recotizacion'),
+    )
+
+
+@login_required
 def manual_rol_front(request):
     """
     Objetivo: checklist de Front (rol Recepcionista en SIGMA).
@@ -334,6 +358,7 @@ VISTAS_MANUAL_HUMOS = (
     ('manual:acepta', manual_acepta, 'acepta'),
     ('manual:rechaza', manual_rechaza, 'rechaza'),
     ('manual:pnc', manual_pnc, 'pnc'),
+    ('manual:recotizacion', manual_recotizacion, 'recotizacion'),
     ('manual:rol_front', manual_rol_front, 'front'),
     ('manual:rol_tecnico', manual_rol_tecnico, 'tecnico'),
     ('manual:rol_calidad', manual_rol_calidad, 'calidad'),

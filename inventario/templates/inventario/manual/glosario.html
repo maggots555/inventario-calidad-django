@@ -89,6 +89,7 @@
         <strong>«En Front» no es un estado de la orden.</strong> Es la pestaña del
         <a href="{% url 'almacen:panel_cotizaciones' %}">Panel de cotizaciones</a>.
         En ese momento la orden suele decir «Se Recibe Cotización de Proveedores».
+        Ahí también corre la vigencia de 5 días hábiles (arranca al notificar a Front).
     </p>
 </div>
 
@@ -138,6 +139,8 @@
     <li><strong>PNC</strong> — Parte no disponible. Son <em>dos</em> avisos: uno interno a Front y otro al cliente.</li>
     <li><strong>REAC</strong> — Reacondicionado: oferta alternativa cuando no hay pieza de reparación.</li>
     <li><strong>Profit</strong> — El margen que Front ajusta antes de mandar el PDF al cliente.</li>
+    <li><strong>Anticipo 50%</strong> — Mínimo que Front registra en Cobros y facturación para que Compras pueda pulsar Generar Compras. Las palomitas no lo exigen.</li>
+    <li><strong>Vigencia</strong> — 5 días hábiles desde Notificar a Front. Si vence sin respuesta, Front solicita recotización.</li>
 </ul>
 {% endblock %}
 

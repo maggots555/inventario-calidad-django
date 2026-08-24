@@ -1,0 +1,122 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Recotización — Manual SIGMA{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Camino 10.4 · Sin respuesta del cliente</p>
+<h1>Recotización</h1>
+<p class="manual-lead">
+    Si el cliente no contestó en <strong>5 días hábiles</strong>, la cotización vence.
+    Front pide a Compras que vuelva a buscar disponibilidad y precios. Después el flujo
+    es el de siempre: Notificar a Front y enviar la oferta nueva al cliente.
+</p>
+
+<article class="manual-paso" id="paso-vence">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">1</span>
+        <h2>Se venció la vigencia</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'almacen:panel_cotizaciones' %}">Almacén → Panel de cotizaciones</a>.
+                KPI <strong>Vencidas</strong> o la fila en rojo. No es el detalle de la orden de Servicio Técnico.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué ves</dt>
+            <dd>Badge <strong>Venció</strong>. En el detalle: alerta roja y, en Acciones, <strong>Cotización vencida sin respuesta</strong>.</dd>
+        </div>
+        <div>
+            <dt>Desde cuándo cuenta</dt>
+            <dd>Los 5 días hábiles arrancan cuando Compras pulsa <span class="manual-btn-name">Notificar a Front</span>, aunque tú aún no hayas mandado el PDF al cliente.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Push y campana diarios a Front y Compras. El botón de recotizar lo pulsas tú.</dd>
+        </div>
+    </dl>
+    <div class="manual-callout">
+        <p>
+            Mientras esté vencida <strong>no</strong> puedes enviar ni aprobar la cotización.
+            Sí puedes rechazar líneas si el cliente ya dijo que no.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-solicitar">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">2</span>
+        <h2>Solicitar recotización a Compras</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud → panel Acciones.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                <span class="manual-btn-name">Solicitar Recotización</span>
+                (nota opcional para Compras) → <span class="manual-btn-name">Confirmar Recotización</span>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué cambia</dt>
+            <dd>La solicitud vuelve a <strong>Borrador</strong>. La orden regresa a <strong>Envío de Cotización al Proveedor</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Compras: push, campana y correo con las piezas a recotizar.</dd>
+        </div>
+    </dl>
+    <div class="manual-callout manual-callout--warn">
+        <p>
+            El botón solo aparece si el cliente <strong>no respondió ninguna</strong> pieza ni servicio.
+            Si ya hay una palomita o un tache, no se recotiza: cierra el caso o levanta una solicitud nueva.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-volver">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">3</span>
+        <h2>Compras recotiza y avisa otra vez</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+        <span class="manual-badge manual-badge--estado">Se Recibe Cotización de Proveedores</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>La misma solicitud, ahora en Borrador. Compras edita líneas y costos.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>Actualizas disponibilidad y precios. Pulsas <span class="manual-btn-name">Notificar a Front</span> (plantilla Cotización lista).</dd>
+        </div>
+        <div>
+            <dt>Qué cambia</dt>
+            <dd>Arranca una vigencia nueva de 5 días hábiles. El panel vuelve a mostrar la ficha en <strong>En Front</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front por correo, igual que la primera vez.</dd>
+        </div>
+    </dl>
+    <p>
+        A partir de ahí Front vuelve a <span class="manual-btn-name">Enviar Cotización al Cliente</span>
+        y registra palomitas, taches o, si otra vez no hay piezas, PNC. Ver
+        <a href="{% url 'manual:acepta' %}">acepta</a>,
+        <a href="{% url 'manual:rechaza' %}">rechaza</a> o
+        <a href="{% url 'manual:pnc' %}">PNC</a>.
+    </p>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:pnc' %}">← PNC</a>
+<a href="{% url 'manual:rol_front' %}">Siguiente: Front / Recepción →</a>
+{% endblock %}

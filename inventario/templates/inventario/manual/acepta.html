@@ -42,9 +42,51 @@
     </p>
 </article>
 
-<article class="manual-paso" id="paso-compras">
+<article class="manual-paso" id="paso-anticipo">
     <div class="manual-paso-head">
         <span class="manual-paso-num">B</span>
+        <h2>Registrar el anticipo del 50%</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Cliente Acepta Cotización</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la <strong>orden</strong> → sección <strong>Cobros y facturación</strong>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                <span class="manual-btn-name">Registrar pago</span> por al menos el 50% del total a cobrar
+                (piezas aceptadas + servicios, el mismo del PDF). Tipo Anticipo; método efectivo, transferencia o tarjeta.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>No cambia. Sigue en <strong>Cliente Acepta Cotización</strong> hasta que Compras genere.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>El candado de Compras se abre: <span class="manual-btn-name">Generar Compras</span> deja de estar apagado.</dd>
+        </div>
+    </dl>
+    <p>
+        Las palomitas <strong>no</strong> exigen pago. El 50% sí es obligatorio para pedir las piezas al proveedor.
+        Si falta, Compras ve el botón apagado con el texto de falta de anticipo (pagado $X de $Y).
+        Facturación puede validar después si la transferencia ya aparece en la cuenta; eso no retrasa este paso.
+    </p>
+    <div class="manual-callout">
+        <p>
+            Si el cliente solo aceptó servicios (sin piezas), el botón que espera el mismo 50% es
+            <span class="manual-btn-name">Generar servicio</span>. El técnico no arranca hasta que
+            ese anticipo esté registrado.
+        </p>
+    </div>
+</article>
+
+<article class="manual-paso" id="paso-compras">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">C</span>
         <h2>Generar las compras</h2>
         <span class="manual-badge manual-badge--rol">Compras</span>
         <span class="manual-badge manual-badge--estado">Esperando Llegada de Piezas</span>
@@ -57,8 +99,7 @@
         <div>
             <dt>Qué haces</dt>
             <dd>
-                El botón permanece apagado hasta que Front cargue en la orden
-                al menos el 50% del total (piezas + servicios, el mismo del PDF).
+                El botón permanece apagado hasta el 50% del paso anterior.
                 Cuando ya está el anticipo, pulsas el botón. Solo el rol Compras lo enciende.
             </dd>
         </div>
@@ -72,17 +113,14 @@
         </div>
     </dl>
     <p>
-        Al registrar palomitas y taches, los <strong>servicios aceptados</strong> (limpieza, respaldo, paquetes)
-        ya quedan en la orden, igual que las piezas. Front cobra el 50% con el mismo total del PDF.
-        Si el cliente solo aceptó servicios y no piezas, el técnico <strong>no</strong> arranca hasta
-        ese mismo 50%: entonces sí se confirma y la orden pasa a <strong>En reparación</strong>,
-        sin esperar paquetería.
+        Al registrar palomitas, los <strong>servicios aceptados</strong> ya quedan en la orden.
+        Compras recibe aviso de inmediato, pero el sistema no deja formalizar la compra hasta el anticipo.
     </p>
 </article>
 
 <article class="manual-paso" id="paso-recibir">
     <div class="manual-paso-head">
-        <span class="manual-paso-num">C</span>
+        <span class="manual-paso-num">D</span>
         <h2>Confirmar que llegaron las piezas</h2>
         <span class="manual-badge manual-badge--rol">Almacén</span>
         <span class="manual-badge manual-badge--estado">Piezas Recibidas</span>
@@ -109,7 +147,7 @@
 
 <article class="manual-paso" id="paso-reparar">
     <div class="manual-paso-head">
-        <span class="manual-paso-num">D</span>
+        <span class="manual-paso-num">E</span>
         <h2>Reparar y subir fotos de reparación</h2>
         <span class="manual-badge manual-badge--rol">Técnico</span>
         <span class="manual-badge manual-badge--estado">Control de Calidad</span>
@@ -143,7 +181,7 @@
 
 <article class="manual-paso" id="paso-egreso">
     <div class="manual-paso-head">
-        <span class="manual-paso-num">E</span>
+        <span class="manual-paso-num">F</span>
         <h2>Fotos de egreso</h2>
         <span class="manual-badge manual-badge--rol">Calidad</span>
         <span class="manual-badge manual-badge--estado">Finalizado - Listo para Entrega</span>
@@ -170,7 +208,7 @@
 
 <article class="manual-paso" id="paso-entrega">
     <div class="manual-paso-head">
-        <span class="manual-paso-num">F</span>
+        <span class="manual-paso-num">G</span>
         <h2>Avisar, entregar y encuesta</h2>
         <span class="manual-badge manual-badge--rol">Front</span>
         <span class="manual-badge manual-badge--estado">Entregado al Cliente</span>
