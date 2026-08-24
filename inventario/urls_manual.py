@@ -1,5 +1,5 @@
 """
-URLs del manual de órdenes con diagnóstico (OOW). Se montan en /manual/ desde config/urls.py.
+URLs del manual de operación (OOW y FL). Se montan en /manual/ desde config/urls.py.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 El app_name `manual` permite escribir {% url 'manual:indice' %} en las
@@ -16,6 +16,8 @@ app_name = 'manual'
 urlpatterns = [
     path('', views.manual_indice, name='indice'),
     path('proceso/', views.manual_proceso, name='proceso'),
+    path('proceso/fl/', views.manual_proceso_fl, name='proceso_fl'),
+    path('proceso/fl/alta-directa/', views.manual_alta_directa_fl, name='alta_directa_fl'),
     path('acepta/', views.manual_acepta, name='acepta'),
     path('rechaza/', views.manual_rechaza, name='rechaza'),
     path('pnc/', views.manual_pnc, name='pnc'),

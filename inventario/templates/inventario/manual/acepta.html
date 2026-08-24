@@ -1,14 +1,23 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}El cliente acepta — OOW{% endblock %}
+{% block title %}El cliente acepta{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Camino 10.1</p>
+<p class="manual-kicker">Camino compartido · OOW y FL</p>
 <h1>El cliente acepta</h1>
 <p class="manual-lead">
     Aceptar puede ser <strong>todo</strong> o <strong>solo algunas piezas/servicios</strong>.
     En ambos casos Front registra la respuesta en SIGMA; el cliente no pulsa nada dentro del sistema.
 </p>
+
+<div class="manual-callout manual-callout--info">
+    <p>
+        <strong>En OOW</strong> ya existe la orden: las palomitas cambian el estado y Front cobra el 50% en esa orden.
+        <strong>En FL</strong> (cotización sin orden) las palomitas no bastan: primero
+        <span class="manual-btn-name">Crear Orden de Servicio</span> (folio FL-, técnico
+        <strong>Pendiente</strong> del catálogo) y <em>después</em> el anticipo. Sin esa orden no hay Cobros y facturación.
+    </p>
+</div>
 
 <article class="manual-paso" id="paso-acepta">
     <div class="manual-paso-head">
@@ -28,7 +37,12 @@
         </div>
         <div>
             <dt>Estado de la orden</dt>
-            <dd>Cuando ya no quedan líneas pendientes cambia a: <strong>Cliente Acepta Cotización</strong>.</dd>
+            <dd>
+                <strong>En OOW:</strong> cuando ya no quedan líneas pendientes cambia a
+                <strong>Cliente Acepta Cotización</strong>.
+                <strong>En FL sin orden:</strong> todavía no hay orden; la solicitud queda
+                <em>totalmente aprobada</em> o <em>parcialmente aprobada</em>.
+            </dd>
         </div>
         <div>
             <dt>Quién se entera</dt>
@@ -42,6 +56,44 @@
     </p>
 </article>
 
+<article class="manual-paso" id="paso-crear-orden-fl">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">A2</span>
+        <h2>Crear la orden FL (solo venta mostrador)</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">Proveniente de Almacén</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de la solicitud → Acciones → <span class="manual-btn-name">Crear Orden de Servicio</span>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Se abre un modal: confirma el folio FL- sugerido y elige el técnico.
+                En el catálogo de técnicos selecciona <strong>Pendiente</strong>
+                (es un empleado de la base, igual que el proveedor Pendiente al cotizar).
+                Confirma. SIGMA crea la orden con los datos del cliente que ya capturaste.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Nace en <strong>Proveniente de Almacén</strong>, tipo venta mostrador, folio FL-.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Ya hay orden: a partir de aquí el 50% y Generar Compras funcionan como en OOW.</dd>
+        </div>
+    </dl>
+    <div class="manual-callout">
+        <p>
+            Este paso <strong>no aplica en OOW</strong>: ahí la orden ya existía desde recepción.
+            Tampoco aplica en el <a href="{% url 'manual:alta_directa_fl' %}">alta directa</a>: esa orden ya se creó en Servicio Técnico.
+        </p>
+    </div>
+</article>
+
 <article class="manual-paso" id="paso-anticipo">
     <div class="manual-paso-head">
         <span class="manual-paso-num">B</span>
@@ -52,7 +104,7 @@
     <dl class="manual-meta">
         <div>
             <dt>Dónde</dt>
-            <dd>Detalle de la <strong>orden</strong> → sección <strong>Cobros y facturación</strong>.</dd>
+            <dd>Detalle de la <strong>orden</strong> → sección <strong>Cobros y facturación</strong>. En FL, solo después de crear la orden.</dd>
         </div>
         <div>
             <dt>Qué haces</dt>
@@ -285,6 +337,6 @@
 {% endblock %}
 
 {% block manual_pager %}
-<a href="{% url 'manual:proceso' %}">← Proceso paso a paso</a>
+<a href="{% url 'manual:alta_directa_fl' %}">← Alta directa FL</a>
 <a href="{% url 'manual:rechaza' %}">Siguiente: el cliente rechaza →</a>
 {% endblock %}

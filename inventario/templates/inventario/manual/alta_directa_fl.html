@@ -1,0 +1,74 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Alta directa FL — Venta mostrador{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Flujo FL · camino B</p>
+<h1>Alta directa (sin cotización previa)</h1>
+<p class="manual-lead">
+    Úsalo solo cuando el cliente <strong>ya está en el piso</strong> y quiere adquirir un servicio
+    de inmediato: no pidió precio por correo ni WhatsApp. No mezcles este camino con la
+    <a href="{% url 'manual:proceso_fl' %}">cotización sin orden</a>.
+</p>
+
+<article class="manual-paso" id="paso-cuando">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">1</span>
+        <h2>Cuándo sí y cuándo no</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <ul>
+        <li><strong>Sí:</strong> el cliente se presenta a comprar un servicio (limpieza, instalación, paquete) y no hay cotización previa.</li>
+        <li><strong>No:</strong> el cliente mandó datos para cotizar una pieza. Eso es
+            <a href="{% url 'manual:proceso_fl' %}">Almacén → Nueva cotización → Sin orden activa</a>.</li>
+        <li><strong>Tampoco:</strong> el equipo entra a diagnóstico. Eso es
+            <a href="{% url 'manual:proceso' %}">OOW</a>, no Venta mostrador.</li>
+    </ul>
+</article>
+
+<article class="manual-paso" id="paso-formulario">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">2</span>
+        <h2>Crear la orden en Servicio Técnico</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+        <span class="manual-badge manual-badge--estado">En Recepción</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}">Servicio → Nueva orden</a>
+                → <strong>Nueva Venta Mostrador</strong>
+                (no el formulario OOW).
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Registras cliente, equipo y folio FL-. No hay formato digital OOW ni Diagnóstico SIC.
+                Al guardar, la orden nace en <strong>En Recepción</strong>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué sigue</dt>
+            <dd>
+                En el detalle agregas los servicios o paquetes de la venta mostrador.
+                Si más adelante hace falta cotizar una pieza, Compras puede vincular una solicitud a esta orden.
+            </dd>
+        </div>
+    </dl>
+    <div class="manual-callout">
+        <p>
+            El 50%, Facturación, fotos de reparación, egreso y entrega son los mismos capítulos
+            que el resto del manual, cuando ya hay orden y (si aplica) piezas.
+            Ver <a href="{% url 'manual:acepta' %}#paso-anticipo">anticipo</a> y
+            <a href="{% url 'manual:rol_facturacion' %}">Facturación</a>.
+        </p>
+    </div>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:proceso_fl' %}">← Proceso FL</a>
+<a href="{% url 'manual:acepta' %}">Siguiente: el cliente acepta →</a>
+{% endblock %}

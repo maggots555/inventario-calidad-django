@@ -1,13 +1,13 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Calidad / Ingeniería — OOW{% endblock %}
+{% block title %}Calidad / Ingeniería{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Tu área · rol Inspector</p>
 <h1>Calidad / Ingeniería</h1>
 <p class="manual-lead">
-    En este flujo no cotizas ni diagnosticas. Tu trabajo son las fotos que
-    <strong>cambian el estado solas</strong>: ingreso al llegar y egreso al salir.
+    No cotizas ni diagnosticas. Tu trabajo son las fotos que
+    <strong>cambian el estado solas</strong>: ingreso al llegar (OOW) y egreso al salir (ambos flujos, si el equipo está en el taller).
 </p>
 
 {% if manual_area_usuario == 'calidad' %}
@@ -16,13 +16,21 @@
 </div>
 {% endif %}
 
-<h2>Checklist de este flujo</h2>
+<h2>Checklist OOW</h2>
 <ol>
     <li>Equipo recién registrado (<strong>En Espera</strong>, formato ya hecho o en paralelo): sube fotos tipo <strong>Ingreso - Estado Inicial</strong>.</li>
     <li>La orden pasa sola a <strong>En Diagnóstico</strong>. Ver <a href="{% url 'manual:proceso' %}#paso-3">paso 3</a>.</li>
     <li>No hace falta cambiar el estado a mano. Si lo cambias, puedes desalinear el historial.</li>
     <li>Al final de la reparación (o si se rechazó y el equipo se entrega igual), sube fotos tipo <strong>Egreso - Estado Final</strong>.</li>
     <li>La orden pasa sola a <strong>Finalizado - Listo para Entrega</strong>. Front avisa al cliente. Ver <a href="{% url 'manual:acepta' %}#paso-egreso">egreso</a>.</li>
+</ol>
+
+<h2>Checklist FL</h2>
+<ol>
+    <li>No hay salto a <strong>En Diagnóstico</strong>: este flujo no diagnostica.</li>
+    <li>Si el equipo físicamente entra al taller (después de crear la orden o en alta directa), documenta el estado estético cuando toque.</li>
+    <li>El egreso sí: fotos <strong>Egreso - Estado Final</strong> cuando el equipo sale, igual que OOW.</li>
+    <li>Si la cotización se rechazó <em>sin orden</em>, no hay galería: el equipo nunca ingresó.</li>
 </ol>
 
 <h2>Qué tipo de foto hace qué</h2>
@@ -39,7 +47,7 @@
         <tr>
             <td>Ingreso - Estado Inicial</td>
             <td>Calidad / Ingeniería</td>
-            <td>Pasa a En Diagnóstico</td>
+            <td>Pasa a En Diagnóstico (típico de OOW; en FL no hay ese salto)</td>
         </tr>
         <tr>
             <td>Durante Diagnóstico</td>

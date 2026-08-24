@@ -1,13 +1,14 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Técnico — OOW{% endblock %}
+{% block title %}Técnico{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Tu área · rol Técnico</p>
 <h1>Técnico</h1>
 <p class="manual-lead">
-    Tu trabajo en este flujo es diagnosticar bien, dejar el texto listo para Front
-    y, si el cliente aceptó, reparar y evidenciar con fotos de reparación.
+    En OOW diagnosticas y dejas el texto listo para Front.
+    En FL no hay Diagnóstico SIC al inicio (el técnico del modal suele ser
+    <strong>Pendiente</strong> del catálogo). En ambos, si el cliente aceptó y llegaron las piezas, reparas y evidencias.
 </p>
 
 {% if manual_area_usuario == 'tecnico' %}
@@ -16,7 +17,7 @@
 </div>
 {% endif %}
 
-<h2>Checklist de este flujo</h2>
+<h2>Checklist OOW</h2>
 <ol>
     <li>Busca la orden por número o service tag (lista de activas o el buscador del detalle).</li>
     <li>Entra a <strong>Configuración Adicional</strong>.</li>
@@ -26,6 +27,13 @@
     <li>Si el cliente aceptó y ya hay <strong>Piezas Recibidas</strong>: repara el equipo.</li>
     <li>Al terminar, sube fotos tipo <strong>Durante Reparación</strong>. Eso manda el equipo a Control de Calidad. Ver <a href="{% url 'manual:acepta' %}#paso-reparar">reparación</a>.</li>
     <li>Si el cliente rechazó: te llega aviso. El equipo va a calidad para fotos de <em>egreso</em>, no a reparación. Ver <a href="{% url 'manual:rechaza' %}">rechazo</a>.</li>
+</ol>
+
+<h2>Checklist FL</h2>
+<ol>
+    <li>No hay diagnóstico al inicio. Front pone el técnico <strong>Pendiente</strong> al crear la orden desde Almacén.</li>
+    <li>Cuando las piezas están en <strong>Piezas Recibidas</strong>: repara y sube fotos <strong>Durante Reparación</strong> (igual que OOW).</li>
+    <li>Si la cotización se rechazó <em>sin orden</em>, no te llega trabajo de taller: el equipo no ingresó.</li>
 </ol>
 
 <h2>Cómo te llegan los avisos</h2>

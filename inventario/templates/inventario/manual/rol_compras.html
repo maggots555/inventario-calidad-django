@@ -1,12 +1,12 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Compras / Almacén — OOW{% endblock %}
+{% block title %}Compras / Almacén{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Tu área · rol Compras (y Almacenista al recibir)</p>
 <h1>Compras / Almacén</h1>
 <p class="manual-lead">
-    Tú armas la cotización de proveedores, liberas a Front y, si el cliente aceptó,
+    Tú armas o completas la cotización de proveedores, liberas a Front y, si el cliente aceptó,
     generas las compras y confirmas que las piezas llegaron. No mandas el PDF de venta al cliente.
 </p>
 
@@ -16,7 +16,7 @@
 </div>
 {% endif %}
 
-<h2>Checklist de este flujo</h2>
+<h2>Checklist OOW</h2>
 <ol>
     <li>Cuando el diagnóstico ya está enviado, cotiza con proveedores (fuera de SIGMA). Ver <a href="{% url 'manual:proceso' %}#paso-6">paso 6</a>.</li>
     <li>Entra a <a href="{% url 'almacen:crear_solicitud_cotizacion' %}">Almacén → Nueva cotización</a>.</li>
@@ -30,14 +30,25 @@
         </ul>
     </li>
     <li>Eso deja la ficha en el panel «En Front» y la orden en <strong>Se Recibe Cotización de Proveedores</strong>. Arrancan 5 días hábiles.</li>
-    <li>Si Front pide recotización (cotización vencida sin respuesta): actualizas costos y vuelves a <span class="manual-btn-name">Notificar a Front</span>. Ver <a href="{% url 'manual:recotizacion' %}">Recotización</a>.</li>
-    <li>Si Front registró aceptación con piezas <strong>y ya cargó el 50% en la orden</strong>: <span class="manual-btn-name">Generar Compras</span>. Sin ese anticipo el botón queda apagado. Ver <a href="{% url 'manual:acepta' %}#paso-compras">generar compras</a>.</li>
+    <li>Si Front pide recotización: actualizas costos y vuelves a <span class="manual-btn-name">Notificar a Front</span>.</li>
+    <li>Si Front registró aceptación con piezas <strong>y ya cargó el 50% en la orden</strong>: <span class="manual-btn-name">Generar Compras</span>.</li>
     <li>Cuando lleguen: <a href="{% url 'almacen:lista_compras' %}">Ver compras</a> → <span class="manual-btn-name">Recibir</span>.</li>
+</ol>
+
+<h2>Checklist FL (cotización sin orden)</h2>
+<ol>
+    <li>Te llega aviso: Front creó una cotización <strong>sin orden</strong> (proveedor Pendiente, sin costos).</li>
+    <li>No creas otra solicitud: <strong>editas</strong> esa. Completas costo, tiempo, notas y el proveedor real.</li>
+    <li><span class="manual-btn-name">Notificar a Front</span> (Cotización lista o PNC). Arrancan 5 días hábiles igual.</li>
+    <li>Si Front pide recotización: mismos botones; no hay orden que devolver de estado.</li>
+    <li>Si el cliente aceptó, Front debe <span class="manual-btn-name">Crear Orden de Servicio</span> y cargar el 50%. Recién entonces <span class="manual-btn-name">Generar Compras</span>.</li>
+    <li>Recibir piezas: igual que OOW.</li>
 </ol>
 
 <h2>Cómo te llegan los avisos</h2>
 <ul>
-    <li><strong>Cliente aceptó piezas:</strong> push, campana y correo. El botón <span class="manual-btn-name">Generar Compras</span> espera el 50% en la orden.</li>
+    <li><strong>Nueva cotización sin orden (FL):</strong> push, campana y correo al guardar Front. Editas esa ficha; no creas otra.</li>
+    <li><strong>Cliente aceptó piezas:</strong> push, campana y correo. El botón <span class="manual-btn-name">Generar Compras</span> espera el 50% en la orden (en FL, también que Front ya haya creado la orden).</li>
     <li><strong>Recotización:</strong> Front pulsó <span class="manual-btn-name">Solicitar Recotización</span>. Te llega push, campana y correo para volver a cotizar.</li>
     <li><strong>Rechazo total:</strong> también te llega (por si habías apartado material).</li>
     <li><strong>Notificar a Front</strong> no te avisa a ti: tú lo disparas. Front recibe correo, no campana.</li>

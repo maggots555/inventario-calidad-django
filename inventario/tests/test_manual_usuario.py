@@ -1,5 +1,5 @@
 """
-Humo del manual de órdenes con diagnóstico (OOW).
+Humo del manual de operación (flujos OOW y FL).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 Usamos RequestFactory (no Client) para no pasar por PaisMiddleware, igual
@@ -18,6 +18,7 @@ from inventario.models import Empleado
 from inventario.views_manual import (
     VISTAS_MANUAL_HUMOS,
     manual_indice,
+    manual_proceso_fl,
     manual_rol_facturacion,
     manual_rol_front,
     resolver_area_manual,
@@ -55,7 +56,7 @@ def _request(factory, user, path):
 )
 class ManualUsuarioHumoTests(TestCase):
     """
-    Objetivo: el manual OOW es interno (login) y todas las páginas responden.
+    Objetivo: el manual OOW/FL es interno (login) y todas las páginas responden.
 
     Efectos secundarios: crea un User y un Empleado de prueba.
     """
@@ -101,7 +102,7 @@ class ManualUsuarioHumoTests(TestCase):
             response = vista(request)
             self.assertEqual(response.status_code, 200, msg=f'{nombre_url} no respondió 200')
             html = response.content.decode()
-            self.assertIn('OOW · diagnóstico', html)
+            self.assertIn('OOW · FL', html)
             self.assertIn(path, html)
 
     def test_navbar_incluye_enlace_al_manual(self) -> None:
@@ -109,7 +110,7 @@ class ManualUsuarioHumoTests(TestCase):
         request = _request(self.factory, self.usuario, '/')
         html = render_to_string('base.html', {}, request=request)
         self.assertIn(reverse('manual:indice'), html)
-        self.assertIn('title="Manual órdenes con diagnóstico (OOW)"', html)
+        self.assertIn('title="Manual de operación (OOW y FL)"', html)
         self.assertIn('bi-journal-bookmark', html)
         # Ya no vive en el menú de módulos (Inventario, Almacén, Config…)
         self.assertNotIn('class="menu-text">Manual</span>', html)
@@ -126,20 +127,35 @@ class ManualUsuarioHumoTests(TestCase):
         self.assertIn('Tu área', html)
         self.assertIn('rol Recepcionista', html)
 
-    def test_portada_tiene_titulo_oow_diagrama_y_menciona_fl(self) -> None:
-        """La portada se llama OOW, trae el diagrama clicable y deja FL para otro manual."""
+    def test_portada_es_hub_con_ambos_flujos(self) -> None:
+        """La portada ofrece OOW y FL; los caminos se comparten, no hay segundo manual."""
         path = reverse('manual:indice')
         request = _request(self.factory, self.usuario, path)
         response = manual_indice(request)
         html = response.content.decode()
         self.assertEqual(response.status_code, 200)
-        self.assertIn('Manual órdenes con diagnóstico (OOW)', html)
-        self.assertIn('Diagrama de flujo', html)
-        self.assertIn('aria-label="Diagrama de flujo de órdenes con diagnóstico OOW"', html)
-        self.assertIn('¿Qué contestó el cliente?', html)
+        self.assertIn('Manual de operación', html)
+        self.assertIn('Órdenes con diagnóstico (OOW)', html)
         self.assertIn('Venta mostrador (FL)', html)
+        self.assertIn('aria-label="Diagrama de flujo de órdenes con diagnóstico OOW"', html)
+        self.assertIn('aria-label="Diagrama de flujo de venta mostrador FL"', html)
+        self.assertNotIn('irá en su propio manual', html)
+        self.assertIn(reverse('manual:proceso'), html)
+        self.assertIn(reverse('manual:proceso_fl'), html)
         self.assertIn(reverse('manual:acepta'), html)
         self.assertIn(reverse('manual:recotizacion'), html)
+
+    def test_proceso_fl_describe_sin_orden_y_crear_orden(self) -> None:
+        """El capítulo FL nombra Sin orden activa, Pendiente y el rechazo sin ST."""
+        path = reverse('manual:proceso_fl')
+        request = _request(self.factory, self.usuario, path)
+        response = manual_proceso_fl(request)
+        html = response.content.decode()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Sin orden activa', html)
+        self.assertIn('Pendiente', html)
+        self.assertIn('Crear Orden de Servicio', html)
+        self.assertIn('motivo en Almacén', html)
 
     def test_facturacion_ve_chip_tu_area(self) -> None:
         """El rol Facturación tiene capítulo propio y marca «Tu área»."""

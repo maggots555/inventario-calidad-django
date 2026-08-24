@@ -1,5 +1,5 @@
 """
-Vistas del manual de órdenes con diagnóstico (OOW).
+Vistas del manual de operación SIGMA (flujos OOW y FL).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
@@ -42,9 +42,23 @@ MANUAL_PAGINAS = [
     },
     {
         'slug': 'proceso',
-        'titulo': 'Proceso paso a paso',
+        'titulo': 'Proceso OOW (diagnóstico)',
         'grupo': 'proceso',
         'url_name': 'manual:proceso',
+        'area': None,
+    },
+    {
+        'slug': 'proceso_fl',
+        'titulo': 'Proceso FL (venta mostrador)',
+        'grupo': 'proceso',
+        'url_name': 'manual:proceso_fl',
+        'area': None,
+    },
+    {
+        'slug': 'alta_directa_fl',
+        'titulo': 'Alta directa FL',
+        'grupo': 'proceso',
+        'url_name': 'manual:alta_directa_fl',
         'area': None,
     },
     {
@@ -175,7 +189,7 @@ def _contexto_manual(request, slug):
 @login_required
 def manual_indice(request):
     """
-    Objetivo: portada del manual OOW (diagrama de flujo y mapa clicable).
+    Objetivo: portada del manual (elige flujo OOW o FL).
 
     Args:
         request: HttpRequest autenticado.
@@ -203,6 +217,40 @@ def manual_proceso(request):
         request,
         'inventario/manual/proceso.html',
         _contexto_manual(request, 'proceso'),
+    )
+
+
+@login_required
+def manual_proceso_fl(request):
+    """
+    Objetivo: venta mostrador (FL) desde cotización sin orden hasta los caminos.
+
+    Args:
+        request: HttpRequest autenticado.
+
+    Efectos secundarios: ninguno.
+    """
+    return render(
+        request,
+        'inventario/manual/proceso_fl.html',
+        _contexto_manual(request, 'proceso_fl'),
+    )
+
+
+@login_required
+def manual_alta_directa_fl(request):
+    """
+    Objetivo: cuándo usar Nueva Venta Mostrador (cliente en piso, sin cotización previa).
+
+    Args:
+        request: HttpRequest autenticado.
+
+    Efectos secundarios: ninguno.
+    """
+    return render(
+        request,
+        'inventario/manual/alta_directa_fl.html',
+        _contexto_manual(request, 'alta_directa_fl'),
     )
 
 
@@ -380,6 +428,8 @@ def manual_glosario(request):
 VISTAS_MANUAL_HUMOS = (
     ('manual:indice', manual_indice, 'indice'),
     ('manual:proceso', manual_proceso, 'proceso'),
+    ('manual:proceso_fl', manual_proceso_fl, 'proceso_fl'),
+    ('manual:alta_directa_fl', manual_alta_directa_fl, 'alta_directa_fl'),
     ('manual:acepta', manual_acepta, 'acepta'),
     ('manual:rechaza', manual_rechaza, 'rechaza'),
     ('manual:pnc', manual_pnc, 'pnc'),

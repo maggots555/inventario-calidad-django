@@ -1,5 +1,5 @@
 /**
- * Manual órdenes con diagnóstico (OOW)
+ * Manual de operación SIGMA (flujos OOW y FL)
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Este CSS solo se carga en las páginas /manual/. El aspecto es de
@@ -365,6 +365,26 @@
     text-align: right;
 }
 
+.manual-hub {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    margin: 1rem 0 1.75rem;
+}
+
+.manual-card--flujo {
+    border-left: 4px solid var(--manual-stamp);
+    padding: 1.15rem 1rem 1.25rem;
+}
+
+.manual-card--flujo .manual-kicker {
+    margin-bottom: 0.35rem;
+}
+
+.manual-card--flujo h3 {
+    font-size: 1.12rem;
+}
+
 .manual-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -651,5 +671,9 @@
 
     .manual-mapa-meta {
         display: none;
+    }
+
+    .manual-hub {
+        grid-template-columns: 1fr;
     }
 }

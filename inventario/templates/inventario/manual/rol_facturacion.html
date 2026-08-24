@@ -1,14 +1,15 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Facturación — OOW{% endblock %}
+{% block title %}Facturación{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Tu área · rol Facturación</p>
 <h1>Facturación</h1>
 <p class="manual-lead">
-    Cuando Front registra un pago por <strong>transferencia</strong> o <strong>tarjeta</strong>,
-    tú confirmas si ese dinero ya aparece en la cuenta de la empresa.
+    Cuando Front registra un pago por <strong>transferencia</strong> o <strong>tarjeta</strong>
+    (en una orden OOW o FL ya creada), tú confirmas si ese dinero ya aparece en la cuenta de la empresa.
     El efectivo de caja <strong>no</strong> pasa por ti: SIGMA lo da por cobrado al instante.
+    En cotización FL <em>sin orden</em> todavía no hay pagos que validar.
 </p>
 
 {% if manual_area_usuario == 'facturacion' %}

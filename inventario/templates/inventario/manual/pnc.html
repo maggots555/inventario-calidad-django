@@ -1,15 +1,23 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}PNC sin piezas — OOW{% endblock %}
+{% block title %}PNC sin piezas{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Camino 10.3</p>
+<p class="manual-kicker">Camino compartido · OOW y FL</p>
 <h1>PNC: no hay piezas</h1>
 <p class="manual-lead">
     PNC significa <strong>parte no disponible</strong>. No es un solo botón.
     Primero Compras avisa a Front (interno). Después Front avisa al cliente.
-    Solo el segundo aviso pone la orden en estado PNC.
+    Solo el segundo aviso pone la orden en estado PNC <em>si ya hay orden</em>.
 </p>
+
+<div class="manual-callout manual-callout--info">
+    <p>
+        Los dos avisos aplican también en FL <strong>sin orden</strong>: Compras usa la plantilla PNC al
+        notificar a Front; Front avisa al cliente desde la misma solicitud. No hay estado PNC en Servicio Técnico
+        hasta que exista una orden.
+    </p>
+</div>
 
 <article class="manual-paso" id="paso-pnc-front">
     <div class="manual-paso-head">
@@ -62,7 +70,10 @@
         </div>
         <div>
             <dt>Estado de la orden</dt>
-            <dd>Ahora sí cambia a: <strong>PNC - Parte No Disponible</strong>.</dd>
+            <dd>
+                <strong>En OOW:</strong> ahora sí cambia a <strong>PNC - Parte No Disponible</strong>.
+                <strong>En FL sin orden:</strong> la solicitud queda enviada a cliente; no hay estado de orden.
+            </dd>
         </div>
         <div>
             <dt>Quién se entera</dt>
@@ -87,7 +98,8 @@
         A partir de una oferta con precios, el flujo vuelve a ser
         <a href="{% url 'manual:acepta' %}">acepta</a> o
         <a href="{% url 'manual:rechaza' %}">rechaza</a>.
-        Si rechaza, Calidad toma fotos de egreso y Front cierra, igual que en el rechazo simple.
+        Si rechaza y ya hay equipo en el taller, Calidad toma fotos de egreso y Front cierra.
+        Si es FL sin orden, el rechazo se queda en Almacén (histórico), sin egreso.
     </p>
 </article>
 {% endblock %}

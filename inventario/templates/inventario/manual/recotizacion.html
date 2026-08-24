@@ -1,14 +1,15 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Recotización — OOW{% endblock %}
+{% block title %}Recotización{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Camino 10.4 · Sin respuesta del cliente</p>
+<p class="manual-kicker">Camino compartido · sin respuesta del cliente</p>
 <h1>Recotización</h1>
 <p class="manual-lead">
     Si el cliente no contestó en <strong>5 días hábiles</strong>, la cotización vence.
     Front pide a Compras que vuelva a buscar disponibilidad y precios. Después el flujo
     es el de siempre: Notificar a Front y enviar la oferta nueva al cliente.
+    Aplica en OOW y en FL (también <strong>sin orden</strong>).
 </p>
 
 <article class="manual-paso" id="paso-vence">
@@ -66,7 +67,11 @@
         </div>
         <div>
             <dt>Qué cambia</dt>
-            <dd>La solicitud vuelve a <strong>Borrador</strong>. La orden regresa a <strong>Envío de Cotización al Proveedor</strong>.</dd>
+            <dd>
+                La solicitud vuelve a <strong>Borrador</strong>.
+                <strong>En OOW:</strong> la orden regresa a <strong>Envío de Cotización al Proveedor</strong>.
+                <strong>En FL sin orden:</strong> no hay orden que actualizar.
+            </dd>
         </div>
         <div>
             <dt>Quién se entera</dt>

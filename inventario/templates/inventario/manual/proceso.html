@@ -1,13 +1,15 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Proceso paso a paso — OOW{% endblock %}
+{% block title %}Proceso OOW — diagnóstico{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Caso feliz · OOW con piezas</p>
-<h1>Proceso paso a paso</h1>
+<p class="manual-kicker">Flujo OOW · con diagnóstico</p>
+<h1>Órdenes con diagnóstico (OOW)</h1>
 <p class="manual-lead">
     Recorrido lineal hasta que Front manda la cotización al cliente.
-    Ahí el flujo se parte en tres: el cliente acepta, rechaza, o no hay piezas (PNC).
+    El equipo <strong>sí entra</strong> a diagnóstico (folio OOW-).
+    El flujo de Venta mostrador está en
+    <a href="{% url 'manual:proceso_fl' %}">Proceso FL</a>.
     Cada paso indica quién, dónde entrar, qué botón y qué estado queda la orden.
 </p>
 
@@ -302,5 +304,5 @@
 
 {% block manual_pager %}
 <a href="{% url 'manual:indice' %}">← Portada</a>
-<a href="{% url 'manual:acepta' %}">Siguiente: el cliente acepta →</a>
+<a href="{% url 'manual:proceso_fl' %}">Siguiente: proceso FL →</a>
 {% endblock %}

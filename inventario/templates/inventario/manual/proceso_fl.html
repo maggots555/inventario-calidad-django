@@ -1,0 +1,147 @@
+{% extends 'inventario/manual/base_manual.html' %}
+
+{% block title %}Proceso FL — Venta mostrador{% endblock %}
+
+{% block manual_contenido %}
+<p class="manual-kicker">Flujo FL · cotización sin orden</p>
+<h1>Venta mostrador (FL)</h1>
+<p class="manual-lead">
+    El equipo <strong>no entra a diagnóstico</strong>. El cliente pide precio por correo, WhatsApp o redes.
+    Front arma la cotización en Almacén <strong>sin orden de servicio</strong>.
+    El folio FL- nace solo si el cliente acepta.
+    Si el cliente ya está en el piso y no pidió cotización antes, usa el
+    <a href="{% url 'manual:alta_directa_fl' %}">alta directa</a>.
+</p>
+
+<article class="manual-paso" id="paso-datos">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">01</span>
+        <h2>Recibir los datos para cotizar</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Fuera de SIGMA: correo, WhatsApp o redes.</dd>
+        </div>
+        <div>
+            <dt>Qué pides</dt>
+            <dd>
+                Modelo, marca, serie del equipo y el número de pieza a cotizar.
+                Si se puede, una imagen del componente.
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Todavía <strong>no hay orden</strong>.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-solicitud">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">02</span>
+        <h2>Crear la solicitud sin orden</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd><a href="{% url 'almacen:crear_solicitud_cotizacion' %}">Almacén → Nueva cotización</a>.</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Activas el interruptor <strong>Sin orden activa</strong>.
+                Llenas datos del cliente y del equipo. Puedes subir imagen de referencia.
+                Agregas los componentes que el cliente quiere cotizar.
+                <strong>No</strong> registres costo, tiempo de entrega ni notas.
+                En proveedor elige el del catálogo llamado <strong>Pendiente</strong>
+                (es un proveedor de la base, no un botón especial).
+            </dd>
+        </div>
+        <div>
+            <dt>Estado de la orden</dt>
+            <dd>Sigue sin orden. La solicitud queda en <strong>Borrador</strong>.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Compras: push, campana y correo al guardar.</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-compras">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">03</span>
+        <h2>Compras completa costos y avisa</h2>
+        <span class="manual-badge manual-badge--rol">Compras</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>Detalle de esa solicitud (el aviso te lleva directo).</dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Consultas proveedores fuera de SIGMA. Luego <strong>editas</strong> la solicitud:
+                costo, tiempo de respuesta, notas y el proveedor real con el que cotizaste
+                (ya no Pendiente). Pulsas <span class="manual-btn-name">Notificar a Front</span>
+                (plantilla Cotización lista, o PNC si no hay pieza).
+            </dd>
+        </div>
+        <div>
+            <dt>Qué cambia</dt>
+            <dd>La ficha pasa al panel <strong>En Front</strong>. Arrancan 5 días hábiles. No hay estado de orden todavía.</dd>
+        </div>
+        <div>
+            <dt>Quién se entera</dt>
+            <dd>Front por correo (no campana).</dd>
+        </div>
+    </dl>
+</article>
+
+<article class="manual-paso" id="paso-oferta">
+    <div class="manual-paso-head">
+        <span class="manual-paso-num">04</span>
+        <h2>Armar la propuesta y enviarla al cliente</h2>
+        <span class="manual-badge manual-badge--rol">Front</span>
+    </div>
+    <dl class="manual-meta">
+        <div>
+            <dt>Dónde</dt>
+            <dd>
+                <a href="{% url 'almacen:panel_cotizaciones' %}">Panel de cotizaciones</a>,
+                pestaña <strong>En Front</strong>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué haces</dt>
+            <dd>
+                Si hace falta, <span class="manual-btn-name">Agregar Servicio Adicional</span>.
+                Ajustas profit y pulsas <span class="manual-btn-name">Enviar Cotización al Cliente</span>.
+            </dd>
+        </div>
+        <div>
+            <dt>Qué cambia</dt>
+            <dd>La solicitud pasa a Enviada a Cliente. Sigue <strong>sin orden</strong> de Servicio Técnico.</dd>
+        </div>
+    </dl>
+    <p>
+        El cliente <strong>no acepta dentro de SIGMA</strong>. Tú registras palomitas o taches.
+        A partir de aquí los caminos son los mismos que en OOW:
+    </p>
+    <ul>
+        <li><a href="{% url 'manual:acepta' %}">El cliente acepta</a> — en FL, después de las palomitas viene <strong>Crear Orden de Servicio</strong> y recién entonces el 50%</li>
+        <li><a href="{% url 'manual:rechaza' %}">El cliente rechaza</a> — motivo en Almacén; no hay fotos de egreso si el equipo no ingresó</li>
+        <li><a href="{% url 'manual:pnc' %}">No hay piezas (PNC)</a></li>
+        <li><a href="{% url 'manual:recotizacion' %}">No contestó en 5 días hábiles</a></li>
+    </ul>
+</article>
+{% endblock %}
+
+{% block manual_pager %}
+<a href="{% url 'manual:proceso' %}">← Proceso OOW</a>
+<a href="{% url 'manual:alta_directa_fl' %}">Siguiente: alta directa FL →</a>
+{% endblock %}

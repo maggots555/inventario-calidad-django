@@ -1,13 +1,14 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Front / Recepción — OOW{% endblock %}
+{% block title %}Front / Recepción{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Tu área · rol Recepcionista</p>
 <h1>Front / Recepción</h1>
 <p class="manual-lead">
-    Eres el hilo con el cliente: das de alta, mandas papeles, traduces la cotización a una oferta,
-    registras lo que el cliente dijo y cobras el anticipo. No compras las piezas; no diagnosticas el equipo.
+    Eres el hilo con el cliente. En OOW das de alta y mandas el diagnóstico.
+    En FL armas la cotización sin orden (o el alta directa si el cliente ya está en el piso).
+    En ambos flujos registras lo que el cliente dijo y cobras el anticipo. No compras las piezas.
 </p>
 
 {% if manual_area_usuario == 'front' %}
@@ -16,7 +17,7 @@
 </div>
 {% endif %}
 
-<h2>Checklist de este flujo</h2>
+<h2>Checklist OOW</h2>
 <ol>
     <li>Crear u importar la orden → queda <strong>En Espera</strong>. Ver <a href="{% url 'manual:proceso' %}#paso-1">paso 1</a>.</li>
     <li>Completar el formato digital OOW, enviarlo e imprimirlo. Ver <a href="{% url 'manual:proceso' %}#paso-2">paso 2</a>.</li>
@@ -25,13 +26,27 @@
     <li>Agrega servicios con <span class="manual-btn-name">Agregar Servicio Adicional</span>.</li>
     <li>Ajusta profit y pulsa <span class="manual-btn-name">Enviar Cotización al Cliente</span>.</li>
     <li>Si pasaron <strong>5 días hábiles</strong> sin respuesta: <a href="{% url 'manual:recotizacion' %}">solicita recotización</a>. Si el cliente ya contestó, sigue el camino que toque.</li>
-    <li>Registra la respuesta: palomitas, taches y motivos. Tres caminos:
+    <li>Registra la respuesta: palomitas, taches y motivos.
         <a href="{% url 'manual:acepta' %}">acepta</a>,
         <a href="{% url 'manual:rechaza' %}">rechaza</a>,
         <a href="{% url 'manual:pnc' %}">PNC</a>.</li>
-    <li>Si aceptó: cobra el anticipo del <strong>50%</strong> en la orden (sección Cobros y facturación). Sin ese dinero Compras no puede pulsar <span class="manual-btn-name">Generar Compras</span>.</li>
+    <li>Si aceptó: cobra el anticipo del <strong>50%</strong> en la orden. Sin ese dinero Compras no puede pulsar <span class="manual-btn-name">Generar Compras</span>.</li>
     <li>Equipo listo: <span class="manual-btn-name">Notificar equipo disponible</span> y, al recoger, <span class="manual-btn-name">Cerrar Orden</span> + encuesta.</li>
 </ol>
+
+<h2>Checklist FL (cotización sin orden)</h2>
+<ol>
+    <li>Pide modelo, marca, serie y número de pieza (imagen si se puede). Ver <a href="{% url 'manual:proceso_fl' %}#paso-datos">datos</a>.</li>
+    <li>Almacén → Nueva cotización → interruptor <strong>Sin orden activa</strong>. Líneas sin costo ni tiempo. Proveedor del catálogo: <strong>Pendiente</strong>.</li>
+    <li>Espera a Compras. Cuando avisen, pestaña <strong>En Front</strong>: servicios, profit y <span class="manual-btn-name">Enviar Cotización al Cliente</span>.</li>
+    <li>Mismos caminos: acepta, rechaza, PNC o recotización.</li>
+    <li>Si aceptó: palomitas y luego <span class="manual-btn-name">Crear Orden de Servicio</span> (técnico <strong>Pendiente</strong>). Recién entonces el 50% en Cobros y facturación.</li>
+    <li>Si rechazó sin haber creado orden: <span class="manual-btn-name">Registrar motivo rechazo</span> en Almacén. No hay egreso.</li>
+</ol>
+<p>
+    Cliente en el piso sin cotización previa: no uses este checklist, usa
+    <a href="{% url 'manual:alta_directa_fl' %}">Alta directa FL</a> (Nueva Venta Mostrador, estado En Recepción).
+</p>
 
 <h2 id="pagos">Pagos: el anticipo del 50%</h2>
 <p>
@@ -61,9 +76,11 @@
 </dl>
 <div class="manual-callout">
     <p>
-        <strong>Orden real.</strong> 1) Registras palomitas. 2) Compras ya recibe aviso, pero el botón
+        <strong>Orden real (OOW).</strong> 1) Registras palomitas. 2) Compras ya recibe aviso, pero el botón
         del sistema sigue apagado. 3) Tú cargas el 50% en la orden. 4) Compras pulsa
         <span class="manual-btn-name">Generar Compras</span>.
+        <strong>En FL</strong> se inserta un paso 2b: <span class="manual-btn-name">Crear Orden de Servicio</span>
+        antes del 50%.
         Facturación valida transferencias y tarjetas en
         <a href="{% url 'manual:rol_facturacion' %}">Pagos por validar</a>; eso
         <strong>no</strong> retrasa el candado del 50%.
@@ -117,7 +134,7 @@
 
 <h2>Cómo te llegan los avisos</h2>
 <ul>
-    <li><strong>Diagnóstico listo:</strong> busca la orden o entra por el detalle; el técnico no te manda el PDF al cliente, lo mandas tú.</li>
+    <li><strong>Diagnóstico listo (OOW):</strong> busca la orden; el técnico no te manda el PDF al cliente, lo mandas tú.</li>
     <li><strong>Cotización lista:</strong> correo de Compras (no campana). El panel «En Front» es tu bandeja.</li>
     <li><strong>Cotización vencida:</strong> push / campana (aviso diario). Entras al detalle de la solicitud, no a la orden.</li>
     <li><strong>PNC interno:</strong> mismo botón Notificar a Front, otra plantilla. Luego tú avisas al cliente.</li>

@@ -2150,17 +2150,19 @@ def acceso_denegado(request):
 
 
 # =============================================================================
-# Manual órdenes con diagnóstico (OOW) — reexport de fachada
+# Manual de operación (OOW y FL) — reexport de fachada
 # EXPLICACIÓN PARA PRINCIPIANTES: el cerebro vive en views_manual.py para no
 # hinchar este archivo. Celery no aplica aquí; urls_manual importa directo
 # del módulo nuevo. El reexport deja las vistas visibles desde `from . import views`.
 # =============================================================================
 from inventario.views_manual import (  # noqa: E402, F401
     manual_acepta,
+    manual_alta_directa_fl,
     manual_glosario,
     manual_indice,
     manual_pnc,
     manual_proceso,
+    manual_proceso_fl,
     manual_rechaza,
     manual_recotizacion,
     manual_rol_calidad,

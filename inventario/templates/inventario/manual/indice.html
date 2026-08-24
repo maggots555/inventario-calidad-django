@@ -1,14 +1,16 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Portada — Órdenes con diagnóstico (OOW){% endblock %}
+{% block title %}Portada — Manual de operación{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Fuera de garantía · con diagnóstico</p>
-<h1>Manual órdenes con diagnóstico (OOW)</h1>
+<p class="manual-kicker">Dos flujos · misma estructura</p>
+<h1>Manual de operación</h1>
 <p class="manual-lead">
-    Guía de taller para órdenes que <strong>sí pasan por diagnóstico</strong>
-    (folio OOW-): el equipo entra, se diagnostica, se cotiza con piezas y se entrega.
-    Es distinto al flujo de <strong>Venta mostrador (FL)</strong>, que irá en su propio manual.
+    Guía de taller de SIGMA. Elige el flujo según cómo nace el trabajo:
+    <strong>OOW</strong> si el equipo entra a diagnóstico, o
+    <strong>Venta mostrador (FL)</strong> si el cliente pide un servicio o pieza
+    <em>sin</em> ese diagnóstico. Después de cotizar, los caminos (acepta, rechaza, PNC, recotización)
+    son los mismos.
 </p>
 
 <div class="manual-callout manual-callout--info">
@@ -19,9 +21,27 @@
     </p>
 </div>
 
-<h2>Diagrama de flujo</h2>
-<p>Cada caja abre el capítulo. Las cuatro salidas (acepta, rechaza, PNC, recotización) aparecen cuando ya se mandó la cotización al cliente.</p>
+<h2>Elige el flujo</h2>
+<div class="manual-hub">
+    <a class="manual-card manual-card--flujo" href="{% url 'manual:proceso' %}">
+        <p class="manual-kicker">Folio OOW-</p>
+        <h3>Órdenes con diagnóstico (OOW)</h3>
+        <p>El equipo entra al centro, hay formato, fotos de ingreso y Diagnóstico SIC. Compras vincula la orden y cotiza.</p>
+    </a>
+    <a class="manual-card manual-card--flujo" href="{% url 'manual:proceso_fl' %}">
+        <p class="manual-kicker">Folio FL-</p>
+        <h3>Venta mostrador (FL)</h3>
+        <p>El habitual: cotización en Almacén <strong>sin orden</strong>. Si el cliente ya está en el piso y no pidió precio antes, usa Alta directa FL (índice → El proceso).</p>
+    </a>
+</div>
+
+<h2>Diagrama OOW</h2>
+<p>Cada caja abre el capítulo. Las cuatro salidas aparecen cuando ya se mandó la cotización al cliente.</p>
 {% include 'inventario/manual/_diagrama_flujo.html' %}
+
+<h2>Diagrama FL (cotización sin orden)</h2>
+<p>Front arma la solicitud; Compras completa costos; Front manda la oferta. Si el cliente acepta, ahí nace el folio FL-.</p>
+{% include 'inventario/manual/_diagrama_flujo_fl.html' %}
 
 <h2>Cómo se llaman los roles aquí</h2>
 <p>
@@ -32,83 +52,27 @@
     <li><strong>Front</strong> = rol <em>Recepcionista</em></li>
     <li><strong>Calidad / Ingeniería</strong> = rol <em>Inspector</em> (fotos de ingreso y egreso)</li>
     <li><strong>Técnico</strong> = rol <em>Técnico</em></li>
-    <li><strong>Compras/Almacén</strong> = rol <em>Compras/Almacenista</em> (al recibir piezas también puede entrar <em>Almacenista</em>)</li>
+    <li><strong>Compras / Almacén</strong> = rol <em>Compras</em> (al recibir piezas también puede entrar <em>Almacenista</em>)</li>
     <li><strong>Facturación</strong> = rol <em>Facturación</em> (valida transferencias y tarjetas en Pagos por validar)</li>
 </ul>
-
-<h2>Mapa del proceso</h2>
-<p>Cada renglón abre el capítulo donde se explica ese tramo. El estado entre comillas es el de la <strong>orden de servicio</strong>, no el de la cotización de Almacén.</p>
-
-<nav class="manual-mapa" aria-label="Mapa del proceso OOW">
-    <a href="{% url 'manual:proceso' %}#paso-1">
-        <span class="manual-mapa-num">01</span>
-        <span>Recepción registra u importa la orden</span>
-        <span class="manual-mapa-meta">En Espera</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-2">
-        <span class="manual-mapa-num">02</span>
-        <span>Formato digital OOW (PDF, correo e impresión)</span>
-        <span class="manual-mapa-meta">Sigue En Espera</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-3">
-        <span class="manual-mapa-num">03</span>
-        <span>Calidad sube fotos de Ingreso</span>
-        <span class="manual-mapa-meta">En Diagnóstico</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-4">
-        <span class="manual-mapa-num">04</span>
-        <span>Técnico guarda Diagnóstico SIC</span>
-        <span class="manual-mapa-meta">Equipo Diagnosticado</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-5">
-        <span class="manual-mapa-num">05</span>
-        <span>Front envía el diagnóstico al cliente</span>
-        <span class="manual-mapa-meta">Diagnóstico Enviado al Cliente</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-6">
-        <span class="manual-mapa-num">06</span>
-        <span>Compras cotiza con proveedores</span>
-        <span class="manual-mapa-meta">Fuera de SIGMA</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-7">
-        <span class="manual-mapa-num">07</span>
-        <span>Compras crea la solicitud y avisa a Front</span>
-        <span class="manual-mapa-meta">Cotización de proveedores</span>
-    </a>
-    <a href="{% url 'manual:proceso' %}#paso-8">
-        <span class="manual-mapa-num">08</span>
-        <span>Front arma la oferta y la manda al cliente</span>
-        <span class="manual-mapa-meta">Esperando Aprobación</span>
-    </a>
-    <a href="{% url 'manual:acepta' %}">
-        <span class="manual-mapa-num">09</span>
-        <span>Cuatro caminos: acepta, rechaza, PNC o recotización</span>
-        <span class="manual-mapa-meta">Ver capítulos</span>
-    </a>
-    <a href="{% url 'manual:acepta' %}#paso-anticipo">
-        <span class="manual-mapa-num">10</span>
-        <span>Si aceptó: anticipo 50%, validación Facturación, piezas, calidad, entrega</span>
-        <span class="manual-mapa-meta">Entregado</span>
-    </a>
-</nav>
 
 <h2>Entra por tu área</h2>
 <div class="manual-cards">
     <a class="manual-card{% if manual_area_usuario == 'front' %} is-tu-area{% endif %}" href="{% url 'manual:rol_front' %}">
         <h3>Front / Recepción</h3>
-        <p>Alta, formato, cotización al cliente, anticipo 50% y recotización.</p>
+        <p>Alta OOW o cotización FL sin orden, oferta al cliente, anticipo 50% y recotización.</p>
     </a>
     <a class="manual-card{% if manual_area_usuario == 'tecnico' %} is-tu-area{% endif %}" href="{% url 'manual:rol_tecnico' %}">
         <h3>Técnico</h3>
-        <p>Buscar la orden, Diagnóstico SIC, IA, fotos de reparación.</p>
+        <p>En OOW: Diagnóstico SIC. En FL: reparación cuando llegan las piezas.</p>
     </a>
     <a class="manual-card{% if manual_area_usuario == 'calidad' %} is-tu-area{% endif %}" href="{% url 'manual:rol_calidad' %}">
         <h3>Calidad / Ingeniería</h3>
-        <p>Fotos de ingreso y egreso: ellas cambian el estado solas.</p>
+        <p>Fotos de ingreso (OOW) y egreso (ambos flujos cuando el equipo sale).</p>
     </a>
     <a class="manual-card{% if manual_area_usuario == 'compras' %} is-tu-area{% endif %}" href="{% url 'manual:rol_compras' %}">
         <h3>Compras / Almacén</h3>
-        <p>Solicitud de cotización, notificar a Front, esperar el 50%, generar compras, recibir.</p>
+        <p>En OOW vinculas la orden. En FL editas la solicitud que Front dejó con proveedor Pendiente.</p>
     </a>
     <a class="manual-card{% if manual_area_usuario == 'facturacion' %} is-tu-area{% endif %}" href="{% url 'manual:rol_facturacion' %}">
         <h3>Facturación</h3>
@@ -117,11 +81,9 @@
 </div>
 
 <h2>Qué no cubre este manual</h2>
-<p>Estas fichas vendrán en otros manuales o más adelante:</p>
+<p>Estas fichas vendrán más adelante:</p>
 <ul class="manual-fuera">
-    <li><strong>Venta mostrador (FL)</strong> — otro flujo, sin este diagnóstico; tendrá su propio manual</li>
     <li>Garantía Dell (formato distinto; interviene Dispatcher)</li>
-    <li>Cotización sin orden de servicio / crear orden FL desde Almacén</li>
     <li>WPB / DOA (pieza incorrecta o dañada)</li>
     <li>Envío a RHITSO</li>
     <li>Lo que ve el cliente en el portal de seguimiento</li>
@@ -131,5 +93,5 @@
 
 {% block manual_pager %}
 <span></span>
-<a href="{% url 'manual:proceso' %}">Siguiente: proceso paso a paso →</a>
+<a href="{% url 'manual:proceso' %}">Siguiente: proceso OOW →</a>
 {% endblock %}

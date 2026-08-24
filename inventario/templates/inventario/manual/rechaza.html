@@ -1,14 +1,23 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}El cliente rechaza — OOW{% endblock %}
+{% block title %}El cliente rechaza{% endblock %}
 
 {% block manual_contenido %}
-<p class="manual-kicker">Camino 10.2</p>
+<p class="manual-kicker">Camino compartido · OOW y FL</p>
 <h1>El cliente rechaza</h1>
 <p class="manual-lead">
     Rechazo total: el cliente no quiere ninguna pieza ni servicio de la propuesta.
-    El equipo no se repara; igual hay que documentar el egreso y cerrar la orden.
 </p>
+
+<div class="manual-callout manual-callout--info">
+    <p>
+        <strong>En OOW</strong> (ya hay orden): tipificas el rechazo, SIGMA pide
+        <span class="manual-btn-name">Registrar motivo ST</span>, y Calidad documenta el egreso del equipo.
+        <strong>En FL sin orden:</strong> no hay Servicio Técnico todavía. Front pulsa
+        <span class="manual-btn-name">Registrar motivo rechazo</span> en Almacén.
+        El registro queda para el histórico. <strong>No</strong> hay fotos de egreso porque el equipo no ingresó.
+    </p>
+</div>
 
 <article class="manual-paso" id="paso-rechazo">
     <div class="manual-paso-head">
@@ -28,7 +37,11 @@
         </div>
         <div>
             <dt>Estado de la orden</dt>
-            <dd><strong>Cotización Rechazada</strong>. La solicitud queda <em>totalmente rechazada</em>.</dd>
+            <dd>
+                <strong>En OOW:</strong> <strong>Cotización Rechazada</strong>.
+                <strong>En FL sin orden:</strong> no hay estado de orden; la solicitud queda
+                <em>totalmente rechazada</em>.
+            </dd>
         </div>
         <div>
             <dt>Quién se entera</dt>
@@ -36,9 +49,11 @@
         </div>
     </dl>
     <p>
-        Si la orden está vinculada, SIGMA pide <strong>Registrar motivo ST</strong> (el motivo que
-        queda en Servicio Técnico). No lo saltes: después se usa en reportes de rechazo.
+        <strong>En OOW</strong> (orden vinculada), SIGMA pide <strong>Registrar motivo ST</strong>
+        (el motivo que queda en Servicio Técnico). No lo saltes: después se usa en reportes de rechazo.
         En algunos motivos el cliente también recibe una mini-encuesta de por qué no aceptó.
+        <strong>En FL sin orden</strong> el botón es <span class="manual-btn-name">Registrar motivo rechazo</span>
+        en Acciones de la solicitud: el histórico vive en Almacén, no en ST.
     </p>
     <div class="manual-callout manual-callout--info">
         <p>
@@ -51,7 +66,7 @@
 <article class="manual-paso" id="paso-egreso-rechazo">
     <div class="manual-paso-head">
         <span class="manual-paso-num">2</span>
-        <h2>Fotos de egreso y cierre</h2>
+        <h2>Fotos de egreso y cierre (solo si ya hay orden)</h2>
         <span class="manual-badge manual-badge--rol">Técnico / Calidad / Front</span>
         <span class="manual-badge manual-badge--estado">Entregado al Cliente</span>
     </div>
@@ -74,8 +89,9 @@
         </div>
     </dl>
     <p>
-        No generes compras. No pases a reparación. El rechazo ya cerró el ciclo comercial;
-        lo que queda es devolver el equipo en el mismo estado estético documentado.
+        Este paso aplica en OOW y en FL <em>si el equipo ya ingresó</em> (alta directa o orden ya creada).
+        En cotización FL rechazada <strong>sin orden</strong>, no hay galería ni Cerrar Orden: el ciclo terminó en Almacén.
+        No generes compras. No pases a reparación.
     </p>
 </article>
 {% endblock %}

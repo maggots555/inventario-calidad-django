@@ -1,6 +1,6 @@
 {% extends 'inventario/manual/base_manual.html' %}
 
-{% block title %}Glosario — OOW{% endblock %}
+{% block title %}Glosario{% endblock %}
 
 {% block manual_contenido %}
 <p class="manual-kicker">Referencia rápida</p>
@@ -23,6 +23,14 @@
         <tr>
             <td>En Espera</td>
             <td>Al crear u importar la orden OOW.</td>
+        </tr>
+        <tr>
+            <td>En Recepción</td>
+            <td>Alta directa de Venta mostrador (Nueva Venta Mostrador).</td>
+        </tr>
+        <tr>
+            <td>Proveniente de Almacén</td>
+            <td>Front pulsó Crear Orden de Servicio desde una cotización FL sin orden.</td>
         </tr>
         <tr>
             <td>En Diagnóstico</td>
@@ -133,8 +141,12 @@
 
 <h2>Siglas y palabras del piso</h2>
 <ul>
-    <li><strong>OOW</strong> — Fuera de garantía (out of warranty). Folio típico OOW-. Este manual cubre esas órdenes: <em>sí hay diagnóstico</em>.</li>
-    <li><strong>FL / Venta mostrador</strong> — Otro flujo (folio FL-), sin este diagnóstico. Irá en un manual aparte; no lo busques aquí.</li>
+    <li><strong>OOW</strong> — Fuera de garantía (out of warranty). Folio típico OOW-. <em>Sí hay diagnóstico</em>.</li>
+    <li><strong>FL / Venta mostrador</strong> — Folio FL-. Sin diagnóstico formal. Lo habitual es cotizar en Almacén <strong>sin orden</strong>; el folio nace si el cliente acepta.</li>
+    <li><strong>Sin orden activa</strong> — Interruptor al crear la cotización en Almacén: todavía no hay orden de Servicio Técnico.</li>
+    <li><strong>Proveedor Pendiente</strong> — Nombre en el <em>catálogo de proveedores</em>. Front lo elige al armar la solicitud FL; Compras lo cambia al proveedor real.</li>
+    <li><strong>Técnico Pendiente</strong> — Nombre en el <em>catálogo de empleados</em>. Front lo elige en el modal Crear Orden de Servicio.</li>
+    <li><strong>Crear Orden de Servicio</strong> — Botón en Acciones de la solicitud FL. Abre el modal (folio FL- + técnico) y vincula la cotización a la orden nueva.</li>
     <li><strong>SICSER</strong> — Sistema externo de registro. SIGMA solo consulta e importa; no escribe allá.</li>
     <li><strong>Diagnóstico SIC</strong> — El texto técnico que el técnico escribe en Configuración Adicional.</li>
     <li><strong>PNC</strong> — Parte no disponible. Son <em>dos</em> avisos: uno interno a Front y otro al cliente.</li>

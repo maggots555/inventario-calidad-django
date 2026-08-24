@@ -1,0 +1,45 @@
+<!--
+  Diagrama de flujo FL (venta mostrador, cotización sin orden).
+  EXPLICACIÓN PARA PRINCIPIANTES: HTML + CSS, cada caja es un enlace.
+  El folio FL- nace solo si el cliente acepta (Crear Orden de Servicio).
+ -->
+<figure class="flujo" aria-label="Diagrama de flujo de venta mostrador FL">
+    <figcaption class="flujo-caption">Cotización sin orden. Cada caja abre el capítulo.</figcaption>
+
+    <ol class="flujo-columna">
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-datos">Datos del cliente<small>modelo, marca, serie, pieza</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-solicitud">Nueva cotización sin orden<small>proveedor Pendiente</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-compras">Compras completa costos<small>editar y notificar a Front</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-oferta">Front arma y envía la oferta<small>servicios + profit</small></a></li>
+    </ol>
+
+    <p class="flujo-pregunta">¿Qué contestó el cliente?</p>
+
+    <div class="flujo-ramas">
+        <a class="flujo-nodo flujo-nodo--ok" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">
+            Acepta
+            <small>Crear Orden de Servicio</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--no" href="{% url 'manual:rechaza' %}">
+            Rechaza
+            <small>Motivo en Almacén (sin ST)</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--pnc" href="{% url 'manual:pnc' %}">
+            PNC
+            <small>Sin piezas (dos avisos)</small>
+        </a>
+        <a class="flujo-nodo flujo-nodo--vence" href="{% url 'manual:recotizacion' %}">
+            No contestó
+            <small>Recotización a Compras</small>
+        </a>
+    </div>
+
+    <p class="flujo-cierre-nota">Si aceptó, Front crea el folio FL- y recién entonces registra el 50%. El taller sigue igual que en OOW.</p>
+
+    <ol class="flujo-columna flujo-columna--cierre">
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">Crear Orden de Servicio<small>técnico Pendiente · Proveniente de Almacén</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">Anticipo 50%<small>candado de Compras</small></a></li>
+        <li><a class="flujo-nodo flujo-nodo--facturacion" href="{% url 'manual:rol_facturacion' %}">Validar pagos<small>Facturación · transferencia/tarjeta</small></a></li>
+        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-compras">Generar compras → reparación<small>egreso y entrega</small></a></li>
+    </ol>
+</figure>
