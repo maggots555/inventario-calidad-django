@@ -3994,9 +3994,9 @@ class SolicitudCotizacion(models.Model):
                     notif_err,
                 )
 
-        # EXPLICACIÓN: las piezas ya están en ST al aprobar. Los servicios
-        # adicionales también deben copiarse a Venta Mostrador AHORA, para
-        # que Front vea el total (y el 50%) antes de Generar Compras.
+        # EXPLICACIÓN: piezas OOW van a PiezaCotizada al aprobar. FL/reac y
+        # servicios se copian a Venta Mostrador AHORA, para que Front vea el
+        # total (y el 50%) antes de Generar Compras.
         # Va DESPUÉS de notificar para no cambiar a «completada» (solo
         # servicios) antes del correo/push de aceptación.
         if self.estado in ('totalmente_aprobada', 'parcialmente_aprobada'):
@@ -4284,10 +4284,11 @@ class SolicitudCotizacion(models.Model):
 
         Diseño anti-duplicados:
         - Solo procesa líneas con estado_cliente='aprobada'.
-        - generar_compras() las marca 'compra_generada' después; este método debe
-          llamarse ANTES de generar_compras() en la vista.
-        - Si la línea ya tiene PiezaVentaMostrador (OneToOne linea_cotizacion),
-          se omite (idempotente).
+        - Lo llama materializar_servicios_aprobados_en_st() al aceptar o
+          vincular (para el cobro del 50%). generar_compras() las marca
+          'compra_generada' después; si se llama otra vez, el OneToOne
+          línea ↔ PiezaVentaMostrador evita duplicados.
+        - La vista de Generar Compras lo deja como red de seguridad.
 
         Trazabilidad (Ago 2026):
         Cada PiezaVentaMostrador guarda ``linea_cotizacion`` para que el sync
@@ -4299,7 +4300,7 @@ class SolicitudCotizacion(models.Model):
         if not self.orden_servicio:
             return 0
 
-        from decimal import Decimal
+        from decimal import ROUND_HALF_UP, Decimal
         from servicio_tecnico.models import VentaMostrador, PiezaVentaMostrador
         from almacen.utils.resolver_componente import resolver_componente_desde_producto
 
@@ -4358,11 +4359,15 @@ class SolicitudCotizacion(models.Model):
                     f"{linea.notas[:400] if linea.notas else ''}"
                 ).strip()
             else:
-                # FL- piezas normales: precio cotizado al cliente (fallback costo proveedor)
-                precio_venta = (
+                # FL: precio al cliente CON IVA. El recuadro de pagos usa
+                # venta.total_venta tal cual (no le suma otro 16%).
+                base_sin_iva = (
                     linea.precio_unitario_cliente
                     if linea.precio_unitario_cliente is not None
                     else (linea.costo_unitario or Decimal('0.00'))
+                )
+                precio_venta = (base_sin_iva * IVA_FACTOR).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP
                 )
                 notas_pieza = (
                     f"Generada desde cotización {self.numero_solicitud}. "

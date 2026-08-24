@@ -16,12 +16,12 @@ También se verifica anti-duplicado de PiezaVentaMostrador y regresión OOW
 """
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.test import TestCase
 from django.urls import reverse
 
-from almacen.models import CompraProducto
+from almacen.models import CompraProducto, LineaServicioAdicional
 from almacen.tests.helpers_integracion_cotizacion import (
     BaseIntegracionCotizacionMixin,
     request_post,
@@ -32,7 +32,9 @@ from servicio_tecnico.models import (
     Cotizacion,
     PiezaVentaMostrador,
     SeguimientoPieza,
+    VentaMostrador,
 )
+from servicio_tecnico.services.pagos_orden import calcular_resumen_cobro
 
 
 class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
@@ -57,6 +59,38 @@ class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
             tiene_acceso_sistema=False,
             contraseña_configurada=False,
         )
+
+    def _crear_orden_fl(self, solicitud, numero_fl: str):
+        """
+        POST crear_orden_fl_desde_cotizacion y devuelve la orden vinculada.
+
+        Args:
+            solicitud: SolicitudCotizacion sin orden (modo sin_orden_activa).
+            numero_fl: Folio FL- visible para el cliente.
+
+        Returns:
+            OrdenServicio recién creada y vinculada.
+        """
+        url_fl = reverse(
+            'almacen:crear_orden_fl_desde_cotizacion',
+            kwargs={'pk': solicitud.pk},
+        )
+        resp_fl = crear_orden_fl_desde_cotizacion(
+            request_post(
+                self.factory,
+                self.user,
+                url_fl,
+                {
+                    'tecnico_id': str(self.tecnico.pk),
+                    'numero_fl': numero_fl,
+                },
+            ),
+            solicitud.pk,
+        )
+        self.assertEqual(resp_fl.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNotNone(solicitud.orden_servicio)
+        return solicitud.orden_servicio
 
     def test_fl_generar_compras_crea_seguimiento_y_recibir_cierra(self) -> None:
         """
@@ -86,27 +120,7 @@ class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
         ).exists())
 
         # Paso 2: crear orden FL vía vista HTTP
-        url_fl = reverse(
-            'almacen:crear_orden_fl_desde_cotizacion',
-            kwargs={'pk': solicitud.pk},
-        )
-        resp_fl = crear_orden_fl_desde_cotizacion(
-            request_post(
-                self.factory,
-                self.user,
-                url_fl,
-                {
-                    'tecnico_id': str(self.tecnico.pk),
-                    'numero_fl': 'FL-2099-0001',
-                },
-            ),
-            solicitud.pk,
-        )
-        self.assertEqual(resp_fl.status_code, 302)
-
-        solicitud.refresh_from_db()
-        orden = solicitud.orden_servicio
-        self.assertIsNotNone(orden)
+        orden = self._crear_orden_fl(solicitud, 'FL-2099-0001')
         self.assertEqual(orden.tipo_servicio, 'venta_mostrador')
         self.assertEqual(orden.estado, 'almacen')
         # FL no debe crear Cotizacion ST
@@ -167,6 +181,85 @@ class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertEqual(resultado.get('seguimientos_actualizados'), 1)
         self.assertTrue(resultado.get('estado_orden_actualizado'))
 
+    def test_fl_al_aceptar_pieza_y_servicio_entran_al_cobro_sin_compra(self) -> None:
+        """
+        Al vincular la FL, pieza y servicio ya están en Venta Mostrador
+        (cobro = PDF). Aún no existe CompraProducto.
+        """
+        solicitud, linea = self._crear_solicitud_con_linea(
+            orden=None,
+            sin_orden_activa=True,
+            estado='enviada_cliente',
+            estado_linea='pendiente',
+        )
+        solicitud.nombre_cliente = 'Cliente FL Cobro'
+        solicitud.email_cliente = 'cliente.flcobro@test.local'
+        solicitud.service_tag = 'SN-FL-COBRO-01'
+        solicitud.tipo_equipo = 'Laptop'
+        solicitud.marca = 'DELL'
+        solicitud.modelo = 'Latitude'
+        solicitud.save()
+        LineaServicioAdicional.objects.create(
+            solicitud=solicitud,
+            tipo_servicio='limpieza',
+            costo=Decimal('450.00'),
+            estado_cliente='pendiente',
+        )
+
+        self.assertTrue(linea.aprobar())
+        servicio = solicitud.servicios_adicionales.get(tipo_servicio='limpieza')
+        self.assertTrue(servicio.aprobar())
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'totalmente_aprobada')
+        self.assertEqual(CompraProducto.objects.count(), 0)
+
+        orden = self._crear_orden_fl(solicitud, 'FL-2099-0100')
+        linea.refresh_from_db()
+        servicio.refresh_from_db()
+
+        # Pieza y servicio ya en ST; Compras aún no pidió al proveedor.
+        self.assertEqual(CompraProducto.objects.count(), 0)
+        self.assertEqual(linea.estado_cliente, 'aprobada')
+        self.assertIsNone(linea.compra_generada_id)
+        pieza_vm = PiezaVentaMostrador.objects.get(linea_cotizacion=linea)
+        self.assertEqual(pieza_vm.venta_mostrador.orden_id, orden.pk)
+        venta = VentaMostrador.objects.get(orden=orden)
+        self.assertTrue(venta.incluye_limpieza)
+        self.assertEqual(venta.costo_limpieza, Decimal('450.00'))
+
+        linea.refresh_from_db()
+        precio_sin_iva = linea.precio_unitario_cliente * linea.cantidad
+        precio_con_iva = (precio_sin_iva * Decimal('1.16')).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP
+        )
+        self.assertEqual(pieza_vm.precio_unitario, precio_con_iva)
+
+        resumen = calcular_resumen_cobro(orden, codigo_pais='MX')
+        total_esperado = solicitud.total_aprobado_con_iva
+        self.assertEqual(resumen.total_venta_mostrador, total_esperado)
+        self.assertEqual(resumen.total_a_cobrar, total_esperado)
+        self.assertEqual(resumen.total_a_cobrar, precio_con_iva + Decimal('450.00'))
+        self.assertFalse(resumen.cubre_anticipo_50)
+
+        # Generar Compras no duplica la pieza; sí nace CompraProducto.
+        self._registrar_anticipo_50(orden)
+        url_compras = reverse(
+            'almacen:generar_compras_solicitud',
+            kwargs={'pk': solicitud.pk},
+        )
+        resp_compras = generar_compras_solicitud(
+            request_post(self.factory, self.user, url_compras, {}),
+            solicitud.pk,
+        )
+        self.assertEqual(resp_compras.status_code, 302)
+        self.assertEqual(
+            PiezaVentaMostrador.objects.filter(linea_cotizacion=linea).count(),
+            1,
+        )
+        linea.refresh_from_db()
+        self.assertIsNotNone(linea.compra_generada_id)
+        self.assertEqual(CompraProducto.objects.count(), 1)
+
     def test_generar_piezas_vm_idempotente_por_linea(self) -> None:
         """
         Segunda llamada a generar_piezas_venta_mostrador no duplica Pieza VM.
@@ -204,9 +297,14 @@ class SeguimientoPiezasFlTest(BaseIntegracionCotizacionMixin, TestCase):
         solicitud.vincular_orden(orden)
         VentaMostrador.objects.get_or_create(orden=orden)
 
+        # Al vincular una solicitud ya aceptada, la pieza ya se copió.
+        self.assertEqual(
+            PiezaVentaMostrador.objects.filter(linea_cotizacion=linea).count(),
+            1,
+        )
         n1 = solicitud.generar_piezas_venta_mostrador()
         n2 = solicitud.generar_piezas_venta_mostrador()
-        self.assertEqual(n1, 1)
+        self.assertEqual(n1, 0)
         self.assertEqual(n2, 0)
         self.assertEqual(
             PiezaVentaMostrador.objects.filter(linea_cotizacion=linea).count(),

@@ -1,12 +1,15 @@
 """
-Copia servicios adicionales aceptados a Venta Mostrador en Servicio Técnico.
+Copia a Venta Mostrador lo aceptado que el cobro necesita ver ya.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-Las piezas de reparación se sincronizan a ST en cuanto el cliente las acepta
-(PiezaCotizada). Los servicios (limpieza, respaldo, paquetes) deben hacer lo
-mismo: al CERRAR la respuesta del cliente (todas las líneas con sí/no) se
-copian a VentaMostrador para que Front cobre el 50% correcto.
+Las piezas de reparación OOW van a PiezaCotizada al aceptar. En FL (y en
+reacondicionado) las piezas van a PiezaVentaMostrador. Los servicios
+(limpieza, paquetes) también viven en Venta Mostrador.
+
+Al CERRAR la respuesta del cliente se copian piezas FL/reac Y servicios,
+para que Front cobre el 50% con el mismo total del PDF, sin esperar a
+que Compras pida las piezas al proveedor.
 
 Este módulo es la ÚNICA puerta de ese traslado. Lo llaman:
 
@@ -51,10 +54,10 @@ def materializar_servicios_aprobados_en_st(
     solicitud: 'SolicitudCotizacion',
 ) -> Optional['VentaMostrador']:
     """
-    Traslada servicios adicionales aprobados a VentaMostrador en la orden ST.
+    Traslada a ST lo aceptado que entra al cobro vía Venta Mostrador.
 
     Objetivo de negocio:
-        Que Front vea el costo de limpieza/paquetes en el recuadro de pagos
+        Que Front vea piezas FL/reac y servicios en el recuadro de pagos
         (y el 50%) en cuanto confirma lo que aceptó el cliente, sin esperar
         a que Compras pida las piezas al proveedor.
 
@@ -62,10 +65,12 @@ def materializar_servicios_aprobados_en_st(
         solicitud: SolicitudCotizacion. Puede no tener orden aún.
 
     Returns:
-        VentaMostrador creado/actualizado, o None si no había nada que copiar
-        (sin orden, sin servicios aprobados, o ya estaban en ST).
+        VentaMostrador creado/actualizado por los servicios, o None si no
+        había servicios que copiar (sin orden, sin servicios, o ya en ST).
+        Las piezas FL/reac igual se copian aunque no haya servicios.
 
     Efectos secundarios:
+        - Crea PiezaVentaMostrador para líneas FL/reac aprobadas (idempotente).
         - Crea/actualiza VentaMostrador y marca servicios como compra_generada.
         - Si no hay piezas pendientes de compra Y ya está el anticipo del 50%:
           pasa a completada y la orden ST a «En reparación».
@@ -81,7 +86,7 @@ def materializar_servicios_aprobados_en_st(
     if not solicitud.orden_servicio_id:
         logger.info(
             '[SYNC-SERVICIOS-ST] Solicitud %s aprobada sin orden; '
-            'VentaMostrador se creará al vincular.',
+            'VentaMostrador y piezas FL se crearán al vincular.',
             solicitud.numero_solicitud,
         )
         return None
@@ -92,6 +97,15 @@ def materializar_servicios_aprobados_en_st(
         # Paso: misma conexión que la solicitud (multi-país). Si copia o
         # cierre fallan, no queda medio servicio marcado compra_generada.
         with transaction.atomic(using=db_alias):
+            # FL/reac: la pieza debe verse en el cobro YA (igual que el servicio).
+            n_piezas = solicitud.generar_piezas_venta_mostrador()
+            if n_piezas:
+                logger.info(
+                    '[SYNC-SERVICIOS-ST] Solicitud %s: %s pieza(s) FL/reac '
+                    'copiada(s) a Venta Mostrador.',
+                    solicitud.numero_solicitud,
+                    n_piezas,
+                )
             venta = solicitud.generar_venta_mostrador()
             _completar_solicitud_si_solo_servicios(solicitud, venta)
     except Exception:

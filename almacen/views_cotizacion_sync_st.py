@@ -130,8 +130,9 @@ def generar_compras_solicitud(request, pk):
         mensajes_exito = []
 
         # ====== Piezas en Venta Mostrador (FL- o equipos reacondicionados en OOW) ======
-        # Se llama ANTES de generar_compras() porque generar_compras() pasa las líneas
-        # a estado 'compra_generada' y este método filtra por estado='aprobada'.
+        # Red de seguridad: al aceptar/vincular ya se copiaron. Si faltaron
+        # (solicitud vieja), se crean ahora. ANTES de generar_compras() porque
+        # ese método pasa las líneas a 'compra_generada' y este filtra 'aprobada'.
         necesita_piezas_vm = (
             puede_generar_compras
             and solicitud.orden_servicio
@@ -495,12 +496,10 @@ def crear_orden_fl_desde_cotizacion(request, pk):
         #   - self.save() → crea Cotizacion en ST vía _sincronizar_cotizacion_st()
         solicitud.vincular_orden(orden)
 
-        # ====== PASO 4: Crear VentaMostrador vacío para la nueva orden ======
-        # Para órdenes FL- (Venta Mostrador / Servicio Directo), NO se sincronizan
-        # las líneas a PiezaCotizada (flujo de diagnóstico). En su lugar se crea el
-        # VentaMostrador vacío ahora para que exista el objeto receptor; las piezas
-        # individuales se crearán como PiezaVentaMostrador cuando el usuario pulse
-        # "Generar Compras" en el detalle de la cotización.
+        # ====== PASO 4: Asegurar VentaMostrador en la nueva orden ======
+        # FL no usa PiezaCotizada. vincular_orden() ya copió piezas/servicios
+        # aceptados a Venta Mostrador (para el cobro del 50%). Este get_or_create
+        # cubre el caso en que aún no había nada aceptado.
         from servicio_tecnico.models import VentaMostrador as VentaMostradorModel
         VentaMostradorModel.objects.get_or_create(
             orden=orden,
@@ -511,7 +510,8 @@ def crear_orden_fl_desde_cotizacion(request, pk):
         mensaje = (
             f'Orden {numero_fl} creada exitosamente y vinculada a la solicitud. '
             f'Orden interna: {orden.numero_orden_interno}. '
-            f'Las piezas aprobadas se registrarán en Venta Mostrador al generar compras.'
+            f'Las piezas y servicios ya aceptados quedan en Venta Mostrador '
+            f'para cobrar el 50%; Generar Compras pide las piezas al proveedor.'
         )
 
         messages.success(request, mensaje)
