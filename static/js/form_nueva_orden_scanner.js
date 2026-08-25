@@ -24,7 +24,7 @@ function inicializarScannerFormNuevaOrden() {
     enlazar('btnEscanearCargadorCrear', 'id_numero_serie_cargador', 'Escanear número de serie del cargador', {
         id: 'id_tiene_cargador',
         mensaje: 'Marca la casilla "¿Incluye cargador?" para poder escanear el número.',
-    });
+    }, 'barras');
 }
 document.addEventListener('DOMContentLoaded', () => {
     inicializarScannerFormNuevaOrden();

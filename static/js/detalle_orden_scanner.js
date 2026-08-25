@@ -23,7 +23,7 @@ function inicializarScannerModalEditarEquipo() {
     enlazar('btnEscanearCargadorModal', 'id_numero_serie_cargador_modal', 'Escanear número de serie del cargador', {
         id: 'id_tiene_cargador_modal',
         mensaje: 'Marca la casilla "Tiene cargador" para poder escanear el número.',
-    });
+    }, 'barras');
 }
 document.addEventListener('DOMContentLoaded', () => {
     inicializarScannerModalEditarEquipo();

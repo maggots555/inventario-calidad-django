@@ -279,6 +279,19 @@
     border-color: #22d3ee;
 }
 
+/* Marco horizontal — barras 1D (Code 128 en cargadores HP/Dell) */
+.scanner-frame--barras {
+    width: min(92vw, 380px);
+    height: min(22vw, 100px);
+    max-width: 400px;
+    max-height: 110px;
+    border-radius: var(--border-radius-lg);
+}
+
+[data-bs-theme="dark"] .scanner-frame--barras {
+    border-color: #60a5fa;
+}
+
 /* Botón cámara inline (input-group) — detalle_orden, OOW, Garantía */
 .btn-scanner-codigo-inline {
     min-width: 44px;

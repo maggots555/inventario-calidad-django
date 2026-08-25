@@ -35,6 +35,7 @@ function inicializarScannerFormNuevaOrden(): void {
       id: 'id_tiene_cargador',
       mensaje: 'Marca la casilla "¿Incluye cargador?" para poder escanear el número.',
     },
+    'barras',
   );
 }
 

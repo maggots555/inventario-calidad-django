@@ -5,11 +5,15 @@ declare const Chart: any;
 // junto con el resto del proyecto — no se re-declara aquí para evitar TS2300.
 // globals.d.ts solo declara las extensiones de Window.
 
+/** Modo visual del scanner: cuadrado (2D) o barras (1D). */
+type ModoScanner = 'cuadrado' | 'barras';
+
 /** Opciones del scanner QR/barras (static/ts/scanner_codigo.ts). */
 interface AbrirScannerCodigoOpciones {
     targetInput: HTMLInputElement;
     onDetect?: (codigo: string) => void;
     tituloModal?: string;
+    modoInicial?: ModoScanner;
 }
 
 /** Condición opcional para enlazarScannerBoton (static/ts/scanner_enlace.ts). */
@@ -28,6 +32,7 @@ interface Window {
         inputId: string,
         tituloModal: string,
         requiereCheckbox?: RequiereCheckboxScanner,
+        modoInicial?: ModoScanner,
     ) => void;
     /**
      * Token CSRF (cookie sigma_csrftoken / csrftoken o input del form).

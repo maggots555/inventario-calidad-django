@@ -34,6 +34,7 @@ function inicializarScannerModalEditarEquipo(): void {
       id: 'id_tiene_cargador_modal',
       mensaje: 'Marca la casilla "Tiene cargador" para poder escanear el número.',
     },
+    'barras',
   );
 }
 

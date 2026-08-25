@@ -26,6 +26,8 @@ interface AbrirScannerCodigoOpciones {
   onDetect?: (codigo: string) => void;
   /** Título del modal (por defecto genérico) */
   tituloModal?: string;
+  /** Marco inicial: cuadrado (QR/Data Matrix) o barras (Code 128) */
+  modoInicial?: ModoScanner;
 }
 
 /** Estado interno de una sesión de escaneo (cámara + timers). */
@@ -47,6 +49,8 @@ interface SesionScannerCodigo {
   modalInstancia: BootstrapModalApi | null;
   opciones: AbrirScannerCodigoOpciones | null;
   videoTrack: MediaStreamTrack | null;
+  /** Modo activo: recorte cuadrado (2D) o horizontal (barras 1D) */
+  modo: ModoScanner;
 }
 
 /** Resultado de lectura de zxing-wasm */
@@ -105,6 +109,10 @@ const MODAL_ID = 'scannerCodigoUniversalModal';
 const VIDEO_HOST_ID = 'scannerCodigoVideoHost';
 const STATUS_ID = 'scannerCodigoStatus';
 const TIPS_ID = 'scannerCodigoTips';
+const MODO_TOGGLE_ID = 'scannerModoToggle';
+const FRAME_ID = 'scannerCodigoFrame';
+const CONSEJO_ID = 'scannerCodigoConsejo';
+const STORAGE_MODO_KEY = 'sigma_scanner_modo';
 
 /** Segundos sin detección antes del primer aviso de ayuda */
 const SEGUNDOS_ANTES_TIP = 5;
@@ -126,6 +134,10 @@ const MAX_LADO_ANALISIS_PX = 640;
 const FACTOR_ZOOM_RECORTE = 2.4;
 /** Ancho máx. del escaneo “frame completo” de respaldo */
 const MAX_ANCHO_FRAME_COMPLETO = 640;
+/** Ancho máx. del recorte horizontal (barras 1D) */
+const MAX_ANCHO_BARRAS_PX = 960;
+/** Alto mín. del recorte horizontal ampliado (más píxeles por barra) */
+const MIN_ALTO_BARRAS_PX = 180;
 /** Formatos que pedimos a zxing-wasm (prioridad de negocio: Dell + inventario). */
 const FORMATOS_SCANNER: string[] = [
   'DataMatrix',
@@ -137,6 +149,22 @@ const FORMATOS_SCANNER: string[] = [
   'UPCA',
   'UPCE',
   'Codabar',
+];
+/** Solo barras 1D — modo horizontal (menos ruido que buscar QR/DM). */
+const FORMATOS_BARRAS_1D: string[] = [
+  'Code128',
+  'Code39',
+  'Codabar',
+  'EAN13',
+  'EAN8',
+  'UPCA',
+  'UPCE',
+];
+/** Recortes horizontales [ancho, alto] como fracción del frame de video */
+const RECORTES_BARRAS: Array<[number, number]> = [
+  [0.88, 0.28],
+  [0.92, 0.34],
+  [0.80, 0.40],
 ];
 
 /**
@@ -173,6 +201,7 @@ const sesion: SesionScannerCodigo = {
   modalInstancia: null,
   opciones: null,
   videoTrack: null,
+  modo: 'cuadrado',
 };
 
 /**
@@ -182,6 +211,7 @@ const sesion: SesionScannerCodigo = {
 function asegurarModalScanner(): HTMLElement {
   let modal = document.getElementById(MODAL_ID);
   if (modal) {
+    enlazarToggleModoScanner(modal);
     return modal;
   }
 
@@ -206,14 +236,22 @@ function asegurarModalScanner(): HTMLElement {
         </div>
         <div class="modal-body text-center">
           <div id="${STATUS_ID}" class="mb-3"></div>
+          <div id="${MODO_TOGGLE_ID}" class="btn-group w-100 mb-3" role="group" aria-label="Tipo de código a escanear">
+            <button type="button" class="btn btn-outline-primary active" data-scanner-modo="cuadrado">
+              <i class="bi bi-qr-code" aria-hidden="true"></i> Cuadrado (QR / Data Matrix)
+            </button>
+            <button type="button" class="btn btn-outline-primary" data-scanner-modo="barras">
+              <i class="bi bi-upc-scan" aria-hidden="true"></i> Barras (Code 128)
+            </button>
+          </div>
           <div class="scanner-container scanner-container--mejorado">
             <div id="${VIDEO_HOST_ID}"></div>
             <div class="scanner-overlay">
-              <div class="scanner-frame scanner-frame--preciso"></div>
+              <div id="${FRAME_ID}" class="scanner-frame scanner-frame--preciso"></div>
             </div>
           </div>
           <div id="${TIPS_ID}" class="mt-3 text-start" hidden></div>
-          <div class="alert alert-info mt-3 mb-0 text-start small">
+          <div id="${CONSEJO_ID}" class="alert alert-info mt-3 mb-0 text-start small">
             <i class="bi bi-info-circle" aria-hidden="true"></i>
             <strong>Consejo:</strong> las etiquetas de cargador Dell suelen ser
             <em>Data Matrix</em> (cuadrado sin los 3 ojos de un QR). Acerca el código
@@ -227,7 +265,121 @@ function asegurarModalScanner(): HTMLElement {
     </div>
   `;
   document.body.appendChild(modal);
+  enlazarToggleModoScanner(modal);
   return modal;
+}
+
+/**
+ * Lee el último modo elegido por el usuario (localStorage) o devuelve default.
+ */
+function obtenerModoPersistido(defaultModo: ModoScanner): ModoScanner {
+  try {
+    const guardado = localStorage.getItem(STORAGE_MODO_KEY);
+    if (guardado === 'cuadrado' || guardado === 'barras') {
+      return guardado;
+    }
+  } catch {
+    // localStorage bloqueado (modo privado, etc.)
+  }
+  return defaultModo;
+}
+
+/**
+ * Guarda la preferencia de modo para la próxima apertura del scanner.
+ */
+function persistirModoScanner(modo: ModoScanner): void {
+  try {
+    localStorage.setItem(STORAGE_MODO_KEY, modo);
+  } catch {
+    // Ignorar si no se puede persistir
+  }
+}
+
+/**
+ * Actualiza marco visual, botones del toggle y texto de consejo según el modo.
+ */
+function aplicarModoScanner(modo: ModoScanner): void {
+  sesion.modo = modo;
+  persistirModoScanner(modo);
+
+  const frame = document.getElementById(FRAME_ID);
+  if (frame) {
+    frame.classList.remove('scanner-frame--preciso', 'scanner-frame--barras');
+    frame.classList.add(
+      modo === 'barras' ? 'scanner-frame--barras' : 'scanner-frame--preciso',
+    );
+  }
+
+  const toggle = document.getElementById(MODO_TOGGLE_ID);
+  if (toggle) {
+    toggle.querySelectorAll<HTMLButtonElement>('[data-scanner-modo]').forEach((btn) => {
+      const esActivo = btn.getAttribute('data-scanner-modo') === modo;
+      btn.classList.toggle('active', esActivo);
+      btn.setAttribute('aria-pressed', esActivo ? 'true' : 'false');
+    });
+  }
+
+  actualizarConsejoModal(modo);
+  ocultarTipsSinDeteccion();
+}
+
+/**
+ * Texto de ayuda bajo el visor — distinto para cuadrado vs barras 1D.
+ */
+function actualizarConsejoModal(modo: ModoScanner): void {
+  const host = document.getElementById(CONSEJO_ID);
+  if (!host) {
+    return;
+  }
+  if (modo === 'barras') {
+    host.innerHTML = `
+      <i class="bi bi-info-circle" aria-hidden="true"></i>
+      <strong>Modo barras:</strong> alinea las <em>rayas horizontales</em> dentro del marco ancho.
+      Muchos cargadores HP/Dell usan Code 128 (franja blanca con rayas negras).
+      Evita reflejos en plástico negro; si falla, copia el número impreso debajo de las barras.`;
+    return;
+  }
+  host.innerHTML = `
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <strong>Modo cuadrado:</strong> etiquetas Dell suelen ser
+    <em>Data Matrix</em> (cuadrícula densa, sin 3 cuadritos de QR).
+    Acerca el código hasta que llene el marco; buena luz y mano firme ayudan.`;
+}
+
+/**
+ * Registra listeners en el toggle Cuadrado/Barras (solo una vez al crear modal).
+ */
+function enlazarToggleModoScanner(modal: HTMLElement): void {
+  const toggle = modal.querySelector(`#${MODO_TOGGLE_ID}`);
+  if (!toggle || toggle.getAttribute('data-scanner-toggle-listo') === '1') {
+    return;
+  }
+  toggle.setAttribute('data-scanner-toggle-listo', '1');
+  toggle.addEventListener('click', (event) => {
+    const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-scanner-modo]');
+    if (!btn) {
+      return;
+    }
+    const modo = btn.getAttribute('data-scanner-modo') as ModoScanner | null;
+    if (modo !== 'cuadrado' && modo !== 'barras') {
+      return;
+    }
+    if (modo === sesion.modo) {
+      return;
+    }
+    aplicarModoScanner(modo);
+    // Reiniciar tips si la cámara ya está activa
+    if (sesion.activa) {
+      limpiarTimersFeedback();
+      programarFeedbackSinDeteccion();
+      mostrarEstadoScanner(
+        'info',
+        modo === 'barras'
+          ? 'Modo barras — alinea las rayas horizontales en el marco ancho'
+          : 'Modo cuadrado — acerca el QR o Data Matrix al marco',
+      );
+    }
+  });
 }
 
 function mostrarEstadoScanner(
@@ -258,12 +410,29 @@ function mostrarTipsSinDeteccion(nivel: 'suave' | 'fuerte'): void {
     return;
   }
   tipsHost.hidden = false;
+  const esBarras = sesion.modo === 'barras';
 
   if (nivel === 'suave') {
     mostrarEstadoScanner(
       'warning',
-      'Aún no reconozco el código. Acércalo más al marco e inténtalo de nuevo…',
+      esBarras
+        ? 'Aún no reconozco las barras. Alinea la franja en el marco ancho…'
+        : 'Aún no reconozco el código. Acércalo más al marco e inténtalo de nuevo…',
     );
+    if (esBarras) {
+      tipsHost.innerHTML = `
+      <div class="alert alert-warning mb-0 text-start">
+        <strong><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+        No se detectó todavía</strong>
+        <ul class="mb-0 mt-2 ps-3">
+          <li>Alinea las <strong>rayas horizontales</strong> paralelas al borde largo del marco.</li>
+          <li>Inclina el cargador para <strong>evitar reflejo</strong> en plástico negro.</li>
+          <li>Acerca hasta que la franja de barras llene casi todo el ancho del marco.</li>
+          <li>Mantén el dispositivo estable 1–2 segundos.</li>
+        </ul>
+      </div>`;
+      return;
+    }
     tipsHost.innerHTML = `
       <div class="alert alert-warning mb-0 text-start">
         <strong><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
@@ -283,12 +452,27 @@ function mostrarTipsSinDeteccion(nivel: 'suave' | 'fuerte'): void {
     'warning',
     'Sigo sin leerlo. Puedes cancelar y escribir el número a mano.',
   );
+  if (esBarras) {
+    tipsHost.innerHTML = `
+    <div class="alert alert-warning mb-0 text-start">
+      <strong><i class="bi bi-question-circle" aria-hidden="true"></i>
+      Sigue sin reconocerse</strong>
+      <ul class="mb-0 mt-2 ps-3">
+        <li>Prueba otro ángulo o más luz directa sobre la etiqueta blanca.</li>
+        <li>Si el cargador tiene <strong>Data Matrix</strong> (cuadrado), cambia a modo Cuadrado arriba.</li>
+        <li>Copia el número impreso debajo de las barras (p. ej. 8SGX21J75539C1TJ33P08ZC).</li>
+        <li>Pulsa <em>Cancelar</em> y usa el teclado — no bloqueamos el guardado.</li>
+      </ul>
+    </div>`;
+    return;
+  }
   tipsHost.innerHTML = `
     <div class="alert alert-warning mb-0 text-start">
       <strong><i class="bi bi-question-circle" aria-hidden="true"></i>
       Sigue sin reconocerse</strong>
       <ul class="mb-0 mt-2 ps-3">
         <li>Prueba otro ángulo o distancia (un poco más cerca suele bastar).</li>
+        <li>Si es etiqueta con <strong>rayas lineales</strong>, cambia a modo Barras arriba.</li>
         <li>Limpia la lente si está opaca o con huellas.</li>
         <li>Si el código está dañado o borroso, escríbelo manualmente en el campo.</li>
         <li>Pulsa <em>Cancelar</em> y usa el teclado — no bloqueamos el guardado.</li>
@@ -444,6 +628,7 @@ function potenciarContrasteImageData(origen: ImageData): ImageData {
  */
 async function intentarLeerConZxingWasm(
   imageData: ImageData,
+  formatos: string[] = FORMATOS_SCANNER,
 ): Promise<CodigoLeido | null> {
   const api = obtenerZXingWasm();
   if (!api) {
@@ -452,7 +637,7 @@ async function intentarLeerConZxingWasm(
 
   const opciones = {
     tryHarder: true,
-    formats: FORMATOS_SCANNER,
+    formats: formatos,
     maxNumberOfSymbols: 1,
   };
 
@@ -554,7 +739,53 @@ async function escanearRecorteCentralAmpliado(
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(video, sx, sy, lado, lado, 0, 0, dest, dest);
 
-  return intentarLeerConZxingWasm(ctx.getImageData(0, 0, dest, dest));
+  const formatos = sesion.modo === 'barras' ? FORMATOS_BARRAS_1D : FORMATOS_SCANNER;
+  return intentarLeerConZxingWasm(ctx.getImageData(0, 0, dest, dest), formatos);
+}
+
+/**
+ * Recorte horizontal panorámico — optimizado para Code 128 en cargadores.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Las barras 1D son anchas y bajas; un recorte cuadrado las corta.
+ * Ampliamos la banda central para dar más píxeles a cada rayita.
+ */
+async function escanearRecorteHorizontal(
+  fraccionAncho: number,
+  fraccionAlto: number,
+): Promise<CodigoLeido | null> {
+  const video = sesion.video;
+  const canvas = sesion.canvas;
+  const ctx = sesion.canvasCtx;
+  if (!video || !canvas || !ctx) {
+    return null;
+  }
+
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw < 40 || vh < 40) {
+    return null;
+  }
+
+  const ancho = Math.floor(vw * fraccionAncho);
+  const alto = Math.floor(vh * fraccionAlto);
+  const sx = Math.floor((vw - ancho) / 2);
+  const sy = Math.floor((vh - alto) / 2);
+  const destW = Math.min(MAX_ANCHO_BARRAS_PX, Math.floor(ancho * FACTOR_ZOOM_RECORTE));
+  const destH = Math.max(
+    MIN_ALTO_BARRAS_PX,
+    Math.floor(alto * FACTOR_ZOOM_RECORTE * 2),
+  );
+
+  canvas.width = destW;
+  canvas.height = destH;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(video, sx, sy, ancho, alto, 0, 0, destW, destH);
+
+  return intentarLeerConZxingWasm(
+    ctx.getImageData(0, 0, destW, destH),
+    FORMATOS_BARRAS_1D,
+  );
 }
 
 /**
@@ -579,7 +810,8 @@ async function escanearFrameCompleto(): Promise<CodigoLeido | null> {
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(video, 0, 0, dw, dh);
 
-  return intentarLeerConZxingWasm(ctx.getImageData(0, 0, dw, dh));
+  const formatos = sesion.modo === 'barras' ? FORMATOS_BARRAS_1D : FORMATOS_SCANNER;
+  return intentarLeerConZxingWasm(ctx.getImageData(0, 0, dw, dh), formatos);
 }
 
 /**
@@ -611,16 +843,26 @@ function iniciarLoopDeteccion(): void {
     }
 
     sesion.analizandoFrame = true;
-    const fraccion = fraccionesRecorte[indiceTick % fraccionesRecorte.length];
     const tick = indiceTick;
     indiceTick += 1;
+    const esBarras = sesion.modo === 'barras';
 
     void (async () => {
       try {
-        let leido = await escanearRecorteCentralAmpliado(fraccion);
+        let leido: CodigoLeido | null = null;
 
-        if (!leido && tick % 4 === 0) {
-          leido = await escanearFrameCompleto();
+        if (esBarras) {
+          const [fw, fh] = RECORTES_BARRAS[tick % RECORTES_BARRAS.length];
+          leido = await escanearRecorteHorizontal(fw, fh);
+          if (!leido && tick % 4 === 0) {
+            leido = await escanearRecorteHorizontal(0.95, 0.45);
+          }
+        } else {
+          const fraccion = fraccionesRecorte[tick % fraccionesRecorte.length];
+          leido = await escanearRecorteCentralAmpliado(fraccion);
+          if (!leido && tick % 4 === 0) {
+            leido = await escanearFrameCompleto();
+          }
         }
 
         if (leido) {
@@ -637,6 +879,13 @@ function iniciarLoopDeteccion(): void {
 }
 
 /**
+ * Normaliza el texto leído (quita sufijo REV de etiquetas de cargador).
+ */
+function limpiarCodigoDetectado(codigo: string): string {
+  return codigo.replace(/\s+REV:\d+\s*$/i, '').trim();
+}
+
+/**
  * Cuando hay detección válida: escribe en el input, avisa y cierra el modal.
  */
 function procesarCodigoDetectado(codigo: string, tipo: string): void {
@@ -644,20 +893,22 @@ function procesarCodigoDetectado(codigo: string, tipo: string): void {
     return;
   }
 
+  const codigoLimpio = limpiarCodigoDetectado(codigo);
+
   // Pausar de inmediato para no procesar el mismo código varias veces
   sesion.activa = false;
   limpiarTimersFeedback();
   ocultarTipsSinDeteccion();
   reproducirBeepConfirmacion();
-  mostrarEstadoScanner('success', `${tipo} detectado: ${codigo}`);
+  mostrarEstadoScanner('success', `${tipo} detectado: ${codigoLimpio}`);
 
   const input = sesion.opciones.targetInput;
-  input.value = codigo;
+  input.value = codigoLimpio;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
 
   if (sesion.opciones.onDetect) {
-    sesion.opciones.onDetect(codigo);
+    sesion.opciones.onDetect(codigoLimpio);
   }
 
   // Breve pausa para que el usuario vea el mensaje de éxito
@@ -784,7 +1035,9 @@ async function iniciarSesionCamara(): Promise<void> {
     ocultarTipsSinDeteccion();
     mostrarEstadoScanner(
       'info',
-      'Scanner activo — acerca el código al marco (sobre todo si es pequeño)',
+      sesion.modo === 'barras'
+        ? 'Scanner activo (modo barras) — alinea las rayas en el marco ancho'
+        : 'Scanner activo — acerca el código al marco (sobre todo si es pequeño)',
     );
     programarFeedbackSinDeteccion();
 
@@ -842,7 +1095,9 @@ async function iniciarSesionCamaraFallback(): Promise<void> {
     sesion.inicioEscaneoMs = Date.now();
     mostrarEstadoScanner(
       'info',
-      'Scanner activo (resolución estándar) — acerca el código al marco',
+      sesion.modo === 'barras'
+        ? 'Scanner activo (modo barras) — alinea las rayas en el marco ancho'
+        : 'Scanner activo (resolución estándar) — acerca el código al marco',
     );
     programarFeedbackSinDeteccion();
     iniciarLoopDeteccion();
@@ -868,6 +1123,10 @@ function abrirScannerCodigo(opciones: AbrirScannerCodigoOpciones): void {
 
   sesion.opciones = opciones;
   const modalEl = asegurarModalScanner();
+
+  const modoInicial = opciones.modoInicial
+    ?? obtenerModoPersistido('cuadrado');
+  aplicarModoScanner(modoInicial);
 
   const titulo = modalEl.querySelector('#scannerCodigoUniversalLabel');
   if (titulo && opciones.tituloModal) {

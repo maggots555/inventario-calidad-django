@@ -29,6 +29,7 @@ function enlazarScannerBoton(
   inputId: string,
   tituloModal: string,
   requiereCheckbox?: RequiereCheckboxScanner,
+  modoInicial?: 'cuadrado' | 'barras',
 ): void {
   const btn = document.getElementById(btnId) as HTMLButtonElement | null;
   const input = document.getElementById(inputId) as HTMLInputElement | null;
@@ -57,6 +58,7 @@ function enlazarScannerBoton(
     window.abrirScannerCodigo({
       targetInput: input,
       tituloModal,
+      modoInicial,
       onDetect: () => {
         input.focus();
       },

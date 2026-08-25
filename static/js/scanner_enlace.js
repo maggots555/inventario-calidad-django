@@ -18,7 +18,7 @@
  * @param tituloModal - Título del modal del scanner
  * @param requiereCheckbox - Si se define, exige que el checkbox esté activo
  */
-function enlazarScannerBoton(btnId, inputId, tituloModal, requiereCheckbox) {
+function enlazarScannerBoton(btnId, inputId, tituloModal, requiereCheckbox, modoInicial) {
     const btn = document.getElementById(btnId);
     const input = document.getElementById(inputId);
     if (!btn || !input) {
@@ -40,6 +40,7 @@ function enlazarScannerBoton(btnId, inputId, tituloModal, requiereCheckbox) {
         window.abrirScannerCodigo({
             targetInput: input,
             tituloModal,
+            modoInicial,
             onDetect: () => {
                 input.focus();
             },

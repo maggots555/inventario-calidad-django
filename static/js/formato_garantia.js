@@ -1338,6 +1338,7 @@
             window.abrirScannerCodigo({
                 targetInput: inputNumeroCargador,
                 tituloModal: 'Escanear número del cargador',
+                modoInicial: 'barras',
                 onDetect: () => {
                     setStatus('Número del cargador capturado con el scanner.', false, false);
                 },
