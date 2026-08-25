@@ -2125,6 +2125,10 @@
   text-decoration: none;
 }
 
+.st-diagnostico-card--factura {
+  border-left-color: var(--st-accent, #10b981);
+}
+
 /* ============================================================
    MODO OSCURO — Tarjeta de push + banner de instalación PWA
    ============================================================ */
@@ -2157,6 +2161,10 @@
 [data-bs-theme="dark"] .st-diagnostico-btn:focus {
   background-color: #334155;
   color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .st-diagnostico-card--factura {
+  border-left-color: #34d399;
 }
 
 [data-bs-theme="dark"] .st-push-label {

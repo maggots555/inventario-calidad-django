@@ -42,6 +42,11 @@ FACTURACION_WEB_TOKEN_TTL = config(
     default=86400 if DEBUG else 3600,
     cast=int,
 )
+# URL pública que abre el cliente (el botón del seguimiento). Sin secretos.
+FACTURACION_WEB_PORTAL_URL = config(
+    'FACTURACION_WEB_PORTAL_URL',
+    default='http://201.149.21.30/facturador',
+)
 
 # EXPLICACIÓN: ALLOWED_HOSTS especifica qué dominios/IPs pueden acceder a tu aplicación
 # En producción, solo incluye dominios e IPs específicas por seguridad

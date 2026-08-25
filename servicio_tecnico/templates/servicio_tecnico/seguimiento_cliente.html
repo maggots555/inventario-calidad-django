@@ -384,6 +384,8 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
       ⏳ Este enlace de <strong>seguimiento</strong> estará disponible {{ dias_restantes }} día{{ dias_restantes|pluralize }} más{% if encuesta_dias_restantes is not None %} · Tienes {{ encuesta_dias_restantes }} día{{ encuesta_dias_restantes|pluralize }} para contestar la encuesta{% endif %}
     </div>
     {% endif %}
+
+    {% include 'servicio_tecnico/partials/_autofactura_seguimiento.html' %}
   </div>
 
   {# Banner MEDIO — entre el agradecimiento y la galería #}
@@ -628,6 +630,8 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
       </a>
     </div>
     {% endif %}
+
+    {% include 'servicio_tecnico/partials/_autofactura_seguimiento.html' %}
 
     {# Banner para estado FINALIZADO #}
     {% if estado == 'finalizado' %}

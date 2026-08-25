@@ -1,15 +1,16 @@
 """
-Tests de la fase 1 del autofacturador (GET venta + authenticate).
+Tests del autofacturador: GET/PUT del API y botón en el seguimiento.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 El portal VO pide un número (webId). SIGMA lo busca en los dígitos de
-orden_cliente (OOW-11902 → 11902). Estos tests no llaman al portal ni
-al SAT: solo comprueban el JSON y los códigos 200/400/401/404.
+orden_cliente (OOW-11902 → 11902). El cliente, en su enlace de
+seguimiento, solo ve un botón que abre el facturador (sin secretos).
 """
 
 import base64
 import json
+import secrets
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -23,6 +24,7 @@ from servicio_tecnico import views_facturacion_demanda
 from servicio_tecnico.models import (
     Cotizacion,
     DetalleEquipo,
+    EnlaceSeguimientoCliente,
     OrdenServicio,
     PagoOrden,
     PiezaCotizada,
@@ -37,9 +39,11 @@ from servicio_tecnico.services.facturacion_demanda import (
     RAZON_YA_TIMBRADA,
     FacturacionDemandaError,
     extraer_digitos,
+    contexto_autofactura_seguimiento,
     obtener_venta_para_facturar,
     web_id_a_entero,
 )
+from servicio_tecnico.views_seguimiento_cliente import seguimiento_orden_cliente
 
 
 API_KEY = 'clave-test-facturacion'
@@ -367,3 +371,146 @@ class FacturacionDemandaPaisTest(TestCase):
                 obtener_venta_para_facturar('11902')
         self.assertEqual(ctx.exception.http_status, 400)
         self.assertIn('México', ctx.exception.razon)
+
+
+@override_settings(
+    RATELIMIT_ENABLE=False,
+    FACTURACION_WEB_PORTAL_URL='http://201.149.21.30/facturador',
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class AutofacturaSeguimientoTest(TestCase):
+    """Fase 3: el cliente ve el botón en /seguimiento/<token>/, sin secretos."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        sucursal = Sucursal.objects.create(
+            nombre='Sucursal Autofactura Seg',
+            ciudad='CDMX',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Seguimiento Factura',
+            cargo='Recepcionista',
+            area='FRONTDESK',
+            email='seg.factura@test.local',
+            sucursal=sucursal,
+            rol='recepcionista',
+            activo=True,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=sucursal,
+            tipo_servicio='diagnostico',
+            estado='reparacion',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-11902',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude',
+            numero_serie='SN-SEG-FAC-01',
+            falla_principal='No enciende',
+            gama='baja',
+        )
+        self.cotizacion = Cotizacion.objects.create(
+            orden=self.orden,
+            usuario_acepto=True,
+        )
+        componente = ComponenteEquipo.objects.create(
+            nombre='Pantalla Seg Fac',
+            tipo_equipo='laptop',
+            activo=True,
+        )
+        PiezaCotizada.objects.create(
+            cotizacion=self.cotizacion,
+            componente=componente,
+            cantidad=1,
+            costo_unitario=Decimal('100.00'),
+            precio_unitario_cliente=Decimal('200.00'),
+            aceptada_por_cliente=True,
+        )
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('232.00'),
+            tipo='pago_completo',
+            metodo='transferencia',
+            registrado_por=self.empleado,
+        )
+        self.token = secrets.token_urlsafe(32)
+        EnlaceSeguimientoCliente.objects.create(orden=self.orden, token=self.token)
+
+    def _get_seguimiento(self):
+        """GET de la página pública sin pasar por Axes / middleware."""
+        request = self.factory.get(
+            reverse('seguimiento_orden_publico', args=[self.token]),
+        )
+        request.META['REMOTE_ADDR'] = '127.0.0.1'
+        return seguimiento_orden_cliente(request, self.token)
+
+    def test_helper_arma_url_con_web_id(self):
+        """Feliz: OOW-11902 → http://…/facturador?webId=11902."""
+        ctx = contexto_autofactura_seguimiento(self.orden)
+        self.assertTrue(ctx['mostrar_autofactura'])
+        self.assertFalse(ctx['factura_ya_emitida'])
+        self.assertEqual(
+            ctx['url_autofactura'],
+            'http://201.149.21.30/facturador?webId=11902',
+        )
+
+    def test_helper_oculto_si_no_acepto(self):
+        """Sin ACU no se ofrece facturar."""
+        self.cotizacion.usuario_acepto = None
+        self.cotizacion.save(update_fields=['usuario_acepto'])
+        ctx = contexto_autofactura_seguimiento(self.orden)
+        self.assertFalse(ctx['mostrar_autofactura'])
+
+    def test_helper_ya_emitida_no_abre_portal(self):
+        """Si ya hay factura, se informa y no se manda a timbrar otra vez."""
+        self.orden.factura_emitida = True
+        self.orden.save(update_fields=['factura_emitida'])
+        ctx = contexto_autofactura_seguimiento(self.orden)
+        self.assertTrue(ctx['mostrar_autofactura'])
+        self.assertTrue(ctx['factura_ya_emitida'])
+        self.assertEqual(ctx['url_autofactura'], '')
+
+    def test_helper_oculto_si_no_hay_pagos(self):
+        """El PDF pide pago además de ACU: sin abono no hay botón."""
+        PagoOrden.objects.filter(orden=self.orden).delete()
+        ctx = contexto_autofactura_seguimiento(self.orden)
+        self.assertFalse(ctx['mostrar_autofactura'])
+
+    def test_pagina_seguimiento_muestra_boton_sin_secretos(self):
+        """Feliz HTTP: el HTML tiene el botón y el webId; no la API Key."""
+        response = self._get_seguimiento()
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode('utf-8')
+        self.assertIn('Facturar ahora', html)
+        self.assertIn('http://201.149.21.30/facturador?webId=11902', html)
+        self.assertNotIn('FACTURACION_WEB_API_KEY', html)
+        self.assertNotIn('X-API-KEY', html)
+        self.assertNotIn('{#', html)
+
+    def test_pagina_sin_boton_si_falta_acu(self):
+        """Borde: cotización pendiente → no aparece Facturar ahora."""
+        self.cotizacion.usuario_acepto = None
+        self.cotizacion.save(update_fields=['usuario_acepto'])
+        response = self._get_seguimiento()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('Facturar ahora', response.content.decode('utf-8'))
+
+    def test_pagina_ya_emitida_muestra_mensaje_sin_boton(self):
+        """Si ya hay CFDI, se informa y no se reabre el portal."""
+        self.orden.factura_emitida = True
+        self.orden.save(update_fields=['factura_emitida'])
+        response = self._get_seguimiento()
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode('utf-8')
+        self.assertIn('Tu factura ya fue emitida', html)
+        self.assertNotIn('Facturar ahora', html)

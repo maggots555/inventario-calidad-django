@@ -70,6 +70,7 @@ def seguimiento_orden_cliente(request, token):
             'orden__detalle_equipo',
             'orden__sucursal',
             'orden__responsable_seguimiento',
+            'orden__cotizacion',
         ).get(token=token)
     except EnlaceSeguimientoCliente.DoesNotExist:
         logger.warning(
@@ -274,6 +275,12 @@ def seguimiento_orden_cliente(request, token):
             tiene_seguimientos_piezas=bool(seguimientos_piezas),
         ),
     }
+    # Autofactura: el cliente solo recibe la URL pública del portal VO
+    # (sin API Key). El helper oculta el botón si no hay ACU + pagos.
+    from servicio_tecnico.services.facturacion_demanda import (
+        contexto_autofactura_seguimiento,
+    )
+    context.update(contexto_autofactura_seguimiento(orden))
 
     if estado_orden == 'entregado':
         # Buscar encuesta de satisfacción activa

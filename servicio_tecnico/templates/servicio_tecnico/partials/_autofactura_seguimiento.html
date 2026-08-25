@@ -1,0 +1,30 @@
+{% comment %}
+  Botón de autofactura en el seguimiento del cliente.
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  El cliente abre el portal VO (otra página). Aquí NO va la API Key.
+  Reutilizamos las clases de la tarjeta de diagnóstico para verse igual.
+{% endcomment %}
+{% if mostrar_autofactura %}
+<div class="st-diagnostico-card st-diagnostico-card--factura">
+  <div class="st-diagnostico-header">
+    <span class="st-diagnostico-icon" aria-hidden="true">🧾</span>
+    <div class="st-diagnostico-text">
+      {% if factura_ya_emitida %}
+      <p class="st-diagnostico-label">Tu factura ya fue emitida</p>
+      <p class="st-diagnostico-hint">Si necesitas una copia, contacta a Facturación con tu folio {{ folio_display }}.</p>
+      {% else %}
+      <p class="st-diagnostico-label">¿Necesitas factura?</p>
+      <p class="st-diagnostico-hint">Captura tus datos fiscales en el portal. Ten a la mano tu RFC.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if url_autofactura %}
+  <a href="{{ url_autofactura }}"
+     class="st-diagnostico-btn"
+     target="_blank"
+     rel="noopener noreferrer">
+    Facturar ahora
+  </a>
+  {% endif %}
+</div>
+{% endif %}

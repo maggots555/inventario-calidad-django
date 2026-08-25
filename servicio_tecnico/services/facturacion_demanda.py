@@ -27,6 +27,7 @@ import re
 import time
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -686,3 +687,68 @@ def validar_secret_authenticate(secret_body: Optional[str]) -> None:
     recibido = secret_body or ''
     if not esperado or not hmac.compare_digest(recibido, esperado):
         raise FacturacionDemandaError(401, 'Unauthorized', 'Secret inválido')
+
+
+def contexto_autofactura_seguimiento(orden: OrdenServicio) -> dict[str, Any]:
+    """
+    Datos para el botón de autofactura en el enlace de seguimiento.
+
+    Objetivo de negocio:
+        El cliente NO ve API Key ni secret. Solo un enlace al portal VO
+        con el webId numérico (dígitos de orden_cliente).
+
+    Args:
+        orden: OrdenServicio del enlace público.
+
+    Returns:
+        dict con mostrar_autofactura, url_autofactura, factura_ya_emitida.
+
+    Efectos secundarios:
+        Lecturas ORM (cotización, pagos). No escribe.
+    """
+    oculto = {
+        'mostrar_autofactura': False,
+        'url_autofactura': '',
+        'factura_ya_emitida': False,
+    }
+    # Paso: CFDI solo México; el portal VO no aplica a otros países.
+    if _codigo_pais() != 'MX':
+        return oculto
+    if orden.estado in ('cancelado', 'rechazada'):
+        return oculto
+
+    from django.core.exceptions import ObjectDoesNotExist
+
+    try:
+        folio = (orden.detalle_equipo.orden_cliente or '').strip()
+    except ObjectDoesNotExist:
+        return oculto
+
+    digitos = extraer_digitos(folio)
+    if not digitos:
+        return oculto
+
+    cotizacion = getattr(orden, 'cotizacion', None)
+    if cotizacion is None or cotizacion.usuario_acepto is not True:
+        return oculto
+    if not orden.pagos.exists():
+        return oculto
+
+    # Paso: ya timbrada → mensaje, no volver a abrir el facturador.
+    if orden.factura_emitida:
+        return {
+            'mostrar_autofactura': True,
+            'url_autofactura': '',
+            'factura_ya_emitida': True,
+        }
+
+    portal = (getattr(settings, 'FACTURACION_WEB_PORTAL_URL', '') or '').rstrip('/')
+    if not portal:
+        return oculto
+
+    web_id = str(int(digitos))
+    return {
+        'mostrar_autofactura': True,
+        'url_autofactura': f'{portal}?{urlencode({"webId": web_id})}',
+        'factura_ya_emitida': False,
+    }
