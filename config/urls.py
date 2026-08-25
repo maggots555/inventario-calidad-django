@@ -92,6 +92,10 @@ urlpatterns = [
     # Formato: /feedback-satisfaccion/<token>/
     path('feedback-satisfaccion/<str:token>/', feedback_satisfaccion_cliente, name='feedback_satisfaccion_publico'),
 
+    # API server-to-server del autofacturador (portal VO). Sin login de staff.
+    # Mismos paths que el PDF: /facturacion-web/authenticate y /folio/{webId}
+    path('facturacion-web/', include('servicio_tecnico.urls_facturacion_demanda')),
+
     # ── URL PÚBLICA: Seguimiento de orden (sin autenticación) ──
     # El cliente abre este link desde el correo de imágenes de ingreso.
     # Muestra timeline del estado, info del equipo y contacto del responsable.

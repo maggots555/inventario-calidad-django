@@ -31,6 +31,18 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-c^$$m7)o4(**%esnl3ao&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
+# Autofacturador VO → SIGMA (Facturación en demanda SICSER 4).
+# EXPLICACIÓN PARA PRINCIPIANTES: el portal en http://201.149.21.30/facturador
+# se autentica con API Key + secret y luego pide la venta por webId numérico.
+# Nunca pongas los valores reales en git; solo en .env.
+FACTURACION_WEB_API_KEY = config('FACTURACION_WEB_API_KEY', default='')
+FACTURACION_WEB_SECRET = config('FACTURACION_WEB_SECRET', default='')
+FACTURACION_WEB_TOKEN_TTL = config(
+    'FACTURACION_WEB_TOKEN_TTL',
+    default=86400 if DEBUG else 3600,
+    cast=int,
+)
+
 # EXPLICACIÓN: ALLOWED_HOSTS especifica qué dominios/IPs pueden acceder a tu aplicación
 # En producción, solo incluye dominios e IPs específicas por seguridad
 ALLOWED_HOSTS = config(

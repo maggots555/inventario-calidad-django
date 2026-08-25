@@ -247,3 +247,7 @@ from .eventos_seguimiento import (  # noqa: F401
 # Template ya partido en partials (Fase A). Handlers form_type → Fase C.
 from .views_detalle_orden import detalle_orden  # noqa: F401
 from .views_pagos import bandeja_pagos_validacion  # noqa: F401
+from .views_facturacion_demanda import (  # noqa: F401
+    authenticate_facturacion_web,
+    folio_facturacion_web,
+)

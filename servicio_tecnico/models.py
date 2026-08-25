@@ -4708,3 +4708,7 @@ class PagoOrden(models.Model):
             models.Index(fields=['orden', 'fecha_pago']),
         ]
 
+
+# Comprobante CFDI del autofacturador (tabla propia; no hinchar OrdenServicio).
+from servicio_tecnico.models_facturacion import ComprobanteFiscalOrden  # noqa: E402, F401
+

@@ -41,6 +41,8 @@ class CompatibilidadReexportsViewsTest(SimpleTestCase):
         self.assertTrue(callable(st_views.registrar_historial))
         self.assertIs(st_views.consultar_sicser, views_sicser.consultar_sicser)
         self.assertIs(st_views.importar_orden_sicser, views_sicser.importar_orden_sicser)
+        self.assertTrue(callable(st_views.authenticate_facturacion_web))
+        self.assertTrue(callable(st_views.folio_facturacion_web))
 
     def test_urls_sicser_resuelven_al_modulo_nuevo(self):
         """reverse/resolve apuntan a las funciones de views_sicser."""

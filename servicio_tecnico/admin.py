@@ -42,6 +42,7 @@ from .models import (
     FormatoServicioGarantia,
     DanoEsteticoVistaGarantia,
     PagoOrden,
+    ComprobanteFiscalOrden,
 )
 
 
@@ -2451,4 +2452,46 @@ class PagoOrdenAdmin(admin.ModelAdmin):
 
     tiene_comprobante.boolean = True
     tiene_comprobante.short_description = 'Comprobante'
+
+
+@admin.register(ComprobanteFiscalOrden)
+class ComprobanteFiscalOrdenAdmin(admin.ModelAdmin):
+    """
+    Admin del CFDI recibido del autofacturador.
+
+    Objetivo: ver UUID, si ya se pidió el GET y si hay XML/PDF.
+    """
+
+    list_display = (
+        'orden',
+        'web_id',
+        'uuid',
+        'solicitado_en',
+        'fecha_timbrado',
+        'tiene_xml',
+        'tiene_pdf',
+    )
+    search_fields = (
+        'uuid',
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+    )
+    raw_id_fields = ('orden',)
+    readonly_fields = (
+        'solicitado_en',
+        'recibido_en',
+        'fecha_timbrado',
+    )
+
+    def tiene_xml(self, obj):
+        return bool(obj.cfdi_xml)
+
+    tiene_xml.boolean = True
+    tiene_xml.short_description = 'XML'
+
+    def tiene_pdf(self, obj):
+        return bool(obj.pdf)
+
+    tiene_pdf.boolean = True
+    tiene_pdf.short_description = 'PDF'
 
