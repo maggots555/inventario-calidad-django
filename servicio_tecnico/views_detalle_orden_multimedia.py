@@ -182,6 +182,49 @@ def handle_subir_imagenes(request, orden, empleado_actual):
                             es_sistema=True
                         )
 
+                    # ============================================================
+                    # FECHA INICIO DIAGNÓSTICO (solo órdenes normales, no VM)
+                    # ============================================================
+                    # EXPLICACIÓN PARA PRINCIPIANTES:
+                    # Al subir fotos de ingreso el técnico ya está arrancando el
+                    # diagnóstico. Si "Inicio Diagnóstico" está vacío, lo llenamos
+                    # con la fecha de hoy. NO tocamos fecha_fin_diagnostico: esa
+                    # marca el fin y dispara "Equipo Diagnosticado".
+                    # Tampoco sobrescribimos una fecha ya capturada a mano.
+                    if orden.tipo_servicio != 'venta_mostrador':
+                        from django.utils import timezone as tz_fecha
+
+                        detalle_equipo = orden.detalle_equipo
+                        if detalle_equipo.fecha_inicio_diagnostico is None:
+                            # Paso 1: fecha local del servidor (no UTC crudo)
+                            fecha_hoy = tz_fecha.localdate()
+                            # Paso 2: guardar solo ese campo (no reescribe el resto)
+                            detalle_equipo.fecha_inicio_diagnostico = fecha_hoy
+                            detalle_equipo.save(
+                                update_fields=['fecha_inicio_diagnostico']
+                            )
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='sistema',
+                                comentario=(
+                                    'Inicio de diagnóstico registrado automáticamente '
+                                    f'({fecha_hoy.strftime("%d/%m/%Y")}) al subir '
+                                    'imágenes de ingreso'
+                                ),
+                                usuario=empleado_actual,
+                                es_sistema=True,
+                            )
+                            # Paso 3: aviso en el mensaje JSON al frontend
+                            if mensaje_estado:
+                                mensaje_estado += (
+                                    f'; Inicio Diagnóstico: {fecha_hoy.strftime('%d/%m/%Y')}'
+                                )
+                            else:
+                                mensaje_estado = (
+                                    'Inicio Diagnóstico registrado: '
+                                    f'{fecha_hoy.strftime("%d/%m/%Y")}'
+                                )
+
                 # Si se suben imágenes de REPARACIÓN → Cambiar a "Control de Calidad"
                 # Aplica a todos los tipos de orden (garantía, OOW, diagnóstico, venta mostrador)
                 elif tipo_imagen == 'reparacion' and estado_anterior != 'control_calidad':
