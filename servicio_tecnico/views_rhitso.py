@@ -800,12 +800,31 @@ def editar_diagnostico_sic(request, orden_id):
         # Paso 4: Actualizar DetalleEquipo
         # EXPLICACIÓN: El diagnóstico técnico va en DetalleEquipo porque
         # es información específica del equipo, no de la orden
+        fecha_fin_anterior = detalle_equipo.fecha_fin_diagnostico
         detalle_equipo.diagnostico_sic = diagnostico_sic
         detalle_equipo.save()
+
+        empleado_actual = (
+            request.user.empleado if hasattr(request.user, 'empleado') else None
+        )
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Mismo cierre que Configuración / IA: Fin Diagnóstico + Equipo Diagnosticado.
+        from servicio_tecnico.services.cierre_diagnostico import (
+            aplicar_fecha_fin_al_guardar_diagnostico_sic,
+        )
+        aplicar_fecha_fin_al_guardar_diagnostico_sic(
+            detalle_equipo,
+            orden,
+            empleado_actual,
+            fecha_fin_anterior=fecha_fin_anterior,
+        )
         
         # Paso 5: Actualizar OrdenServicio
         # EXPLICACIÓN: Los datos RHITSO van en OrdenServicio porque son
         # específicos del proceso de reparación externa de esta orden
+        # (re-leemos estado por si el helper lo cambió a equipo_diagnosticado)
+        orden.refresh_from_db()
         orden.motivo_rhitso = motivo_rhitso
         orden.descripcion_rhitso = descripcion_rhitso
         orden.complejidad_estimada = complejidad_estimada
@@ -821,7 +840,7 @@ def editar_diagnostico_sic(request, orden_id):
         registrar_historial(
             orden=orden,
             tipo_evento='actualizacion',
-            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            usuario=empleado_actual,
             comentario=f"📝 Diagnóstico SIC actualizado | "
                       f"Motivo RHITSO: {motivo_rhitso} | "
                       f"Complejidad: {complejidad_estimada} | "

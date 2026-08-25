@@ -157,7 +157,7 @@ def guardar_diagnostico_sic_ia(request):
     Objetivo de negocio:
         Evitar el doble clic (Aceptar + Guardar configuración). Al aceptar la
         sugerencia de redacción, el texto queda guardado en BD de inmediato.
-        No modifica fechas ni otros campos de Configuración Adicional.
+        Si aplica, también cierra el diagnóstico (fecha_fin + Equipo Diagnosticado).
 
     Recibe vía POST:
         - orden_id (int): PK de la OrdenServicio
@@ -168,7 +168,8 @@ def guardar_diagnostico_sic_ia(request):
         {'success': False, 'error': '...'}
 
     Efectos secundarios:
-        Actualiza DetalleEquipo.diagnostico_sic y crea un HistorialOrden.
+        Actualiza DetalleEquipo.diagnostico_sic; puede setear
+        fecha_fin_diagnostico y estado equipo_diagnosticado; crea HistorialOrden.
     """
     from django.shortcuts import get_object_or_404
 
@@ -200,13 +201,29 @@ def guardar_diagnostico_sic_ia(request):
             'error': 'Esta orden no tiene detalle de equipo.',
         }, status=400)
 
-    # Guardar solo el diagnóstico (no tocamos fechas ni falla_principal)
+    # Valor ANTES de guardar: el helper detecta "primera vez" de fecha_fin.
+    fecha_fin_anterior = detalle_equipo.fecha_fin_diagnostico
+
+    # Guardar el diagnóstico; el cierre (fecha_fin / estado) lo hace el helper.
     detalle_equipo.diagnostico_sic = diagnostico_sic
     detalle_equipo.save(update_fields=['diagnostico_sic'])
 
     empleado_actual = None
     if hasattr(request.user, 'empleado'):
         empleado_actual = request.user.empleado
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Aceptar la mejora IA también "guarda" el SIC; debe cerrar el diagnóstico
+    # igual que el botón Guardar configuración.
+    from servicio_tecnico.services.cierre_diagnostico import (
+        aplicar_fecha_fin_al_guardar_diagnostico_sic,
+    )
+    aplicar_fecha_fin_al_guardar_diagnostico_sic(
+        detalle_equipo,
+        orden,
+        empleado_actual,
+        fecha_fin_anterior=fecha_fin_anterior,
+    )
 
     # Historial breve: queda rastro de que se aceptó una mejora IA
     registrar_historial(

@@ -18,6 +18,9 @@ from .forms import (
     ReingresoRHITSOForm,
 )
 from .models import EstadoRHITSO, HistorialOrden
+from .services.cierre_diagnostico import (
+    aplicar_fecha_fin_al_guardar_diagnostico_sic,
+)
 from .services.historial import registrar_historial
 
 
@@ -57,31 +60,23 @@ def handle_configuracion(request, orden, empleado_actual):
         detalle_actualizado = form_config.save()
 
         # ===================================================================
-        # NUEVA FUNCIONALIDAD: Cambiar estado al finalizar diagnóstico
+        # Fin diagnóstico + Equipo Diagnosticado (helper compartido)
         # ===================================================================
-        # Verificar si se acaba de agregar la fecha de fin de diagnóstico
-        fecha_fin_nueva = detalle_actualizado.fecha_fin_diagnostico
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si hay Diagnóstico SIC y la fecha de fin estaba vacía, el helper
+        # la llena con hoy. Si la fecha de fin aparece por primera vez
+        # (auto o a mano), también pasa el estado a Equipo Diagnosticado.
+        resultado_cierre = aplicar_fecha_fin_al_guardar_diagnostico_sic(
+            detalle_actualizado,
+            orden,
+            empleado_actual,
+            fecha_fin_anterior=fecha_fin_anterior,
+        )
 
-        if not fecha_fin_anterior and fecha_fin_nueva:
-            # Se agregó la fecha de fin de diagnóstico por primera vez
-            # → Cambiar estado a "equipo_diagnosticado"
-            estado_anterior = orden.estado
-            orden.estado = 'equipo_diagnosticado'
-            orden.save()
-
-            # Registrar el cambio de estado en el historial
-            registrar_historial(
-                orden=orden,
-                tipo_evento='estado',
-                usuario=empleado_actual,
-                comentario=f"🔄 Estado cambiado automáticamente: '{dict(orden._meta.get_field('estado').choices).get(estado_anterior)}' → 'Equipo Diagnosticado' (Diagnóstico finalizado)",
-                es_sistema=True
-            )
-
-            # Mensaje informativo al usuario
+        if resultado_cierre['estado_cambiado']:
             messages.info(
                 request,
-                '🔍 Estado actualizado automáticamente a: "Equipo Diagnosticado"'
+                'Estado actualizado automáticamente a: "Equipo Diagnosticado"',
             )
         # ===================================================================
 
