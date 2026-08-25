@@ -178,6 +178,33 @@
                                             </form>
                                             <small class="text-muted">Editable para ajustar métricas</small>
                                         </div>
+
+                                        {# Mano de obra: dato interno; no entra al cobro al cliente #}
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Mano de Obra (costo interno):</label>
+                                            <form method="post" class="d-flex align-items-center gap-2 flex-wrap" id="formEditarManoObra">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="form_type" value="editar_mano_obra">
+                                                <div class="input-group input-group-sm" style="max-width: 220px;">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number"
+                                                           name="costo_mano_obra"
+                                                           class="form-control text-end"
+                                                           step="0.01"
+                                                           min="0"
+                                                           value="{{ cotizacion.costo_mano_obra|floatformat:2 }}">
+                                                    <button type="submit" class="btn btn-outline-primary" title="Guardar mano de obra">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                </div>
+                                                {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
+                                                    <span class="badge bg-success" title="Descuento aplicado">🎁 GRATIS</span>
+                                                {% endif %}
+                                            </form>
+                                            <small class="text-muted">
+                                                Costo interno (diagnóstico/reparación). No se cobra otra vez al cliente.
+                                            </small>
+                                        </div>
                                         
                                         {% if cotizacion.fecha_respuesta %}
                                             <div class="mb-3">
@@ -301,108 +328,51 @@
                                 </div>
                             </div>
                             
-                            <!-- Panel Derecho: Resumen Financiero -->
+                            <!-- Panel Derecho: Resumen Financiero (solo cobro al cliente) -->
                             <div class="col-lg-6">
                                 <div class="card h-100" style="border-left: 4px solid #4facfe;">
                                     <div class="card-body">
-                                        <h6 class="card-title mb-3">
+                                        <h6 class="card-title mb-2">
                                             <i class="bi bi-cash-stack"></i> Resumen Financiero
                                         </h6>
-                                        
-                                        <table class="table table-sm table-borderless">
-                                            <tr>
-                                                <td class="text-muted">
-                                                    Mano de Obra:
-                                                    <div class="small">Diagnóstico de ingreso (ya cubierto al recibir el equipo; no se cobra otra vez).</div>
-                                                </td>
-                                                <td class="text-end">
-                                                    <form method="post" class="d-inline-flex align-items-center gap-1" id="formEditarManoObra">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="form_type" value="editar_mano_obra">
-                                                        <span class="text-muted">$</span>
-                                                        <input type="number" 
-                                                               name="costo_mano_obra" 
-                                                               class="form-control form-control-sm text-end" 
-                                                               style="max-width: 110px;"
-                                                               step="0.01"
-                                                               min="0"
-                                                               value="{{ cotizacion.costo_mano_obra|floatformat:2 }}">
-                                                        <button type="submit" class="btn btn-outline-primary btn-sm" title="Guardar mano de obra">
-                                                            <i class="bi bi-check-lg"></i>
-                                                        </button>
-                                                    </form>
-                                                    {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
-                                                        <span class="badge bg-success ms-1" title="Descuento aplicado">
-                                                            🎁 GRATIS
-                                                        </span>
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td class="text-muted">Total Piezas Cotizadas (costo empresa):</td>
-                                                <td class="text-end"><strong>${{ cotizacion.costo_total_piezas|floatformat:2 }}</strong></td>
-                                            </tr>
-                                            {% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}
-                                            <tr>
-                                                <td class="text-muted">Total piezas aceptadas (precio cliente, sin IVA):</td>
-                                                <td class="text-end text-primary"><strong>${{ cotizacion.precio_piezas_aceptadas_cliente|floatformat:2 }}</strong></td>
-                                            </tr>
-                                            {% if cotizacion.margen_estimado > 0 %}
-                                            <tr>
-                                                <td class="text-muted">Margen estimado (piezas aceptadas, sin IVA):</td>
-                                                <td class="text-end text-info"><strong>${{ cotizacion.margen_estimado|floatformat:2 }}</strong></td>
-                                            </tr>
-                                            {% endif %}
-                                            {% endif %}
-                                            {% if cotizacion.usuario_acepto is not None %}
-                                                <!-- Mostrar desglose de piezas solo si hay decisión -->
-                                                {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
-                                                    <tr>
-                                                        <td class="text-muted">Piezas Aceptadas:</td>
-                                                        <td class="text-end text-success"><strong>${{ cotizacion.costo_piezas_aceptadas|floatformat:2 }}</strong></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="text-muted">Piezas Rechazadas:</td>
-                                                        <td class="text-end text-danger">
-                                                            <strong>${{ cotizacion.costo_piezas_rechazadas|floatformat:2 }}</strong>
-                                                        </td>
-                                                    </tr>
-                                                {% endif %}
-                                            {% endif %}
-                                            <tr style="border-top: 2px solid #dee2e6;">
-                                                <td class="text-muted"><strong>{% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}TOTAL COTIZACIÓN (costo interno):{% else %}TOTAL COTIZACIÓN:{% endif %}</strong></td>
-                                                <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
-                                            </tr>
-                                            
-                                            {% if cotizacion.usuario_acepto and cotizacion.descontar_mano_obra %}
-                                                <tr style="border-top: 2px solid #ffc107;">
-                                                    <td class="text-danger">
-                                                        <strong><i class="bi bi-scissors"></i> Descuento Mano de Obra:</strong>
+                                        <p class="small text-muted mb-3">
+                                            El diagnóstico de ingreso no se incluye; ya se cubrió al recibir el equipo.
+                                        </p>
+
+                                        {% if cotizacion.usuario_acepto is False %}
+                                            <div class="alert alert-secondary py-2 mb-0" role="status">
+                                                <i class="bi bi-info-circle"></i>
+                                                Cotización rechazada — no hay piezas a cobrar.
+                                            </div>
+                                        {% elif resumen_cobro.subtotal_cotizacion > 0 or resumen_cobro.total_cotizacion_con_iva > 0 %}
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <tr>
+                                                    <td class="text-muted">
+                                                        {% if cotizacion.usuario_acepto %}
+                                                            Piezas aceptadas (sin IVA):
+                                                        {% else %}
+                                                            Piezas cotizadas (sin IVA):
+                                                        {% endif %}
                                                     </td>
                                                     <td class="text-end">
-                                                        <h5 class="mb-0 text-danger">
-                                                            -${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}
-                                                        </h5>
+                                                        <strong>${{ resumen_cobro.subtotal_cotizacion|floatformat:2 }}</strong>
                                                     </td>
                                                 </tr>
-                                            {% endif %}
-
-                                            {% if resumen_cobro.subtotal_cotizacion > 0 or resumen_cobro.total_cotizacion_con_iva > 0 %}
                                                 {% if resumen_cobro.aplica_iva %}
                                                 <tr>
-                                                    <td class="text-muted">Piezas (precio cliente, sin IVA):</td>
-                                                    <td class="text-end"><strong>${{ resumen_cobro.subtotal_cotizacion|floatformat:2 }}</strong></td>
-                                                </tr>
-                                                <tr>
                                                     <td class="text-muted">IVA (16%):</td>
-                                                    <td class="text-end"><strong>${{ resumen_cobro.iva_cotizacion|floatformat:2 }}</strong></td>
+                                                    <td class="text-end">
+                                                        <strong>${{ resumen_cobro.iva_cotizacion|floatformat:2 }}</strong>
+                                                    </td>
                                                 </tr>
                                                 {% endif %}
                                                 <tr style="border-top: 2px solid #28a745;">
                                                     <td class="text-success">
-                                                        <strong>TOTAL A COBRAR (piezas{% if resumen_cobro.aplica_iva %} + IVA{% endif %}):</strong>
+                                                        <strong>Total{% if resumen_cobro.aplica_iva %} (con IVA){% endif %}:</strong>
                                                         {% if resumen_cobro.es_estimado %}
-                                                        <div class="small text-muted">Estimado: la cotización aún no está aceptada.</div>
+                                                        <div class="small text-muted">
+                                                            Estimado — pendiente decisión del cliente.
+                                                        </div>
                                                         {% endif %}
                                                     </td>
                                                     <td class="text-end">
@@ -411,51 +381,9 @@
                                                         </h5>
                                                     </td>
                                                 </tr>
-                                            {% endif %}
-                                        </table>
-                                        
-                                        <!-- Desglose de piezas aceptadas/rechazadas (solo si hay decisión) -->
-                                        {% if cotizacion.usuario_acepto is not None %}
-                                            <hr class="my-3">
-                                            <h6 class="mb-2">
-                                                <i class="bi bi-list-check"></i> Desglose de Piezas
-                                            </h6>
-                                            
-                                            <!-- Piezas Aceptadas -->
-                                            {% with piezas_aceptadas=piezas_cotizadas|dictsort:"aceptada_por_cliente" %}
-                                                {% for pieza in piezas_cotizadas %}
-                                                    {% if pieza.aceptada_por_cliente %}
-                                                        <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
-                                                             style="background-color: rgba(40, 167, 69, 0.1); border-left: 3px solid #28a745; border-radius: 4px;">
-                                                            <div>
-                                                                <small>
-                                                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                                                    <strong>{{ pieza.componente.nombre }}</strong>
-                                                                    <span class="text-muted">× {{ pieza.cantidad }}</span>
-                                                                </small>
-                                                            </div>
-                                                            <small class="text-success fw-bold">${{ pieza.costo_total|floatformat:2 }}</small>
-                                                        </div>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            {% endwith %}
-                                            
-                                            <!-- Piezas Rechazadas -->
-                                            {% for pieza in piezas_cotizadas %}
-                                                {% if pieza.aceptada_por_cliente == False %}
-                                                    <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
-                                                         style="background-color: rgba(220, 53, 69, 0.1); border-left: 3px solid #dc3545; border-radius: 4px;">
-                                                        <div>
-                                                            <small>
-                                                                <i class="bi bi-x-circle-fill text-danger"></i>
-                                                                <strong class="text-muted text-decoration-line-through">{{ pieza.componente.nombre }}</strong>
-                                                                <span class="text-muted">× {{ pieza.cantidad }}</span>
-                                                            </small>
-                                                        </div>
-                                                        <small class="text-danger fw-bold text-decoration-line-through">${{ pieza.costo_total|floatformat:2 }}</small>
-                                                    </div>
-                                                {% endif %}
-                                            {% endfor %}
+                                            </table>
+                                        {% else %}
+                                            <p class="text-muted mb-0 small">Sin piezas con precio al cliente aún.</p>
                                         {% endif %}
                                     </div>
                                 </div>
