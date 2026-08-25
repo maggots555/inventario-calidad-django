@@ -737,4 +737,15 @@ def _pasar_orden_a_piezas_recibidas_si_aplica(orden, solicitud=None) -> bool:
         f"[SYNC_SEGUIMIENTO_RECIBIR] Orden {orden.numero_orden_interno}: "
         f"{estado_anterior} → piezas_recibidas"
     )
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Al llegar la última pieza (diagnóstico o Venta Mostrador) arranca
+    # el reloj de reparación. Si la fecha ya existía, el helper no la pisa.
+    from servicio_tecnico.services.fechas_reparacion import (
+        aplicar_inicio_reparacion_si_vacia,
+    )
+    aplicar_inicio_reparacion_si_vacia(
+        orden,
+        motivo='Piezas Recibidas (Almacén)',
+    )
     return True

@@ -209,6 +209,19 @@ def handle_cambio_estado(request, orden, empleado_actual):
             f'✅ Estado cambiado a: {orden_actualizada.get_estado_display()}'
         )
 
+        # Inicio de reparación si el hito es Piezas Recibidas o En Reparación
+        # y la fecha todavía está vacía (no pisa una fecha previa).
+        if orden_actualizada.estado in ('piezas_recibidas', 'reparacion'):
+            from servicio_tecnico.services.fechas_reparacion import (
+                aplicar_inicio_reparacion_si_vacia,
+            )
+            etiqueta = orden_actualizada.get_estado_display()
+            aplicar_inicio_reparacion_si_vacia(
+                orden_actualizada,
+                empleado_actual,
+                motivo=f'cambio de estado a {etiqueta}',
+            )
+
         # Alerta de cobro (no bloquea): 50% al iniciar / 100% al entregar.
         from servicio_tecnico.services.pagos_orden import (
             mensaje_alerta_pago_por_estado,

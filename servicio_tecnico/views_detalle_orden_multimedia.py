@@ -224,22 +224,66 @@ def handle_subir_imagenes(request, orden, empleado_actual):
                                     'Inicio Diagnóstico registrado: '
                                     f'{fecha_hoy.strftime("%d/%m/%Y")}'
                                 )
+                    else:
+                        # VM: si no esperó piezas, el ingreso arranca la reparación.
+                        # Si Almacén ya puso la fecha (Piezas Recibidas), no se pisa.
+                        from servicio_tecnico.services.fechas_reparacion import (
+                            aplicar_inicio_reparacion_si_vacia,
+                        )
+                        inicio_rep = aplicar_inicio_reparacion_si_vacia(
+                            orden,
+                            empleado_actual,
+                            motivo='imágenes de ingreso (Venta Mostrador)',
+                        )
+                        if inicio_rep['aplicada']:
+                            fecha_rep = inicio_rep['fecha_inicio'].strftime('%d/%m/%Y')
+                            extra = f'Inicio Reparación: {fecha_rep}'
+                            if mensaje_estado:
+                                mensaje_estado += f'; {extra}'
+                            else:
+                                mensaje_estado = extra
 
                 # Si se suben imágenes de REPARACIÓN → Cambiar a "Control de Calidad"
                 # Aplica a todos los tipos de orden (garantía, OOW, diagnóstico, venta mostrador)
-                elif tipo_imagen == 'reparacion' and estado_anterior != 'control_calidad':
-                    orden.estado = 'control_calidad'
-                    cambio_realizado = True
-                    mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Control de Calidad'
+                elif tipo_imagen == 'reparacion':
+                    if estado_anterior != 'control_calidad':
+                        orden.estado = 'control_calidad'
+                        cambio_realizado = True
+                        mensaje_estado = (
+                            f'Estado actualizado: '
+                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
+                            'Control de Calidad'
+                        )
 
-                    # Registrar cambio automático en historial
-                    HistorialOrden.objects.create(
-                        orden=orden,
-                        tipo_evento='estado',
-                        comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Control de Calidad (imágenes de reparación cargadas)',
-                        usuario=empleado_actual,
-                        es_sistema=True
+                        HistorialOrden.objects.create(
+                            orden=orden,
+                            tipo_evento='estado',
+                            comentario=(
+                                f'Cambio automático de estado: '
+                                f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
+                                'Control de Calidad (imágenes de reparación cargadas)'
+                            ),
+                            usuario=empleado_actual,
+                            es_sistema=True
+                        )
+
+                    # Fin de reparación: las fotos cierran el trabajo de taller
+                    # aunque la orden ya estuviera en Control de Calidad.
+                    from servicio_tecnico.services.fechas_reparacion import (
+                        aplicar_fin_reparacion_si_vacia,
                     )
+                    fin_rep = aplicar_fin_reparacion_si_vacia(
+                        orden,
+                        empleado_actual,
+                        motivo='imágenes de reparación',
+                    )
+                    if fin_rep['aplicada']:
+                        fecha_fin = fin_rep['fecha_fin'].strftime('%d/%m/%Y')
+                        extra_fin = f'Fin Reparación: {fecha_fin}'
+                        if mensaje_estado:
+                            mensaje_estado += f'; {extra_fin}'
+                        else:
+                            mensaje_estado = extra_fin
 
                 # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
                 elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
