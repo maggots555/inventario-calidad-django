@@ -111,7 +111,16 @@
                                 <label for="{{ form.numero_serie.id_for_label }}" class="form-label required">
                                     <i class="bi bi-upc-scan"></i> Número de Serie
                                 </label>
-                                {{ form.numero_serie }}
+                                <div class="input-group">
+                                    {{ form.numero_serie }}
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-scanner-codigo-inline"
+                                            id="btnEscanearNumeroSerieCrear"
+                                            title="Escanear QR o código de barras"
+                                            aria-label="Escanear número de serie del equipo">
+                                        <i class="bi bi-camera" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 {% if form.numero_serie.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.numero_serie.errors %}{{ error }}{% endfor %}
@@ -207,7 +216,17 @@
                                     <i class="bi bi-upc"></i> Número de Serie del Cargador
                                     <span class="badge bg-secondary">Opcional</span>
                                 </label>
-                                {{ form.numero_serie_cargador }}
+                                <div class="input-group">
+                                    {{ form.numero_serie_cargador }}
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-scanner-codigo-inline"
+                                            id="btnEscanearCargadorCrear"
+                                            title="Escanear QR o código de barras"
+                                            aria-label="Escanear número de serie del cargador"
+                                            disabled>
+                                        <i class="bi bi-camera" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 {% if form.numero_serie_cargador.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.numero_serie_cargador.errors %}{{ error }}{% endfor %}
@@ -319,6 +338,10 @@
     EXPLICACIÓN: Script TypeScript compilado para funcionalidad Select2 en campo modelo
 -->
 {% load static %}
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.2/dist/iife/reader/index.js"></script>
+<script src="{% static 'js/scanner_codigo.js' %}" defer></script>
+<script src="{% static 'js/scanner_enlace.js' %}" defer></script>
+<script src="{% static 'js/form_nueva_orden_scanner.js' %}" defer></script>
 <script src="{% static 'js/modelo_autocomplete.js' %}"></script>
 
 <!--
@@ -337,6 +360,7 @@ function toggleCargadorFields() {
     
     // Obtener el div que contiene el campo de número de serie del cargador
     const divNumeroSerie = document.getElementById('div_numero_serie_cargador');
+    const btnEscanearCargador = document.getElementById('btnEscanearCargadorCrear');
     
     // Verificar si el checkbox existe (por seguridad)
     if (tieneCargador && divNumeroSerie) {
@@ -344,6 +368,9 @@ function toggleCargadorFields() {
         if (tieneCargador.checked) {
             // MOSTRAR el campo de número de serie
             divNumeroSerie.style.display = 'block';
+            if (btnEscanearCargador) {
+                btnEscanearCargador.disabled = false;
+            }
         } else {
             // OCULTAR el campo de número de serie
             divNumeroSerie.style.display = 'none';
@@ -352,6 +379,9 @@ function toggleCargadorFields() {
             const inputNumeroSerie = document.getElementById('id_numero_serie_cargador');
             if (inputNumeroSerie) {
                 inputNumeroSerie.value = '';
+            }
+            if (btnEscanearCargador) {
+                btnEscanearCargador.disabled = true;
             }
         }
     }

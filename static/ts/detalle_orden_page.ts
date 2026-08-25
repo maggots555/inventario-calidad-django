@@ -229,16 +229,23 @@ _el('formCambioEstado')?.addEventListener('submit', function(e) {
 function toggleCargadorFieldsModal() {
     const checkboxCargador = _el('id_tiene_cargador_modal');
     const divNumeroSerie = _el('divNumeroSerieCargadorModal');
+    const btnEscanearCargador = _el('btnEscanearCargadorModal');
     
     if (checkboxCargador && divNumeroSerie) {
         if (checkboxCargador.checked) {
             divNumeroSerie.style.display = 'block';
+            if (btnEscanearCargador) {
+                btnEscanearCargador.disabled = false;
+            }
         } else {
             divNumeroSerie.style.display = 'none';
             // Limpiar el campo si se desmarca
             const inputNumeroSerie = _el('id_numero_serie_cargador_modal');
             if (inputNumeroSerie) {
                 inputNumeroSerie.value = '';
+            }
+            if (btnEscanearCargador) {
+                btnEscanearCargador.disabled = true;
             }
         }
     }

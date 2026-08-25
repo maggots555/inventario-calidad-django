@@ -12,10 +12,23 @@ interface AbrirScannerCodigoOpciones {
     tituloModal?: string;
 }
 
+/** Condición opcional para enlazarScannerBoton (static/ts/scanner_enlace.ts). */
+interface RequiereCheckboxScanner {
+    id: string;
+    mensaje: string;
+}
+
 interface Window {
     sigmaLoader: InstanceType<typeof DashboardLoader> | null;
     /** Abre modal de cámara y escribe el código detectado en un input */
     abrirScannerCodigo?: (opciones: AbrirScannerCodigoOpciones) => void;
+    /** Enlaza botón cámara + input destino (static/ts/scanner_enlace.ts) */
+    enlazarScannerBoton?: (
+        btnId: string,
+        inputId: string,
+        tituloModal: string,
+        requiereCheckbox?: RequiereCheckboxScanner,
+    ) => void;
     /**
      * Token CSRF (cookie sigma_csrftoken / csrftoken o input del form).
      * Definido en static/ts/csrf.ts y cargado desde base.html.

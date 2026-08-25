@@ -38,6 +38,9 @@ _ASSETS = (
     'detalle_orden_enviar_imagenes',
     'detalle_orden_ver_video',
     'detalle_orden_fabs',
+    'detalle_orden_scanner',
+    'scanner_enlace',
+    'form_nueva_orden_scanner',
 )
 
 
@@ -226,3 +229,9 @@ class DetalleOrdenFaseCContextTest(TestCase):
         self.assertIn('detalle_orden_enviar_imagenes.js', html)
         self.assertIn('detalle_orden_ver_video.js', html)
         self.assertIn('detalle_orden_fabs.js', html)
+        self.assertIn('scanner_codigo.js', html)
+        self.assertIn('scanner_enlace.js', html)
+        self.assertIn('detalle_orden_scanner.js', html)
+        self.assertIn('zxing-wasm@3.1.2', html)
+        self.assertIn('btnEscanearNumeroSerieModal', html)
+        self.assertIn('btnEscanearCargadorModal', html)
