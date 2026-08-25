@@ -801,6 +801,7 @@ def editar_diagnostico_sic(request, orden_id):
         # EXPLICACIÓN: El diagnóstico técnico va en DetalleEquipo porque
         # es información específica del equipo, no de la orden
         fecha_fin_anterior = detalle_equipo.fecha_fin_diagnostico
+        diagnostico_sic_anterior = detalle_equipo.diagnostico_sic or ''
         detalle_equipo.diagnostico_sic = diagnostico_sic
         detalle_equipo.save()
 
@@ -818,6 +819,7 @@ def editar_diagnostico_sic(request, orden_id):
             orden,
             empleado_actual,
             fecha_fin_anterior=fecha_fin_anterior,
+            diagnostico_sic_anterior=diagnostico_sic_anterior,
         )
         
         # Paso 5: Actualizar OrdenServicio

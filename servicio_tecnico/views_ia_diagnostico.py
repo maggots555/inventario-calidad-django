@@ -201,8 +201,9 @@ def guardar_diagnostico_sic_ia(request):
             'error': 'Esta orden no tiene detalle de equipo.',
         }, status=400)
 
-    # Valor ANTES de guardar: el helper detecta "primera vez" de fecha_fin.
+    # Valor ANTES de guardar: el helper detecta "primera vez" de fecha_fin y SIC.
     fecha_fin_anterior = detalle_equipo.fecha_fin_diagnostico
+    diagnostico_sic_anterior = detalle_equipo.diagnostico_sic or ''
 
     # Guardar el diagnóstico; el cierre (fecha_fin / estado) lo hace el helper.
     detalle_equipo.diagnostico_sic = diagnostico_sic
@@ -223,6 +224,7 @@ def guardar_diagnostico_sic_ia(request):
         orden,
         empleado_actual,
         fecha_fin_anterior=fecha_fin_anterior,
+        diagnostico_sic_anterior=diagnostico_sic_anterior,
     )
 
     # Historial breve: queda rastro de que se aceptó una mejora IA

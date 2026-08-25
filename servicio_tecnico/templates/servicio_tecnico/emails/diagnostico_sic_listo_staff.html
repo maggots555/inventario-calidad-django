@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico SIC — {{ referencia_orden }}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f4f8;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #333;
+        }
+        .wrapper {
+            max-width: 640px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+        .header {
+            padding: 28px 32px 22px;
+            text-align: center;
+            border-bottom: 3px solid #1565c0;
+            background: #e8f4fd;
+        }
+        .header.compras {
+            background: #fff8e1;
+            border-bottom-color: #f9a825;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: #051d63;
+            font-weight: 800;
+        }
+        .header.compras h1 { color: #e65100; }
+        .header p { margin: 8px 0 0; font-size: 0.95rem; color: #1565c0; }
+        .content { padding: 28px 32px; }
+        .content p {
+            font-size: 0.95rem;
+            line-height: 1.65;
+            margin: 0 0 14px;
+            color: #374151;
+        }
+        .info-box {
+            margin: 0 0 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border-left: 5px solid #1565c0;
+            padding: 14px 18px;
+        }
+        .info-box.compras { border-left-color: #f9a825; }
+        .info-row { padding: 6px 0; font-size: 0.92rem; }
+        .info-label {
+            font-weight: 700;
+            color: #1e40af;
+            display: inline-block;
+            min-width: 140px;
+        }
+        .sic-box {
+            margin: 0 0 20px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            color: #334155;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 8px;
+            background-color: #1565c0;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 22px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .btn.compras { background-color: #e65100; }
+        .footer {
+            background: #2c3e50;
+            color: #fff;
+            padding: 18px 28px;
+            text-align: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        {% if audiencia == 'compras' %}
+        <div class="header compras">
+            <h1>Diagnóstico SIC disponible — cotizar piezas</h1>
+            <p>Orden {{ referencia_orden }}</p>
+        </div>
+        {% else %}
+        <div class="header">
+            <h1>Diagnóstico listo para compartir</h1>
+            <p>Orden {{ referencia_orden }}</p>
+        </div>
+        {% endif %}
+
+        <div class="content">
+            {% if audiencia == 'compras' %}
+            <p>
+                El técnico guardó el Diagnóstico SIC. Revisa los componentes
+                identificados y comienza la búsqueda o cotización de piezas.
+            </p>
+            {% else %}
+            <p>
+                La orden ya tiene Diagnóstico SIC. Entra al detalle y usa
+                «Enviar diagnóstico» para compartirlo con el cliente.
+            </p>
+            {% endif %}
+
+            <div class="info-box {% if audiencia == 'compras' %}compras{% endif %}">
+                {% if folio_cliente %}
+                <div class="info-row">
+                    <span class="info-label">Folio cliente</span>
+                    {{ folio_cliente }}
+                </div>
+                {% endif %}
+                {% if service_tag %}
+                <div class="info-row">
+                    <span class="info-label">Service Tag</span>
+                    {{ service_tag }}
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">Folio interno</span>
+                    {{ folio_interno }}
+                </div>
+                {% if nombre_cliente %}
+                <div class="info-row">
+                    <span class="info-label">Cliente</span>
+                    {{ nombre_cliente }}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if extracto_sic %}
+            <p><strong>Extracto del Diagnóstico SIC:</strong></p>
+            <div class="sic-box">{{ extracto_sic }}</div>
+            {% endif %}
+
+            <p>
+                {% if audiencia == 'compras' %}
+                <a class="btn compras" href="{{ url_detalle }}">Revisar piezas a cotizar</a>
+                {% else %}
+                <a class="btn" href="{{ url_detalle }}">Abrir orden y enviar al cliente</a>
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="footer">
+            Aviso interno de SIGMA — Servicio Técnico
+            {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
+        </div>
+    </div>
+</body>
+</html>

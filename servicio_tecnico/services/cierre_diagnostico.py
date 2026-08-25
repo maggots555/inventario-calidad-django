@@ -26,6 +26,7 @@ def aplicar_fecha_fin_al_guardar_diagnostico_sic(
     empleado: Any = None,
     *,
     fecha_fin_anterior: Any = None,
+    diagnostico_sic_anterior: str = '',
 ) -> dict[str, Any]:
     """
     Auto-llena fecha_fin_diagnostico y, si es la primera vez, cierra el estado.
@@ -42,6 +43,8 @@ def aplicar_fecha_fin_al_guardar_diagnostico_sic(
         fecha_fin_anterior: Valor de fecha_fin ANTES del guardado del formulario
             (None = no había fecha). Permite detectar "primera vez" aunque el
             técnico la haya puesto a mano en el mismo POST.
+        diagnostico_sic_anterior: Texto del SIC antes del guardado (anti-spam
+            de avisos push/correo al responsable y Compras).
 
     Returns:
         dict con:
@@ -116,5 +119,16 @@ def aplicar_fecha_fin_al_guardar_diagnostico_sic(
                 ),
                 es_sistema=True,
             )
+
+    # Paso 3: avisar a responsable de seguimiento y Compras (primera vez con SIC).
+    from servicio_tecnico.services.notificaciones_diagnostico import (
+        notificar_diagnostico_sic_listo,
+    )
+
+    notificar_diagnostico_sic_listo(
+        orden,
+        diagnostico_sic_anterior=diagnostico_sic_anterior,
+        diagnostico_sic_nuevo=getattr(detalle, 'diagnostico_sic', None) or '',
+    )
 
     return resultado

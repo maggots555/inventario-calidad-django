@@ -42,6 +42,7 @@ def handle_configuracion(request, orden, empleado_actual):
     from .models import DetalleEquipo
     detalle_bd = DetalleEquipo.objects.get(pk=orden.detalle_equipo.pk)
     fecha_fin_anterior = detalle_bd.fecha_fin_diagnostico
+    diagnostico_sic_anterior = detalle_bd.diagnostico_sic or ''
 
     form_config = ConfiguracionAdicionalForm(
         request.POST,
@@ -71,6 +72,7 @@ def handle_configuracion(request, orden, empleado_actual):
             orden,
             empleado_actual,
             fecha_fin_anterior=fecha_fin_anterior,
+            diagnostico_sic_anterior=diagnostico_sic_anterior,
         )
 
         if resultado_cierre['estado_cambiado']:
