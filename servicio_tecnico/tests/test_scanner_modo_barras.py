@@ -68,3 +68,54 @@ class ScannerModoBarrasAssetsTest(SimpleTestCase):
         form_ts = _TS_FORM.read_text(encoding='utf-8')
         self.assertIn("'barras'", form_ts)
         self.assertIn('btnEscanearCargadorCrear', form_ts)
+
+
+class ScannerLentePrincipalAssetsTest(SimpleTestCase):
+    """
+    Humo: el scanner elige la lente 1x y muestra selector si hay varias traseras.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No podemos abrir la cámara en CI. Solo comprobamos que el TypeScript, el
+    JS compilado y el CSS contienen las piezas del plan (heurística + selector).
+    """
+
+    def setUp(self):
+        self.ts = _TS.read_text(encoding='utf-8')
+        self.js = _JS.read_text(encoding='utf-8')
+        self.css = _CSS.read_text(encoding='utf-8')
+
+    def test_fuente_ts_elige_lente_principal(self):
+        """Heurística, persistencia y cambio de lente están en scanner_codigo.ts."""
+        for fragmento in (
+            'sigma_scanner_deviceId',
+            'clasificarLente',
+            'esCamaraFrontal',
+            'elegirCamaraPrincipal',
+            'scannerSelectorLentes',
+            'ultrawide',
+            '0.5',
+            'cambiarLenteScanner',
+            'pistaPareceGranAngular',
+            'deviceId',
+        ):
+            with self.subTest(fragmento=fragmento):
+                self.assertIn(fragmento, self.ts)
+
+    def test_js_compilado_incluye_lente_principal(self):
+        """El build debe generar las mismas piezas en scanner_codigo.js."""
+        for fragmento in (
+            'sigma_scanner_deviceId',
+            'clasificarLente',
+            'elegirCamaraPrincipal',
+            'scannerSelectorLentes',
+            'ultrawide',
+            'cambiarLenteScanner',
+        ):
+            with self.subTest(fragmento=fragmento):
+                self.assertIn(fragmento, self.js)
+
+    def test_css_incluye_selector_lentes_scanner(self):
+        """Botones 0.5x/1x/2x viven en components.css (se carga en todas las pantallas)."""
+        self.assertIn('.scanner-selector-lentes', self.css)
+        self.assertIn('.scanner-btn-lente', self.css)
+        self.assertIn('[data-bs-theme="dark"] .scanner-btn-lente', self.css)

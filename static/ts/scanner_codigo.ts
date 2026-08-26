@@ -14,6 +14,7 @@
  *
  * Efectos secundarios:
  * - Solicita permiso de cámara (getUserMedia)
+ * - Elige la lente principal (1x) cuando el teléfono expone varias traseras
  * - Inyecta un modal Bootstrap en el DOM si no existe
  * - Al detectar: llena el input, dispara evento `input` y cierra el modal
  */
@@ -51,7 +52,31 @@ interface SesionScannerCodigo {
   videoTrack: MediaStreamTrack | null;
   /** Modo activo: recorte cuadrado (2D) o horizontal (barras 1D) */
   modo: ModoScanner;
+  /** Cámaras traseras detectadas (vacío en iPhone típico: 1 sola lente) */
+  camarasTraseras: CamaraTraseraScanner[];
+  /** deviceId de la lente que está transmitiendo ahora */
+  dispositivoActualId: string | null;
+  /**
+   * true si el técnico tocó el selector.
+   * Evita que el auto-cambio por zoom.min pise una elección manual.
+   */
+  lenteElegidaPorUsuario: boolean;
+  /** Evita doble clic al cambiar de lente */
+  cambiandoLente: boolean;
 }
+
+/**
+ * Una cámara trasera listada por enumerateDevices().
+ * EXPLICACIÓN PARA PRINCIPIANTES: el navegador no dice “esta es la 1x”;
+ * solo da un id y un nombre (label). Nosotros clasificamos el label.
+ */
+interface CamaraTraseraScanner {
+  deviceId: string;
+  label: string;
+}
+
+/** Tipo de lente inferido por el nombre que reporta el sistema. */
+type ClasificacionLente = 'ultrawide' | 'tele' | 'macro' | 'principal' | 'desconocido';
 
 /** Resultado de lectura de zxing-wasm */
 interface ZXingWasmReadResult {
@@ -112,7 +137,10 @@ const TIPS_ID = 'scannerCodigoTips';
 const MODO_TOGGLE_ID = 'scannerModoToggle';
 const FRAME_ID = 'scannerCodigoFrame';
 const CONSEJO_ID = 'scannerCodigoConsejo';
+const SELECTOR_LENTES_ID = 'scannerSelectorLentes';
 const STORAGE_MODO_KEY = 'sigma_scanner_modo';
+/** Recuerda la última lente que sí sirvió para escanear en este teléfono */
+const STORAGE_DEVICE_KEY = 'sigma_scanner_deviceId';
 
 /** Segundos sin detección antes del primer aviso de ayuda */
 const SEGUNDOS_ANTES_TIP = 5;
@@ -202,6 +230,10 @@ const sesion: SesionScannerCodigo = {
   opciones: null,
   videoTrack: null,
   modo: 'cuadrado',
+  camarasTraseras: [],
+  dispositivoActualId: null,
+  lenteElegidaPorUsuario: false,
+  cambiandoLente: false,
 };
 
 /**
@@ -211,6 +243,7 @@ const sesion: SesionScannerCodigo = {
 function asegurarModalScanner(): HTMLElement {
   let modal = document.getElementById(MODAL_ID);
   if (modal) {
+    asegurarHostSelectorLentes(modal);
     enlazarToggleModoScanner(modal);
     return modal;
   }
@@ -249,6 +282,7 @@ function asegurarModalScanner(): HTMLElement {
             <div class="scanner-overlay">
               <div id="${FRAME_ID}" class="scanner-frame scanner-frame--preciso"></div>
             </div>
+            <div id="${SELECTOR_LENTES_ID}" class="scanner-selector-lentes" hidden></div>
           </div>
           <div id="${TIPS_ID}" class="mt-3 text-start" hidden></div>
           <div id="${CONSEJO_ID}" class="alert alert-info mt-3 mb-0 text-start small">
@@ -267,6 +301,25 @@ function asegurarModalScanner(): HTMLElement {
   document.body.appendChild(modal);
   enlazarToggleModoScanner(modal);
   return modal;
+}
+
+/**
+ * Si el modal ya existía (sesión previa), garantiza el host del selector.
+ * Va FUERA de .scanner-overlay porque ese overlay tiene pointer-events: none.
+ */
+function asegurarHostSelectorLentes(modal: HTMLElement): void {
+  if (modal.querySelector(`#${SELECTOR_LENTES_ID}`)) {
+    return;
+  }
+  const contenedor = modal.querySelector('.scanner-container');
+  if (!contenedor) {
+    return;
+  }
+  const host = document.createElement('div');
+  host.id = SELECTOR_LENTES_ID;
+  host.className = 'scanner-selector-lentes';
+  host.hidden = true;
+  contenedor.appendChild(host);
 }
 
 /**
@@ -292,6 +345,133 @@ function persistirModoScanner(modo: ModoScanner): void {
     localStorage.setItem(STORAGE_MODO_KEY, modo);
   } catch {
     // Ignorar si no se puede persistir
+  }
+}
+
+/**
+ * ¿El label describe una cámara frontal (selfie)?
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES: enumerateDevices() mezcla frontales y
+ * traseras. El scanner siempre quiere la trasera (el equipo está sobre la mesa).
+ */
+function esCamaraFrontal(label: string): boolean {
+  const l = label.toLowerCase();
+  return (
+    l.includes('front')
+    || l.includes('user')
+    || l.includes('selfie')
+    || l.includes('facing front')
+  );
+}
+
+/**
+ * Clasifica una lente por el nombre que reporta Android/iOS.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES: la API web NO tiene un campo “lente 1x”.
+ * Chrome en Android a veces llama al gran angular “ultra-wide” o “0.5”;
+ * iPhone suele decir “Back Camera” y solo expone una trasera.
+ *
+ * “wide” solo (sin ultra) NO lo tratamos como gran angular: en iOS “Wide”
+ * es la cámara principal.
+ */
+function clasificarLente(label: string): ClasificacionLente {
+  const l = label.toLowerCase();
+  // Gran angular: distorsiona y aleja el código — pésimo para Data Matrix.
+  if (
+    l.includes('ultra')
+    || l.includes('ultrawide')
+    || l.includes('0.5')
+    || l.includes('wide-angle')
+    || l.includes('wide angle')
+  ) {
+    return 'ultrawide';
+  }
+  if (
+    l.includes('tele')
+    || l.includes('2x')
+    || l.includes('3x')
+    || l.includes('5x')
+  ) {
+    return 'tele';
+  }
+  if (l.includes('macro')) {
+    return 'macro';
+  }
+  if (
+    l.includes('back')
+    || l.includes('rear')
+    || l.includes('environment')
+    || l.includes('facing back')
+  ) {
+    return 'principal';
+  }
+  return 'desconocido';
+}
+
+/**
+ * Puntaje para elegir default: mayor = mejor para leer códigos.
+ * Principal gana; gran angular queda al fondo (sigue disponible en el selector).
+ */
+function puntajeLente(label: string): number {
+  const tipo = clasificarLente(label);
+  if (tipo === 'principal') {
+    return 100;
+  }
+  if (tipo === 'desconocido') {
+    return 50;
+  }
+  if (tipo === 'tele') {
+    return 20;
+  }
+  if (tipo === 'macro') {
+    return 10;
+  }
+  return 0;
+}
+
+/**
+ * Elige la lente con la que debe abrir el scanner.
+ *
+ * @param camaras - Solo traseras (ya filtradas)
+ * @param deviceIdGuardado - Última lente que funcionó en este teléfono, o null
+ */
+function elegirCamaraPrincipal(
+  camaras: CamaraTraseraScanner[],
+  deviceIdGuardado: string | null,
+): string | null {
+  if (camaras.length === 0) {
+    return null;
+  }
+  // Preferencia del técnico (o la que auto-corregimos la vez anterior)
+  if (deviceIdGuardado && camaras.some((c) => c.deviceId === deviceIdGuardado)) {
+    return deviceIdGuardado;
+  }
+  let mejor = camaras[0];
+  let mejorPuntaje = puntajeLente(mejor.label);
+  for (let i = 1; i < camaras.length; i += 1) {
+    const candidata = camaras[i];
+    const puntaje = puntajeLente(candidata.label);
+    if (puntaje > mejorPuntaje) {
+      mejor = candidata;
+      mejorPuntaje = puntaje;
+    }
+  }
+  return mejor.deviceId;
+}
+
+function obtenerDeviceIdPersistido(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_DEVICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistirDeviceIdScanner(deviceId: string): void {
+  try {
+    localStorage.setItem(STORAGE_DEVICE_KEY, deviceId);
+  } catch {
+    // localStorage bloqueado (modo privado, etc.)
   }
 }
 
@@ -832,7 +1012,7 @@ function iniciarLoopDeteccion(): void {
   let indiceTick = 0;
 
   sesion.intervaloQr = window.setInterval(() => {
-    if (!sesion.activa || !sesion.video) {
+    if (!sesion.activa || !sesion.video || sesion.cambiandoLente) {
       return;
     }
     if (sesion.analizandoFrame) {
@@ -925,19 +1105,17 @@ function procesarCodigoDetectado(codigo: string, tipo: string): void {
  */
 function detenerScannerCodigo(): void {
   sesion.activa = false;
+  sesion.cambiandoLente = false;
   limpiarTimersFeedback();
   ocultarTipsSinDeteccion();
+  ocultarSelectorLentesScanner();
 
   if (sesion.intervaloQr !== null) {
     window.clearInterval(sesion.intervaloQr);
     sesion.intervaloQr = null;
   }
 
-  if (sesion.video && sesion.video.srcObject) {
-    const stream = sesion.video.srcObject as MediaStream;
-    stream.getTracks().forEach((track) => track.stop());
-    sesion.video.srcObject = null;
-  }
+  detenerTracksActuales();
 
   if (sesion.canvas && sesion.canvas.parentNode) {
     sesion.canvas.parentNode.removeChild(sesion.canvas);
@@ -952,8 +1130,309 @@ function detenerScannerCodigo(): void {
   sesion.canvas = null;
   sesion.canvasCtx = null;
   sesion.videoTrack = null;
+  sesion.camarasTraseras = [];
+  sesion.dispositivoActualId = null;
+  sesion.lenteElegidaPorUsuario = false;
   sesion.framesSinExito = 0;
   sesion.analizandoFrame = false;
+}
+
+/**
+ * Corta el stream actual sin destruir el <video> (hace falta al cambiar de lente).
+ */
+function detenerTracksActuales(): void {
+  if (sesion.video && sesion.video.srcObject) {
+    const stream = sesion.video.srcObject as MediaStream;
+    stream.getTracks().forEach((track) => track.stop());
+    sesion.video.srcObject = null;
+  }
+  sesion.videoTrack = null;
+}
+
+function esperarMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Lista cámaras traseras. Hay que pedir permiso ANTES: si no, los labels
+ * llegan vacíos y no podemos distinguir gran angular de 1x.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES: abrimos un stream temporal solo para que
+ * el navegador rellene los nombres; lo cerramos de inmediato. En iPhone
+ * suele haber 1 trasera → el selector se oculta solo.
+ */
+async function detectarCamarasTraseras(): Promise<void> {
+  if (sesion.camarasTraseras.length > 0) {
+    return;
+  }
+
+  let streamTemporal: MediaStream | null = null;
+  try {
+    streamTemporal = await navigator.mediaDevices.getUserMedia({ video: true });
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+
+    const traseras: CamaraTraseraScanner[] = [];
+    for (const camara of videoInputs) {
+      if (esCamaraFrontal(camara.label)) {
+        continue;
+      }
+      traseras.push({ deviceId: camara.deviceId, label: camara.label });
+    }
+
+    // Si no pudimos clasificar ninguna, usamos todas (mejor eso que quedarnos ciegos)
+    sesion.camarasTraseras = traseras.length > 0
+      ? traseras
+      : videoInputs.map((c) => ({ deviceId: c.deviceId, label: c.label }));
+  } catch (err) {
+    console.warn('No se pudieron listar cámaras del scanner:', err);
+    sesion.camarasTraseras = [];
+  } finally {
+    if (streamTemporal) {
+      streamTemporal.getTracks().forEach((t) => t.stop());
+    }
+    // Android a veces no libera el hardware al instante
+    await esperarMs(200);
+  }
+}
+
+/**
+ * Constraints del preview. Con deviceId pedimos ESA lente; si no, “trasera”.
+ */
+function construirConstraintsVideo(
+  deviceId: string | null,
+  estricto: boolean,
+): MediaTrackConstraints {
+  const constraints: MediaTrackConstraints = estricto
+    ? {
+        width: { ideal: 1280, max: 1280 },
+        height: { ideal: 720, max: 720 },
+        frameRate: { ideal: 30, max: 30 },
+      }
+    : {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+
+  if (deviceId) {
+    constraints.deviceId = { exact: deviceId };
+  } else {
+    constraints.facingMode = estricto ? { ideal: 'environment' } : 'environment';
+  }
+  return constraints;
+}
+
+async function solicitarStreamCamara(
+  deviceId: string | null,
+  estricto: boolean,
+): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    video: construirConstraintsVideo(deviceId, estricto),
+    audio: false,
+  });
+}
+
+/**
+ * Engancha el stream al <video> ya creado y aplica enfoque/zoom suave.
+ */
+async function adjuntarStreamAlVideo(stream: MediaStream): Promise<void> {
+  if (!sesion.video) {
+    throw new Error('No se pudo crear el elemento de video.');
+  }
+  const track = stream.getVideoTracks()[0] || null;
+  sesion.videoTrack = track;
+  if (track) {
+    await aplicarMejorasEnfoque(track);
+  }
+  sesion.video.srcObject = stream;
+
+  // EXPLICACIÓN PARA PRINCIPIANTES: a veces el video ya tiene metadatos
+  // cuando asignamos el stream (sobre todo al cambiar de lente). Si
+  // esperamos el evento loadedmetadata y ya se disparó, nos quedamos colgados.
+  const aplicarTamanoCanvas = (): void => {
+    if (sesion.canvas && sesion.video) {
+      sesion.canvas.width = sesion.video.videoWidth;
+      sesion.canvas.height = sesion.video.videoHeight;
+    }
+  };
+  if (sesion.video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    aplicarTamanoCanvas();
+  } else {
+    await new Promise<void>((resolve) => {
+      sesion.video!.addEventListener(
+        'loadedmetadata',
+        () => {
+          aplicarTamanoCanvas();
+          resolve();
+        },
+        { once: true },
+      );
+    });
+  }
+  await sesion.video.play();
+}
+
+/**
+ * Chrome en Android: el gran angular suele reportar zoom.min < 1 (p. ej. 0.5).
+ * La lente 1x arranca en 1.0. Si el técnico ya eligió a mano, no tocamos nada.
+ */
+function pistaPareceGranAngular(track: MediaStreamTrack): boolean {
+  if (clasificarLente(track.label) === 'ultrawide') {
+    return true;
+  }
+  if (typeof track.getCapabilities !== 'function') {
+    return false;
+  }
+  const caps = track.getCapabilities() as MediaTrackCapabilities & {
+    zoom?: { min?: number };
+  };
+  return Boolean(caps.zoom && typeof caps.zoom.min === 'number' && caps.zoom.min < 1);
+}
+
+/**
+ * Si abrimos el 0.5x por error, saltamos a otra trasera (no ultrawide si hay).
+ */
+async function corregirGranAngularSiAplica(): Promise<void> {
+  if (sesion.lenteElegidaPorUsuario || !sesion.videoTrack) {
+    return;
+  }
+  if (!pistaPareceGranAngular(sesion.videoTrack)) {
+    return;
+  }
+  const actual = sesion.dispositivoActualId;
+  const noUltra = sesion.camarasTraseras.find(
+    (c) => c.deviceId !== actual && clasificarLente(c.label) !== 'ultrawide',
+  );
+  const cualquiera = sesion.camarasTraseras.find((c) => c.deviceId !== actual);
+  const alternativa = noUltra || cualquiera;
+  if (!alternativa) {
+    return;
+  }
+  await cambiarLenteScanner(alternativa.deviceId, 'auto');
+}
+
+/**
+ * Icono/texto del botón — mismo criterio visual que la cámara de fotos.
+ */
+function obtenerInfoLenteScanner(
+  label: string,
+  index: number,
+): { icono: string; texto: string } {
+  const tipo = clasificarLente(label);
+  if (tipo === 'ultrawide') {
+    return { icono: 'bi-arrows-angle-expand', texto: '0.5x' };
+  }
+  if (tipo === 'tele') {
+    return { icono: 'bi-zoom-in', texto: '2x' };
+  }
+  if (tipo === 'macro') {
+    return { icono: 'bi-flower1', texto: 'Macro' };
+  }
+  if (tipo === 'principal') {
+    return { icono: 'bi-camera', texto: '1x' };
+  }
+  return { icono: 'bi-camera', texto: index === 0 ? '1x' : `Lente ${index + 1}` };
+}
+
+function ocultarSelectorLentesScanner(): void {
+  const host = document.getElementById(SELECTOR_LENTES_ID);
+  if (!host) {
+    return;
+  }
+  host.hidden = true;
+  host.innerHTML = '';
+}
+
+/**
+ * Pinta 0.5x / 1x / 2x solo si hay más de una trasera.
+ * EXPLICACIÓN PARA PRINCIPIANTES: en iPhone casi nunca aparece; en Android
+ * con triple cámara sí, por si la heurística se equivoca.
+ */
+function actualizarSelectorLentesScanner(): void {
+  const host = document.getElementById(SELECTOR_LENTES_ID);
+  if (!host) {
+    return;
+  }
+  if (sesion.camarasTraseras.length <= 1) {
+    ocultarSelectorLentesScanner();
+    return;
+  }
+
+  host.hidden = false;
+  host.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
+  sesion.camarasTraseras.forEach((camara, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'scanner-btn-lente';
+    btn.title = camara.label || `Lente ${index + 1}`;
+    if (camara.deviceId === sesion.dispositivoActualId) {
+      btn.classList.add('active');
+    }
+    const { icono, texto } = obtenerInfoLenteScanner(camara.label, index);
+    btn.innerHTML = `<i class="bi ${icono}" aria-hidden="true"></i> ${texto}`;
+    btn.addEventListener('click', () => {
+      void cambiarLenteScanner(camara.deviceId, 'usuario');
+    });
+    fragment.appendChild(btn);
+  });
+
+  host.appendChild(fragment);
+}
+
+/**
+ * Cambia de lente sin cerrar el modal ni el modo cuadrado/barras.
+ *
+ * @param deviceId - Cámara destino
+ * @param origen - 'usuario' (tocó el botón) o 'auto' (corrección zoom.min)
+ */
+async function cambiarLenteScanner(
+  deviceId: string,
+  origen: 'usuario' | 'auto',
+): Promise<void> {
+  if (sesion.cambiandoLente) {
+    return;
+  }
+  if (deviceId === sesion.dispositivoActualId && sesion.videoTrack) {
+    return;
+  }
+
+  sesion.cambiandoLente = true;
+  try {
+    sesion.dispositivoActualId = deviceId;
+    if (origen === 'usuario') {
+      sesion.lenteElegidaPorUsuario = true;
+    }
+    persistirDeviceIdScanner(deviceId);
+
+    detenerTracksActuales();
+    await esperarMs(150);
+
+    let stream: MediaStream;
+    try {
+      stream = await solicitarStreamCamara(deviceId, true);
+    } catch (err) {
+      const nombre = (err as DOMException).name;
+      if (nombre === 'OverconstrainedError') {
+        stream = await solicitarStreamCamara(deviceId, false);
+      } else {
+        throw err;
+      }
+    }
+    await adjuntarStreamAlVideo(stream);
+    actualizarSelectorLentesScanner();
+  } catch (err) {
+    console.error('No se pudo cambiar de lente del scanner:', err);
+    mostrarEstadoScanner(
+      'warning',
+      'No se pudo cambiar de lente. Prueba otra o escribe el código a mano.',
+    );
+  } finally {
+    sesion.cambiandoLente = false;
+  }
 }
 
 /**
@@ -969,9 +1448,9 @@ async function iniciarSesionCamara(): Promise<void> {
   }
 
   const hostOk =
-    location.protocol === 'https:' ||
-    location.hostname === 'localhost' ||
-    location.hostname === '127.0.0.1';
+    location.protocol === 'https:'
+    || location.hostname === 'localhost'
+    || location.hostname === '127.0.0.1';
   if (!hostOk) {
     mostrarEstadoScanner(
       'warning',
@@ -996,39 +1475,36 @@ async function iniciarSesionCamara(): Promise<void> {
       throw new Error('No se pudo crear el elemento de video.');
     }
 
+    await detectarCamarasTraseras();
+    const guardado = obtenerDeviceIdPersistido();
+    const deviceId = elegirCamaraPrincipal(sesion.camarasTraseras, guardado);
+    sesion.dispositivoActualId = deviceId;
+    sesion.lenteElegidaPorUsuario = Boolean(
+      guardado && deviceId === guardado,
+    );
+
     // EXPLICACIÓN PARA PRINCIPIANTES:
     // 1280×720 se ve fluido en tablets; el recorte central ampliado aporta detalle.
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280, max: 1280 },
-        height: { ideal: 720, max: 720 },
-        frameRate: { ideal: 30, max: 30 },
-      },
-    });
-
-    const track = stream.getVideoTracks()[0] || null;
-    sesion.videoTrack = track;
-    if (track) {
-      await aplicarMejorasEnfoque(track);
+    // Pedimos deviceId exacto para no caer en el gran angular por default.
+    let stream: MediaStream;
+    try {
+      stream = await solicitarStreamCamara(deviceId, true);
+    } catch (err) {
+      const nombre = (err as DOMException).name;
+      if (nombre === 'OverconstrainedError') {
+        await iniciarSesionCamaraFallback(deviceId);
+        return;
+      }
+      throw err;
     }
 
-    sesion.video.srcObject = stream;
-    await new Promise<void>((resolve) => {
-      sesion.video!.addEventListener(
-        'loadedmetadata',
-        () => {
-          if (sesion.canvas && sesion.video) {
-            sesion.canvas.width = sesion.video.videoWidth;
-            sesion.canvas.height = sesion.video.videoHeight;
-          }
-          resolve();
-        },
-        { once: true },
-      );
-    });
+    await adjuntarStreamAlVideo(stream);
+    await corregirGranAngularSiAplica();
+    if (sesion.dispositivoActualId) {
+      persistirDeviceIdScanner(sesion.dispositivoActualId);
+    }
+    actualizarSelectorLentesScanner();
 
-    await sesion.video.play();
     sesion.activa = true;
     sesion.inicioEscaneoMs = Date.now();
     sesion.framesSinExito = 0;
@@ -1054,8 +1530,7 @@ async function iniciarSesionCamara(): Promise<void> {
     } else if (err.name === 'NotFoundError') {
       mostrarEstadoScanner('error', 'No se encontró cámara en este dispositivo.');
     } else if (err.name === 'OverconstrainedError') {
-      // Fallback: constraints estrictas fallaron → pedir sin max
-      await iniciarSesionCamaraFallback();
+      await iniciarSesionCamaraFallback(sesion.dispositivoActualId);
     } else {
       mostrarEstadoScanner(
         'error',
@@ -1068,29 +1543,27 @@ async function iniciarSesionCamara(): Promise<void> {
 /**
  * Segunda oportunidad si el dispositivo no acepta 1280×720 exacto.
  */
-async function iniciarSesionCamaraFallback(): Promise<void> {
+async function iniciarSesionCamaraFallback(deviceId: string | null): Promise<void> {
   try {
-    prepararVideoYCanvas();
+    if (!sesion.video) {
+      prepararVideoYCanvas();
+    }
     if (!sesion.video) {
       throw new Error('No se pudo crear el elemento de video.');
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    });
-    const track = stream.getVideoTracks()[0] || null;
-    sesion.videoTrack = track;
-    if (track) {
-      await aplicarMejorasEnfoque(track);
+    let stream: MediaStream;
+    try {
+      stream = await solicitarStreamCamara(deviceId, false);
+    } catch {
+      // Último recurso: cualquier trasera, sin deviceId
+      stream = await solicitarStreamCamara(null, false);
     }
-    sesion.video.srcObject = stream;
-    await new Promise<void>((resolve) => {
-      sesion.video!.addEventListener('loadedmetadata', () => resolve(), { once: true });
-    });
-    await sesion.video.play();
+    await adjuntarStreamAlVideo(stream);
+    await corregirGranAngularSiAplica();
+    if (sesion.dispositivoActualId) {
+      persistirDeviceIdScanner(sesion.dispositivoActualId);
+    }
+    actualizarSelectorLentesScanner();
     sesion.activa = true;
     sesion.inicioEscaneoMs = Date.now();
     mostrarEstadoScanner(
