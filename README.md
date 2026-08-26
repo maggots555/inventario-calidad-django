@@ -38,1390 +38,220 @@
 
 ---
 
-**Sistema empresarial de última generación** para centros de servicio técnico de equipos de cómputo con **Machine Learning**, **Analytics avanzado**, **TypeScript frontend** y **arquitectura multi-país**.
+**SIGMA** es un sistema de gestión para **centros de servicio técnico de equipos de cómputo**: órdenes de reparación, control de calidad, almacén/cotizador, evidencia foto/video y seguimiento al cliente.
 
-Combina gestión de órdenes de servicio, control de calidad, **predicciones con IA**, **dashboards interactivos tipo Power BI**, seguimiento de incidencias, sistema RHITSO para casos complejos, **procesamiento en segundo plano con Celery + Redis**, **encuestas de satisfacción**, **evidencia en video con análisis IA**, **seguimiento público PWA con push para clientes fuera de garantía**, **cotización de equipos reacondicionados** e **integración SICSER** (consulta e importación de órdenes).
+Incluye analytics (Plotly/pandas), trabajos en segundo plano (Celery + Redis), PWA instalable (staff y portal cliente), arquitectura **multi-país** (BD por tenant) e IA asistida opcional (Ollama / Gemini) para diagnóstico y portal público. Integración **SICSER** en Fase 1 (consulta e importación; sin escrituras externas).
+
+> Producto: **SIGMA v1.0.0** (independiente de la versión de Django).  
+> Detalle de módulos, fases y reglas de desarrollo → [`docs/`](./docs/) y [`AGENTS.md`](./AGENTS.md).
 
 ---
 
-## 📸 Capturas de Pantalla
-
-### Dashboard Principal - Score Card
+## Capturas de pantalla
 
 <p align="center">
   <img src="docs/screenshots/dashboard_scorecard.png" alt="Dashboard Score Card" width="800">
   <br>
-  <em>Dashboard interactivo con métricas en tiempo real, gráficas de tendencias y KPIs principales</em>
+  <em>Dashboard Score Card — KPIs y tendencias</em>
 </p>
-
-### Gestión de Órdenes de Servicio
 
 <p align="center">
   <img src="docs/screenshots/lista_ordenes.png" alt="Lista de Órdenes" width="800">
   <br>
-  <em>Sistema de gestión de órdenes con 21 estados de seguimiento y filtros avanzados</em>
+  <em>Gestión de órdenes de servicio</em>
 </p>
-
-### Detalle de Orden con RHITSO
 
 <p align="center">
   <img src="docs/screenshots/detalle_orden_rhitso.png" alt="Detalle Orden RHITSO" width="800">
   <br>
-  <em>Vista detallada con seguimiento RHITSO, timeline de eventos e incidencias</em>
+  <em>Detalle de orden con seguimiento RHITSO</em>
 </p>
-
-### Registro de Incidencias de Calidad
 
 <p align="center">
   <img src="docs/screenshots/form_incidencia.png" alt="Formulario Incidencia" width="800">
   <br>
-  <em>Formulario inteligente con autocompletado, detección de reincidencias y drag & drop de imágenes</em>
+  <em>Registro de incidencias de calidad</em>
 </p>
-
-### Reportes Avanzados con 7 Tabs
 
 <p align="center">
   <img src="docs/screenshots/reportes_avanzados.png" alt="Reportes Avanzados" width="800">
   <br>
-  <em>Sistema de reportes con Pareto, heatmaps, análisis de atribuibilidad y exportación Excel</em>
+  <em>Reportes avanzados (Pareto, heatmaps, atribuibilidad)</em>
 </p>
-
-### Sistema de Notificaciones
 
 <p align="center">
   <img src="docs/screenshots/notificaciones.png" alt="Sistema de Notificaciones" width="800">
   <br>
-  <em>Historial de notificaciones enviadas con seguimiento de éxito/fallo</em>
+  <em>Historial de notificaciones</em>
 </p>
 
-> **Nota**: Las capturas de pantalla se encuentran en la carpeta [`docs/screenshots/`](./docs/screenshots/). Si no las ves, significa que aún no se han agregado al repositorio.
+Más capturas y guía de actualización: [`docs/screenshots/`](./docs/screenshots/).
 
 ---
 
-## 🎯 Módulos Principales del Sistema
+## Módulos principales
 
-### 1️⃣ **Servicio Técnico** - Gestión de Órdenes de Reparación
+| App | Rol |
+|-----|-----|
+| **`servicio_tecnico`** | Núcleo del taller: órdenes, cotizaciones ST, RHITSO, multimedia, encuestas, portal de seguimiento, SICSER |
+| **`almacen`** | Inventario central, compras, cotizador (profit / reacondicionados) y sync Almacén ↔ ST |
+| **`scorecard`** | Incidencias de calidad, atribuibilidad, reportes y exportación Excel |
+| **`inventario`** | Base compartida: sucursales, empleados y legado de productos |
+| **`notificaciones`** | Campanita in-app + Web Push (staff y cliente) |
 
-**Módulo**: `servicio_tecnico`
-
-Sistema completo de órdenes de servicio técnico con flujo dual:
-
-- **📋 Diagnóstico y Cotización**: Evaluación técnica → Cotización → Aprobación cliente → Reparación
-- **🛍️ Venta Mostrador**: Servicios directos sin diagnóstico (formateos, instalaciones, upgrades)
-- **🔄 Sistema Híbrido**: Una orden puede combinar ambos flujos (diagnóstico + ventas adicionales)
-
-**Características principales:**
-
-- ✅ Gestión completa del ciclo de vida de reparaciones
-- ✅ 21 estados de seguimiento (desde ingreso hasta entrega)
-- ✅ **Autocompletado Inteligente**: Buscador avanzado de modelos de equipos con `ReferenciaGamaEquipo` y `Select2`.
-- ✅ Sistema de cotización con gestión de piezas y proveedores
-- ✅ Seguimiento de piezas solicitadas (WPB, DOA, PNC)
-- ✅ Referencias de gama de equipos para cotización rápida
-- ✅ Historial completo de eventos por orden
-- ✅ Sistema de imágenes con tipos (ingreso, diagnóstico, reparación, entrega, packing)
-- ✅ **Cámara Integrada**: Captura de fotos directamente desde dispositivos móviles con selector de lentes, orientación híbrida y UI minimalista
-- ✅ **Envío de Diagnóstico por PDF**: Generación automática de PDF con componentes dinámicos y mano de obra editable, enviado al cliente por correo
-- ✅ **Seguimiento Público OOW/FL**: Portal de seguimiento para clientes de órdenes fuera de garantía con galería de imágenes, timeline y PDF de diagnóstico
-- ✅ **PWA + Web Push del Cliente**: Portal instalable en móvil con `PushSubscriptionCliente` (sin cuenta Django), distinto del push interno de staff
-- ✅ **Analytics de Adopción**: Eventos de producto (`EventoSeguimientoCliente`) + embudo PWA/push/chat + KPIs de notificaciones push
-- ✅ **Dashboard OOW/FL**: Panel de métricas para seguimiento de clientes fuera de garantía con filtros avanzados
-- ✅ **Encuestas de Satisfacción**: Sistema NPS con envío automático por correo y dashboard de resultados
-- ✅ **Concentrado Semanal CIS**: Reporte semanal con exportación a Excel mensual
-- ✅ **Correo de Cotización Rechazada**: Notificación con feedback del cliente mediante token seguro
-- ✅ **PDF y Análisis de Feedback de Rechazos**: PDF de rechazos + analizador de sentimiento/feedback (cascada Ollama/Gemini)
-- ✅ Venta mostrador con paquetes predefinidos y servicios adicionales
-- ✅ Integración con sistema de calidad para reingresos
-- ✅ **Buscador Inteligente de Reingresos**: Búsqueda de orden original con chip visual
-- ✅ **Mejorador de Diagnóstico con IA**: Corrección y mejora de redacción del diagnóstico técnico usando IA (Ollama local o Google Gemini en la nube), con reglas estrictas que garantizan no modificar el contenido técnico
-- ✅ **Chatbot IA en Portal Público del Cliente**: Asistente flotante en la vista de seguimiento con contexto completo de la orden (cotización, piezas, venta mostrador), seguridad anti-injection y rate limit
-- ✅ **Banners Promocionales**: Carrusel de banners en portal público con panel de administración Django para gestión sin código
-- ✅ **Modal de Estado de Piezas**: Timeline animado por pieza visible al cliente cuando la orden espera piezas, con estados de retraso y daños
-- ✅ **Panel Mi Perfil**: Vista personalizada por rol con estadísticas, comentarios de clientes, descarga de órdenes activas en Excel y métricas de venta mostrador
-- ✅ **Directorio de Empleados**: Panel con estadísticas por empleado consultable por gerencia
-- ✅ **Redes Sociales Dinámicas**: Links de RRSS (Instagram, Facebook, TikTok) configurados por sucursal en páginas públicas
-- ✅ **Galería de Videos de Evidencia**: Subida, reproducción y compresión asíncrona vía Celery + FFmpeg
-- ✅ **Cámara de Video Integrada**: Grabación nativa desde móviles con selector de lentes, 720p/60fps y cronómetro
-- ✅ **Video Resumen de Galería**: Generación automática con efecto Ken Burns, transiciones xfade y música ambient
-- ✅ **Envío de Evidencia en Video al Cliente**: Extracción de frames + análisis IA opcional (Ollama/Gemini) + correo
-- ✅ **Dictado por Voz en Diagnóstico SIC**: Web Speech API → Ollama Whisper → Google Gemini con deduplicación de segmentos
-- ✅ **Inspector Visual IA**: Análisis estético opcional de imágenes de ingreso antes de enviar al cliente
-- ✅ **Web Push Notifications (staff)**: Alertas push a técnicos e inspectores (listas blancas de estados en `signals.py`)
-- ✅ **Recordatorio de Imágenes**: Celery Beat diario avisa si faltan fotos de ingreso/diagnóstico/reparación
-- ✅ **Integración SICSER (Fase 1)**: Consulta de listados OOW/garantías e importación de órdenes a SIGMA (solo lectura + caché Redis)
-- ✅ **Análisis de Candidatos RHITSO**: Reporte/analytics de equipos aptos y no aptos para envío externo
-
-**Estados del flujo:**
-
-```
-INGRESO → ASIGNADO → EN DIAGNÓSTICO → DIAGNÓSTICO ENVIADO →
-EQUIPO DIAGNOSTICADO → COTIZACIÓN ENVIADA → CLIENTE ACEPTA →
-PIEZAS SOLICITADAS → PIEZAS RECIBIDAS → EN REPARACIÓN →
-REPARACIÓN COMPLETADA → CONTROL CALIDAD → LISTO PARA ENTREGA → ENTREGADO
-```
-
-**Casos especiales:**
-
-- WPB (Wrong Part Bought): Pieza incorrecta
-- DOA (Dead On Arrival): Pieza dañada
-- PNC (Part Not Compatible): Parte no disponible
-- Cliente rechaza cotización
+`config/` concentra settings, URLs, Celery, multi-país, PWA y constantes de dominio.
 
 ---
 
-### 2️⃣ **Score Card de Calidad** - Control de Calidad e Incidencias
+## Capacidades clave
 
-**Módulo**: `scorecard`
-
-Sistema avanzado de registro y análisis de incidencias de calidad en reparaciones.
-
-**Características principales:**
-
-- ✅ Registro detallado de incidencias con 4 niveles de severidad (Baja, Media, Alta, Crítica)
-- ✅ Clasificación por tipo de fallo (Estético, Funcional, Software, Hardware, Documentación)
-- ✅ **Sistema de Atribuibilidad**: Distingue entre errores atribuibles al técnico vs. causas externas
-- ✅ Detección automática de reincidencias por número de serie
-- ✅ Gestión de evidencias fotográficas con drag & drop
-- ✅ **Sistema de Notificaciones por Email**: Automatizado y manual con múltiples destinatarios
-- ✅ Workflow completo: Abierta → En Revisión → Reincidente → Cerrada
-- ✅ Seguimiento de componentes defectuosos
-- ✅ Justificaciones para incidencias NO atribuibles
-
-**Dashboard de Métricas:**
-
-- 📊 KPIs en tiempo real (Total incidencias, Tasa de reincidencia, Promedio de cierre)
-- 📈 Gráficas de tendencias y análisis
-- 🏆 Ranking de técnicos por desempeño
-- 📉 Análisis de Pareto de fallos más frecuentes
-
-**Reportes Avanzados con 7 Tabs:**
-
-1. **Resumen Ejecutivo**: KPIs, Pareto, Heatmaps, Tendencias
-2. **Atribuibilidad**: Análisis de responsabilidad técnica
-3. **Por Técnico**: Scorecard individual de cada técnico
-4. **Reincidencias**: Cadenas de reincidencias detectadas
-5. **Tiempos**: Análisis de tiempos de cierre y alertas
-6. **Componentes**: Componentes más problemáticos
-7. **Notificaciones**: Análisis del sistema de emails
-
-**Exportación:**
-
-- 📥 Excel completo con múltiples hojas de análisis
-- 🖨️ Impresión optimizada de reportes
+- Ciclo de vida de órdenes (22 estados) con piezas WPB/DOA/PNC, venta mostrador e historial
+- Cotizador de almacén sincronizado con ST (incl. cotizaciones sin orden y reacondicionados)
+- RHITSO: seguimiento de reparaciones externas, PDF y analytics de candidatos
+- Score Card: incidencias, reincidencias, reportes multi-tab y notificaciones por correo
+- Evidencia multimedia: cámara foto/video, compresión FFmpeg vía Celery, video resumen
+- Portal público OOW/FL: timeline, galería, PDF, chat IA opcional, PWA + push del cliente
+- PWA staff, dark mode, permisos por grupos Django, django-axes
+- Multi-país por subdominio (`mexico`, `argentina`, `chile`, `colombia`) con `db_alias` en Celery
+- Dashboards Plotly y predictores ML (scikit-learn) sobre histórico de cotizaciones/rechazos
+- SICSER Fase 1: listados e importación a SIGMA (caché Redis; solo lectura hacia SICSER)
 
 ---
 
-### 3️⃣ **Sistema RHITSO** - Seguimiento de Reparaciones Complejas
+## En números (aprox., agosto 2026)
 
-**Módulo**: `servicio_tecnico` (submódulo)
+| Métrica | Valor |
+|---------|-------|
+| Apps de negocio | 5 |
+| Países / tenants | 4 |
+| Estados de orden | 22 |
+| Estados RHITSO | 12 |
+| Código Python (apps, sin migrations) | ~154 000 LOC |
+| TypeScript (`static/ts/`) | ~74 módulos · ~43 000 LOC |
+| Templates HTML | ~67 000 LOC |
+| Visualizaciones Plotly | 50+ métodos |
+| Documentación Markdown en `docs/` | ~75 archivos |
+| Scripts en `scripts/` | ~70 |
 
-Subsistema especializado para reparaciones que requieren seguimiento externo con RHITSO (proveedor/partner).
-
-**Características principales:**
-
-- ✅ 12 estados específicos de seguimiento RHITSO
-- ✅ Gestión de múltiples owners (Dell, HP, Lenovo, Asus, etc.)
-- ✅ Clasificación por complejidad (Simple, Moderada, Compleja)
-- ✅ Registro de incidencias durante reparación externa
-- ✅ Sistema de notificaciones automáticas por cambios de estado
-- ✅ Generación de PDFs con resumen completo
-- ✅ Cálculo de días hábiles para SLA
-- ✅ Paleta de colores distintiva para identificación visual
-- ✅ **Análisis de Candidatos RHITSO**: Reporte de equipos aptos/no aptos con filtros y exportación
-
-**Estados RHITSO:**
-
-```
-PENDIENTE ENVÍO → ENVIADO RHITSO → RECIBIDO RHITSO →
-EN DIAGNÓSTICO RHITSO → COTIZADO → APROBADO → EN REPARACIÓN →
-REPARADO → ENVIADO RETORNO → RECIBIDO → PROBADO → FINALIZADO
-```
-
-**Incidencias RHITSO:**
-
-- Gravedad: Baja, Media, Alta, Crítica
-- Impacto al cliente: Ninguno, Bajo, Medio, Alto
-- Prioridad: Baja, Normal, Alta, Urgente
-- Seguimiento completo con notificaciones
+Las cifras son orientativas (crecen con el repo). El inventario fino de features y fases vive en [`docs/implementaciones/`](./docs/implementaciones/).
 
 ---
 
-### 4️⃣ **Inventario** - Gestión de Productos Base
+## Stack
 
-**Módulo**: `inventario`
+| Capa | Tecnología |
+|------|------------|
+| Backend | Django 5.2.14 · Python 3.12+ · Celery · Redis |
+| Frontend | TypeScript 5.9 · Bootstrap 5.3 · Plotly / Chart.js |
+| Datos | SQLite (dev) · PostgreSQL (prod) · multi-BD por país |
+| Media / docs | Pillow · FFmpeg · ReportLab · Web Push (`pywebpush`) |
+| IA opcional | Ollama local · Google Gemini · scikit-learn |
 
-Módulo base de gestión de productos con control de calidad simple.
-
-**Características:**
-
-- ✅ CRUD completo de productos
-- ✅ Control de calidad (Bueno, Regular, Malo)
-- ✅ Gestión de sucursales y empleados (base compartida)
-- ✅ Sistema de usuarios con roles personalizados
-
----
-
-### 5️⃣ **Almacén Central** - Gestión Integral de Suministros y Piezas
-
-**Módulo**: `almacen`
-
-Sistema avanzado para el control de inventario de almacén central, compras y trazabilidad de piezas.
-
-**Características principales:**
-
-- ✅ **Gestión de Stock Dual**: Productos resurtibles (consumibles) y unidades únicas (piezas con número de serie).
-- ✅ **Workflow de Compras**: Ciclo completo desde Solicitud de Cotización → Aprobación → Compra → Recepción.
-- ✅ **Cotización Multi-proveedor**: Comparativa de precios y tiempos de entrega entre múltiples proveedores para una misma necesidad.
-- ✅ **Trazabilidad 100%**: Seguimiento individual de piezas desde la compra hasta su asignación a una Orden de Servicio.
-- ✅ **Auditorías de Inventario**: Sistema de conteo físico vs. sistema con registro de diferencias y ajustes.
-- ✅ **Solicitudes de Baja**: Flujo de aprobación para descarte de material dañado o antiguo con registro fotográfico.
-- ✅ **Transferencias**: Movimientos de mercancía controlados entre diferentes sucursales.
-- ✅ **SVG Dinámico**: Visualización interactiva de categorías mediante iconos animados.
-- ✅ **Sincronización Almacén ↔ Servicio Técnico**: Cotizaciones, piezas y servicios adicionales sincronizados bidireccionalmente
-- ✅ **Cotizaciones sin Orden Activa**: Flujo comercial previo al ingreso formal, con vinculación posterior a `OrdenServicio`
-- ✅ **Servicios Adicionales en Cotización**: `LineaServicioAdicional` para cotizar limpieza, SO, paquetes y crear/actualizar `VentaMostrador`
-- ✅ **Modal de Cotización al Cliente**: Calculadora de profit, preview PDF y envío por correo con plantilla personalizada por país
-- ✅ **Cotización de Equipos Reacondicionados**: Costeo propio, PDF dedicado, financiamiento/opción de pago y términos específicos
-- ✅ **Estado `enviada_front`**: Notificación a front desk y aviso de vigencia con edición de líneas en `enviada_cliente`
-- ✅ **Creación de Orden FL desde Cotización**: Generación directa de orden fuera de línea al aprobar servicios FL
-- ✅ **Precios Cliente y Términos**: Campos de costo cliente, RFC, datos de facturación y términos y condiciones en PDF/correo
-- ✅ **Plantilla México para Cotización**: Correo y PDF con datos bancarios, CLABE y formulario de facturación específicos de México
-- ✅ **Protección de Compras**: No se generan compras sin orden de servicio vinculada
-- ✅ **Resolver Catálogo → ComponenteEquipo**: Mapeo semántico de piezas de almacén al catálogo de ST
-
-**Workflow de Adquisición:**
-```
-SOLICITUD DE COTIZACIÓN → ENVÍO A PROVEEDORES → RECEPCIÓN DE OFERTAS → 
-ELECCIÓN DE MEJOR OPCIÓN → APROBACIÓN GERENCIAL → ORDEN DE COMPRA → 
-SEGUIMIENTO DE ENVÍO → RECEPCIÓN EN ALMACÉN → INGRESO A STOCK
-```
+Dependencias fijadas: [`requirements.lock`](./requirements.lock) · frontend: [`package.json`](./package.json) (`pnpm run build`).
 
 ---
 
-## 🚀 Funcionalidades Destacadas del Sistema
+## Instalación rápida (desarrollo)
 
-### 🌙 Modo Oscuro (Dark Mode)
+### Requisitos
 
-- **Toggle** en la navbar con iconos luna/sol y persistencia en `localStorage`
-- **Sin parpadeo**: Script anti-flash en `<head>` aplica el tema antes del primer render
-- **Bootstrap 5.3**: Integración nativa via `data-bs-theme` en `<html>`
-- **Variables CSS completas**: Paleta oscura coherente para todos los módulos y páginas
-- **Compatibilidad total**: Dashboards, modales, formularios, portales públicos y Dark mode en los chatbots de IA
-- **Módulo TypeScript**: `dark_mode.ts`
+- Python 3.12+, Node.js 18+, pnpm, Git
+- Redis (recomendado; necesario para Celery, cache y varias features async)
 
-### 👤 Panel Mi Perfil
-
-Panel de estadísticas personalizado según el rol del usuario (técnico, inspector, recepción, gerencia):
-
-- **Estadísticas por rol**: Métricas relevantes al puesto (órdenes, incidencias, cotizaciones)
-- **Estadísticas de Venta Mostrador**: Desglose de ventas directas para técnicos
-- **Carrusel de comentarios**: Reseñas de clientes obtenidas de encuestas de satisfacción
-- **Descarga de órdenes activas en Excel**: Exportación filtrada por responsable
-- **Módulo TypeScript**: `mi_perfil.ts`
-
-### 🏢 Directorio de Empleados
-
-- Vista de directorio consultable con estadísticas individuales por empleado
-- Accesible para roles gerenciales desde el menú principal
-- Comentarios de clientes asociados a cada técnico
-
-### 🔐 Sistema de Autenticación, Permisos y Seguridad
-
-- Login personalizado con usuarios de Django
-- Relación Usuario ↔ Empleado para gestión completa
-- Forzado de cambio de contraseña en primer inicio
-- **Permisos granulares por Django Groups**: Decoradores `@permission_required` en todas las vistas
-- **Protección Brute-Force**: Bloqueo automático ante múltiples intentos fallidos (django-axes)
-- **Rate Limiting**: Protección de vistas públicas con `django-ratelimit`
-- **Validación de Credenciales**: Sistema robusto de validación de fortaleza de contraseñas
-
----
-
-## 🌍 Sistema Multi-País
-
-### Arquitectura Multi-Tenant por Subdominio
-
-El sistema soporta operaciones en múltiples países con bases de datos independientes:
-
-- **México** (`mexico.sigmasystem.work`) - Operación principal
-- **Argentina** (`argentina.sigmasystem.work`) - Operación secundaria
-- **Chile** (`chile.sigmasystem.work`) - Operación regional
-- **Colombia** (`colombia.sigmasystem.work`) - Operación regional
-
-**Características:**
-
-- ✅ **Middleware de País**: Detección automática por subdominio con `PaisMiddleware`
-- ✅ **Database Router**: Enrutamiento automático de consultas a la BD correcta por país
-- ✅ **Celery Multi-Tenant**: Tareas asíncronas propagan `db_alias` por país para evitar mezclar datos entre tenants
-- ✅ **Configuración Centralizada**: `config/paises_config.py` con timezone, moneda, empresa por país
-- ✅ **Banderas SVG Animadas**: Indicador visual del país activo en navbar
-- ✅ **Context Processors**: Variables de país disponibles en todos los templates
-- ✅ **Media Segregado**: Archivos de cada país en subcarpetas independientes
-
----
-
-## ⚡ Celery + Redis - Procesamiento en Segundo Plano
-
-### Tareas Asíncronas y Cache
-
-- ✅ **Celery Workers**: Procesamiento de correos electrónicos en segundo plano (RHITSO, diagnóstico, imágenes, encuestas, cotizaciones, evidencia video)
-- ✅ **Celery Beat**: Tareas programadas diarias a las 8:00 (encuestas pendientes + recordatorio de imágenes faltantes) y limpieza de notificaciones cada 24 h
-- ✅ **Redis Cache**: Cache de dashboards pesados y respuestas SICSER (DB Redis `/2`, separada del broker Celery `/0`–`/1`)
-- ✅ **Panel de Notificaciones (🔔)**: Campanita con polling adaptativo, URLs navegables, soporte móvil y eliminación individual
-- ✅ **App `notificaciones`**: Módulo dedicado con `Notificacion`, `PushSubscription` (staff) y `PushSubscriptionCliente` (portal público)
-- ✅ **Compresión de Video Asíncrona**: FFmpeg vía Celery al subir videos de evidencia o generar video resumen
-- ✅ **Envío de Evidencia en Video**: Tarea Celery con extracción de frames, análisis IA opcional y correo al cliente
-- ✅ **Multi-Tenant en Workers**: Señal `task_prerun` configura el país activo antes de ejecutar cada tarea Celery
-
----
-
-## 🏗️ Infraestructura y Almacenamiento
-
-### Gestión de Datos y Conectividad
-
-- **Almacenamiento Dual**: Sistema configurado para gestión dinámica entre discos (Soporte hasta 1TB)
-- **Cloudflare Tunnel**: Configuración segura para acceso remoto en producción sin apertura de puertos (con validación SSL estricta)
-- **Backup Automatizado**: Scripts mensuales/diarios para PostgreSQL y SQLite
-- **Backup en la Nube con rclone**: Sincronización automática de backups a Google Drive vía rclone (guía de configuración incluida)
-- **Soporte SVG**: Visualización optimizada de gráficos vectoriales en todo el sistema
-- **ManifestStaticFilesStorage**: Cache busting automático de archivos estáticos
-- **PWA (Progressive Web App)**: Instalable en Android e iOS como app nativa (staff) con soporte para notch/Dynamic Island, service worker, favicons PNG y Web Push
-- **PWA del Cliente (seguimiento)**: Manifest dinámico por token (`/seguimiento/<token>/manifest.json`) + install prompt y push propios, sin cuenta de usuario
-
----
-
-## 🤖 Machine Learning & Inteligencia Artificial
-
-### Sistema ML Avanzado (`ml_advanced/`)
-
-El sistema integra un módulo completo de Machine Learning con 4 componentes especializados:
-
-#### 1. **Optimizador de Precios con ML**
-
-- **Archivo**: `optimizador_precios.py` (21KB)
-- **Funcionalidad**:
-  - Predicción de precios óptimos para cotizaciones
-  - Análisis de elasticidad de precios por gama y marca
-  - Recomendaciones basadas en histórico de aceptación
-  - Ajuste automático según patrones de comportamiento del cliente
-
-#### 2. **Análisis de Motivos de Rechazo**
-
-- **Archivo**: `motivo_rechazo.py` (24KB)
-- **Funcionalidad**:
-  - Clasificación automática de rechazos
-  - Predicción de probabilidad de rechazo pre-envío
-  - Identificación de patrones en rechazos por técnico/sucursal
-  - Sugerencias inteligentes para mejorar tasa de aceptación
-
-#### 3. **Recomendador de Acciones**
-
-- **Archivo**: `recomendador_acciones.py` (29KB)
-- **Funcionalidad**:
-  - Sistema de recomendaciones inteligentes basado en contexto
-  - Predicción de próximas acciones necesarias por orden
-  - Optimización de flujo de trabajo
-  - Alertas proactivas basadas en ML
-
-#### 4. **Predictor de Servicio Técnico**
-
-- **Archivo**: `ml_predictor.py` (21KB)
-- **Funcionalidad**:
-  - Predicción de tiempo de reparación estimado
-  - Estimación de probabilidad de fallo/reincidencia
-  - Análisis de tendencias de servicio
-  - Detección de anomalías en procesos
-
----
-
-## 🤖 Inteligencia Artificial — Ollama & Google Gemini
-
-### Asistentes IA Integrados (v5.0+)
-
-El sistema integra **asistentes de IA** conectados a modelos de lenguaje locales (Ollama) y en la nube (Google Gemini), con un dispatcher unificado configurable vía variables de entorno.
-
-**Módulo**: `servicio_tecnico/ollama_client.py`
-
-#### 1. **Mejorador de Diagnóstico Técnico**
-
-Disponible en la vista detalle de orden para el técnico:
-
-- **Funcionalidad**: Mejora ortografía, gramática y redacción del diagnóstico escrito por el técnico
-- **Reglas estrictas (prompt de sistema)**:
-  - Solo corrige redacción — NUNCA cambia el contenido técnico
-  - NUNCA agrega fallas, síntomas o componentes no mencionados
-  - NUNCA elimina información del técnico
-  - Usa terminología técnica estándar (ej: "cargador" → "adaptador de corriente")
-- **Módulo TypeScript**: `ollama_sic.ts` (387 líneas)
-
-#### 2. **Chatbot en Portal Público de Seguimiento del Cliente**
-
-Asistente flotante en la vista pública (`/servicio/seguimiento/<token>/`):
-
-- **Contexto inteligente**: Conoce el estado de la orden, cotización, venta mostrador, técnico asignado y folio
-- **Seguridad**: Rate limit 5 req/min por IP, anti-injection, anti-leak de instrucciones del sistema, payloads codificados
-- **Conversación**: Historial de 6 turnos en memoria por sesión
-- **UI**: Burbuja flotante con robot SVG animado (float + pulse), chips de sugerencias, badge "Nuevo"
-- **Dark mode completo** en burbuja, panel y todos los estados del chat
-- **Módulo TypeScript**: `seguimiento_chat.ts` (437 líneas)
-
-#### 3. **Inspector Visual y Análisis de Evidencia en Video**
-
-Capacidades de visión y análisis multimedia integradas en flujos de ingreso y egreso:
-
-- **Inspector Visual IA**: Evalúa condición estética de imágenes de ingreso antes de enviar al cliente (selector Ollama/Gemini)
-- **Análisis de Evidencia en Video**: Extrae frames de videos de galería y genera resumen con IA para el correo al cliente
-- **Dictado por Voz**: Transcripción del diagnóstico SIC con cascada Web Speech API → Ollama Whisper → Gemini
-- **Módulos TypeScript**: `compartir_video.ts`, `voz_diagnostico.ts`
-- **Módulos Backend**: `servicio_tecnico/ollama_client.py`, `servicio_tecnico/gemini_client.py`
-
-#### 4. **Integración SICSER (Fase 1)**
-
-Consulta e importación de órdenes desde el sistema externo SICSER:
-
-- **Cliente HTTP** con caché Redis: `sicser_client.py`
-- **Importación a SIGMA**: `sicser_import.py`
-- **UI**: `consultar_sicser.ts` — listados OOW/garantías
-- **Alcance**: solo lectura + import; no escribe de vuelta a SICSER
-- **Config**: variables `SICSER_*` en `.env`
-
-#### Proveedores Soportados
-
-| Proveedor | Tipo | Variable `.env` | Modelos recomendados |
-|-----------|------|-----------------|----------------------|
-| **Ollama** | Local / Tailscale | `OLLAMA_ENABLED`, `OLLAMA_URL`, `OLLAMA_MODELS` | `llama3.2`, `mistral`, `gemma2` |
-| **Google Gemini** | Nube (API) | `GEMINI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | `gemini-2.0-flash`, `gemini-1.5-flash` |
-
-**Características del dispatcher**:
-- ✅ Selección de proveedor/modelo desde la UI en tiempo real
-- ✅ Fallback configurable entre proveedores
-- ✅ Timeouts independientes por proveedor
-- ✅ Sin dependencias externas en Python (usa solo `urllib` estándar)
-
----
-
-## 📊 Dashboard Analytics Avanzado (Tipo Power BI)
-
-### Sistema de Visualizaciones Interactivas con Plotly
-
-**Archivo**: `plotly_visualizations.py` (~4,607 líneas)
-
-Clase `DashboardCotizacionesVisualizer` con **50+ métodos de visualización** que generan gráficos HTML interactivos profesionales:
-
-**Gráficos Implementados:**
-
-- **Temporales**: Evolución de cotizaciones, comparativos entre períodos, tendencias
-- **Distribución**: Histogramas + Boxplots de costos, análisis de rangos
-- **Jerárquicos**: Sunburst (Gama → Tipo → Marca), Sankey (flujos), Treemap
-- **Avanzados**: Heatmaps de desempeño, Pareto, rankings dinámicos, matrices de correlación
-
-**Características Destacadas:**
-
-- ✅ **Totalmente interactivo**: Zoom, pan, hover tooltips, click events
-- ✅ **Paleta Bootstrap**: Colores consistentes con el diseño del sistema
-- ✅ **Responsive**: Mobile-friendly y adaptable
-- ✅ **Exportación**: PNG, SVG, PDF desde el navegador
-- ✅ **Performance**: Optimizado para grandes volúmenes de datos
-
-**Tipos de Análisis:**
-
-- Tasas de aceptación por sucursal/técnico/gama
-- Evolución temporal (diario, semanal, mensual)
-- Top piezas rechazadas/aceptadas
-- Distribución de costos y outliers
-- Análisis de sugerencias técnicas vs. solicitudes de cliente
-- Efectividad de cotizaciones por categoría
-
----
-
-## 💻 TypeScript Integration - Frontend Type-Safe
-
-### Stack Frontend Moderno
-
-El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y mantenible.
-
-**Configuración**:
-
-- `tsconfig.json` - Strict mode, ES2018 target
-- `tsconfig.sw.json` - Compilación separada del service worker PWA
-- Compilación automática: `static/ts/` → `static/js/` (incluye service worker)
-- Source maps para debugging
-- Types de Bootstrap incluidos (@types/bootstrap)
-
-**Módulos TypeScript** (~55 archivos, ~31,200 líneas):
-
-1. **`base.ts`** (718 líneas) - Funcionalidad base compartida, utilities y helpers
-2. **`camara_integrada.ts`** (1,579 líneas) - Sistema de cámara nativa con selector de lentes y orientación híbrida
-3. **`upload_imagenes_dual.ts`** (2,248 líneas) - Subida de imágenes con reintentos automáticos anti-Cloudflare
-4. **`diagnostico_modal.ts`** (2,458 líneas) - Modal de envío de diagnóstico con PDF y componentes dinámicos
-5. **`lightbox_galeria.ts`** (1,100 líneas) - Sistema de galería con modo inspección y navegación
-6. **`solicitud_baja_form.ts`** (1,655 líneas) - Formularios de solicitud de baja con workflow
-7. **`dashboard_rhitso.ts`** (769 líneas) - Timeline RHITSO, estadísticas en tiempo real
-8. **`dashboard_encuestas.ts`** (774 líneas) - Dashboard de encuestas de satisfacción NPS
-9. **`dashboard_cotizaciones.ts`** (605 líneas) - Dashboard interactivo con filtros dinámicos
-10. **`dashboard_seguimiento_piezas.ts`** (583 líneas) - Tracking WPB, DOA, PNC
-11. **`scorecard_form.ts`** (790 líneas) - Formularios con detección de reincidencias
-12. **`busqueda_reingreso.ts`** (641 líneas) - Buscador inteligente de órdenes originales con chip
-13. **`busqueda_ordenes.ts`** (555 líneas) - Búsqueda con autocompletado y paginación
-14. **`concentrado_semanal.ts`** (584 líneas) - Concentrado CIS con reporte mensual
-15. **`notificaciones.ts`** (570 líneas) - Panel de notificaciones con polling adaptativo
-16. **`dashboard_feedback_rechazo.ts`** (531 líneas) - Análisis de rechazos por costo y piezas
-17. **`dashboard_seguimiento_enlaces.ts`** (464 líneas) - Dashboard de seguimiento público OOW + embudo de adopción
-18. **`modelo_autocomplete.ts`** (364 líneas) - Autocompletado de modelos de equipos
-19. **`modelo_autocomplete_modal.ts`** (460 líneas) - Modal de autocompletado avanzado
-20. **`form_compra.ts`** (600 líneas) - Formularios de compra de almacén
-21. **`password-validator.ts`** (448 líneas) - Validación de fortaleza de contraseñas
-22. **`galeria_seguimiento.ts`** (394 líneas) - Galería de seguimiento público
-23. **`dashboard-distribucion-sucursales.ts`** (370 líneas) - Distribución multi-sucursal
-24. **`feedback_satisfaccion.ts`** (332 líneas) - Formulario de encuesta con partículas
-25. **`plantillas_rechazo.ts`** (247 líneas) - Gestión de plantillas con autocompletado
-26. **`historial_orden.ts`** (234 líneas) - Timeline de historial de orden
-27. **`login_particles.ts`** (181 líneas) - Efectos de partículas, canvas interactivo
-28. **`feedback_particles.ts`** (139 líneas) - Partículas animadas en encuestas
-29. **`unidades_agrupadas.ts`** (135 líneas) - Agrupación de unidades de inventario
-30. **`dark_mode.ts`** (36 líneas) - Toggle de modo oscuro con anti-flash y persistencia *(nuevo v5.0)*
-31. **`dashboard_loader.ts`** (349 líneas) - Vista de carga animada para dashboards pesados *(nuevo v5.0)*
-32. **`piezas_modal.ts`** (98 líneas) - Modal con timeline de estado de piezas para el cliente *(nuevo v5.0)*
-33. **`mi_perfil.ts`** (190 líneas) - Carrusel de comentarios y estadísticas de perfil *(nuevo v5.0)*
-34. **`ollama_sic.ts`** (387 líneas) - Mejorador de diagnóstico con IA (Ollama + Gemini) *(nuevo v5.0)*
-35. **`seguimiento_chat.ts`** (437 líneas) - Chatbot IA flotante en portal público del cliente *(nuevo v5.0)*
-36. **`banner_carousel.ts`** (169 líneas) - Carrusel de banners promocionales en portal público *(nuevo v5.0)*
-37. **`camara_video.ts`** (1,374 líneas) - Grabador de video integrado con selector de lentes y cronómetro *(nuevo v5.1)*
-38. **`compartir_video.ts`** (212 líneas) - Modal para enviar videos de evidencia al cliente con IA *(nuevo v5.1)*
-39. **`cotizacion_cliente_modal.ts`** (658 líneas) - Modal de cotización al cliente con calculadora de profit *(nuevo v5.1)*
-40. **`detalle_solicitud.ts`** (527 líneas) - Interactividad de detalle de solicitud de cotización *(nuevo v5.1)*
-41. **`form_solicitud_cotizacion.ts`** (1,161 líneas) - Formset TypeScript para crear/editar cotizaciones *(nuevo v5.1)*
-42. **`upload_video.ts`** (líneas variables) - Subida y gestión de videos de evidencia en galería *(nuevo v5.1)*
-43. **`video_resumen.ts`** - Generación y descarga de video resumen de galería *(nuevo v5.1)*
-44. **`voz_diagnostico.ts`** - Dictado por voz en diagnóstico SIC (Speech API → Whisper → Gemini) *(nuevo v5.1)*
-45. **`push_notifications.ts`** - Suscripción y gestión de Web Push en Mi Perfil (staff) *(nuevo v5.1)*
-46. **`pwa_install.ts`** - Prompt personalizado de instalación PWA (staff) *(nuevo v5.1)*
-47. **`service_worker.ts`** - Service worker para PWA y modo offline *(nuevo v5.1)*
-48. **`pwa_install_seguimiento.ts`** - Prompt de instalación PWA del portal cliente *(nuevo v5.2)*
-49. **`push_notifications_cliente.ts`** - Web Push del cliente ligado al enlace de seguimiento *(nuevo v5.2)*
-50. **`eventos_seguimiento.ts`** - Registro de eventos de adopción (PWA, push, chat, PDF) *(nuevo v5.2)*
-51. **`cotizacion_reacondicionado_modal.ts`** - Cotización de equipos reacondicionados *(nuevo v5.2)*
-52. **`consultar_sicser.ts`** - UI de consulta e importación SICSER *(nuevo v5.2)*
-53. **`globals.d.ts`** / **`eventos_seguimiento.d.ts`** - Declaraciones de tipos globales
-
-**Ventajas del TypeScript:**
-
-- ✅ Type safety en todo el frontend
-- ✅ Autocompletado inteligente en IDEs
-- ✅ Refactoring seguro sin romper funcionalidad
-- ✅ Detección temprana de errores
-- ✅ Mejor mantenibilidad y escalabilidad del código
-
-**Scripts disponibles**:
-
-```bash
-pnpm install    # Instalar dependencias (packageManager: pnpm@11.3.0)
-pnpm run build  # Compilar TypeScript a JavaScript (+ service worker)
-pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
-```
-
----
-
-### 📧 Sistema de Notificaciones por Email
-
-**Configurado con Gmail SMTP + Celery (segundo plano)**
-
-- Notificaciones automáticas de incidencias
-- Envío manual con múltiples destinatarios
-- **Procesamiento asíncrono con Celery**: Correos no bloquean vistas del usuario
-- Plantillas profesionales con branding estandarizado
-- **WhatsApp dinámico**: Contacto en footer de emails
-- Historial completo de notificaciones enviadas
-- Seguimiento de éxito/fallo de envíos
-- **URLs navegables en campanita**: Cada notificación puede enlazar directo a la pantalla relevante
-- **Web Push Notifications**: Alertas push a técnicos e inspectores vía VAPID (`pywebpush`)
-- **Web Push del Cliente**: Suscripciones ligadas al enlace de seguimiento (sin cuenta Django)
-- **Correo de diagnóstico**: PDF adjunto con componentes y mano de obra
-- **Correo de cotización rechazada**: Con token seguro para feedback
-- **Correo de encuesta de satisfacción**: Enlace con token único
-- **Correo de imágenes de egreso**: Notificación al finalizar
-- **Correo de evidencia en video**: Frames extraídos con análisis IA opcional adjunto al cliente
-- **Correo de cotización al cliente (Almacén)**: PDF con precios, términos y plantilla personalizada por país (reparación o reacondicionado)
-- **Recordatorio push de imágenes**: Beat diario si faltan evidencias fotográficas
-
-### 📊 Sistema de Reportes y Análisis
-
-- **Dashboards interactivos con Plotly**: 50+ visualizaciones tipo Power BI
-- **Chart.js**: Gráficas básicas complementarias
-- Filtros avanzados (fechas, sucursales, técnicos, severidad, etc.)
-- Exportación a Excel con múltiples hojas y análisis estadístico
-- Gráficas dinámicas: Pareto, Sunburst, Sankey, Heatmaps, Rankings
-- Análisis de reincidencias y tiempos de resolución
-- **Machine Learning**: Predicciones y recomendaciones inteligentes
-- **Dashboard de Rechazos**: Análisis por costo y número de piezas
-- **Concentrado Semanal CIS**: Reporte con exportación Excel mensual
-- **Dashboard de Encuestas NPS**: Análisis de satisfacción del cliente
-- **Distribución Multi-Sucursal**: Vista con exportación Excel
-- **Nuevo Tab de Aceptaciones**: Análisis avanzado de aceptaciones en Dashboard de Cotizaciones
-- **Vista de Carga Animada**: Pantalla de espera para dashboards pesados (cotizaciones, OOW/FL)
-- **Embudo de Adopción (seguimiento)**: KPIs de PWA, push y chat del portal cliente
-- **Análisis de Candidatos RHITSO**: Aptos / no aptos con filtros
-
-### 📱 Interfaz de Usuario Moderna
-
-- **TypeScript 5.9.3**: Frontend type-safe con ~55 módulos (~31,200 líneas)
-- **Modo Oscuro Completo**: Toggle en navbar con anti-flash y persistencia en localStorage
-- **Glassmorphism UI**: Efectos 3D y transparencias modernas
-- **Particle Effects**: Canvas interactivo en login/logout y encuestas
-- Diseño responsivo con Bootstrap 5.3.2
-- **Cámara Integrada**: Captura nativa desde móviles con selector de lentes y orientación 270°
-- **Cámara de Video Integrada**: Grabación de evidencia en video con compresión automática vía Celery
-- Drag & Drop avanzado para carga de imágenes con reintentos automáticos
-- Autocompletado inteligente en formularios
-- Pestañas dinámicas para organización de datos
-- **Lightbox Gallery**: Sistema completo con modo inspección y navegación (TypeScript)
-- **PWA Nativa (staff + cliente)**: Instalable en Android e iOS; el portal de seguimiento tiene manifest y push propios
-- **Banderas SVG Animadas**: Indicador visual de país en navbar
-- **Redes Sociales Dinámicas**: Links de RRSS (Instagram, Facebook, TikTok) configurados por sucursal
-- Sistema de badges con colores semánticos
-
-### 🔄 APIs REST Internas
-
-- Endpoints para carga dinámica de datos
-- Autocompletado de campos por relaciones
-- Filtrado de componentes por tipo de equipo
-- Búsqueda de reincidencias en tiempo real
-- Datos para gráficas y reportes
-
----
-
-## 📋 Características Técnicas
-
-### Backend (Django 5.2.14)
-
-- **Arquitectura MVC** con separación de responsabilidades
-- **ORM avanzado** con relaciones complejas (OneToOne, ForeignKey, ManyToMany)
-- **Signals de Django** para automatizaciones (cambios de estado, notificaciones)
-- **Validaciones personalizadas** a nivel de modelo y formulario
-- **Sistema de archivos** con gestión de media uploads por país
-- **Custom Template Tags y Filters** para lógica de presentación
-- **APIs REST** con JsonResponse para frontend dinámico
-- **Machine Learning Models** integrados en el flujo de trabajo
-- **Celery + Redis** para procesamiento asíncrono de correos y tareas programadas
-- **Redis Cache** para dashboards pesados con invalidación automática
-- **Multi-País** con middleware, DB router y configuración centralizada
-- **Rate Limiting** con `django-ratelimit` en vistas públicas
-- **ManifestStaticFilesStorage** para cache busting automático
-
-### Frontend Moderno
-
-- **TypeScript 5.9.3** - Type-safe development (~55 módulos, ~31,200 líneas)
-- **Plotly.js** - Dashboards interactivos tipo Power BI
-- **Bootstrap 5.3.2** - Framework CSS responsivo
-- **Bootstrap Icons** - Iconografía consistente
-- **Chart.js 4.4.0** - Gráficas básicas complementarias
-- **JavaScript ES2018+** - Interactividad moderna
-- **CSS modular** organizado por responsabilidad
-- **Glassmorphism & 3D Effects** - UI de última generación
-- **Drag & Drop API** nativa para carga de archivos
-- **Cámara Integrada** - Captura nativa desde móviles (TypeScript)
-
-### Data Science & Analytics
-
-- **Plotly 6.3.0** - Visualizaciones interactivas profesionales
-- **Pandas 2.3.0** - Análisis y manipulación de datos
-- **Scikit-learn 1.5.0** - Machine Learning models
-- **Matplotlib 3.9.0** - Gráficos estadísticos
-- **Seaborn 0.13.0** - Visualizaciones estadísticas avanzadas
-- **NumPy** - Cálculos numéricos eficientes
-
-### Base de Datos
-
-- **SQLite3** (desarrollo) / **PostgreSQL** (producción)
-- **Multi-Database**: Base de datos independiente por país con `DatabaseRouter`
-- **Migraciones versionadas** con Django Migrations
-- **Índices optimizados** para consultas frecuentes
-- **Connection Pooling**: `CONN_MAX_AGE=600` en PostgreSQL
-- **Backup automatizado** de base de datos
-
-### Seguridad
-
-- **CSRF Protection** habilitada (`CSRF_COOKIE_NAME = 'sigma_csrftoken'` en producción)
-- **Sanitización de inputs** con validadores Django
-- **Permisos granulares** por modelo con Django Groups
-- **Passwords hasheados** con PBKDF2
-- **Variables de entorno** (.env) para configuración sensible
-- **django-axes**: Bloqueo ante múltiples intentos fallidos
-- **django-ratelimit**: Protección de vistas públicas contra abuso
-- **Tokens seguros**: Para enlaces de feedback, encuestas y seguimiento
-- **Cloudflare SSL**: Validación estricta en producción
-- **ForcePasswordChange**: Middleware que obliga cambio de contraseña en el primer login
-
----
-
-## 🗄️ Modelos de Datos Principales
-
-### Servicio Técnico
-
-- **OrdenServicio**: Orden principal (21 estados posibles)
-- **DetalleEquipo**: Información técnica del equipo
-- **ReferenciaGamaEquipo**: Catálogo de modelos para autocompletado
-- **Cotizacion**: Cotizaciones de reparación
-- **PiezaCotizada**: Piezas en cotizaciones
-- **SeguimientoPieza**: Tracking de piezas solicitadas
-- **VentaMostrador**: Ventas directas
-- **PiezaVentaMostrador**: Items de venta mostrador
-- **ImagenOrden**: Evidencias fotográficas (5 tipos: ingreso, diagnóstico, reparación, entrega, packing)
-- **HistorialOrden**: Eventos de auditoría
-- **EstadoRHITSO**: Estados de proceso RHITSO
-- **CategoriaDiagnostico**: Categorías de diagnóstico
-- **TipoIncidenciaRHITSO**: Tipos de incidencias RHITSO
-- **SeguimientoRHITSO**: Fechas clave del proceso
-- **IncidenciaRHITSO**: Problemas durante reparación externa
-- **ConfiguracionRHITSO**: Configuración del subsistema RHITSO
-- **FeedbackCliente**: Encuestas de satisfacción NPS con comentarios
-- **EnlaceSeguimientoCliente**: Enlaces de seguimiento público para órdenes OOW/FL
-- **EventoSeguimientoCliente**: Analytics de adopción (visitas, PWA, push, chat, PDF)
-- **RecordatorioImagenOrden**: Control de recordatorios por imágenes faltantes (ingreso inspector a 2 días; técnico/egreso al pasar a finalizado)
-- **BannerPromocional**: Banners promocionales con carrusel en portal público (gestionados desde admin)
-- **AnalisisSentimientoEncuesta**: Resultados del análisis de sentimientos con IA
-- **VideoOrden**: Videos de evidencia y video resumen por orden
-
-### Score Card
-
-- **Incidencia**: Registro de fallas de calidad
-- **EvidenciaIncidencia**: Imágenes de incidencias
-- **TipoIncidencia**: Categorización de fallos
-- **ComponenteEquipo**: Catálogo de componentes
-- **NotificacionIncidencia**: Historial de emails
-- **DestinatarioNotificacion**: Destinatarios de notificaciones
-
-### Almacén Central
-
-- **ProductoAlmacen**: Productos consumibles y piezas únicas
-- **UnidadInventario**: Rastreo individual por número de serie
-- **Proveedor**: Catálogo de proveedores y contactos
-- **CompraProducto**: Registro de adquisiciones
-- **SolicitudCotizacion**: Gestión multi-proveedor con sincronización a Servicio Técnico
-- **LineaCotizacion**: Líneas de piezas con precios cliente, reacondicionado y vinculación a `PiezaCotizada`
-- **LineaServicioAdicional**: Servicios adicionales (Venta Mostrador) dentro de cotizaciones de almacén (`es_necesaria`)
-- **AuditoriaInventario**: Control de stock físico
-- **SolicitudBaja**: Descarte de material con aprobación
-
-### Inventario (Base)
-
-- **Producto**: Productos en inventario base
-- **Sucursal**: Sucursales de la empresa
-- **Empleado**: Personal (técnicos, inspectores, etc.)
-
-### Notificaciones
-
-- **Notificacion**: Notificaciones internas del sistema con polling adaptativo y URL navegable
-- **PushSubscription**: Suscripciones Web Push por usuario (staff)
-- **PushSubscriptionCliente**: Suscripciones Web Push ligadas al enlace de seguimiento (cliente, sin cuenta)
-
----
-
-## 🎨 Paletas de Colores del Sistema
-
-### Estados de Orden (21 estados)
-
-- **Azul**: Ingreso/Recepción
-- **Púrpura**: Diagnóstico
-- **Naranja**: Cotización
-- **Verde**: Aprobaciones
-- **Amarillo**: Gestión de piezas
-- **Cian**: Reparación
-- **Verde oscuro**: Calidad
-- **Rojo**: Rechazos/Problemas
-
-### Severidad de Incidencias
-
-- **Verde (#27ae60)**: Baja
-- **Amarillo (#f39c12)**: Media
-- **Naranja (#e67e22)**: Alta
-- **Rojo (#e74c3c)**: Crítica
-
-### Sistema RHITSO
-
-- Paleta distintiva con colores Tailwind
-- Estados claramente diferenciables
-- Badges con contraste automático
-
----
-
-## 📱 Rutas Principales del Sistema
-
-### Servicio Técnico
-
-- `/servicio/` - Lista de órdenes
-- `/servicio/ordenes/crear/` - Nueva orden
-- `/servicio/ordenes/<id>/` - Detalle de orden
-- `/servicio/ordenes/<id>/editar/` - Editar orden
-- `/servicio/ordenes/<id>/cotizacion/` - Crear cotización
-- `/servicio/ordenes/<id>/venta-mostrador/` - Crear venta
-- `/servicio/rhitso/` - Gestión RHITSO
-- `/servicio/concentrado-semanal/` - Concentrado Semanal CIS
-- `/servicio/dashboard/seguimiento-oow-fl/` - Dashboard de seguimiento OOW/FL
-- `/servicio/seguimiento/<token>/` - Seguimiento público para clientes (OOW) — también en `/seguimiento/<token>/`
-- `/servicio/seguimiento/<token>/chat/` - Chatbot IA público del cliente *(nuevo v5.0)*
-- `/seguimiento/<token>/diagnostico/` - PDF de diagnóstico en el enlace público *(nuevo v5.2)*
-- `/seguimiento/<token>/manifest.json` - Manifest PWA del cliente *(nuevo v5.2)*
-- `/seguimiento/<token>/push/*` - Suscripción / cancelación Web Push del cliente *(nuevo v5.2)*
-- `/seguimiento/<token>/eventos/` - Registro de eventos de adopción *(nuevo v5.2)*
-- `/servicio/encuesta/<token>/` - Encuesta de satisfacción (público)
-- `/servicio/encuestas/dashboard/` - Dashboard de encuestas NPS
-- `/servicio/feedback-rechazo/dashboard/` - Análisis de rechazos
-- `/servicio/mi-perfil/` - Panel de perfil con estadísticas por rol *(nuevo v5.0)*
-- `/servicio/directorio-empleados/` - Directorio de empleados *(nuevo v5.0)*
-- `/servicio/api/pulir-diagnostico-sic/` - Mejorador de diagnóstico con IA *(nuevo v5.0)*
-- `/servicio/ordenes/<id>/video-resumen/generar/` - Generar video resumen de galería *(nuevo v5.1)*
-- `/servicio/orden/<id>/enviar-evidencia-video/` - Enviar evidencia en video al cliente *(nuevo v5.1)*
-- `/servicio/sicser/consultar/` - Consulta de listados SICSER *(nuevo v5.2)*
-- `/servicio/sicser/importar/` - Importar orden SICSER a SIGMA *(nuevo v5.2)*
-
-### Score Card
-
-- `/scorecard/` - Dashboard principal
-- `/scorecard/incidencias/` - Lista de incidencias
-- `/scorecard/incidencias/crear/` - Registrar incidencia
-- `/scorecard/incidencias/<id>/` - Detalle con acciones
-- `/scorecard/reportes/` - Reportes avanzados (7 tabs)
-- `/scorecard/api/` - APIs REST internas
-
-### Almacén Central
-
-- `/almacen/` - Dashboard de almacén
-- `/almacen/productos/` - Catálogo de productos y stock
-- `/almacen/compras/` - Gestión de órdenes de compra
-- `/almacen/solicitudes-cotizacion/` - Cotizaciones multi-proveedor
-- `/almacen/solicitudes-cotizacion/<pk>/vincular-orden/` - Vincular cotización sin orden activa *(nuevo v5.1)*
-- `/almacen/solicitudes-cotizacion/<pk>/crear-orden-fl/` - Crear orden FL desde cotización *(nuevo v5.1)*
-- `/almacen/solicitudes-cotizacion/<pk>/preview-pdf-cotizacion/` - Preview PDF de cotización al cliente *(nuevo v5.1)*
-- `/almacen/solicitudes-cotizacion/<pk>/pdf-cotizacion-final/` - Descarga PDF final (reparación o reacondicionado) *(nuevo v5.2)*
-- `/almacen/auditorias/` - Control de inventario físico
-
-### Sistema
-
-- `/admin/` - Panel de administración Django
-- `/login/` - Autenticación de usuarios
-- `/` - Página principal (redirect según rol)
-- `/notificaciones/` - API de notificaciones internas (polling)
-
----
-
-## 🛠️ Instalación y Configuración
-
-### Requisitos Previos
-
-- Python 3.12+
-- pip (gestor de paquetes Python)
-- Node.js 18+ (para compilación TypeScript)
-- Redis (para Celery y cache en producción)
-- Git
-- Cuenta Gmail (para notificaciones por email)
-
-### Instalación
-
-1. **Clonar el repositorio**
+### Pasos
 
 ```bash
 git clone https://github.com/maggots555/inventario-calidad-django.git
 cd inventario-calidad-django
-```
 
-2. **Crear y activar entorno virtual**
-
-```bash
 python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 
-# En Windows:
-venv\Scripts\activate
+pip install -r requirements.lock  # o requirements.txt si actualizas deps a propósito
 
-# En macOS/Linux:
-source venv/bin/activate
-```
+cp .env.example .env              # completar SECRET_KEY, email, Redis, etc.
 
-3. **Instalar dependencias**
-
-```bash
-# Recomendado: mismas versiones que producción/CI
-pip install -r requirements.lock
-
-# Alternativa (lista “humana” / intención; puede resolver versiones distintas):
-# pip install -r requirements.txt
-```
-
-4. **Configurar variables de entorno**
-
-Crear archivo `.env` en la raíz del proyecto:
-
-```env
-# Django
-SECRET_KEY=tu-secret-key-aqui
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Base de datos (SQLite para desarrollo)
-DB_ENGINE=django.db.backends.sqlite3
-DB_NAME=db.sqlite3
-
-# Email (Gmail)
-EMAIL_HOST_USER=tu-email@gmail.com
-EMAIL_HOST_PASSWORD=tu-app-password-gmail
-
-# Notificaciones
-CORREO_REMITENTE_NOMBRE=Sistema de Calidad
-CORREO_REMITENTE_EMAIL=sistema@tuempresa.com
-
-# Celery + Redis (producción)
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-REDIS_CACHE_URL=redis://localhost:6379/2
-
-# Almacenamiento
-PRIMARY_MEDIA_ROOT=/path/to/primary
-ALTERNATE_MEDIA_ROOT=/path/to/alternate
-MIN_FREE_SPACE_GB=10
-
-# Cotizador Almacén (márgenes — ver .env.example completo)
-# PROFIT_MOSTRADOR= / COSTOS_FIJOS_* / DIAGNOSTICO_*
-
-# Chat IA del portal de seguimiento
-# CHAT_SEGUIMIENTO_MODEL= / CHAT_SEGUIMIENTO_MAX_TOKENS=
-
-# SICSER (Fase 1 — solo lectura + import)
-# SICSER_BASE_URL= / SICSER_TOKEN_OOW= / SICSER_TOKEN_GARANTIAS=
-```
-
-**Obtener App Password de Gmail:**
-
-1. Ir a [Cuenta de Google](https://myaccount.google.com/)
-2. Seguridad → Verificación en dos pasos (activar)
-3. Contraseñas de aplicaciones → Generar
-4. Copiar el password de 16 caracteres
-
-5. **Aplicar migraciones**
-
-```bash
 python manage.py migrate
-```
-
-6. **Crear superusuario**
-
-```bash
 python manage.py createsuperuser
-```
 
-7. **Poblar datos iniciales** (Opcional)
-
-```bash
-# Sucursales y empleados base
+# Datos de ejemplo (opcional)
 python scripts/poblado/poblar_sistema.py
-
-# Catálogo de servicios
-python scripts/poblado/poblar_servicios.py
-
-# Estados RHITSO
-python scripts/poblado/poblar_estados_rhitso.py
-
-# Datos de ejemplo para Score Card
 python scripts/poblado/poblar_scorecard.py
-```
 
-8. **Compilar TypeScript**
+pnpm install && pnpm run build
 
-```bash
-pnpm install
-pnpm run build
-```
-
-9. **Ejecutar el servidor**
-
-```bash
 python manage.py runserver
 ```
 
-10. **Acceder al sistema**
-
-- Sistema: http://127.0.0.1:8000/
+- App: http://127.0.0.1:8000/  
 - Admin: http://127.0.0.1:8000/admin/
 
----
+Variables y secretos: ver [`.env.example`](./.env.example). Guía de máquina nueva: [`docs/guias/setup/SETUP_NUEVA_MAQUINA.md`](./docs/guias/setup/SETUP_NUEVA_MAQUINA.md).
 
-## 🎯 Uso del Sistema
-
-### Para Recepcionistas
-
-1. **Crear orden de servicio** desde `/servicio/crear/`
-2. Capturar datos del cliente y equipo
-3. Tomar fotos de ingreso
-4. Asignar técnico responsable
-
-### Para Técnicos
-
-1. Ver órdenes asignadas en `/servicio/`
-2. Actualizar estado a "En Diagnóstico"
-3. Subir imágenes de diagnóstico
-4. Crear cotización con piezas necesarias
-5. Actualizar a "Reparación" tras aprobación
-6. Marcar como "Control de Calidad" al terminar
-
-### Para Control de Calidad
-
-1. Revisar órdenes en "Control de Calidad"
-2. Verificar funcionamiento del equipo
-3. **Si encuentra problemas**: Registrar incidencia en Score Card
-4. Aprobar o devolver a técnico
-5. Cambiar estado a "Listo para Entrega"
-
-### Para Inspectores de Calidad
-
-1. Dashboard en `/scorecard/`
-2. Registrar incidencias con evidencias
-3. Enviar notificaciones a responsables
-4. Marcar incidencias como NO atribuibles (si aplica)
-5. Cerrar incidencias resueltas
-6. Generar reportes ejecutivos
-
-### Para Gerencia
-
-1. Ver dashboard de Score Card
-2. Analizar reportes avanzados (7 tabs)
-3. Exportar Excel para análisis externo
-4. Revisar métricas de técnicos
-5. Identificar tendencias y áreas de mejora
+**Producción / async:** levantar Redis + worker Celery + Beat; checklist en [`docs/PRODUCTION_CHECKLIST.md`](./docs/PRODUCTION_CHECKLIST.md).
 
 ---
 
-## 📊 KPIs y Métricas del Sistema
+## Documentación
 
-### Servicio Técnico
+| Recurso | Contenido |
+|---------|-----------|
+| [`AGENTS.md`](./AGENTS.md) | Reglas para desarrollo (modularidad, Celery multi-tenant, PWA, tests, dark mode) |
+| [`docs/README.md`](./docs/README.md) | Índice de guías e implementaciones |
+| [`docs/implementaciones/`](./docs/implementaciones/) | Detalle por módulo (ST, almacén, scorecard, RHITSO, multi-país, …) |
+| [`docs/SISTEMA_PERMISOS.md`](./docs/SISTEMA_PERMISOS.md) | Permisos y grupos |
+| [`docs/COTIZADOR_PROFIT.md`](./docs/COTIZADOR_PROFIT.md) | Márgenes del cotizador |
 
-- Órdenes activas por estado
-- Tiempo promedio de reparación
-- Tasa de aprobación de cotizaciones
-- Órdenes en cada estado del flujo
-- Días promedio por fase
+### Tests útiles
 
-### Score Card
-
-- **Total de incidencias** (desglosado por estado)
-- **Tasa de reincidencia** (% de equipos con 2+ incidencias)
-- **Promedio días de cierre** (desde detección hasta cierre)
-- **Top técnicos** (ranking por menor incidencias)
-- **Componentes problemáticos** (más frecuentes)
-- **Atribuibilidad** (% errores técnicos vs. externos)
-- **Efectividad de notificaciones** (tasa de éxito de envíos)
-
-### RHITSO
-
-- Órdenes en proceso RHITSO por estado
-- Tiempo promedio de reparación externa
-- Incidencias durante proceso externo
-- SLA cumplidos vs. vencidos
+```bash
+python manage.py test almacen
+python manage.py test servicio_tecnico.tests
+```
 
 ---
 
-## 🔧 Scripts de Utilidades
-
-Ver documentación completa en [`docs/README.md`](./docs/README.md)
-
-### Poblado de Datos (`scripts/poblado/`)
-
-- `poblar_sistema.py` - Sucursales, empleados, usuarios
-- `poblar_servicios.py` - Catálogo de servicios
-- `poblar_estados_rhitso.py` - Estados del proceso RHITSO
-- `poblar_productos.py` - Productos de inventario
-- `poblar_scorecard.py` - Datos de ejemplo Score Card
-
-### Verificación (`scripts/verificacion/`)
-
-- `verificar_datos.py` - Validación de integridad de datos
-- `verificar_fase*.py` - Verificación por fase de implementación
-- `actualizar_seguimientos_existentes.py` - Actualización masiva
-
-### Testing (`scripts/testing/`)
-
-- `test_email_config.py` - Prueba de configuración de email
-- `test_pdf_rhitso.py` - Prueba de generación de PDFs
-- `test_rhitso_config.py` - Validación de configuración RHITSO
-- `test_compresion_imagenes.py` - Prueba de compresión de imágenes
-
----
-
-## 📚 Documentación Completa
-
-El proyecto incluye **80 documentos técnicos** organizados en [`docs/`](./docs/):
-
-### Por Módulo
-
-- **RHITSO**: 8 documentos (plan, fases, colores, PDFs)
-- **Score Card**: 8 documentos (fases, atribuibilidad, notificaciones)
-- **Venta Mostrador**: 11 documentos (changelogs, refactors, referencias)
-- **Servicio Técnico**: 5 documentos (vistas, piezas, estados)
-
-### Guías
-
-- **Setup**: Configuración inicial, comandos Git
-- **Referencias**: Colores, mejoras, planes de reportes
-
-Ver índice completo en [`docs/README.md`](./docs/README.md)
-
----
-
-## 🚦 Próximas Mejoras
-
-### Corto Plazo
-
-- [x] ~~Módulo de reportes PDF personalizados~~ ✅ (Diagnóstico PDF implementado)
-- [ ] Firma digital del cliente en entregas
-- [ ] App móvil para técnicos (seguimiento en campo)
-- [x] ~~Integración con WhatsApp Business API~~ ✅ (WhatsApp dinámico en emails)
-- [ ] Dashboard ejecutivo con métricas financieras
-- [x] ~~Modo oscuro completo~~ ✅ (Dark mode con anti-flash, variables CSS y toggle en navbar)
-- [x] ~~Asistente IA para técnicos~~ ✅ (Mejorador de diagnóstico Ollama + Gemini)
-- [x] ~~Chatbot para clientes en portal público~~ ✅ (Chatbot IA en seguimiento con seguridad y dark mode)
-- [x] ~~Sincronización Almacén ↔ Servicio Técnico~~ ✅ (Cotizaciones, piezas y servicios adicionales bidireccionales)
-- [x] ~~Cotización al cliente con PDF desde Almacén~~ ✅ (Modal con calculadora de profit y envío por correo)
-- [x] ~~PWA + Push del portal de seguimiento~~ ✅ (Manifest por token, push sin cuenta)
-- [x] ~~Cotización de equipos reacondicionados~~ ✅ (Costeo + PDF propio)
-- [x] ~~Integración SICSER (consulta/import)~~ ✅ (Fase 1 solo lectura)
-
-### Mediano Plazo
-
-- [ ] Sistema de garantías automatizado
-- [x] ~~Portal de clientes (consulta de órdenes)~~ ✅ (Seguimiento público OOW/FL)
-- [ ] Integración con sistema de facturación
-- [x] ~~IA para predicción de fallas recurrentes~~ ✅ (ML predictor implementado)
-- [x] ~~Sistema de feedback del cliente~~ ✅ (Encuestas NPS + feedback de rechazo)
-
-### Largo Plazo
-
-- [x] ~~Multi-tenant para franquicias~~ ✅ (Sistema multi-país: México, Argentina, Chile y Colombia)
-- [ ] Marketplace de refacciones
-- [ ] Sistema de capacitación de técnicos
-- [ ] Integración con ERPs empresariales
-
----
-
-## Estructura del Proyecto
+## Estructura del proyecto (resumen)
 
 ```
 inventario-calidad-django/
-├── config/                 # Configuración del proyecto Django
-│   ├── settings.py        # Settings principal
-│   ├── urls.py            # URLs raíz
-│   ├── constants.py       # Constantes del sistema
-│   ├── celery.py          # Configuración Celery
-│   ├── paises_config.py   # Configuración multi-país
-│   ├── middleware_pais.py # Middleware de detección de país
-│   ├── db_router.py       # Database Router multi-país
-│   ├── context_processors.py # Variables globales de templates
-│   ├── storage_utils.py   # Almacenamiento dinámico
-│   ├── media_views.py     # Servicio seguro de media
-│   └── wsgi.py / asgi.py
-├── servicio_tecnico/      # App principal de servicio técnico
-│   ├── models.py          # ~23 modelos
-│   ├── views.py           # Fachada de reexports (NO monolito)
-│   ├── views_*.py         # Vistas por dominio (detalle_orden, órdenes, RHITSO, …)
-│   ├── services/          # Lógica compartida (historial, multimedia, context, …)
-│   ├── plotly_visualizations.py  # ~4,607 líneas - Dashboards Plotly
-│   ├── sicser_client.py / sicser_import.py  # Integración SICSER
-│   ├── chat_seguimiento_helpers.py          # Chat IA público
-│   ├── ml_predictor.py    # Predictor ML
-│   ├── ml_advanced/       # ML avanzado (4 módulos)
-│   ├── excel_exporters.py # Exportación Excel
-│   └── templates/         # Templates del módulo
-├── scorecard/             # App de control de calidad
-├── inventario/            # App de inventario base
-├── almacen/               # Almacén: views.py fachada + views_*.py + utils/ + tasks + tests
-├── notificaciones/        # App de notificaciones internas (Celery + Web Push dual)
-├── templates/             # Templates globales (base.html)
-├── static/
-│   ├── ts/                # ~55 módulos TypeScript fuente (~31,200 líneas)
-│   ├── js/                # JavaScript compilado (auto-generado)
-│   ├── css/               # CSS organizado (base, components, forms)
-│   └── images/            # Imágenes, favicons PNG y SVGs
-├── media/                 # Archivos subidos (organizados por país)
-│   ├── mexico/
-│   ├── argentina/
-│   ├── chile/
-│   ├── colombia/
-│   └── ...
-├── docs/                  # 80 documentos técnicos
-├── scripts/               # 77 scripts de utilidades
-│   ├── poblado/           # Datos iniciales
-│   ├── testing/           # Scripts de pruebas
-│   ├── verificacion/      # Validación de datos
-│   ├── migracion/         # Migraciones de datos
-│   └── ml/                # Entrenamiento ML
-├── ml_models/             # Modelos ML entrenados (.pkl)
-├── logs/                  # Logs de aplicación
-├── manage.py
-├── requirements.txt       # Lista “humana” de dependencias (intención)
-├── requirements.lock      # Versiones pinneadas (instalación reproducible)
-├── package.json           # Dependencias Node (TypeScript)
-└── tsconfig.json          # Configuración TypeScript
+├── config/                 # Settings, URLs, Celery, multi-país, PWA
+├── servicio_tecnico/       # App principal ST
+├── almacen/                # Cotizador e inventario central
+├── scorecard/              # Calidad / incidencias
+├── inventario/             # Sucursales, empleados, base legacy
+├── notificaciones/         # In-app + Web Push
+├── static/ts/              # Fuente TypeScript (compilar → static/js/)
+├── templates/              # Plantillas globales
+├── docs/                   # Documentación extendida
+├── scripts/                # Poblado, verificación, testing manual
+├── AGENTS.md               # Guía operativa para agentes / devs
+└── manage.py
 ```
 
-> **📖 Documentación Completa**: Ver [`docs/README.md`](./docs/README.md) para acceso a toda la documentación técnica, guías de implementación y scripts de utilidades.
+---
+
+## Contribuir
+
+1. Crea una rama desde `main` / tu rama de trabajo.
+2. Respeta las reglas de [`AGENTS.md`](./AGENTS.md) (no editar `static/js/` a mano; editar `static/ts/` y `pnpm run build`).
+3. Si cambias comportamiento verificable, añade o amplía un test.
+4. Abre un PR con descripción clara del *por qué*.
 
 ---
 
-## 💡 Tecnologías Utilizadas
+## Licencia
 
-### Backend
-
-- **Django 5.2.14** - Framework web Python
-- **Python 3.12.3** - Lenguaje de programación
-- **SQLite3** - Base de datos (desarrollo)
-- **PostgreSQL** - Base de datos (producción) con connection pooling
-- **Celery 5.3+** - Tareas asíncronas en segundo plano
-- **Redis 5.4+** - Broker de mensajes y cache
-- **django-celery-beat** - Tareas programadas
-- **Pillow** - Procesamiento de imágenes
-- **openpyxl** - Exportación Excel avanzada
-- **ReportLab** - Generación de PDFs
-- **Plotly** - Visualizaciones servidor-side
-- **Pandas** - Procesamiento y análisis de datos
-- **Scikit-learn** - Machine Learning
-- **Matplotlib & Seaborn** - Análisis estadístico
-- **django-axes** - Protección contra brute-force
-- **django-ratelimit** - Rate limiting de vistas públicas
-
-### Frontend
-
-- **TypeScript 5.9.3** - Type-safe development (~55 módulos)
-- **Plotly.js** - Dashboards interactivos tipo Power BI
-- **Bootstrap 5.3.2** - Framework CSS
-- **Bootstrap Icons** - Iconografía
-- **Chart.js 4.4.0** - Gráficas básicas
-- **JavaScript ES2018+** - Interactividad moderna
-- **Glassmorphism & 3D Effects** - UI de última generación
-
-### DevOps & Herramientas
-
-- **Git** - Control de versiones
-- **Celery + Redis** - Cola de tareas y cache
-- **Cloudflare Tunnel** - Acceso remoto seguro sin puertos abiertos
-- **Nginx** - Proxy inverso en producción
-- **Linux (Producción)** / **Windows (Desarrollo)**
-- **VS Code** - Editor recomendado
-- **Django Debug Toolbar** - Debugging (dev)
+Distribuido bajo **GNU GPL v3**. Ver [`LICENSE`](./LICENSE).
 
 ---
 
-## 👥 Contribuir
+## Soporte
 
-1. Fork del proyecto
-2. Crear rama para nueva funcionalidad (`git checkout -b feature/NuevaCaracteristica`)
-3. Commit de cambios (`git commit -m 'Agregar nueva característica'`)
-4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
-5. Crear Pull Request
-
-**Código de Conducta:**
-
-- Seguir convenciones de Django
-- Documentar código complejo
-- Incluir tests para nuevas features
-- Mantener compatibilidad con versiones anteriores
+Issues en el repositorio de GitHub. Documentación operativa y de despliegue en [`docs/`](./docs/).
 
 ---
 
-## 📄 Licencia
+**Objetivo:** digitalizar el flujo del centro de servicio — del ingreso del equipo a la entrega — con calidad, almacén y seguimiento al cliente en un solo sistema.
 
-Este proyecto está licenciado bajo la **GNU General Public License v3.0**.
-
-Copyright © 2025-2026 Jorge Magos (maggots555)
-
-Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos de la GNU General Public License publicada por la Free Software Foundation, ya sea la versión 3 de la Licencia, o (a tu elección) cualquier versión posterior.
-
-Este programa se distribuye con la esperanza de que sea útil, pero SIN NINGUNA GARANTÍA; ni siquiera la garantía implícita de COMERCIABILIDAD o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Vea la GNU General Public License para más detalles.
-
-Consulte el archivo [LICENSE](./LICENSE) para ver el texto completo de la licencia.
-
----
-
-## 📞 Soporte y Contacto
-
-**Desarrollador**: Sistema Integrado de Gestión Técnica  
-**Repositorio**: [github.com/maggots555/inventario-calidad-django](https://github.com/maggots555/inventario-calidad-django)
-
-**Documentación Técnica**: Ver [`docs/README.md`](./docs/README.md) para documentación detallada de cada módulo.
-
----
-
-## 🏆 Reconocimientos
-
-Este sistema integra las mejores prácticas de:
-
-- **Django Documentation** - Arquitectura MVC
-- **Bootstrap** - Diseño responsivo
-- **Plotly** - Visualizaciones interactivas profesionales
-- **TypeScript** - Type-safe frontend development
-- **Scikit-learn** - Machine Learning best practices
-- **Chart.js** - Visualización de datos
-- **Metodologías Lean** - Optimización de procesos
-
----
-
-## 📈 Estado del Proyecto
-
-**Versión Actual**: 5.2 (Agosto 2026)  
-**Estado**: ✅ Producción (5 apps de negocio + ML/Analytics/Multi-País/Celery/IA/Video/PWA dual/SICSER)  
-**Última Actualización**: Agosto 3, 2026
-
-### Módulos Completados
-
-- ✅ **Inventario** (v1.0) - Sistema base
-- ✅ **Servicio Técnico** (v4.1) - RHITSO, cámara, seguimiento OOW/FL PWA+push, encuestas, SICSER, video evidencia
-- ✅ **Score Card** (v2.2) - Con reportes avanzados y notificaciones optimizadas
-- ✅ **RHITSO** (v1.6) - Seguimiento externo + análisis de candidatos
-- ✅ **Almacén Central** (v1.6) - Cotizaciones cliente, reacondicionados, sync ST y stock único
-- ✅ **Notificaciones** (v1.2) - Campanita Celery + Web Push staff y cliente
-- ✅ **IA Integrada** (v1.0) - Mejorador de diagnóstico y chatbot público (Ollama + Gemini) *(nuevo v5.0)*
-- ✅ **Modo Oscuro** (v1.0) - Dark mode completo con toggle en navbar y anti-flash *(nuevo v5.0)*
-- ✅ **Video Evidencia** (v1.0) - Cámara de video, compresión Celery, video resumen y envío con IA *(nuevo v5.1)*
-- ✅ **PWA Cliente + Analytics** (v1.0) - Install/push del portal + embudo de adopción *(nuevo v5.2)*
-- ✅ **SICSER** (v1.0) - Consulta e importación de órdenes (Fase 1) *(nuevo v5.2)*
-- ✅ **Reacondicionados** (v1.0) - Cotización y PDF de equipos reacondicionados *(nuevo v5.2)*
-
-### Estadísticas del Sistema
-
-- **21 estados** de orden de servicio
-- **12 estados** RHITSO
-- **4 niveles** de severidad de incidencias
-- **7 tabs** de reportes avanzados
-- **50+ visualizaciones** Plotly interactivas tipo Power BI (~4,607 líneas)
-- **~55 módulos** TypeScript (~31,200 líneas)
-- **4 sistemas** ML/IA especializados (con soporte para etiquetas nuevas)
-- **2 asistentes IA** conversacionales (Ollama local + Google Gemini)
-- **80 documentos** técnicos
-- **77 scripts** de utilidades
-- **86,000+ líneas** de código Python
-- **31,200+ líneas** de TypeScript
-- **45,700+ líneas** de templates Django
-- **4 países** en producción (México, Argentina, Chile y Colombia)
-- **~23 modelos** en servicio técnico
-
----
-
-## 🎓 Para Desarrolladores Nuevos
-
-Si eres nuevo en el proyecto, sigue este orden:
-
-1. **Leer**: [`docs/guias/setup/SETUP_NUEVA_MAQUINA.md`](./docs/guias/setup/SETUP_NUEVA_MAQUINA.md)
-2. **Guía para agentes/IA**: [`AGENTS.md`](./AGENTS.md) — reglas críticas (Celery multi-tenant, PWA dual, SICSER, dark mode)
-3. **Configurar**: Entorno local siguiendo la instalación arriba
-4. **Explorar**: Navega por cada módulo en orden:
-   - Inventario (más simple)
-   - Servicio Técnico (core del sistema)
-   - Score Card (análisis de calidad)
-   - RHITSO (seguimiento externo)
-   - Almacén Central (gestión de suministros)
-   - Notificaciones (sistema de alertas)
-5. **Documentar**: Lee la documentación de cada módulo en [`docs/implementaciones/`](./docs/implementaciones/)
-6. **Practicar**: Usa los scripts de poblado para crear datos de prueba
-7. **Verificar**: Ejecuta `python manage.py test almacen` y los scripts de testing
-
----
-
-**🎯 Objetivo del Sistema**: Digitalizar y optimizar el flujo completo de un centro de servicio técnico, desde el ingreso del equipo hasta la entrega, con control de calidad integrado y análisis de desempeño continuo.
-
-**Made with ❤️ using Django**
+**Made with Django · SIGMA v1.0.0**

@@ -4,12 +4,12 @@ Este directorio contiene toda la documentación técnica, guías de implementaci
 
 ## 📂 Estructura de Carpetas
 
-### � `/screenshots/`
+### `/screenshots/`
 Capturas de pantalla del sistema para el README principal.
-- `README.md` - Guía completa para tomar y preparar screenshots
-- 6 imágenes principales del sistema (pendientes de agregar)
+- `README.md` - Guía para tomar y preparar screenshots
+- 6 imágenes principales del sistema (incluidas en el repo)
 
-### �📖 `/implementaciones/`
+### 📖 `/implementaciones/`
 Documentación detallada de cada módulo implementado en el sistema.
 
 #### 🔧 `/implementaciones/servicio_tecnico/`
