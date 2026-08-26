@@ -36,6 +36,9 @@ from servicio_tecnico.forms import (
 )
 from servicio_tecnico.services.formato_garantia import orden_es_candidata_formato_garantia
 from servicio_tecnico.services.formato_oow import orden_es_candidata_formato_oow
+from servicio_tecnico.services.formato_venta_mostrador import (
+    orden_es_candidata_formato_venta_mostrador,
+)
 
 
 def build_detalle_orden_context(request, orden):
@@ -310,6 +313,7 @@ def build_detalle_orden_context(request, orden):
         # Botones de formato digital en el encabezado
         'mostrar_formato_oow': orden_es_candidata_formato_oow(orden),
         'mostrar_formato_garantia': orden_es_candidata_formato_garantia(orden),
+        'mostrar_formato_venta_mostrador': orden_es_candidata_formato_venta_mostrador(orden),
 
         # Formularios
         'form_config': form_config,

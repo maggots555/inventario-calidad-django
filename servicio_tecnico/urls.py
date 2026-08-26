@@ -438,6 +438,23 @@ urlpatterns = [
         name='formato_garantia_eliminar_evidencia',
     ),
 
+    # Formato Digital Venta Mostrador (Nota de Venta Directa)
+    path('orden/<int:orden_id>/formato-venta-mostrador/',
+         views.formato_venta_mostrador_wizard,
+         name='formato_venta_mostrador_wizard'),
+    path('orden/<int:orden_id>/formato-venta-mostrador/guardar/',
+         views.formato_venta_mostrador_guardar,
+         name='formato_venta_mostrador_guardar'),
+    path('orden/<int:orden_id>/formato-venta-mostrador/finalizar/',
+         views.formato_venta_mostrador_finalizar,
+         name='formato_venta_mostrador_finalizar'),
+    path('orden/<int:orden_id>/formato-venta-mostrador/reenviar-email/',
+         views.formato_venta_mostrador_reenviar_email,
+         name='formato_venta_mostrador_reenviar_email'),
+    path('orden/<int:orden_id>/formato-venta-mostrador/pdf/',
+         views.formato_venta_mostrador_pdf,
+         name='formato_venta_mostrador_pdf'),
+
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 

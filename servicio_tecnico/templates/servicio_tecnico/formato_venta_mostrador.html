@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} — {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/formato_oow.css' %}">
+{% endblock %}
+
+{% block content %}
+<!--
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Wizard de Nota de Venta Directa (venta mostrador / FL).
+  TODO es opcional: se puede generar el PDF solo con los conceptos vendidos.
+  Reutilizamos el CSS de OOW para que iPad/PWA se sienta igual.
+-->
+<div class="container-fluid formato-oow-page py-3"
+     id="formatoVmApp"
+     data-url-guardar="{{ url_guardar }}"
+     data-url-finalizar="{{ url_finalizar }}"
+     data-url-reenviar="{{ url_reenviar }}"
+     data-url-pdf="{{ url_pdf }}"
+     data-url-detalle="{{ url_detalle }}"
+     data-estado="{{ formato.estado }}">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="formato-oow-titulo h3 mb-1">
+                <i class="bi bi-receipt" aria-hidden="true"></i>
+                Nota de Venta Directa
+                <span class="formato-oow-badge">FL</span>
+            </h1>
+            <p class="text-muted mb-0">
+                {{ orden.numero_orden_interno }}
+                {% if orden.detalle_equipo.orden_cliente %}
+                    · {{ orden.detalle_equipo.orden_cliente }}
+                {% endif %}
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_detalle }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a la orden
+            </a>
+        </div>
+    </div>
+
+    <nav class="formato-oow-nav-progreso" aria-label="Secciones de la nota de venta">
+        <a class="formato-oow-nav-chip" href="#seccion-venta"><span class="formato-oow-nav-num">1</span> Venta</a>
+        <a class="formato-oow-nav-chip" href="#seccion-equipo"><span class="formato-oow-nav-num">2</span> Equipo</a>
+        <a class="formato-oow-nav-chip" href="#seccion-danos"><span class="formato-oow-nav-num">3</span> Daños</a>
+        <a class="formato-oow-nav-chip" href="#seccion-firmas"><span class="formato-oow-nav-num">4</span> Firmas</a>
+        <a class="formato-oow-nav-chip" href="#seccion-envio"><span class="formato-oow-nav-num">5</span> Envío</a>
+    </nav>
+
+    <div class="alert alert-info" role="status">
+        <strong>Todo es opcional.</strong>
+        Si el equipo aún no ingresa, genera y envía la nota solo con lo vendido.
+        Los daños estéticos y las firmas se pueden capturar después y regenerar el PDF.
+    </div>
+
+    {% if formato.estado == 'finalizado' %}
+    <div class="alert alert-success" role="status">
+        <strong>Nota generada</strong>
+        {% if formato.finalizado_en %}({{ formato.finalizado_en|date:"d/m/Y H:i" }}){% endif %}.
+        <ul class="mb-0 mt-2">
+            <li><strong>Regenerar PDF</strong> — actualiza el documento (no envía correo).</li>
+            <li><strong>Reenviar por correo</strong> — manda el PDF actual a los emails capturados.</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    {# --- Venta y cliente --- #}
+    <section class="card formato-oow-card mb-3" id="seccion-venta">
+        <div class="card-header formato-oow-section-header">1 · Datos del cliente y conceptos vendidos</div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="empresaCliente">Empresa / razón social</label>
+                    <input type="text" class="form-control" id="empresaCliente"
+                           value="{{ formato.empresa_cliente }}"
+                           placeholder="Nombre de la empresa (opcional)">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="personaContacto">Persona de contacto</label>
+                    <input type="text" class="form-control" id="personaContacto"
+                           value="{{ formato.persona_contacto }}"
+                           placeholder="Nombre de quien recibe (opcional)">
+                </div>
+            </div>
+            <dl class="row mb-3 formato-oow-dl">
+                <dt class="col-sm-3">RFC</dt>
+                <dd class="col-sm-9">{{ orden.detalle_equipo.rfc_cliente|default:"—" }}</dd>
+                <dt class="col-sm-3">Email</dt>
+                <dd class="col-sm-9">{{ orden.detalle_equipo.email_cliente|default:"—" }}</dd>
+                <dt class="col-sm-3">Teléfono</dt>
+                <dd class="col-sm-9">{{ orden.detalle_equipo.telefono_cliente|default:"—" }}</dd>
+            </dl>
+
+            <h2 class="h6 text-uppercase text-muted">Lo que se adquirió</h2>
+            <p class="form-text small">
+                Si hay que corregir un precio o un servicio, hazlo en la sección
+                de Venta Mostrador de la orden y luego regenera el PDF.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0">
+                    <thead>
+                        <tr>
+                            <th>Cantidad</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Precio</th>
+                            <th class="text-end">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaConceptosVm">
+                        {# Rellenado por TS desde orden_json #}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    {# --- Equipo (opcional) --- #}
+    <section class="card formato-oow-card mb-3" id="seccion-equipo">
+        <div class="card-header formato-oow-section-header">2 · Datos del equipo <span class="text-muted fw-normal">(opcional)</span></div>
+        <div class="card-body">
+            <dl class="row mb-3 formato-oow-dl">
+                <dt class="col-sm-3">Marca / Modelo</dt>
+                <dd class="col-sm-9">
+                    {{ orden.detalle_equipo.marca|default:"—" }}
+                    {{ orden.detalle_equipo.modelo|default:"" }}
+                </dd>
+                <dt class="col-sm-3">Service Tag</dt>
+                <dd class="col-sm-9">{{ orden.detalle_equipo.numero_serie|default:"—" }}</dd>
+            </dl>
+            <label class="form-label" for="numeroCargador">Número del cargador</label>
+            <input type="text" class="form-control" id="numeroCargador"
+                   value="{{ formato.numero_cargador }}"
+                   placeholder="No. serie / descripción (opcional)"
+                   autocomplete="off">
+        </div>
+    </section>
+
+    {# --- Daños (opcional) --- #}
+    <section class="card formato-oow-card mb-3" id="seccion-danos">
+        <div class="card-header formato-oow-section-header">3 · Daños estéticos <span class="text-muted fw-normal">(opcional)</span></div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">
+                Solo si el equipo ya ingresó. Si un lado no tiene daño, puedes
+                saltarlo: el PDF omite esta sección si no guardas ninguna vista.
+            </p>
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="tipoDiagrama">Tipo de equipo</label>
+                    <select id="tipoDiagrama" class="form-select">
+                        <option value="laptop" {% if formato.tipo_diagrama == 'laptop' %}selected{% endif %}>Laptop</option>
+                        <option value="escritorio" {% if formato.tipo_diagrama == 'escritorio' %}selected{% endif %}>Escritorio</option>
+                        <option value="aio" {% if formato.tipo_diagrama == 'aio' %}selected{% endif %}>All in One</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="etiquetaDano">Tipo de daño</label>
+                    <select id="etiquetaDano" class="form-select">
+                        <option value="Rayado">Rayado</option>
+                        <option value="Golpe">Golpe</option>
+                        <option value="Mancha">Mancha</option>
+                        <option value="Roto">Roto / Abierto</option>
+                        <option value="Desgaste">Desgaste</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="vistaActiva">Vista a marcar</label>
+                    <select id="vistaActiva" class="form-select">
+                        {% for clave, label in vistas_laptop %}
+                        <option value="{{ clave }}" data-grupo="laptop">{{ label }}</option>
+                        {% endfor %}
+                        {% for clave, label in vistas_escritorio %}
+                        <option value="{{ clave }}" data-grupo="escritorio">{{ label }}</option>
+                        {% endfor %}
+                        {% for clave, label in vistas_aio %}
+                        <option value="{{ clave }}" data-grupo="aio">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="formato-oow-canvas-wrap">
+                <canvas id="canvasDano" width="640" height="400" aria-label="Lienzo para marcar daños"></canvas>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-primary" id="btnGuardarVista">
+                    <i class="bi bi-check2" aria-hidden="true"></i> Guardar vista
+                </button>
+                <button type="button" class="btn btn-outline-danger" id="btnLimpiarVista">
+                    <i class="bi bi-eraser" aria-hidden="true"></i> Limpiar trazos
+                </button>
+            </div>
+            <div class="formato-oow-vistas-guardadas mt-3" id="vistasGuardadas"></div>
+        </div>
+    </section>
+
+    {# --- Firmas (opcionales) --- #}
+    <section class="card formato-oow-card mb-3" id="seccion-firmas">
+        <div class="card-header formato-oow-section-header">4 · Firmas <span class="text-muted fw-normal">(opcionales)</span></div>
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <p class="form-label mb-1">Entrega de equipo en CIS</p>
+                    <div class="formato-oow-firma-wrap">
+                        <canvas id="canvasFirmaCis" width="640" height="200"
+                                aria-label="Firma de entrega en CIS"></canvas>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="btnLimpiarFirmaCis">
+                        Limpiar firma CIS
+                    </button>
+                    <div class="formato-oow-firma-preview mt-2" id="firmaCisPreviewWrap"
+                         {% if not formato.firma_entrega_cis %}hidden{% endif %}>
+                        <img id="firmaCisPreviewImg"
+                             src="{% if formato.firma_entrega_cis %}{{ formato.firma_entrega_cis.url }}{% endif %}"
+                             alt="Firma CIS guardada">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <p class="form-label mb-1">Entrega de equipo a cliente</p>
+                    <div class="formato-oow-firma-wrap">
+                        <canvas id="canvasFirmaCliente" width="640" height="200"
+                                aria-label="Firma de entrega a cliente"></canvas>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="btnLimpiarFirmaCli">
+                        Limpiar firma cliente
+                    </button>
+                    <div class="formato-oow-firma-preview mt-2" id="firmaClientePreviewWrap"
+                         {% if not formato.firma_entrega_cliente %}hidden{% endif %}>
+                        <img id="firmaClientePreviewImg"
+                             src="{% if formato.firma_entrega_cliente %}{{ formato.firma_entrega_cliente.url }}{% endif %}"
+                             alt="Firma cliente guardada">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# --- Envío --- #}
+    <section class="card formato-oow-card mb-3" id="seccion-envio">
+        <div class="card-header formato-oow-section-header">5 · Envío por correo</div>
+        <div class="card-body">
+            <label class="form-label">Email(s) para recibir la nota</label>
+            <p class="form-text small mt-0 mb-2">Puedes agregar hasta 3 correos.</p>
+            <div id="emailsEnvioLista" class="formato-oow-emails-lista"></div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="btnAgregarEmail">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Agregar otro correo
+            </button>
+            <label class="formato-oow-check mt-3" id="wrapEnviarEmail"
+                   {% if formato.estado == 'finalizado' %}hidden{% endif %}>
+                <input type="checkbox" id="enviarEmail" checked
+                       {% if formato.estado == 'finalizado' %}disabled{% endif %}>
+                <span>Enviar PDF por correo al generar (a los emails capturados, máx. 3)</span>
+            </label>
+        </div>
+    </section>
+
+    <div class="formato-oow-actions sticky-bottom">
+        <div class="d-flex flex-wrap gap-2 justify-content-center">
+            <button type="button" class="btn btn-outline-primary btn-lg" id="btnGuardarBorrador">
+                <i class="bi bi-save" aria-hidden="true"></i>
+                {% if formato.estado == 'finalizado' %}Guardar cambios{% else %}Guardar borrador{% endif %}
+            </button>
+            {% if formato.estado == 'finalizado' %}
+            <button type="button" class="btn btn-warning btn-lg" id="btnRegenerarPdf">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Regenerar PDF
+            </button>
+            <button type="button" class="btn btn-success btn-lg" id="btnReenviarEmail">
+                <i class="bi bi-envelope" aria-hidden="true"></i> Reenviar por correo
+            </button>
+            <a href="{{ url_pdf }}?inline=1" class="btn btn-outline-success btn-lg" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Ver PDF actual
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-primary btn-lg" id="btnFinalizar">
+                <i class="bi bi-check2-circle" aria-hidden="true"></i> Generar PDF
+            </button>
+            {% endif %}
+        </div>
+        <div class="formato-oow-status-box mt-3" id="formatoVmStatusBox" hidden>
+            <div class="formato-oow-status-inner">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status" id="formatoVmSpinner" hidden>
+                    <span class="visually-hidden">Cargando…</span>
+                </div>
+                <p class="mb-0" id="formatoVmStatus" aria-live="polite"></p>
+            </div>
+            <div class="mt-2" id="formatoVmStatusActions" hidden>
+                <a href="{{ url_pdf }}?inline=1" class="btn btn-success btn-sm" id="btnVerPdfGenerado"
+                   target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Ver / descargar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="formato-oow-overlay" id="formatoVmOverlay" hidden aria-hidden="true">
+    <div class="formato-oow-overlay-card">
+        <div class="spinner-border text-light mb-3 formato-oow-overlay-spinner" role="status">
+            <span class="visually-hidden">Generando…</span>
+        </div>
+        <p class="mb-1 fw-semibold" id="formatoVmOverlayTitulo">Generando PDF…</p>
+        <p class="mb-0 small opacity-75" id="formatoVmOverlayTexto">
+            Esto puede tardar unos segundos. No cierres la tablet.
+        </p>
+    </div>
+</div>
+
+{{ formato_json|json_script:"formato-vm-data" }}
+{{ orden_json|json_script:"orden-vm-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/formato_venta_mostrador.js' %}" defer></script>
+{% endblock %}

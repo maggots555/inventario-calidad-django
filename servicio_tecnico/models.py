@@ -4712,3 +4712,12 @@ class PagoOrden(models.Model):
 # Comprobante CFDI del autofacturador (tabla propia; no hinchar OrdenServicio).
 from servicio_tecnico.models_facturacion import ComprobanteFiscalOrden  # noqa: E402, F401
 
+# Formato digital Nota de Venta Directa (venta mostrador / FL).
+from servicio_tecnico.models_formato_venta_mostrador import (  # noqa: E402, F401
+    DanoEsteticoVistaVentaMostrador,
+    FormatoServicioVentaMostrador,
+    dano_estetico_vm_upload_path,
+    formato_vm_firma_upload_path,
+    formato_vm_pdf_upload_path,
+)
+

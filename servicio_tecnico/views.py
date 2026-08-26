@@ -150,6 +150,13 @@ from .views_formato_garantia import (  # noqa: F401
     formato_garantia_subir_evidencia,
     formato_garantia_wizard,
 )
+from .views_formato_venta_mostrador import (  # noqa: F401
+    formato_venta_mostrador_finalizar,
+    formato_venta_mostrador_guardar,
+    formato_venta_mostrador_pdf,
+    formato_venta_mostrador_reenviar_email,
+    formato_venta_mostrador_wizard,
+)
 from .views_referencias_gama import (  # noqa: F401
     crear_referencia_gama,
     editar_referencia_gama,

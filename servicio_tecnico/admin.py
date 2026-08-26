@@ -43,6 +43,8 @@ from .models import (
     DanoEsteticoVistaGarantia,
     PagoOrden,
     ComprobanteFiscalOrden,
+    FormatoServicioVentaMostrador,
+    DanoEsteticoVistaVentaMostrador,
 )
 
 
@@ -2406,6 +2408,48 @@ class FormatoServicioGarantiaAdmin(admin.ModelAdmin):
 @admin.register(DanoEsteticoVistaGarantia)
 class DanoEsteticoVistaGarantiaAdmin(admin.ModelAdmin):
     """Vistas anotadas de daños estéticos ligadas a un formato Garantía."""
+
+    list_display = ('formato', 'clave_vista', 'etiqueta_dano', 'fecha_actualizacion')
+    list_filter = ('clave_vista',)
+    search_fields = (
+        'formato__orden__numero_orden_interno',
+        'clave_vista',
+        'etiqueta_dano',
+    )
+    raw_id_fields = ('formato',)
+
+
+@admin.register(FormatoServicioVentaMostrador)
+class FormatoServicioVentaMostradorAdmin(admin.ModelAdmin):
+    """
+    Admin del Formato Digital de Venta Mostrador (Nota de Venta Directa).
+
+    Objetivo: auditar borradores/finalizados, PDF y destinatarios de correo.
+    """
+
+    list_display = (
+        'orden',
+        'estado',
+        'email_envio',
+        'emails_envio',
+        'finalizado_en',
+        'fecha_actualizacion',
+    )
+    list_filter = ('estado', 'tipo_diagrama')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+        'email_envio',
+        'empresa_cliente',
+        'persona_contacto',
+    )
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'finalizado_en')
+    raw_id_fields = ('orden', 'creado_por', 'actualizado_por')
+
+
+@admin.register(DanoEsteticoVistaVentaMostrador)
+class DanoEsteticoVistaVentaMostradorAdmin(admin.ModelAdmin):
+    """Vistas anotadas opcionales de daños estéticos del formato VM."""
 
     list_display = ('formato', 'clave_vista', 'etiqueta_dano', 'fecha_actualizacion')
     list_filter = ('clave_vista',)

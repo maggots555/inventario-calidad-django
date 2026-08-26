@@ -1552,3 +1552,127 @@ WHATSAPP_FORMATO_GARANTIA_TEXTO = (
     n1=WHATSAPP_FORMATO_GARANTIA_NUMEROS[0],
     n2=WHATSAPP_FORMATO_GARANTIA_NUMEROS[1],
 )
+
+
+# ============================================================================
+# FORMATO DIGITAL VENTA MOSTRADOR — Nota de Venta Directa
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Textos legales del formato papel de venta mostrador (FL). Van en el PDF
+# y no se hardcodean en el generador, para poder auditarlos y traducirlos.
+
+LEYENDA_VENTA_MOSTRADOR = (
+    'SE REALIZA VENTA PIEZA A SOLICITUD DEL CLIENTE, NO DESEA DIAGNÓSTICO '
+    'DEL EQUIPO, EN CASO DE PRESENTAR FALLA ADICIONAL NO HABRÁ DEVOLUCIÓN '
+    'DE PAGO Y LA GARANTÍA SOLO ES VÁLIDA POR PIEZA REEMPLAZADA EN CASO DE '
+    'PRESENTAR ALGÚN DAÑO DE FÁBRICA.'
+)
+
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_CDMX = '5575615114'
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_GDL = '5528412687'
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_MTY = '5528735678'
+
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_TEXTO_MX = (
+    'Estimado Usuario, cualquier duda referente a la pieza y/o servicio '
+    'adquirido estamos para servirle y ayudarle por WhatsApp. '
+    f'EDO. DE MÉXICO Y CDMX {WHATSAPP_FORMATO_VENTA_MOSTRADOR_CDMX} | '
+    f'GUADALAJARA {WHATSAPP_FORMATO_VENTA_MOSTRADOR_GDL} | '
+    f'MONTERREY {WHATSAPP_FORMATO_VENTA_MOSTRADOR_MTY}'
+)
+
+# Términos y condiciones (página 2 de la nota de venta). Cada ítem es un
+# párrafo numerado; el PDF los imprime en orden.
+TERMINOS_VENTA_MOSTRADOR = [
+    (
+        'Realizar solamente la instalación Y / O cambio de piezas que suministro '
+        '(el cliente) en cuyo caso solamente se realizará el servicio de remplazo '
+        'de piezas mas no así ningún servicio complementario, por lo cual en este '
+        'caso SIC no se hace responsable por el funcionamiento del equipo derivado '
+        'del cambio de piezas NO Adquiridas con SIC y/o sus proveedores autorizados, '
+        'pues no se emitió diagnóstico de funcionamiento, ni se sabe del estado de '
+        'conservación y funcionamiento de las piezas suministradas.'
+    ),
+    (
+        'Para la instalación de Sistema(s) Operativo(s) me comprometo a proveer las '
+        'licencias y los medios originales para efectuar la instalación, desinstalación '
+        'o reinstalación, así como que reconozco que todo software no autorizado será '
+        'removido del equipo, pues en (SIC) no se trabaja con software apócrifo o sin '
+        'licencia original.'
+    ),
+    (
+        'RESPALDO DE INFORMACIÓN: El cliente reconoce y acepta eximir a (SIC) de toda '
+        'responsabilidad civil y / o penal por la pérdida y / o daño, parcial o total '
+        'de la información contenida en el disco duro; así como por cualquier daño o '
+        'perjuicio indirecto derivado de la misma prestación del servicio, toda vez '
+        'que acepto que es mi responsabilidad haber respaldado, resguardado y '
+        'transferido toda mi información personal contenida en el disco duro antes de '
+        'hacer entrega de mi equipo en sus instalaciones ya sea para diagnóstico y '
+        'reparación o bien para cambio de piezas adquiridas en (SIC) o suministradas '
+        'por el cliente de la misma manera declaro que el equipo que entrego a cambio '
+        'de piezas es mi propiedad, así como contar con la documentación legal que lo '
+        'avale. En caso contrario renuncio a reclamar cualquier pérdida o alteración '
+        'de datos o contenido ya que el servicio no puede garantizar la integridad de '
+        'los mismos por la naturaleza técnica del trabajo.'
+    ),
+    (
+        'ABANDONO DE PRODUCTO: En caso de que el equipo del cliente permanezca dentro '
+        'de las instalaciones de (SIC) por más de 15 días hábiles, después de haber '
+        'sido enviada la cotización y / o se haya reparado y se le haya notificado al '
+        'cliente que puede ir por el equipo por no aceptar la reparación o bien este '
+        'haya sido reparado, o en su caso se hayan cambiado las piezas, se hará un '
+        'cargo de $23.50 (veintitrés pesos 50 / 100 M.N) por cada día de almacenaje '
+        'que permanezca en resguardo en nuestro almacén; Pasados treinta días naturales '
+        '(SIC) puede disponer libremente del producto del cliente (equipo) y no se hará '
+        'responsable por daño alguno o pérdida de equipo o información o bien se '
+        'procederá a su destrucción sin responsabilidad para (SIC). En estos casos, '
+        'renuncio a reclamar mi producto o su valor, incluyendo toda la información y '
+        'datos dentro de mi producto.'
+    ),
+    (
+        'GARANTÍA DE MANO DE OBRA: Toda pieza reemplazada (adquirida e instalada en SIC), '
+        'tiene 30 días naturales de garantía en caso de presentar daño de fábrica. No se '
+        'hará válida si el usuario intentó reparar, instalar o retirar la parte o por mal '
+        'uso del equipo (virus, actualizaciones o instalación de software NO compatible u '
+        'original). Si la pieza no es adquirida en SIC no se ofrece ningún tipo de '
+        'garantía por la misma. Si el cliente solicita solo el cambio o instalación de '
+        'piezas no se garantiza el funcionamiento del equipo derivado de que el cliente '
+        'NO solicita revisión y/o diagnóstico; por lo cual, en este caso el cliente '
+        'deslinda de responsabilidad a (SIC) en caso de que con el cambio de la pieza '
+        'adquirida o suministrada su equipo no funcione de acuerdo a las expectativas '
+        'del cliente.'
+    ),
+    (
+        'Para recoger su equipo es indispensable presentar su orden (Contrato) de '
+        'servicio original en conjunto con identificación oficial del contacto o '
+        'cliente; Para hacer válida cualquiera de nuestras garantías es indispensable '
+        'presentar su factura por ello es necesario exigirla antes de retirar su equipo, '
+        'misma que será enviada vía correo electrónico.'
+    ),
+    (
+        'No se emitirán Facturas ni hay cambios de Factura después de cada fin de mes; '
+        'solicítela durante el periodo fiscal en que realizó su pago.'
+    ),
+    (
+        'Declara el cliente que el recurso económico con el que paga a (SIC) y con el '
+        'que adquirió su equipo, es de procedencia lícita, deslindando a (SIC) de toda '
+        'responsabilidad por la procedencia del mismo, toda vez que (SIC) desconoce los '
+        'antecedentes del mismo equipo.'
+    ),
+    (
+        'De acuerdo a la Ley Federal para la Protección de Datos Personales en Posesión '
+        'de Particulares, sus datos están debidamente protegidos y resguardados y usted '
+        'puede consultar nuestro aviso de privacidad en todo momento en www.sic.com.mx'
+    ),
+    (
+        'En caso de controversia ambas partes se someten en primer término a la instancia '
+        'conciliadora de PROFECO y en caso de desacuerdo de las partes someten su '
+        'jurisdicción y competencia a los tribunales civiles de Tlalnepantla de Baz, '
+        'Estado de México, al tratarse el presente de un contrato de prestación de '
+        'servicios o bien de suministro o cambio de piezas.'
+    ),
+    (
+        'Los equipos con plaga (cucarachas, hormigas, arañas, etc.) de acuerdo a las '
+        'políticas de fabricante, se inhabilita la garantía; para los casos fuera de '
+        'garantía, de igual forma nos reservamos el derecho de admisión.'
+    ),
+]
