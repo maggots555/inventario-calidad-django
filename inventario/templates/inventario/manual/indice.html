@@ -36,11 +36,18 @@
 </div>
 
 <h2>Diagrama OOW</h2>
-<p>Cada caja abre el capítulo. Las cuatro salidas aparecen cuando ya se mandó la cotización al cliente.</p>
+<p>
+    Cada caja abre el capítulo. El diagrama va en dos partes para no saturar:
+    primero hasta la respuesta del cliente (decisiones anidadas) y, si aceptó, el cierre en taller.
+    El camino feliz (<strong>Acepta</strong>) es el único nodo con acento fuerte.
+</p>
 {% include 'inventario/manual/_diagrama_flujo.html' %}
 
 <h2>Diagrama FL (cotización sin orden)</h2>
-<p>Front arma la solicitud; Compras completa costos; Front manda la oferta. Si el cliente acepta, ahí nace el folio FL-.</p>
+<p>
+    Front arma la solicitud; Compras completa costos; Front manda la oferta.
+    Misma lógica de dos partes: si el cliente acepta, ahí nace el folio FL-.
+</p>
 {% include 'inventario/manual/_diagrama_flujo_fl.html' %}
 
 <h2>Cómo se llaman los roles aquí</h2>

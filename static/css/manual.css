@@ -3,30 +3,64 @@
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Este CSS solo se carga en las páginas /manual/. El aspecto es de
- * "orden de trabajo de taller": riel perforado a la izquierda, números
- * de paso como sello, y estados en tipografía mono (como un folio).
+ * "libreta / orden de trabajo de taller": riel perforado, papel con
+ * grano sutil, títulos con Scope One (ya cargada en base.css),
+ * números de paso como sello y estados en mono (como un folio).
  *
- * Colores: variables de base.css para que el modo oscuro funcione solo.
+ * Colores: variables propias + base.css para que el modo oscuro
+ * funcione solo. Motion ligera; se apaga con prefers-reduced-motion.
  */
 
 .manual-shell {
+    /* Tipografía de capítulo: Scope One ya viene de base.css (serif de taller) */
+    --manual-display: "Scope One", "Georgia", "Times New Roman", serif;
     --manual-ink: var(--text-primary);
     --manual-muted: var(--text-secondary);
+    /* Papel del texto principal: blanco (como antes). El crema queda solo en el índice. */
     --manual-paper: var(--card-bg);
+    --manual-panel: #faf7f2;
     --manual-rule: var(--border-color);
     --manual-stamp: #b45309;
     --manual-stamp-bg: #fff7ed;
-    --manual-rail: #f4efe6;
+    --manual-rail: #efe6d8;
+    /* Color del agujero: debe contrastar con el riel (en claro = fondo de página) */
+    --manual-hole: var(--body-bg);
     --manual-accent: var(--primary-color);
+    --manual-grain: rgba(45, 35, 20, 0.035);
     max-width: 1280px;
     margin: 0 auto;
     padding: 1rem 1rem 3rem;
+    /* Atmósfera: tinte suave detrás de la hoja, no fondo plano */
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 50% -10%,
+            color-mix(in srgb, var(--manual-stamp) 10%, transparent),
+            transparent 60%
+        ),
+        var(--body-bg);
 }
 
 [data-bs-theme="dark"] .manual-shell {
+    --manual-paper: var(--card-bg);
+    --manual-panel: var(--card-bg);
     --manual-stamp: #fbbf24;
     --manual-stamp-bg: #1e293b;
-    --manual-rail: #0f172a;
+    /*
+      EXPLICACIÓN PARA PRINCIPIANTES:
+      Antes el riel era #0f172a (igual que --body-bg), entonces el
+      “agujero” y el riel eran el mismo color y no se veían circulitos.
+      El riel va un tono más claro; el agujero sigue siendo el fondo de página.
+    */
+    --manual-rail: #1e293b;
+    --manual-hole: var(--body-bg);
+    --manual-grain: rgba(226, 232, 240, 0.03);
+    background:
+        radial-gradient(
+            ellipse 70% 40% at 50% -5%,
+            color-mix(in srgb, var(--manual-stamp) 8%, transparent),
+            transparent 55%
+        ),
+        var(--body-bg);
 }
 
 .manual-layout {
@@ -40,10 +74,11 @@
 .manual-toc {
     position: sticky;
     top: 5.5rem;
-    background: var(--manual-paper);
+    background: var(--manual-panel);
     border: 1px solid var(--manual-rule);
     border-radius: 4px;
     box-shadow: var(--shadow-sm);
+    animation: manual-sheet-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .manual-toc-title {
@@ -127,7 +162,7 @@
     display: none;
 }
 
-/* ----- Hoja tipo orden de trabajo ----- */
+/* ----- Hoja tipo libreta / orden de trabajo ----- */
 .manual-sheet {
     background: var(--manual-paper);
     border: 1px solid var(--manual-rule);
@@ -135,6 +170,27 @@
     box-shadow: var(--shadow);
     position: relative;
     overflow: hidden;
+    /* Entrada suave de la hoja al cargar el capítulo */
+    animation: manual-sheet-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Grano de papel (SVG noise embebido). pointer-events: none = no tapa clics */
+.manual-sheet::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+    mix-blend-mode: multiply;
+    opacity: 0.07;
+}
+
+[data-bs-theme="dark"] .manual-sheet::after {
+    mix-blend-mode: soft-light;
+    opacity: 0.12;
 }
 
 .manual-sheet::before {
@@ -144,14 +200,47 @@
     top: 0;
     bottom: 0;
     width: 18px;
+    z-index: 2;
     background:
-        radial-gradient(circle at 9px 14px, var(--body-bg) 4px, transparent 4.5px) 0 0 / 18px 28px,
+        radial-gradient(circle at 9px 14px, var(--manual-hole) 4px, transparent 4.5px) 0 0 / 18px 28px,
         var(--manual-rail);
     border-right: 1px dashed var(--manual-rule);
 }
 
 .manual-sheet-inner {
+    position: relative;
+    z-index: 2;
     padding: 1.5rem 1.5rem 2rem 2.25rem;
+    /* Renglones de libreta muy suaves (no compiten con el texto) */
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 31px,
+        color-mix(in srgb, var(--manual-rule) 28%, transparent) 31px,
+        color-mix(in srgb, var(--manual-rule) 28%, transparent) 32px
+    );
+    background-attachment: local;
+}
+
+/* Sello de folio en la esquina: detalle “de taller” memorable */
+.manual-sheet-inner::before {
+    content: "SIGMA · MANUAL";
+    position: absolute;
+    top: 0.85rem;
+    right: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--manual-stamp);
+    border: 1.5px solid color-mix(in srgb, var(--manual-stamp) 55%, transparent);
+    padding: 0.35rem 0.45rem;
+    border-radius: 2px;
+    transform: rotate(8deg);
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
 }
 
 .manual-kicker {
@@ -161,26 +250,34 @@
     text-transform: uppercase;
     color: var(--manual-stamp);
     margin: 0 0 0.35rem;
+    /* Deja aire al sello de la esquina en pantallas angostas */
+    max-width: calc(100% - 7rem);
 }
 
 .manual-sheet h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-family: var(--manual-display);
+    font-size: clamp(1.65rem, 2.4vw + 0.8rem, 2.15rem);
+    font-weight: 400;
+    letter-spacing: -0.015em;
     color: var(--manual-ink);
     margin: 0 0 0.75rem;
-    line-height: 1.2;
+    line-height: 1.15;
+    max-width: 22ch;
 }
 
 .manual-lead {
-    font-size: 1.05rem;
+    font-size: 1.08rem;
+    line-height: 1.7;
     color: var(--manual-muted);
-    max-width: 42rem;
+    max-width: 38rem;
     margin-bottom: 1.5rem;
 }
 
 .manual-sheet h2 {
-    font-size: 1.2rem;
-    font-weight: 700;
+    font-family: var(--manual-display);
+    font-size: 1.28rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
     margin: 2rem 0 0.75rem;
     color: var(--manual-ink);
 }
@@ -194,12 +291,19 @@
 .manual-sheet p,
 .manual-sheet li {
     color: var(--manual-ink);
-    line-height: 1.65;
+    line-height: 1.7;
+}
+
+/* Medida cómoda de lectura (no estira el párrafo a todo el ancho) */
+.manual-sheet-inner > p,
+.manual-paso > p {
+    max-width: 40rem;
 }
 
 .manual-sheet ul,
 .manual-sheet ol {
     padding-left: 1.2rem;
+    max-width: 40rem;
 }
 
 /* ----- Pasos numerados ----- */
@@ -207,7 +311,19 @@
     border-top: 1px solid var(--manual-rule);
     padding: 1.35rem 0 0.4rem;
     scroll-margin-top: 5.5rem;
+    /* Entrada escalonada: cada paso aparece un poco después del anterior */
+    animation: manual-paso-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+.manual-paso:nth-of-type(1) { animation-delay: 0.06s; }
+.manual-paso:nth-of-type(2) { animation-delay: 0.1s; }
+.manual-paso:nth-of-type(3) { animation-delay: 0.14s; }
+.manual-paso:nth-of-type(4) { animation-delay: 0.18s; }
+.manual-paso:nth-of-type(5) { animation-delay: 0.22s; }
+.manual-paso:nth-of-type(6) { animation-delay: 0.26s; }
+.manual-paso:nth-of-type(7) { animation-delay: 0.3s; }
+.manual-paso:nth-of-type(8) { animation-delay: 0.34s; }
+.manual-paso:nth-of-type(n + 9) { animation-delay: 0.38s; }
 
 .manual-paso:first-of-type {
     border-top: none;
@@ -235,11 +351,21 @@
     color: var(--manual-stamp);
     background: var(--manual-stamp-bg);
     border-radius: 50%;
+    /* Inclina el sello como si lo hubieran estampado a mano */
+    transform: rotate(-4deg);
+    transition: transform 0.2s ease;
+}
+
+.manual-paso:hover .manual-paso-num {
+    transform: rotate(0deg) scale(1.04);
 }
 
 .manual-paso-head h2 {
     margin: 0;
     flex: 1 1 12rem;
+    font-family: var(--manual-display);
+    font-weight: 400;
+    font-size: 1.22rem;
 }
 
 .manual-badge {
@@ -272,8 +398,9 @@
     gap: 0.75rem;
     margin: 0 0 1rem;
     padding: 0.85rem 1rem;
-    background: var(--hover-bg);
+    background: color-mix(in srgb, var(--manual-rail) 35%, var(--manual-paper));
     border: 1px dashed var(--manual-rule);
+    border-radius: 2px;
 }
 
 .manual-meta div {
@@ -310,6 +437,8 @@
     background: var(--manual-stamp-bg);
     padding: 0.85rem 1rem;
     margin: 1rem 0;
+    max-width: 40rem;
+    border-radius: 0 4px 4px 0;
 }
 
 .manual-callout p:last-child {
@@ -400,12 +529,15 @@
     text-decoration: none;
     color: var(--manual-ink);
     min-height: 44px;
+    background: var(--manual-paper);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 }
 
 .manual-card:hover {
-    border-color: var(--primary-color);
+    border-color: var(--manual-stamp);
     color: var(--manual-ink);
-    background: var(--hover-bg);
+    background: var(--manual-stamp-bg);
+    transform: translateY(-2px);
 }
 
 .manual-card.is-tu-area {
@@ -466,29 +598,52 @@
 }
 
 .manual-pager a {
-    color: var(--primary-color);
+    color: var(--manual-stamp);
     text-decoration: none;
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .manual-pager a:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    border-bottom-color: var(--manual-stamp);
+    color: var(--manual-ink);
 }
 
-/* ----- Diagrama de flujo (portada OOW) ----- */
+/* ----- Diagrama de flujo (portada OOW / FL) -----
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Inspirado en diagram-design, pero adaptado a SIGMA:
+ * - Forma = tipo de nodo (óvalo inicio/fin, rectángulo paso, diamante decisión)
+ * - Un solo acento fuerte: camino feliz (Acepta)
+ * - Decisiones anidadas (máx. 3 salidas)
+ * - Leyenda fuera del área de nodos
+ * - Tokens del manual + dark mode (no coral genérico ni SVG fijo)
+ */
 .flujo {
-    margin: 0 0 1.75rem;
+    margin: 0 0 1.5rem;
     padding: 1rem 0.75rem 1.25rem;
-    border: 1px dashed var(--manual-rule);
+    border: 1px solid var(--manual-rule);
+    border-radius: 6px;
+    background: var(--manual-paper);
+}
+
+.flujo--cierre {
+    margin-top: 0.25rem;
+    border-style: dashed;
     background: var(--hover-bg);
 }
 
 .flujo-caption {
     font-family: var(--font-mono);
     font-size: 0.72rem;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--manual-muted);
     margin: 0 0 1rem;
@@ -512,12 +667,16 @@
     align-items: center;
 }
 
+/* Conector ortogonal: flecha hacia abajo (sin sombra) */
 .flujo-columna li:not(:last-child)::after {
     content: "";
-    width: 2px;
-    height: 0.85rem;
-    background: var(--manual-stamp);
-    opacity: 0.55;
+    width: 0;
+    height: 0;
+    margin: 0.25rem 0 0.15rem;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 8px solid var(--manual-muted);
+    opacity: 0.65;
 }
 
 .flujo-nodo {
@@ -528,7 +687,7 @@
     color: var(--manual-ink);
     background: var(--manual-paper);
     border: 1px solid var(--manual-rule);
-    border-left: 4px solid var(--manual-stamp);
+    border-radius: 6px;
     padding: 0.55rem 0.7rem;
     font-size: 0.9rem;
     font-weight: 600;
@@ -556,24 +715,111 @@
     outline-offset: 2px;
 }
 
+/* Óvalo = inicio / fin (la forma dice el rol, no solo el color) */
+.flujo-nodo--inicio,
+.flujo-nodo--fin {
+    border-radius: 999px;
+    border-color: var(--manual-muted);
+}
+
+.flujo-nodo--fin {
+    border-color: var(--success-color);
+    background: color-mix(in srgb, var(--success-color) 8%, var(--manual-paper));
+}
+
+/* Camino feliz: ÚNICO acento editorial fuerte del diagrama */
+.flujo-nodo--focal {
+    border-color: var(--manual-stamp);
+    border-width: 2px;
+    background: var(--manual-stamp-bg);
+}
+
+.flujo-nodo--focal:hover,
+.flujo-nodo--focal:focus-visible {
+    background: color-mix(in srgb, var(--manual-stamp) 18%, var(--manual-paper));
+}
+
+/* Salidas / cierres: más quietas que el focal */
+.flujo-nodo--salida {
+    border-style: solid;
+    opacity: 0.95;
+    font-weight: 600;
+}
+
+.flujo-nodo--ok {
+    border-color: var(--success-color);
+}
+
+.flujo-nodo--no {
+    border-color: var(--danger-color);
+}
+
+.flujo-nodo--pnc {
+    border-color: var(--warning-color);
+}
+
+.flujo-nodo--vence {
+    border-color: var(--primary-color);
+}
+
+/* Paso opcional / async (Facturación): borde discontinuo */
+.flujo-nodo--opcional {
+    border-style: dashed;
+    border-color: var(--info-color);
+    background: color-mix(in srgb, var(--info-color) 6%, var(--manual-paper));
+}
+
+.flujo-decision {
+    margin: 1rem auto 0.35rem;
+    max-width: 36rem;
+}
+
 .flujo-pregunta {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     max-width: 22rem;
-    margin: 1.15rem auto 0.7rem;
-    padding: 0.7rem 0.85rem;
+    margin: 0 auto 0.7rem;
+    padding: 0.7rem 1rem;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.1em;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     text-align: center;
+    color: var(--manual-ink);
+    background: var(--hover-bg);
+    border: 1px solid var(--manual-rule);
+    /* Rombo suave: la forma marca “decisión” sin clip-path que corte el texto */
+    clip-path: polygon(6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%, 0 50%);
+}
+
+.flujo-pregunta-tag {
     color: var(--manual-stamp);
-    background: var(--manual-stamp-bg);
-    border: 1px dashed var(--manual-stamp);
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.flujo-rama-continua {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.4rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--manual-muted);
+    border: 1px dashed var(--manual-rule);
+    border-radius: 6px;
+    background: transparent;
 }
 
 .flujo-cierre-nota {
     max-width: 36rem;
-    margin: 0.85rem auto 0.35rem;
+    margin: 0.85rem auto 0.75rem;
     font-size: 0.85rem;
     color: var(--manual-muted);
     text-align: center;
@@ -582,43 +828,95 @@
 
 .flujo-ramas {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
     margin-bottom: 0.35rem;
 }
 
-.flujo-nodo--ok {
-    border-left-color: var(--success-color);
+.flujo-ramas--binaria {
+    grid-template-columns: 1fr;
+    max-width: 22rem;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.flujo-nodo--no {
-    border-left-color: var(--danger-color);
+.flujo-ramas--tres {
+    grid-template-columns: 1fr;
+    max-width: 22rem;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-.flujo-nodo--pnc {
-    border-left-color: var(--warning-color);
+/* Leyenda horizontal bajo el diagrama (nunca encima de nodos) */
+.flujo-leyenda {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0.75rem 0 0;
+    border-top: 1px solid var(--manual-rule);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.65rem 1.1rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--manual-muted);
 }
 
-.flujo-nodo--vence {
-    border-left-color: var(--primary-color);
+.flujo-leyenda li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
-.flujo-nodo--fin {
-    border-left-color: var(--success-color);
+.flujo-leyenda-muestra {
+    display: inline-block;
+    width: 1.1rem;
+    height: 0.7rem;
+    border: 1px solid var(--manual-rule);
+    background: var(--manual-paper);
+    flex-shrink: 0;
 }
 
-.flujo-nodo--facturacion {
-    border-left-color: var(--info-color);
-    border-style: dashed;
+.flujo-leyenda-muestra--inicio {
+    border-radius: 999px;
+    border-color: var(--manual-muted);
 }
 
-.flujo-columna--cierre {
-    margin-top: 0.85rem;
+.flujo-leyenda-muestra--paso {
+    border-radius: 4px;
+}
+
+.flujo-leyenda-muestra--focal {
+    border-radius: 4px;
+    border-color: var(--manual-stamp);
+    border-width: 2px;
+    background: var(--manual-stamp-bg);
+}
+
+.flujo-leyenda-muestra--salida {
+    border-radius: 4px;
+    border-color: var(--manual-muted);
+    opacity: 0.85;
 }
 
 @media (min-width: 700px) {
-    .flujo-ramas {
-        grid-template-columns: repeat(4, 1fr);
+    .flujo-ramas--binaria {
+        grid-template-columns: 1fr 1fr;
+        max-width: 28rem;
+    }
+
+    .flujo-ramas--tres {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 36rem;
+    }
+}
+
+/* Fallback si el navegador no soporta color-mix */
+@supports not (background: color-mix(in srgb, white 50%, black)) {
+    .flujo-nodo--fin,
+    .flujo-nodo--opcional {
+        background: var(--manual-paper);
     }
 }
 
@@ -657,12 +955,29 @@
     }
 
     .manual-sheet::before {
-        width: 10px;
-        background: var(--manual-rail);
+        width: 12px;
+        /* En móvil también dejamos los circulitos (antes se perdían) */
+        background:
+            radial-gradient(circle at 6px 12px, var(--manual-hole) 3px, transparent 3.5px) 0 0 / 12px 24px,
+            var(--manual-rail);
     }
 
     .manual-sheet-inner {
         padding: 1.1rem 1rem 1.5rem 1.35rem;
+        /* En móvil el renglón + sello compiten con el título: bajamos ruido */
+        background-image: none;
+    }
+
+    .manual-sheet-inner::before {
+        opacity: 0.32;
+        font-size: 0.5rem;
+        top: 0.45rem;
+        right: 0.35rem;
+        padding: 0.25rem 0.35rem;
+    }
+
+    .manual-kicker {
+        max-width: calc(100% - 5.5rem);
     }
 
     .manual-mapa a {
@@ -675,5 +990,62 @@
 
     .manual-hub {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ----- Motion (agrado al entrar al capítulo) ----- */
+@keyframes manual-sheet-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes manual-paso-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Accesibilidad: si el usuario pide menos movimiento, apagamos animaciones */
+@media (prefers-reduced-motion: reduce) {
+    .manual-sheet,
+    .manual-paso,
+    .manual-card,
+    .manual-paso-num,
+    .manual-pager a {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .manual-paso:hover .manual-paso-num {
+        transform: rotate(-4deg);
+    }
+
+    .manual-card:hover {
+        transform: none;
+    }
+}
+
+@supports not (background: color-mix(in srgb, white 50%, black)) {
+    .manual-shell {
+        background: var(--body-bg);
+    }
+
+    .manual-meta {
+        background: var(--hover-bg);
+    }
+
+    .manual-sheet-inner {
+        background-image: none;
     }
 }

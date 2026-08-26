@@ -1,45 +1,116 @@
 <!--
   Diagrama de flujo FL (venta mostrador, cotización sin orden).
-  EXPLICACIÓN PARA PRINCIPIANTES: HTML + CSS, cada caja es un enlace.
-  El folio FL- nace solo si el cliente acepta (Crear Orden de Servicio).
- -->
-<figure class="flujo" aria-label="Diagrama de flujo de venta mostrador FL">
-    <figcaption class="flujo-caption">Cotización sin orden. Cada caja abre el capítulo.</figcaption>
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma idea que el diagrama OOW: HTML + CSS, cajas clicables, decisiones
+  anidadas y acento solo en «Acepta». El folio FL- nace al aceptar
+  (Crear Orden de Servicio). Parte 1 = oferta; Parte 2 = si aceptó.
+-->
+
+<figure class="flujo" aria-label="Diagrama FL parte 1: cotización sin orden hasta la respuesta">
+    <figcaption class="flujo-caption">Parte 1 · Cotización sin orden → respuesta</figcaption>
 
     <ol class="flujo-columna">
-        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-datos">Datos del cliente<small>modelo, marca, serie, pieza</small></a></li>
-        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-solicitud">Nueva cotización sin orden<small>proveedor Pendiente</small></a></li>
-        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-compras">Compras completa costos<small>editar y notificar a Front</small></a></li>
-        <li><a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-oferta">Front arma y envía la oferta<small>servicios + profit</small></a></li>
+        <li>
+            <a class="flujo-nodo flujo-nodo--inicio" href="{% url 'manual:proceso_fl' %}#paso-datos">
+                Datos del cliente
+                <small>modelo, marca, serie, pieza</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-solicitud">
+                Nueva cotización sin orden
+                <small>proveedor Pendiente</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-compras">
+                Compras completa costos
+                <small>editar y notificar a Front</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo" href="{% url 'manual:proceso_fl' %}#paso-oferta">
+                Front arma y envía la oferta
+                <small>servicios + profit</small>
+            </a>
+        </li>
     </ol>
 
-    <p class="flujo-pregunta">¿Qué contestó el cliente?</p>
-
-    <div class="flujo-ramas">
-        <a class="flujo-nodo flujo-nodo--ok" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">
-            Acepta
-            <small>Crear Orden de Servicio</small>
-        </a>
-        <a class="flujo-nodo flujo-nodo--no" href="{% url 'manual:rechaza' %}">
-            Rechaza
-            <small>Motivo en Almacén (sin ST)</small>
-        </a>
-        <a class="flujo-nodo flujo-nodo--pnc" href="{% url 'manual:pnc' %}">
-            PNC
-            <small>Sin piezas (dos avisos)</small>
-        </a>
-        <a class="flujo-nodo flujo-nodo--vence" href="{% url 'manual:recotizacion' %}">
-            No contestó
-            <small>Recotización a Compras</small>
-        </a>
+    <div class="flujo-decision" role="group" aria-label="Decisión: ¿contestó el cliente a tiempo?">
+        <p class="flujo-pregunta">
+            <span class="flujo-pregunta-tag" aria-hidden="true">◇</span>
+            ¿Contestó el cliente a tiempo?
+        </p>
+        <div class="flujo-ramas flujo-ramas--binaria">
+            <a class="flujo-nodo flujo-nodo--salida flujo-nodo--vence" href="{% url 'manual:recotizacion' %}">
+                No
+                <small>Recotización a Compras</small>
+            </a>
+            <p class="flujo-rama-continua">Sí → sigue abajo</p>
+        </div>
     </div>
 
-    <p class="flujo-cierre-nota">Si aceptó, Front crea el folio FL- y recién entonces registra el 50%. El taller sigue igual que en OOW.</p>
+    <div class="flujo-decision" role="group" aria-label="Decisión: qué contestó el cliente">
+        <p class="flujo-pregunta">
+            <span class="flujo-pregunta-tag" aria-hidden="true">◇</span>
+            ¿Qué contestó?
+        </p>
+        <div class="flujo-ramas flujo-ramas--tres">
+            <a class="flujo-nodo flujo-nodo--focal flujo-nodo--ok" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">
+                Acepta
+                <small>Crear Orden de Servicio</small>
+            </a>
+            <a class="flujo-nodo flujo-nodo--salida flujo-nodo--no" href="{% url 'manual:rechaza' %}">
+                Rechaza
+                <small>Motivo en Almacén (sin ST)</small>
+            </a>
+            <a class="flujo-nodo flujo-nodo--salida flujo-nodo--pnc" href="{% url 'manual:pnc' %}">
+                PNC
+                <small>Sin piezas (dos avisos)</small>
+            </a>
+        </div>
+    </div>
 
-    <ol class="flujo-columna flujo-columna--cierre">
-        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">Crear Orden de Servicio<small>técnico Pendiente · Proveniente de Almacén</small></a></li>
-        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">Anticipo 50%<small>candado de Compras</small></a></li>
-        <li><a class="flujo-nodo flujo-nodo--facturacion" href="{% url 'manual:rol_facturacion' %}">Validar pagos<small>Facturación · transferencia/tarjeta</small></a></li>
-        <li><a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-compras">Generar compras → reparación<small>egreso y entrega</small></a></li>
+    <p class="flujo-cierre-nota">
+        Si aceptó, Front crea el folio <strong>FL-</strong> y recién entonces registra el 50%
+        (Parte 2). El taller después sigue igual que en OOW.
+    </p>
+
+    <ul class="flujo-leyenda" aria-label="Leyenda del diagrama">
+        <li><span class="flujo-leyenda-muestra flujo-leyenda-muestra--inicio"></span> Inicio / fin</li>
+        <li><span class="flujo-leyenda-muestra flujo-leyenda-muestra--paso"></span> Paso</li>
+        <li><span class="flujo-leyenda-muestra flujo-leyenda-muestra--focal"></span> Camino feliz</li>
+        <li><span class="flujo-leyenda-muestra flujo-leyenda-muestra--salida"></span> Salida / cierre</li>
+    </ul>
+</figure>
+
+<figure class="flujo flujo--cierre" aria-label="Diagrama FL parte 2: si el cliente aceptó">
+    <figcaption class="flujo-caption">Parte 2 · Si el cliente aceptó (nace el FL-)</figcaption>
+
+    <ol class="flujo-columna">
+        <li>
+            <a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-crear-orden-fl">
+                Crear Orden de Servicio
+                <small>técnico Pendiente · Proveniente de Almacén</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo" href="{% url 'manual:acepta' %}#paso-anticipo">
+                Anticipo 50%
+                <small>candado de Compras</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo flujo-nodo--opcional" href="{% url 'manual:rol_facturacion' %}">
+                Validar pagos
+                <small>Facturación · transferencia/tarjeta</small>
+            </a>
+        </li>
+        <li>
+            <a class="flujo-nodo flujo-nodo--fin" href="{% url 'manual:acepta' %}#paso-compras">
+                Generar compras → reparación
+                <small>egreso y entrega</small>
+            </a>
+        </li>
     </ol>
 </figure>
