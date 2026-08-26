@@ -1572,12 +1572,26 @@ WHATSAPP_FORMATO_VENTA_MOSTRADOR_CDMX = '5575615114'
 WHATSAPP_FORMATO_VENTA_MOSTRADOR_GDL = '5528412687'
 WHATSAPP_FORMATO_VENTA_MOSTRADOR_MTY = '5528735678'
 
-WHATSAPP_FORMATO_VENTA_MOSTRADOR_TEXTO_MX = (
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_INTRO = (
     'Estimado Usuario, cualquier duda referente a la pieza y/o servicio '
-    'adquirido estamos para servirle y ayudarle por WhatsApp. '
-    f'EDO. DE MÉXICO Y CDMX {WHATSAPP_FORMATO_VENTA_MOSTRADOR_CDMX} | '
-    f'GUADALAJARA {WHATSAPP_FORMATO_VENTA_MOSTRADOR_GDL} | '
-    f'MONTERREY {WHATSAPP_FORMATO_VENTA_MOSTRADOR_MTY}'
+    'adquirido estamos para servirle y ayudarle por WhatsApp.'
+)
+
+# Cada tupla: (etiqueta de sucursal, teléfono a 10 dígitos). El PDF las
+# imprime en columnas; no hardcodear ciudades en el generador.
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_SUCURSALES = [
+    ('Edo. de México y CDMX', WHATSAPP_FORMATO_VENTA_MOSTRADOR_CDMX),
+    ('Guadalajara', WHATSAPP_FORMATO_VENTA_MOSTRADOR_GDL),
+    ('Monterrey', WHATSAPP_FORMATO_VENTA_MOSTRADOR_MTY),
+]
+
+WHATSAPP_FORMATO_VENTA_MOSTRADOR_TEXTO_MX = (
+    WHATSAPP_FORMATO_VENTA_MOSTRADOR_INTRO
+    + ' '
+    + ' | '.join(
+        f'{ciudad.upper()} {telefono}'
+        for ciudad, telefono in WHATSAPP_FORMATO_VENTA_MOSTRADOR_SUCURSALES
+    )
 )
 
 # Términos y condiciones (página 2 de la nota de venta). Cada ítem es un

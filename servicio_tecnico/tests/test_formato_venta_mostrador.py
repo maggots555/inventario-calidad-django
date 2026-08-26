@@ -184,6 +184,17 @@ class FormatoVmServiceTest(TestCase):
         self.assertIn(b'/Count 2', raw)
         self.assertGreater(len(raw), 2000)
 
+    def test_formato_telefono_whatsapp_mx(self):
+        """Los 10 dígitos de WhatsApp se leen con espacios en el PDF."""
+        from servicio_tecnico.utils.pdf_formato_venta_mostrador import (
+            PDFFormatoVentaMostrador,
+        )
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        generador = PDFFormatoVentaMostrador(formato)
+        self.assertEqual(generador._fmt_tel_mx('5575615114'), '55 7561 5114')
+        self.assertEqual(generador._fmt_tel_mx('123'), '123')
+
     def test_pdf_sin_equipo_completo(self):
         """Campos de equipo vacíos no rompen la generación."""
         detalle = self.orden.detalle_equipo

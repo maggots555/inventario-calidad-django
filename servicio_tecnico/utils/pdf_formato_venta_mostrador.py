@@ -43,7 +43,8 @@ from reportlab.platypus import (
 from config.constants import (
     LEYENDA_VENTA_MOSTRADOR,
     TERMINOS_VENTA_MOSTRADOR,
-    WHATSAPP_FORMATO_VENTA_MOSTRADOR_TEXTO_MX,
+    WHATSAPP_FORMATO_VENTA_MOSTRADOR_INTRO,
+    WHATSAPP_FORMATO_VENTA_MOSTRADOR_SUCURSALES,
     catalogo_vistas_dano_estetico,
 )
 from config.paises_config import get_pais_actual
@@ -190,7 +191,7 @@ class PDFFormatoVentaMostrador:
             fontName='Helvetica-Bold',
             fontSize=10,
             textColor=COLOR_NAVY,
-            alignment=TA_CENTER,
+            alignment=TA_LEFT,
             leading=13,
         ))
         self._estilos.add(ParagraphStyle(
@@ -265,12 +266,28 @@ class PDFFormatoVentaMostrador:
             leading=9,
         ))
         self._estilos.add(ParagraphStyle(
-            'WhatsappVm',
+            'WhatsappIntroVm',
             fontName='Helvetica',
             fontSize=7,
             textColor=COLOR_NAVY,
             alignment=TA_CENTER,
             leading=9,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'WhatsappCiudadVm',
+            fontName='Helvetica',
+            fontSize=6.5,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            leading=8,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'WhatsappNumeroVm',
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            leading=11,
         ))
         self._estilos.add(ParagraphStyle(
             'TerminoNumVm',
@@ -287,8 +304,8 @@ class PDFFormatoVentaMostrador:
         return [KeepTogether(partes)]
 
     def _crear_header_seccion(self, titulo: str) -> Table:
-        """Barra navy de sección."""
-        ancho = letter[0] - (2 * MARGEN)
+        """Barra navy de sección (ancho completo del contenido)."""
+        ancho = self._ancho_util()
         tabla = Table(
             [[Paragraph(titulo, self._estilos['TituloFormatoVm'])]],
             colWidths=[ancho],
@@ -330,8 +347,19 @@ class PDFFormatoVentaMostrador:
         except Exception:
             return None
 
+    def _ancho_util(self) -> float:
+        """Ancho de página menos márgenes izquierdo y derecho."""
+        return letter[0] - (2 * MARGEN)
+
     def _construir_header(self) -> List:
-        """Logos a ambos lados + razón social centrada (como el papel)."""
+        """
+        Un solo logo SIC a la derecha + razón social a la izquierda.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Antes se repetía el mismo PNG a ambos lados (`[logo, centro, logo]`).
+        Eso apretaba el texto de la empresa y se veían dos logotipos. Ahora
+        hay dos columnas: datos de contacto | un logo.
+        """
         elementos: List = []
         logo = self._obtener_logo()
         empresa = self.pais_config.get(
@@ -340,22 +368,23 @@ class PDFFormatoVentaMostrador:
         )
         direccion = self.pais_config.get('empresa_direccion', '')
         telefono = self.pais_config.get('empresa_telefono', '')
-        bloque_centro = (
+        bloque_empresa = (
             f'<b>{self._esc(empresa)}</b><br/>'
             f'<font size="7">{self._esc(direccion)}</font><br/>'
             f'<font size="7">Atención a clientes {self._esc(telefono)}</font>'
         )
-        centro = Paragraph(bloque_centro, self._estilos['EmpresaHeaderVm'])
+        texto = Paragraph(bloque_empresa, self._estilos['EmpresaHeaderVm'])
+        ancho_logo = 42 * mm
+        ancho_texto = self._ancho_util() - ancho_logo
         if logo:
-            fila = [[logo, centro, logo]]
+            fila = [[texto, logo]]
         else:
-            fila = [['', centro, '']]
-        tabla = Table(fila, colWidths=[42 * mm, None, 42 * mm])
+            fila = [[texto, '']]
+        tabla = Table(fila, colWidths=[ancho_texto, ancho_logo])
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-            ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ]))
@@ -365,11 +394,23 @@ class PDFFormatoVentaMostrador:
         return elementos
 
     def _construir_titulo_y_folio(self) -> List:
-        """Título NOTA DE VENTA DIRECTA + recuadro fecha/folio."""
+        """
+        Título NOTA DE VENTA DIRECTA + recuadro fecha/folio, sin solaparse.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        `_crear_header_seccion()` dibuja la barra navy al ANCHO COMPLETO de
+        la hoja. Si esa barra se mete en una celda más estrecha (porque al
+        lado va Fecha/Folio), ReportLab no recorta: la barra se sale y tapa
+        el recuadro. Por eso aquí el título usa el ancho de SU columna.
+        """
         momento = self.formato.finalizado_en or timezone.now()
         fecha_txt = timezone.localtime(momento).strftime('%d/%m/%Y')
         folio = self._folio()
-        titulo = self._crear_header_seccion('NOTA DE VENTA DIRECTA')
+        # Columna folio + hueco entre título y recuadro
+        hueco = 3 * mm
+        ancho_folio = 60 * mm
+        ancho_titulo = self._ancho_util() - ancho_folio - hueco
+
         recuadro = Table(
             [
                 [
@@ -381,7 +422,7 @@ class PDFFormatoVentaMostrador:
                     Paragraph(self._esc(folio), self._estilos['CeldaValorVm']),
                 ],
             ],
-            colWidths=[22 * mm, 38 * mm],
+            colWidths=[20 * mm, 40 * mm],
         )
         recuadro.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
@@ -392,10 +433,25 @@ class PDFFormatoVentaMostrador:
             ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
-        fila = Table([[titulo, recuadro]], colWidths=[None, 62 * mm])
+        fila = Table(
+            [[
+                Paragraph('NOTA DE VENTA DIRECTA', self._estilos['TituloFormatoVm']),
+                '',
+                recuadro,
+            ]],
+            colWidths=[ancho_titulo, hueco, ancho_folio],
+        )
         fila.setStyle(TableStyle([
+            # Navy solo en la columna del título, hueco blanco, recuadro a la derecha.
+            # Así ambas celdas de contenido quedan a la misma altura (la del folio).
+            ('BACKGROUND', (0, 0), (0, 0), COLOR_NAVY),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ('LEFTPADDING', (0, 0), (0, 0), 4),
             ('RIGHTPADDING', (0, 0), (0, 0), 4),
         ]))
         return [fila]
@@ -671,18 +727,81 @@ class PDFFormatoVentaMostrador:
         ]))
         return [caja]
 
+    def _fmt_tel_mx(self, digitos: str) -> str:
+        """
+        Separa un teléfono mexicano de 10 dígitos: 5575615114 → 55 7561 5114.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        En el PDF se lee mejor con espacios. Si el número no tiene 10
+        dígitos (otro país o dato raro), se imprime tal cual.
+        """
+        solo = ''.join(c for c in (digitos or '') if c.isdigit())
+        if len(solo) == 10:
+            return f'{solo[:2]} {solo[2:6]} {solo[6:]}'
+        return digitos or ''
+
     def _construir_whatsapp(self) -> List:
-        """Pie de contacto WhatsApp (México) o teléfono del país."""
+        """
+        Bloque de contacto WhatsApp: encabezado + intro + columnas de sucursal.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Antes era un párrafo corrido y el texto se partía a la mitad
+        (el primer número en una línea y el resto en otra). Ahora es una
+        tarjetita con 3 columnas, igual de corporativa que el resto del PDF.
+        """
         codigo = (self.pais_config.get('codigo') or 'MX').upper()
+        elementos: List = [
+            self._crear_header_seccion('ATENCIÓN POR WHATSAPP'),
+            Spacer(1, 2 * mm),
+        ]
         if codigo == 'MX':
-            texto = WHATSAPP_FORMATO_VENTA_MOSTRADOR_TEXTO_MX
+            intro = WHATSAPP_FORMATO_VENTA_MOSTRADOR_INTRO
+            sucursales = WHATSAPP_FORMATO_VENTA_MOSTRADOR_SUCURSALES
         else:
             tel = self.pais_config.get('empresa_telefono', '')
-            texto = (
+            intro = (
                 'Estimado Usuario, cualquier duda referente a la pieza y/o '
-                f'servicio adquirido estamos para servirle. Tel. {tel}'
+                'servicio adquirido estamos para servirle.'
             )
-        return [Paragraph(self._esc(texto), self._estilos['WhatsappVm'])]
+            sucursales = [('Teléfono de contacto', tel)]
+
+        elementos.append(Paragraph(self._esc(intro), self._estilos['WhatsappIntroVm']))
+        elementos.append(Spacer(1, 2 * mm))
+
+        n = max(len(sucursales), 1)
+        ancho_col = self._ancho_util() / n
+        celdas = []
+        for ciudad, telefono in sucursales:
+            tarjeta = Table(
+                [
+                    [Paragraph(self._esc(ciudad), self._estilos['WhatsappCiudadVm'])],
+                    [Paragraph(self._esc(self._fmt_tel_mx(telefono)), self._estilos['WhatsappNumeroVm'])],
+                ],
+                colWidths=[ancho_col],
+            )
+            tarjeta.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (0, 0), 3),
+                ('BOTTOMPADDING', (0, -1), (0, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ]))
+            celdas.append(tarjeta)
+
+        fila = Table([celdas], colWidths=[ancho_col] * n)
+        fila.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY_SUAVE),
+            ('BOX', (0, 0), (-1, -1), 0.6, COLOR_NAVY),
+            ('INNERGRID', (0, 0), (-1, -1), 0.4, COLOR_GRIS_BORDE),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        elementos.append(fila)
+        return [KeepTogether(elementos)]
 
     def _construir_terminos(self) -> List:
         """Página 2: 11 cláusulas + línea de conformidad."""
