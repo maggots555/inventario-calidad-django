@@ -117,3 +117,6 @@ scripts/poblado/*.xlsx
 
 # Documentación interna con información confidencial de márgenes y precios
 docs/COTIZADOR_PROFIT.md
+
+# Propuesta comercial a Dirección (evaluación + tarifas). No subir a GitHub.
+docs/PROPUESTA_EVALUACION_SIGMA.md
