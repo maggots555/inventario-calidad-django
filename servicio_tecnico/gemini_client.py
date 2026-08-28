@@ -1019,6 +1019,7 @@ def transcribir_audio_gemini(
     audio_content_type: str = "audio/webm",
     idioma: str = "es",
     model: str = "",
+    timeout: int | None = None,
 ) -> dict:
     """
     Transcribe audio usando la API de Google Gemini con inline_data.
@@ -1032,6 +1033,8 @@ def transcribir_audio_gemini(
         audio_content_type: MIME type del audio (default: audio/webm)
         idioma: Código de idioma para orientar al modelo (es = español)
         model: Modelo a usar. Si está vacío, usa GEMINI_MODEL del settings.
+        timeout: Segundos de urllib. None = GEMINI_TIMEOUT (60). La cascada
+            de Diagnóstico SIC pasa GEMINI_TRANSCRIBE_TIMEOUT (180).
 
     Returns:
         dict:
@@ -1065,7 +1068,8 @@ def transcribir_audio_gemini(
     if model.startswith('[Gemini] '):
         model = model[len('[Gemini] '):]
 
-    timeout = getattr(settings, 'GEMINI_TIMEOUT', 60)
+    if timeout is None:
+        timeout = getattr(settings, 'GEMINI_TIMEOUT', 60)
 
     # ── Codificar audio en base64 ─────────────────────────────────────────────
     audio_b64 = _base64_audio.b64encode(audio_bytes).decode('utf-8')
@@ -1210,6 +1214,7 @@ def transcribir_audio_gemini_con_fallback(
     audio_content_type: str = "audio/webm",
     idioma: str = "es",
     modelos: list[str] | None = None,
+    timeout: int | None = None,
 ) -> dict:
     """
     Transcribe audio intentando cada modelo de GEMINI_MODELS en orden hasta que uno funcione.
@@ -1230,6 +1235,7 @@ def transcribir_audio_gemini_con_fallback(
         modelos: Lista opcional a recorrer. Si es None, usa GEMINI_MODELS.
             La cascada de Diagnóstico SIC pasa aquí solo Flash/Lite (sin
             gemini-3.5-transcribe, que ya se intentó por Interactions API).
+        timeout: Segundos por modelo. None = GEMINI_TIMEOUT.
 
     Returns:
         dict con el resultado del primer modelo que respondió con éxito:
@@ -1258,6 +1264,7 @@ def transcribir_audio_gemini_con_fallback(
             audio_content_type=audio_content_type,
             idioma=idioma,
             model=modelo,
+            timeout=timeout,
         )
 
         if resultado['success']:

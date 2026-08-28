@@ -923,6 +923,9 @@ GEMINI_TRANSCRIBE_MODEL = config(
     'GEMINI_TRANSCRIBE_MODEL',
     default='gemini-3.5-transcribe',
 )
+# Timeout SOLO para voz→texto (Transcribe + fallback Flash de audio).
+# No usar GEMINI_TIMEOUT aquí: pulir diagnóstico debe seguir en 60s.
+GEMINI_TRANSCRIBE_TIMEOUT = config('GEMINI_TRANSCRIBE_TIMEOUT', default=180, cast=int)
 
 # GEMINI_MODELS: lista de modelos Gemini disponibles para el selector.
 # Formato: nombres separados por coma.

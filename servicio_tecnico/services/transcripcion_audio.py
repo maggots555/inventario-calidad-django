@@ -33,6 +33,10 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+# El audio vive en cache Django (Redis /2) hasta que el worker Celery lo lea.
+# 15 min basta: si el worker está caído, el frontend ya habrá mostrado timeout.
+CACHE_TTL_TRANSCRIPCION = 15 * 60
+
 # Interactions API (Gemini 3.5 Transcribe). Distinta de generateContent.
 GEMINI_INTERACTIONS_URL = (
     'https://generativelanguage.googleapis.com/v1beta/interactions'
@@ -79,6 +83,30 @@ def _modelo_transcribe() -> str:
 def _es_modelo_transcribe(nombre: str) -> bool:
     """True si el ID es el STT dedicado (no debe ir en la cascada Flash)."""
     return 'transcribe' in (nombre or '').lower()
+
+
+def timeout_transcripcion() -> int:
+    """
+    Segundos de espera HTTP para voz→texto (no el de pulir diagnóstico).
+
+    Returns:
+        int: GEMINI_TRANSCRIBE_TIMEOUT o 180 si no está definido.
+    """
+    valor = getattr(settings, 'GEMINI_TRANSCRIBE_TIMEOUT', 180)
+    try:
+        return max(int(valor), 1)
+    except (TypeError, ValueError):
+        return 180
+
+
+def clave_cache_audio(cache_key: str) -> str:
+    """Clave Redis/cache donde está el blob de audio pendiente."""
+    return f'transcribe_audio:{cache_key}'
+
+
+def clave_cache_owner(task_id: str) -> str:
+    """Clave que guarda el user.pk dueño de la tarea (anti-espionaje)."""
+    return f'transcribe_owner:{task_id}'
 
 
 def _extraer_texto_interaccion(response_data: dict) -> str:
@@ -176,7 +204,7 @@ def transcribir_con_gemini_transcribe(
         return {'success': False, 'error': 'No se recibieron bytes de audio.'}
 
     modelo = _modelo_transcribe()
-    timeout = getattr(settings, 'GEMINI_TIMEOUT', 60)
+    timeout = timeout_transcripcion()
 
     # Pista BCP-47: el taller habla español de México.
     language_tag = 'es-MX' if (idioma or 'es').lower().startswith('es') else idioma
@@ -208,7 +236,7 @@ def transcribir_con_gemini_transcribe(
     logger.info(
         '[AudioTranscripcion][Transcribe] Iniciando | '
         f'Modelo: {modelo} | Audio: {len(audio_bytes)} bytes '
-        f'({audio_content_type}) | Idioma: {language_tag}'
+        f'({audio_content_type}) | Idioma: {language_tag} | Timeout: {timeout}s'
     )
 
     data = json.dumps(payload).encode('utf-8')
@@ -376,6 +404,7 @@ def transcribir_audio_cascada(
                 audio_content_type=audio_content_type,
                 idioma=idioma,
                 modelos=modelos_generales,
+                timeout=timeout_transcripcion(),
             )
             # El fallback interno cuenta sub-intentos; sumamos los extras.
             sub_intentos = max(int(resultado.get('intentos') or 1), 1)
@@ -400,6 +429,7 @@ def transcribir_audio_cascada(
             audio_filename=audio_filename,
             audio_content_type=audio_content_type,
             idioma=idioma,
+            timeout=timeout_transcripcion(),
         )
         if resultado.get('success'):
             resultado['proveedor'] = 'ollama'

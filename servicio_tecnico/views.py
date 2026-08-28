@@ -186,6 +186,7 @@ from .views_concentrado import (  # noqa: F401
     exportar_concentrado_pdf,
 )
 from .views_ia_diagnostico import (  # noqa: F401
+    estado_transcripcion_audio,
     guardar_diagnostico_sic_ia,
     pulir_diagnostico_sic_ia,
     transcribir_audio_diagnostico,

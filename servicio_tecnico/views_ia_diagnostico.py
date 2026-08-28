@@ -3,8 +3,8 @@ Vistas AJAX de IA para diagnóstico SIC (Fase 2 modularización).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 - pulir_diagnostico_sic_ia: mejora la redacción del diagnóstico (Ollama/Gemini).
-- transcribir_audio_diagnostico: fallback servidor cuando no hay Web Speech API
-  (cascada: Gemini 3.5 Transcribe → Gemini Flash → Ollama).
+- transcribir_audio_diagnostico: encola Celery; el worker corre la cascada
+  Transcribe → Flash → Ollama. El frontend hace polling de estado.
 
 NO incluyen el chat del portal cliente (chat_seguimiento_cliente) — eso
 va en la Fase 3 (views_seguimiento_cliente.py).
@@ -13,7 +13,7 @@ urls.py sigue usando views.pulir_diagnostico_sic_ia etc. porque views.py reexpor
 """
 
 import logging
-import time
+import uuid
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -256,54 +256,53 @@ def guardar_diagnostico_sic_ia(request):
 
 # ============================================================================
 # VISTA AJAX: transcribir_audio_diagnostico
-# Endpoint que recibe un archivo de audio grabado por el técnico en el campo
-# Diagnóstico SIC y lo transcribe usando IA.
+# El técnico envía el WebM grabado. Esta vista NO llama a Gemini: guarda el
+# audio en cache y encola una tarea Celery. El navegador pregunta el estado
+# en GET .../estado/<task_id>/ cada 2 s (así Cloudflare no corta a los ~100 s).
 #
-# FLUJO:
-# 1. El navegador graba audio con MediaRecorder (WebM/OGG/MP4 según soporte)
-# 2. Si Web Speech API funcionó en el cliente, NO llega aquí (se maneja en JS)
-# 3. Si Web Speech API no está disponible, el cliente envía el audio aquí
-# 4. La vista valida el archivo y delega la cascada al service:
-#    Transcribe (STT) → Gemini Flash/Lite → Ollama
-# 5. Devuelve JSON con el texto transcrito
-#
-# Endpoint: POST /api/transcribir-audio-diagnostico/
-# Recibe:  archivo 'audio' (multipart), campo 'idioma' (opcional, default 'es')
-# Devuelve: {'success': True, 'texto': '...', 'proveedor': '...'}
-#           {'success': False, 'error': '...mensaje...'}
+# Endpoint POST: /api/transcribir-audio-diagnostico/
+# Endpoint GET:  /api/transcribir-audio-diagnostico/estado/<task_id>/
 # ============================================================================
 
 @login_required
 @require_http_methods(["POST"])
 def transcribir_audio_diagnostico(request):
     """
-    API AJAX: Transcribe un audio a texto (cascada Transcribe → Gemini → Ollama).
-
-    Este endpoint es el fallback del lado servidor cuando el navegador no
-    soporta la Web Speech API (principalmente Firefox y algunos Android).
+    API AJAX: encola la transcripción en Celery y devuelve task_id.
 
     Recibe vía POST (multipart/form-data):
         - audio (File): Archivo de audio grabado (WebM, OGG, MP4, WAV)
         - idioma (str, opcional): Código de idioma (default: 'es')
 
     Devuelve JSON:
-        {'success': True, 'texto': '...', 'proveedor': 'gemini-transcribe'|'gemini'|'ollama'}
-        {'success': False, 'error': '...mensaje de error amigable...'}
+        {'success': True, 'task_id': '...'}
+        {'success': False, 'error': '...'}
 
     Efectos secundarios:
-        Llama APIs de Google y/o Ollama. No escribe en la base de datos.
+        Escribe el audio en cache Django (TTL 15 min) y encola Celery.
+        No llama a Google ni a Ollama en este request.
     """
+    import base64
+
+    from django.core.cache import cache
+
+    from config.paises_config import get_pais_actual
+    from servicio_tecnico.services.transcripcion_audio import (
+        CACHE_TTL_TRANSCRIPCION,
+        clave_cache_audio,
+        clave_cache_owner,
+    )
+    from servicio_tecnico.tasks_transcripcion import transcribir_audio_diagnostico_task
+
     ollama_enabled = getattr(settings, 'OLLAMA_ENABLED', False)
     gemini_enabled = getattr(settings, 'GEMINI_ENABLED', False)
 
-    # Verificar que al menos un proveedor de IA está habilitado
     if not (ollama_enabled or gemini_enabled):
         return JsonResponse({
             'success': False,
             'error': 'La transcripción de audio no está habilitada en este entorno.'
         }, status=403)
 
-    # Validar que llegó el archivo de audio
     audio_file = request.FILES.get('audio')
     if not audio_file:
         return JsonResponse({
@@ -311,7 +310,6 @@ def transcribir_audio_diagnostico(request):
             'error': 'No se recibió ningún archivo de audio.'
         }, status=400)
 
-    # Límite de tamaño: 25 MB (audios de diagnóstico son cortos, < 2 minutos)
     MAX_SIZE_BYTES = 25 * 1024 * 1024
     if audio_file.size > MAX_SIZE_BYTES:
         return JsonResponse({
@@ -320,53 +318,104 @@ def transcribir_audio_diagnostico(request):
         }, status=400)
 
     idioma = request.POST.get('idioma', 'es').strip()
-
-    # Leer el contenido binario del archivo
     audio_bytes = audio_file.read()
     audio_nombre = audio_file.name or 'audio.webm'
     audio_content_type = audio_file.content_type or 'audio/webm'
 
     logger.info(
-        f"[AudioDiag] Solicitud de transcripción | Usuario: {request.user.username} | "
+        f"[AudioDiag] Encolando transcripción | Usuario: {request.user.username} | "
         f"Archivo: {audio_nombre} | Tamaño: {len(audio_bytes)} bytes | Idioma: {idioma}"
     )
 
-    from servicio_tecnico.services.transcripcion_audio import transcribir_audio_cascada
-
-    # La cascada vive en services/: Transcribe → Flash/Lite → Ollama.
-    _t = time.monotonic()
-    resultado = transcribir_audio_cascada(
-        audio_bytes=audio_bytes,
-        audio_filename=audio_nombre,
-        audio_content_type=audio_content_type,
-        idioma=idioma,
+    # EXPLICACIÓN: base64 en cache es JSON-safe (Redis pickle o JSON).
+    cache_key = uuid.uuid4().hex
+    cache.set(
+        clave_cache_audio(cache_key),
+        {
+            'audio_b64': base64.b64encode(audio_bytes).decode('ascii'),
+            'audio_filename': audio_nombre,
+            'audio_content_type': audio_content_type,
+            'idioma': idioma,
+        },
+        CACHE_TTL_TRANSCRIPCION,
     )
-    tiempo_ms = int((time.monotonic() - _t) * 1000)
 
-    if resultado.get('success'):
-        logger.info(
-            f"[AudioDiag] Transcripción OK "
-            f"({resultado.get('proveedor')}/{resultado.get('modelo_usado')}) | "
-            f"{tiempo_ms}ms | Intentos: {resultado.get('intentos', 1)} | "
-            f"Chars: {len(resultado.get('texto', ''))}"
-        )
-        return JsonResponse({
-            'success': True,
-            'texto': resultado['texto'],
-            'proveedor': resultado.get('proveedor', ''),
-            'modelo_usado': resultado.get('modelo_usado', ''),
-            'tiempo_ms': tiempo_ms,
-        })
+    tarea = transcribir_audio_diagnostico_task.delay(
+        cache_key=cache_key,
+        usuario_id=request.user.pk,
+        db_alias=get_pais_actual()['db_alias'],
+    )
+    cache.set(
+        clave_cache_owner(tarea.id),
+        request.user.pk,
+        CACHE_TTL_TRANSCRIPCION,
+    )
 
-    logger.error(
-        f"[AudioDiag] Cascada agotada ({resultado.get('intentos', '?')} intentos) | "
-        f"Error: {resultado.get('error')}"
+    logger.info(
+        f"[AudioDiag] Tarea encolada | task_id={tarea.id} | cache_key={cache_key}"
     )
     return JsonResponse({
-        'success': False,
-        'error': resultado.get(
-            'error',
-            'No se pudo transcribir el audio. Intenta de nuevo o escribe el diagnóstico manualmente.',
-        )
+        'success': True,
+        'task_id': tarea.id,
+        'mensaje': 'Transcribiendo en segundo plano. No cierres la página.',
     })
+
+
+@login_required
+@require_http_methods(["GET"])
+def estado_transcripcion_audio(request, task_id):
+    """
+    Polling del estado de transcribir_audio_diagnostico_task.
+
+    Args:
+        task_id: UUID de Celery devuelto por el POST.
+
+    Returns:
+        JsonResponse con estado, listo, y texto si SUCCESS.
+
+    Efectos secundarios:
+        Solo lectura (Redis AsyncResult + cache de dueño).
+    """
+    from celery.result import AsyncResult
+    from django.core.cache import cache
+
+    from servicio_tecnico.services.transcripcion_audio import clave_cache_owner
+
+    dueno_id = cache.get(clave_cache_owner(task_id))
+    if dueno_id is None or int(dueno_id) != int(request.user.pk):
+        return JsonResponse({
+            'success': False,
+            'error': 'No tienes permiso para consultar esta transcripción.',
+        }, status=403)
+
+    resultado = AsyncResult(task_id)
+    estado = resultado.state
+    respuesta = {
+        'estado': estado,
+        'listo': estado in ('SUCCESS', 'FAILURE'),
+    }
+
+    if estado == 'SUCCESS':
+        data = resultado.result or {}
+        if not isinstance(data, dict):
+            data = {}
+        respuesta['success'] = bool(data.get('success'))
+        respuesta['texto'] = data.get('texto') or ''
+        respuesta['proveedor'] = data.get('proveedor') or ''
+        respuesta['modelo_usado'] = data.get('modelo_usado') or ''
+        if not data.get('success'):
+            respuesta['error'] = data.get(
+                'error',
+                'No se pudo transcribir el audio.',
+            )
+
+    elif estado == 'FAILURE':
+        respuesta['success'] = False
+        error = resultado.result
+        if isinstance(error, Exception):
+            respuesta['error'] = str(error)[:300]
+        else:
+            respuesta['error'] = 'Error desconocido al transcribir el audio.'
+
+    return JsonResponse(respuesta)
 

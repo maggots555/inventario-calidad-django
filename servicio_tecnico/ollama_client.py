@@ -2354,6 +2354,7 @@ def transcribir_audio_ollama(
     audio_filename: str = "audio.webm",
     audio_content_type: str = "audio/webm",
     idioma: str = "es",
+    timeout: int | None = None,
 ) -> dict:
     """
     Transcribe audio usando el endpoint OpenAI-compatible de Ollama.
@@ -2367,6 +2368,9 @@ def transcribir_audio_ollama(
         audio_filename: Nombre del archivo para el campo multipart (incluye extensión)
         audio_content_type: MIME type del audio (audio/webm, audio/wav, etc.)
         idioma: Código de idioma ISO 639-1 (es = español, default)
+        timeout: Segundos de urllib. None = OLLAMA_TIMEOUT. La cascada de
+            Diagnóstico SIC pasa GEMINI_TRANSCRIBE_TIMEOUT para no cortar
+            audios largos a los 120s.
 
     Returns:
         dict con estructura:
@@ -2386,7 +2390,8 @@ def transcribir_audio_ollama(
 
     base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
     model = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
-    timeout = getattr(settings, 'OLLAMA_TIMEOUT', 120)
+    if timeout is None:
+        timeout = getattr(settings, 'OLLAMA_TIMEOUT', 120)
 
     # ── Convertir a WAV si el formato no es WAV ───────────────────────────────
     # EXPLICACIÓN PARA PRINCIPIANTES:

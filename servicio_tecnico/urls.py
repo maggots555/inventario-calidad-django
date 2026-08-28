@@ -319,11 +319,14 @@ urlpatterns = [
          name='guardar_diagnostico_sic_ia'),
 
     # Transcripción de audio a texto para el campo Diagnóstico SIC.
-    # Fallback del servidor cuando Web Speech API no está disponible en el navegador.
-    # Cascada: Gemini 3.5 Transcribe → Gemini Flash/Lite → Ollama.
+    # POST encola Celery; GET consulta AsyncResult (polling del micrófono).
+    # Cascada en el worker: Gemini 3.5 Transcribe → Gemini Flash/Lite → Ollama.
     path('api/transcribir-audio-diagnostico/',
          views.transcribir_audio_diagnostico,
          name='transcribir_audio_diagnostico'),
+    path('api/transcribir-audio-diagnostico/estado/<str:task_id>/',
+         views.estado_transcripcion_audio,
+         name='estado_transcripcion_audio'),
     
     # ========================================================================
     # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)

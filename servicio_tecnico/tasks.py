@@ -5841,3 +5841,6 @@ from servicio_tecnico.tasks_diagnostico import (  # noqa: E402, F401
 from servicio_tecnico.tasks_formato_venta_mostrador import (  # noqa: E402, F401
     enviar_formato_venta_mostrador_email_task,
 )
+from servicio_tecnico.tasks_transcripcion import (  # noqa: E402, F401
+    transcribir_audio_diagnostico_task,
+)

@@ -321,3 +321,214 @@ class TranscribirConGeminiTranscribeHttpTests(SimpleTestCase):
         self.assertEqual(config_stt['language_codes'], ['es-MX'])
         # Google responde HTTP 400 si mandamos language_hints (campo inexistente).
         self.assertNotIn('language_hints', config_stt)
+        # GEMINI_TIMEOUT=10 en esta clase; audio usa GEMINI_TRANSCRIBE_TIMEOUT (180).
+        self.assertEqual(mock_urlopen.call_args.kwargs.get('timeout'), 180)
+
+
+class TimeoutTranscripcionTests(SimpleTestCase):
+    """El timeout de audio no debe heredar GEMINI_TIMEOUT (pulir texto)."""
+
+    @override_settings(GEMINI_TIMEOUT=60, GEMINI_TRANSCRIBE_TIMEOUT=180)
+    def test_lee_transcribe_timeout_no_el_global(self):
+        from servicio_tecnico.services.transcripcion_audio import timeout_transcripcion
+
+        self.assertEqual(timeout_transcripcion(), 180)
+
+
+@override_settings(
+    GEMINI_ENABLED=True,
+    OLLAMA_ENABLED=False,
+    GEMINI_TRANSCRIBE_ENABLED=True,
+    CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'transcribe-vista-tests',
+        }
+    },
+)
+class TranscripcionCeleryVistaTests(SimpleTestCase):
+    """
+    POST encola Celery (no corre la cascada). GET consulta AsyncResult.
+    """
+
+    def setUp(self) -> None:
+        from django.test import RequestFactory
+
+        self.factory = RequestFactory()
+        self.user = MagicMock()
+        self.user.pk = 7
+        self.user.username = 'tec.transcribe'
+        self.user.is_authenticated = True
+        self.user.is_anonymous = False
+
+    def _post_audio(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+
+        from servicio_tecnico.views_ia_diagnostico import transcribir_audio_diagnostico
+
+        audio = SimpleUploadedFile(
+            'diagnostico.webm',
+            AUDIO_FAKE,
+            content_type='audio/webm',
+        )
+        request = self.factory.post(
+            reverse('servicio_tecnico:transcribir_audio_diagnostico'),
+            {'idioma': 'es', 'audio': audio},
+        )
+        request.user = self.user
+        return transcribir_audio_diagnostico(request)
+
+    @patch('servicio_tecnico.tasks_transcripcion.transcribir_audio_diagnostico_task.delay')
+    @patch('config.paises_config.get_pais_actual')
+    def test_post_encola_y_no_corre_cascada(
+        self,
+        mock_pais: MagicMock,
+        mock_delay: MagicMock,
+    ) -> None:
+        """El request HTTP solo guarda cache y devuelve task_id."""
+        from django.core.cache import cache
+
+        from servicio_tecnico.services.transcripcion_audio import clave_cache_owner
+
+        mock_pais.return_value = {'db_alias': 'default'}
+        mock_delay.return_value = MagicMock(id='task-uuid-test')
+
+        with patch(
+            'servicio_tecnico.services.transcripcion_audio.transcribir_audio_cascada'
+        ) as mock_cascada:
+            respuesta = self._post_audio()
+
+        self.assertEqual(respuesta.status_code, 200)
+        data = json.loads(respuesta.content)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['task_id'], 'task-uuid-test')
+        mock_delay.assert_called_once()
+        mock_cascada.assert_not_called()
+        self.assertEqual(cache.get(clave_cache_owner('task-uuid-test')), 7)
+
+    @patch('celery.result.AsyncResult')
+    def test_get_estado_success_devuelve_texto(self, mock_ar: MagicMock) -> None:
+        from django.core.cache import cache
+        from django.urls import reverse
+
+        from servicio_tecnico.services.transcripcion_audio import (
+            CACHE_TTL_TRANSCRIPCION,
+            clave_cache_owner,
+        )
+        from servicio_tecnico.views_ia_diagnostico import estado_transcripcion_audio
+
+        cache.set(clave_cache_owner('abc'), 7, CACHE_TTL_TRANSCRIPCION)
+        mock_ar.return_value.state = 'SUCCESS'
+        mock_ar.return_value.result = {
+            'success': True,
+            'texto': 'El SSD no enciende.',
+            'proveedor': 'gemini-transcribe',
+            'modelo_usado': 'gemini-3.5-transcribe',
+        }
+        request = self.factory.get(
+            reverse(
+                'servicio_tecnico:estado_transcripcion_audio',
+                kwargs={'task_id': 'abc'},
+            )
+        )
+        request.user = self.user
+        respuesta = estado_transcripcion_audio(request, task_id='abc')
+        data = json.loads(respuesta.content)
+        self.assertTrue(data['listo'])
+        self.assertTrue(data['success'])
+        self.assertEqual(data['texto'], 'El SSD no enciende.')
+
+    @patch('celery.result.AsyncResult')
+    def test_get_estado_usuario_ajeno_403(self, mock_ar: MagicMock) -> None:
+        from django.core.cache import cache
+        from django.urls import reverse
+
+        from servicio_tecnico.services.transcripcion_audio import (
+            CACHE_TTL_TRANSCRIPCION,
+            clave_cache_owner,
+        )
+        from servicio_tecnico.views_ia_diagnostico import estado_transcripcion_audio
+
+        cache.set(clave_cache_owner('abc'), 99, CACHE_TTL_TRANSCRIPCION)
+        request = self.factory.get(
+            reverse(
+                'servicio_tecnico:estado_transcripcion_audio',
+                kwargs={'task_id': 'abc'},
+            )
+        )
+        request.user = self.user
+        respuesta = estado_transcripcion_audio(request, task_id='abc')
+        self.assertEqual(respuesta.status_code, 403)
+        mock_ar.assert_not_called()
+
+
+@override_settings(
+    CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'transcribe-tarea-tests',
+        }
+    },
+)
+class TranscripcionCeleryTareaTests(SimpleTestCase):
+    """La tarea lee cache, borra la clave y llama la cascada."""
+
+    @patch('servicio_tecnico.services.transcripcion_audio.transcribir_audio_cascada')
+    def test_tarea_lee_cache_y_devuelve_resultado(
+        self,
+        mock_cascada: MagicMock,
+    ) -> None:
+        import base64
+
+        from django.core.cache import cache
+
+        from servicio_tecnico.services.transcripcion_audio import (
+            CACHE_TTL_TRANSCRIPCION,
+            clave_cache_audio,
+        )
+        from servicio_tecnico.tasks_transcripcion import (
+            transcribir_audio_diagnostico_task,
+        )
+
+        cache_key = 'clave-test-audio'
+        cache.set(
+            clave_cache_audio(cache_key),
+            {
+                'audio_b64': base64.b64encode(AUDIO_FAKE).decode('ascii'),
+                'audio_filename': 'diag.webm',
+                'audio_content_type': 'audio/webm',
+                'idioma': 'es',
+            },
+            CACHE_TTL_TRANSCRIPCION,
+        )
+        mock_cascada.return_value = {
+            'success': True,
+            'texto': 'Placa madre dañada.',
+            'proveedor': 'gemini-transcribe',
+            'modelo_usado': 'gemini-3.5-transcribe',
+        }
+
+        resultado = transcribir_audio_diagnostico_task.run(
+            cache_key=cache_key,
+            usuario_id=7,
+            db_alias='default',
+        )
+
+        self.assertTrue(resultado['success'])
+        self.assertEqual(resultado['texto'], 'Placa madre dañada.')
+        mock_cascada.assert_called_once()
+        self.assertIsNone(cache.get(clave_cache_audio(cache_key)))
+
+    def test_tarea_cache_vacio_error(self) -> None:
+        from servicio_tecnico.tasks_transcripcion import (
+            transcribir_audio_diagnostico_task,
+        )
+
+        resultado = transcribir_audio_diagnostico_task.run(
+            cache_key='no-existe',
+            usuario_id=7,
+            db_alias='default',
+        )
+        self.assertFalse(resultado['success'])
+        self.assertIn('expiró', resultado['error'])

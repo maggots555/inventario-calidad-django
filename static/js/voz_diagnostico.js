@@ -7,21 +7,18 @@
  * textarea de Diagnóstico SIC en detalle_orden.html. Permite al técnico
  * dictar el diagnóstico en lugar de escribirlo.
  *
- * ARQUITECTURA DE 3 CAPAS (fallback en cascada):
+ * ARQUITECTURA (el frontend elige 1 o 2; el backend ya trae su propia cascada):
  *
  * Capa 1 — Web Speech API (navegador nativo):
  *   - Funciona en Chrome, Edge y la mayoría de Android.
- *   - No necesita backend ni internet (la transcripción la hace el navegador).
  *   - El texto va apareciendo en tiempo real mientras el técnico habla.
  *   - Se detiene automáticamente cuando deja de hablar (~2 segundos de silencio).
  *
- * Capa 2 — Ollama Whisper (backend, vía /api/transcribir-audio-diagnostico/):
- *   - Activo cuando Web Speech API NO está disponible (Firefox, iOS Safari sin permisos).
+ * Capa 2 — Backend POST /api/transcribir-audio-diagnostico/ (Firefox / iOS):
  *   - Graba audio con MediaRecorder y lo envía al servidor.
- *   - El servidor usa el modelo Whisper instalado en Ollama para transcribir.
- *
- * Capa 3 — Gemini API (backend, automático si Ollama falla):
- *   - El backend maneja este fallback internamente.
+ *   - Django encola Celery y responde con task_id (no espera a Gemini).
+ *   - El navegador pregunta GET .../estado/<task_id>/ cada 2 s.
+ *   - El worker prueba: Gemini 3.5 Transcribe → Flash/Lite → Ollama.
  *   - El frontend no necesita saber qué proveedor respondió.
  *
  * COMPORTAMIENTO:
@@ -35,6 +32,10 @@
 // ============================================================================
 /** URL del endpoint de transcripción en el backend */
 const VOZ_ENDPOINT = '/servicio-tecnico/api/transcribir-audio-diagnostico/';
+/** Cada cuánto preguntamos a Celery si ya hay texto */
+const VOZ_POLL_MS = 2000;
+/** Tope de espera del polling (5 minutos). Si Celery está caído, avisamos. */
+const VOZ_POLL_MAX_MS = 5 * 60000;
 /** Tiempo máximo de grabación en milisegundos (60 segundos) */
 const VOZ_MAX_DURACION_MS = 60000;
 /** Idioma para la transcripción */
@@ -56,6 +57,9 @@ class VozDiagnostico {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.timerTimeout = null;
+        this.pollingIntervalId = null;
+        this.cronometroIntervalId = null;
+        this.pollingStartTime = 0;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.reconocedor = null; // Referencia al SpeechRecognition activo
         this.sesionReconocimientoId = 0;
@@ -214,7 +218,7 @@ class VozDiagnostico {
         rec.start();
     }
     // ==========================================================================
-    // CAPA 2: MediaRecorder → Backend (Ollama/Gemini)
+    // CAPA 2: MediaRecorder → Backend (Celery + polling)
     // ==========================================================================
     iniciarMediaRecorder() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -272,7 +276,7 @@ class VozDiagnostico {
         }
         return '';
     }
-    /** Envía el audio grabado al backend para transcripción */
+    /** Envía el audio, recibe task_id y pregunta el estado cada 2 s */
     enviarAudioAlServidor(mimeType) {
         var _a, _b;
         if (this.audioChunks.length === 0) {
@@ -281,6 +285,7 @@ class VozDiagnostico {
             return;
         }
         this.setEstado('procesando');
+        this.iniciarCronometroEspera();
         const extension = this.extensionDesdeMime(mimeType);
         const blob = new Blob(this.audioChunks, { type: mimeType || 'audio/webm' });
         const formData = new FormData();
@@ -295,20 +300,95 @@ class VozDiagnostico {
         })
             .then(res => res.json())
             .then((data) => {
-            if (data.success && data.texto) {
-                this.textarea.value = this.insertarTexto(this.textarea.value, data.texto);
-                this.dispatchCambio();
+            if (data.success && data.task_id) {
+                this.iniciarPolling(data.task_id);
+                return;
             }
-            else {
-                this.mostrarError(data.error || 'Error desconocido al transcribir.');
-            }
+            this.detenerEspera();
+            this.mostrarError(data.error || 'No se pudo encolar la transcripción.');
+            this.setEstado('inactivo');
         })
             .catch((err) => {
+            this.detenerEspera();
             this.mostrarError('Error de conexión al transcribir: ' + err.message);
-        })
-            .finally(() => {
             this.setEstado('inactivo');
         });
+    }
+    /** Pregunta a Django si Celery ya terminó. No mantiene el POST abierto. */
+    iniciarPolling(taskId) {
+        this.pollingStartTime = Date.now();
+        const consultar = () => {
+            var _a, _b;
+            const transcurrido = Date.now() - this.pollingStartTime;
+            if (transcurrido >= VOZ_POLL_MAX_MS) {
+                this.detenerEspera();
+                this.mostrarError('La transcripción tardó más de 5 minutos. '
+                    + '¿Está corriendo Celery? Intenta de nuevo o escribe el diagnóstico.');
+                this.setEstado('inactivo');
+                return;
+            }
+            const url = `${VOZ_ENDPOINT}estado/${encodeURIComponent(taskId)}/`;
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': (_b = (_a = window.getCsrfToken) === null || _a === void 0 ? void 0 : _a.call(window)) !== null && _b !== void 0 ? _b : '',
+                },
+            })
+                .then(res => {
+                if (res.status === 403) {
+                    throw new Error('Sin permiso para esta transcripción.');
+                }
+                return res.json();
+            })
+                .then((data) => {
+                if (!data.listo) {
+                    return;
+                }
+                this.detenerEspera();
+                if (data.success && data.texto) {
+                    this.textarea.value = this.insertarTexto(this.textarea.value, data.texto);
+                    this.dispatchCambio();
+                    this.setEstado('inactivo');
+                    return;
+                }
+                this.mostrarError(data.error || 'No se pudo transcribir el audio. Escribe el diagnóstico.');
+                this.setEstado('inactivo');
+            })
+                .catch((err) => {
+                console.warn('[VozDiagnostico] Polling reintentará:', err);
+            });
+        };
+        consultar();
+        this.pollingIntervalId = window.setInterval(consultar, VOZ_POLL_MS);
+    }
+    /** Mensaje + cronómetro 0:00 mientras espera a Celery */
+    iniciarCronometroEspera() {
+        this.pollingStartTime = Date.now();
+        this.actualizarTextoEspera(0);
+        this.cronometroIntervalId = window.setInterval(() => {
+            const segundos = Math.floor((Date.now() - this.pollingStartTime) / 1000);
+            this.actualizarTextoEspera(segundos);
+        }, 1000);
+    }
+    actualizarTextoEspera(segundos) {
+        const mins = Math.floor(segundos / 60);
+        const segs = segundos % 60;
+        const reloj = `${mins}:${String(segs).padStart(2, '0')}`;
+        this.indicador.style.display = 'inline';
+        this.indicador.classList.remove('text-danger');
+        this.indicador.classList.add('text-muted');
+        this.indicador.textContent =
+            `Transcribiendo en segundo plano, no cierres la página… ${reloj}`;
+    }
+    detenerEspera() {
+        if (this.pollingIntervalId !== null) {
+            window.clearInterval(this.pollingIntervalId);
+            this.pollingIntervalId = null;
+        }
+        if (this.cronometroIntervalId !== null) {
+            window.clearInterval(this.cronometroIntervalId);
+            this.cronometroIntervalId = null;
+        }
     }
     /** Devuelve la extensión de archivo según el MIME type */
     extensionDesdeMime(mimeType) {
@@ -388,6 +468,7 @@ class VozDiagnostico {
         this.boton.disabled = estado === 'procesando';
         switch (estado) {
             case 'inactivo':
+                this.detenerEspera();
                 this.boton.classList.add('btn-outline-secondary');
                 this.boton.title = 'Dictar diagnóstico por voz';
                 this.boton.innerHTML = '<i class="bi bi-mic"></i>';
@@ -404,10 +485,10 @@ class VozDiagnostico {
                 break;
             case 'procesando':
                 this.boton.classList.add('btn-warning');
-                this.boton.title = 'Transcribiendo audio...';
+                this.boton.title = 'Transcribiendo en segundo plano…';
                 this.boton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
                 this.indicador.style.display = 'inline';
-                this.indicador.textContent = 'Transcribiendo...';
+                this.indicador.textContent = 'Transcribiendo en segundo plano, no cierres la página… 0:00';
                 break;
         }
     }

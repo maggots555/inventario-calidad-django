@@ -57,6 +57,10 @@ class CompatibilidadFase2ReexportsTest(SimpleTestCase):
             st_views.transcribir_audio_diagnostico,
             views_ia_diagnostico.transcribir_audio_diagnostico,
         )
+        self.assertIs(
+            st_views.estado_transcripcion_audio,
+            views_ia_diagnostico.estado_transcripcion_audio,
+        )
         self.assertIs(st_views.mi_perfil, views_perfil.mi_perfil)
         self.assertIs(
             st_views.exportar_excel_mi_perfil,
@@ -115,6 +119,11 @@ class CompatibilidadFase2ReexportsTest(SimpleTestCase):
                 'servicio_tecnico:transcribir_audio_diagnostico',
                 None,
                 views_ia_diagnostico.transcribir_audio_diagnostico,
+            ),
+            (
+                'servicio_tecnico:estado_transcripcion_audio',
+                {'task_id': 'abc'},
+                views_ia_diagnostico.estado_transcripcion_audio,
             ),
             ('servicio_tecnico:mi_perfil', None, views_perfil.mi_perfil),
             (
