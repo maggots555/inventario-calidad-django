@@ -517,7 +517,9 @@
 
 /* ===== TEXTO MUTED PERSONALIZADO ===== */
 .text-muted-small {
-    color: #6b7280;
+    /* EXPLICACIÓN: usa el token global para que en oscuro no quede
+       #6b7280 (ilegible sobre #0f172a). */
+    color: var(--text-muted, #6b7280);
     font-size: 0.75rem;
 }
 
@@ -4256,7 +4258,7 @@ thead.sticky-top {
 }
 
 [data-bs-theme="dark"] .search-box .form-control::placeholder {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .search-box .form-control:focus {
@@ -4267,7 +4269,7 @@ thead.sticky-top {
 }
 
 [data-bs-theme="dark"] .search-box small.text-muted {
-    color: #64748b !important;
+    color: var(--text-muted) !important;
 }
 
 /* ===== SECTION CARDS ===== */
@@ -4953,7 +4955,7 @@ thead.sticky-top {
     color: #e2e8f0;
 }
 [data-bs-theme="dark"] .seguimiento-pieza-item .text-muted {
-    color: #64748b !important;
+    color: var(--text-muted) !important;
 }
 
 /* Chip de orden seleccionada (Reingreso) */

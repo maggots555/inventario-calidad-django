@@ -89,6 +89,15 @@
     --border-color: #e5e7eb;
     --text-primary: #111827;
     --text-secondary: #4b5563;
+    /*
+     * Texto auxiliar (hints, placeholders, .text-muted).
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Antes cada CSS inventaba un gris "sutil". En oscuro varios usaban
+     * #64748b sobre #0f172a (~3.4:1) y no se leía. Este token unifica
+     * el muted: en claro el gray-500 de siempre; en oscuro slate-400
+     * (#94a3b8, ~6.2:1, cumple WCAG AA 4.5:1).
+     */
+    --text-muted: #6b7280;
 
     /*
      * Relleno de marca (pestañas/chips activos con texto blanco).
@@ -244,6 +253,13 @@
     --border-color: #334155;
     --text-primary: #e2e8f0;
     --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    /*
+     * Bootstrap .text-muted / .form-text leen --bs-secondary-color.
+     * Sin esto, cada página pelea con un gris distinto.
+     */
+    --bs-secondary-color: #94a3b8;
+    --bs-tertiary-color: #94a3b8;
 
     /* Mismo relleno que en claro: texto blanco sobre azul de marca. */
     --brand-fill: #1f6391;
@@ -368,7 +384,7 @@
 
 [data-bs-theme="dark"] .table-warning .text-muted,
 [data-bs-theme="dark"] .table-warning small {
-    color: #94a3b8 !important;
+    color: var(--text-muted) !important;
 }
 
 [data-bs-theme="dark"] .table-danger > * {
@@ -610,7 +626,7 @@
 
 /* Text utilities */
 [data-bs-theme="dark"] .text-muted {
-    color: #94a3b8 !important;
+    color: var(--text-muted) !important;
 }
 
 [data-bs-theme="dark"] .text-dark {
@@ -692,7 +708,7 @@
 
 /* Small text en sección de imágenes */
 [data-bs-theme="dark"] small.text-muted {
-    color: #94a3b8 !important;
+    color: var(--text-muted) !important;
 }
 
 /* Alerts - Bootstrap overrides para dark mode */
@@ -779,7 +795,7 @@
 }
 
 [data-bs-theme="dark"] .form-control::placeholder {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* Select2 dark mode */
@@ -826,7 +842,7 @@
 
 /* Placeholder */
 [data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection__placeholder {
-    color: #64748b !important;
+    color: var(--text-muted) !important;
 }
 
 /* Tags múltiples */

@@ -3249,7 +3249,7 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-fecha {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .notif-app {
@@ -3284,7 +3284,7 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-vacia {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* ── Animación de remoción ── */

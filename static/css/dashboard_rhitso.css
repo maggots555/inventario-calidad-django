@@ -705,7 +705,7 @@
 }
 
 [data-bs-theme="dark"] .stat-description {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .stat-trend {

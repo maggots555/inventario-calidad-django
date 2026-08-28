@@ -714,7 +714,7 @@
 }
 
 [data-bs-theme="dark"] .justificacion-marcador {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* Títulos de sección */

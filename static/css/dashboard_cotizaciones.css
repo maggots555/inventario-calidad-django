@@ -613,8 +613,11 @@ body {
     color: #f1f5f9;
 }
 
-[data-bs-theme="dark"] .kpi-sub {
-    color: #64748b;
+/* EXPLICACIÓN: el HTML usa .kpi-subtext; .kpi-sub queda por si algún
+   dashboard hermano reusa el mismo CSS. Token accesible (~6.2:1). */
+[data-bs-theme="dark"] .kpi-sub,
+[data-bs-theme="dark"] .kpi-subtext {
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .grafico-card {
@@ -743,7 +746,7 @@ body {
 }
 
 [data-bs-theme="dark"] .kpi-acept-sub {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* Headers de cards — versión oscura */

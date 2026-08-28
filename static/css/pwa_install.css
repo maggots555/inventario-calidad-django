@@ -182,7 +182,7 @@
 }
 
 [data-bs-theme="dark"] .pwa-install-dismiss-btn {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .pwa-install-dismiss-btn:hover {

@@ -674,7 +674,7 @@
 }
 
 [data-bs-theme="dark"] .lista-cot-empty-icon-ring i {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .lista-cot-empty h4 {

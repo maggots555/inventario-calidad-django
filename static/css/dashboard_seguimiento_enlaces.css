@@ -426,7 +426,7 @@
 }
 
 [data-bs-theme="dark"] .kpi-sub {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .se-chart-card {
@@ -522,5 +522,5 @@
 [data-bs-theme="dark"] .se-card .card-body[style*="#f8fafc"],
 [data-bs-theme="dark"] .se-empty-msg {
     background: #0f172a;
-    color: #64748b;
+    color: var(--text-muted);
 }

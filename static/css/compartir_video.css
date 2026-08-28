@@ -314,7 +314,7 @@
 
 [data-bs-theme="dark"] .ev-video-card .ev-thumb-placeholder {
     background: #1e293b;
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .ev-video-card .ev-info {
@@ -326,7 +326,7 @@
 }
 
 [data-bs-theme="dark"] .ev-video-card .ev-desc {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* --- Select all bar oscuro --- */

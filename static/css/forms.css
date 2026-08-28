@@ -86,7 +86,7 @@
 }
 
 .form-control::placeholder {
-    color: var(--gray-400);
+    color: var(--text-muted, var(--gray-400));
     font-weight: 400;
 }
 
@@ -214,7 +214,9 @@ textarea.form-control {
 /* ===== AYUDA Y MENSAJES ===== */
 .form-text {
     font-size: var(--text-xs);
-    color: var(--gray-500);
+    /* EXPLICACIÓN: --text-muted (no --gray-500). En oscuro gray-500 se
+       invierte a #d1d5db y queda más claro que el resto de hints. */
+    color: var(--text-muted, var(--gray-500));
     margin-top: var(--space-1);
     display: block;
     line-height: 1.4;
@@ -733,7 +735,7 @@ html.custom-cursor-active .select2-selection * {
 
 [data-bs-theme="dark"] .form-control::placeholder,
 [data-bs-theme="dark"] textarea.form-control::placeholder {
-    color: #6b7fa0 !important;
+    color: var(--text-muted) !important;
 }
 
 [data-bs-theme="dark"] .form-control:hover:not(:focus),

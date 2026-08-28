@@ -2024,7 +2024,7 @@
 }
 
 [data-bs-theme="dark"] .sc-autocomplete-interna {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .sc-autocomplete-item mark {
@@ -2037,7 +2037,7 @@
 }
 
 [data-bs-theme="dark"] .sc-autocomplete-sin-resultados {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 /* =============================================================================

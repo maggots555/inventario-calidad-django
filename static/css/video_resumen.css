@@ -210,7 +210,7 @@
 }
 
 [data-bs-theme="dark"] #vr-estado-celery {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .vr-tiempo-estimado {
@@ -231,7 +231,7 @@
 }
 
 [data-bs-theme="dark"] #vr-info-video {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .vr-tipo-badge {

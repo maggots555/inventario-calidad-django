@@ -491,7 +491,7 @@
 }
 
 [data-bs-theme="dark"] .fbr-kpi-card .kpi-sub {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .fbr-chart-card {
@@ -631,7 +631,7 @@
 }
 
 [data-bs-theme="dark"] .fbr-comentario-card .comentario-meta {
-    color: #64748b;
+    color: var(--text-muted);
     border-top-color: #334155;
 }
 
@@ -655,5 +655,5 @@
 }
 
 [data-bs-theme="dark"] .fbr-paginacion .pag-info {
-    color: #64748b;
+    color: var(--text-muted);
 }

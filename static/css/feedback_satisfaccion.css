@@ -557,7 +557,7 @@
 }
 
 [data-bs-theme="dark"] .fs-nps-labels {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .fs-detalle-calificaciones {
@@ -582,7 +582,7 @@
 }
 
 [data-bs-theme="dark"] .feedback-textarea::placeholder {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 /* Badge de vigencia en dark — azul claro del sistema */

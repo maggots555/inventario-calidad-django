@@ -596,7 +596,7 @@
 }
 
 [data-bs-theme="dark"] .enc-kpi-card .kpi-sub {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .enc-chart-card {
@@ -704,7 +704,7 @@
 }
 
 [data-bs-theme="dark"] .enc-comentario-card .comentario-meta {
-    color: #64748b;
+    color: var(--text-muted);
     border-top-color: #334155;
 }
 
@@ -1105,7 +1105,7 @@
 }
 
 [data-bs-theme="dark"] .ia-metadatos {
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 [data-bs-theme="dark"] .ia-cache-badge {
