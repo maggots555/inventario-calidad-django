@@ -7,7 +7,7 @@ Devuelven JSON (datos estructurados) que TypeScript lee periódicamente.
 
 ¿Qué es JSON?
 Es un formato de texto que JavaScript/TypeScript entiende nativamente.
-Ejemplo: {"no_leidas": 3, "notificaciones": [{...}, {...}]}
+Ejemplo: {"no_leidas_accion": 3, "accion": [{...}], "avisos": [{...}]}
 
 Optimización de producción:
 La vista de listar usa cache de Redis (10 segundos) para evitar consultas
@@ -15,9 +15,10 @@ a la base de datos en cada polling. Las vistas de escritura (marcar, eliminar)
 invalidan el cache automáticamente para que el próximo polling refleje los cambios.
 
 Endpoints disponibles (campanita 🔔):
-    GET  /notificaciones/api/listar/           → Lista últimas 20 notificaciones
+    GET  /notificaciones/api/listar/           → Dos cortes: Por hacer + Avisos
     POST /notificaciones/api/marcar/<id>/      → Marca una como leída
-    POST /notificaciones/api/marcar-todas/     → Marca todas como leídas
+    POST /notificaciones/api/marcar-todas/     → Marca todas como leídas (botón ✓✓)
+    POST /notificaciones/api/marcar-avisos/    → Marca solo informativas (al abrir)
     POST /notificaciones/api/eliminar/<id>/    → Elimina una notificación
     POST /notificaciones/api/eliminar-todas/   → Elimina todas las notificaciones
 
@@ -38,6 +39,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 
 from .models import Notificacion, PushSubscription
+from .utils import clave_cache_notificaciones, invalidar_cache_notificaciones
 
 logger = logging.getLogger('notificaciones')
 
@@ -49,16 +51,20 @@ logger = logging.getLogger('notificaciones')
 # Con cache: solo 6 consultas SQL por minuto (1 cada 10s por usuario).
 # En un intervalo de 60s (modo idle), la mejora es aún mayor.
 CACHE_TTL_NOTIF: int = 10  # segundos
+# Tope por pestaña: 20 de «Por hacer» y 20 de «Avisos», independientes.
+LIMITE_LISTA_NOTIF: int = 20
 
 
 def _cache_key(user_id: int) -> str:
-    """Genera la clave de cache única por usuario.
+    """Clave Redis v2 por usuario (delegada a utils).
 
-    EXPLICACIÓN: Cada usuario tiene sus propias notificaciones,
-    así que el cache debe ser individual. La clave sigue el formato:
-    'notif:42' donde 42 es el ID del usuario.
+    Args:
+        user_id: PK del usuario.
+
+    Returns:
+        str: ``notif:v2:{id}``.
     """
-    return f'notif:{user_id}'
+    return clave_cache_notificaciones(user_id)
 
 
 def _invalidar_cache(user_id: int) -> None:
@@ -67,20 +73,48 @@ def _invalidar_cache(user_id: int) -> None:
     EXPLICACIÓN: Se llama después de marcar como leída, eliminar, etc.
     Al borrar el cache, el próximo polling consultará la BD con datos frescos.
     """
-    cache.delete(_cache_key(user_id))
+    invalidar_cache_notificaciones(user_id)
+
+
+def _serializar_notificacion(n: Notificacion) -> dict:
+    """Convierte un registro Notificacion al dict que consume TypeScript.
+
+    Args:
+        n: Instancia de Notificacion.
+
+    Returns:
+        dict: Campos del ítem de la campanita.
+    """
+    return {
+        'id': n.id,
+        'titulo': n.titulo,
+        'mensaje': n.mensaje,
+        'tipo': n.tipo,
+        'categoria': n.categoria or 'general',
+        'requiere_accion': bool(n.requiere_accion),
+        'leida': n.leida,
+        'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+        'app': n.app_origen or '',
+        'url': n.url or '',
+    }
 
 
 @login_required
 @require_GET
 def obtener_notificaciones(request):
     """
-    Devuelve las últimas 20 notificaciones del usuario en formato JSON.
+    Devuelve dos cortes independientes: Por hacer y Avisos.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     TypeScript llama a esta URL periódicamente con fetch().
+    Antes se devolvían las últimas 20 mezcladas: un correo de «video listo»
+    tapaba un pago por validar. Ahora cada pestaña tiene su propio tope de 20.
+
     La respuesta incluye:
-    - no_leidas: número de notificaciones sin leer (para el badge rojo)
-    - notificaciones: lista con las últimas 20 (leídas y no leídas)
+    - no_leidas / no_leidas_accion: pendientes de acción (badge de la campanita)
+    - no_leidas_avisos: informativas sin leer
+    - no_leidas_equipo: acción + categoria equipo_disponible (chip)
+    - accion / avisos: listas (leídas y no leídas, más recientes primero)
 
     Optimización con cache:
     El resultado se guarda en Redis por 10 segundos. Si TypeScript
@@ -97,32 +131,31 @@ def obtener_notificaciones(request):
     data = cache.get(key)
 
     if data is None:
-        # Cache vacío o expirado → consultar la BD
-        notificaciones = Notificacion.objects.filter(
-            usuario=user
-        ).order_by('-fecha_creacion')[:20]
+        # Cache vacío o expirado → consultar la BD (un queryset base).
+        qs = Notificacion.objects.filter(usuario=user)
+        # Paso 1: dos cortes para que el ruido de Celery no tape el trabajo.
+        accion_qs = qs.filter(requiere_accion=True).order_by('-fecha_creacion')
+        avisos_qs = qs.filter(requiere_accion=False).order_by('-fecha_creacion')
+        accion = list(accion_qs[:LIMITE_LISTA_NOTIF])
+        avisos = list(avisos_qs[:LIMITE_LISTA_NOTIF])
 
-        no_leidas = Notificacion.objects.filter(
-            usuario=user,
-            leida=False
+        # Paso 2: contadores sobre TODA la BD del usuario, no solo las 20.
+        no_leidas_accion = qs.filter(requiere_accion=True, leida=False).count()
+        no_leidas_avisos = qs.filter(requiere_accion=False, leida=False).count()
+        no_leidas_equipo = qs.filter(
+            requiere_accion=True,
+            leida=False,
+            categoria='equipo_disponible',
         ).count()
 
+        # Paso 3: el badge usa no_leidas_accion (trabajo pendiente, no ruido).
         data = {
-            'no_leidas': no_leidas,
-            'notificaciones': [
-                {
-                    'id':         n.id,
-                    'titulo':     n.titulo,
-                    'mensaje':    n.mensaje,
-                    'tipo':       n.tipo,
-                    'categoria':  n.categoria or 'general',
-                    'leida':      n.leida,
-                    'fecha':      n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-                    'app':        n.app_origen or '',
-                    'url':        n.url or '',
-                }
-                for n in notificaciones
-            ]
+            'no_leidas': no_leidas_accion,
+            'no_leidas_accion': no_leidas_accion,
+            'no_leidas_avisos': no_leidas_avisos,
+            'no_leidas_equipo': no_leidas_equipo,
+            'accion': [_serializar_notificacion(n) for n in accion],
+            'avisos': [_serializar_notificacion(n) for n in avisos],
         }
 
         # Guardar en Redis por CACHE_TTL_NOTIF segundos
@@ -165,7 +198,8 @@ def marcar_todas_leidas(request):
     Marca TODAS las notificaciones no leídas del usuario como leídas.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Se llama cuando el usuario abre el dropdown de la campanita.
+    Se llama desde el botón ✓✓ del header. Las de «Por hacer» NO se
+    marcan al abrir el panel (solo las informativas, ver marcar_avisos).
     .update(leida=True) es más eficiente que recorrer una por una,
     porque hace una sola consulta SQL: UPDATE ... SET leida=True WHERE ...
     """
@@ -178,6 +212,36 @@ def marcar_todas_leidas(request):
 
     logger.info(
         f"[NOTIF] {request.user.username} marcó {actualizadas} notificación(es) como leída(s)."
+    )
+
+    return JsonResponse({'ok': True, 'actualizadas': actualizadas})
+
+
+@login_required
+@require_POST
+def marcar_avisos_leidos(request):
+    """
+    Marca como leídas solo las notificaciones informativas («Avisos»).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Al abrir la campanita no queremos apagar el badge de trabajo pendiente.
+    Este endpoint deja intactas las de ``requiere_accion=True`` (Por hacer)
+    y solo marca las informativas: correo enviado, video listo, etc.
+
+    Efectos secundarios:
+        UPDATE en BD + invalida cache Redis del usuario.
+    """
+    actualizadas = Notificacion.objects.filter(
+        usuario=request.user,
+        leida=False,
+        requiere_accion=False,
+    ).update(leida=True)
+
+    _invalidar_cache(request.user.id)
+
+    logger.info(
+        f"[NOTIF] {request.user.username} marcó {actualizadas} aviso(s) "
+        f"informativo(s) como leído(s)."
     )
 
     return JsonResponse({'ok': True, 'actualizadas': actualizadas})

@@ -13,7 +13,8 @@ Campos principales:
 - titulo   : Texto corto que describe la notificación (ej: "Correo RHITSO enviado")
 - mensaje  : Texto largo con detalles (ej: "Orden ST-001, enviado a 3 destinatarios")
 - tipo     : Categoría visual (exito=verde, error=rojo, warning=amarillo, info=azul)
-- categoria: Agrupación para pestañas de la campanita (general, equipo_disponible, …)
+- categoria: Agrupación de dominio (general, equipo_disponible, …)
+- requiere_accion: True = pestaña «Por hacer»; False = pestaña «Avisos»
 - leida    : Si el usuario ya la vio (True) o no (False)
 - usuario  : Quién debe ver esta notificación (el que disparó la tarea)
 - task_id  : ID de la tarea Celery (para rastreo técnico)
@@ -55,22 +56,35 @@ class Notificacion(models.Model):
         help_text="Determina el icono y color de la notificación"
     )
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # "tipo" es solo visual (verde/rojo). "categoria" agrupa notificaciones
-    # en pestañas de la campanita (ej. Equipo disponible vs el resto).
+    # "tipo" es solo visual (verde/rojo). "categoria" agrupa por dominio
+    # (ej. equipo_disponible). "requiere_accion" decide la pestaña:
+    # True → «Por hacer» (hay que atenderlo); False → «Avisos» (solo informa).
     categoria = models.CharField(
         max_length=40,
         default='general',
         db_index=True,
         verbose_name="Categoría",
         help_text=(
-            "Agrupación para pestañas de la campanita "
+            "Agrupación de dominio para filtros de la campanita "
             "(ej. general, equipo_disponible)"
+        ),
+    )
+    requiere_accion = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Requiere acción",
+        help_text=(
+            "True: aparece en «Por hacer» y el badge no se apaga al abrir. "
+            "False: aparece en «Avisos» (correo enviado, video listo, etc.)."
         ),
     )
     leida = models.BooleanField(
         default=False,
         verbose_name="Leída",
-        help_text="Se marca True cuando el usuario abre el panel de notificaciones"
+        help_text=(
+            "Los avisos informativos se marcan al abrir la campanita. "
+            "Los que requieren acción se marcan al pulsar el ítem o ✓✓."
+        ),
     )
     fecha_creacion = models.DateTimeField(
         auto_now_add=True,
@@ -128,6 +142,11 @@ class Notificacion(models.Model):
             # El panel consulta notificaciones por usuario + no leídas constantemente.
             models.Index(fields=['usuario', '-fecha_creacion'], name='idx_notif_usuario_fecha'),
             models.Index(fields=['usuario', 'leida'], name='idx_notif_usuario_leida'),
+            # Dos cortes independientes (Por hacer vs Avisos) por usuario y fecha.
+            models.Index(
+                fields=['usuario', 'requiere_accion', '-fecha_creacion'],
+                name='idx_notif_usr_accion_fecha',
+            ),
         ]
 
     def __str__(self):

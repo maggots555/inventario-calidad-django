@@ -82,6 +82,7 @@ class ApiListarCategoriaTest(TestCase):
             tipo='info',
             usuario=self.user,
             categoria='equipo_disponible',
+            requiere_accion=True,
             app_origen='servicio_tecnico',
         )
         self.factory = RequestFactory()
@@ -93,10 +94,11 @@ class ApiListarCategoriaTest(TestCase):
         self.assertEqual(response.status_code, 200)
         import json
         data = json.loads(response.content.decode())
-        self.assertIn('notificaciones', data)
-        self.assertGreaterEqual(len(data['notificaciones']), 1)
-        item = data['notificaciones'][0]
+        self.assertIn('accion', data)
+        self.assertGreaterEqual(len(data['accion']), 1)
+        item = data['accion'][0]
         self.assertEqual(item.get('categoria'), 'equipo_disponible')
+        self.assertTrue(item.get('requiere_accion'))
 
 
 class AvisoRecepcionCategoriaTest(TestCase):
@@ -166,3 +168,4 @@ class AvisoRecepcionCategoriaTest(TestCase):
         ).first()
         self.assertIsNotNone(notif)
         self.assertIn('Equipo listo', notif.titulo)
+        self.assertTrue(notif.requiere_accion)

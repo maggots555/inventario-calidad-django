@@ -122,6 +122,7 @@ def enviar_push_y_campanita(
     mensaje: str,
     url: str,
     app_origen: str = 'almacen',
+    requiere_accion: bool = True,
 ) -> int:
     """
     Envía push + campanita a cada empleado (fallos aislados por persona).
@@ -132,6 +133,7 @@ def enviar_push_y_campanita(
         mensaje: Cuerpo del aviso.
         url: Ruta relativa al hacer clic.
         app_origen: etiqueta de la app que dispara (campanita / logs).
+        requiere_accion: True (default) = pestaña «Por hacer»; False = «Avisos».
 
     Returns:
         Cantidad de empleados a los que se intentó notificar.
@@ -164,6 +166,7 @@ def enviar_push_y_campanita(
                 usuario=user,
                 url=url,
                 app_origen=app_origen,
+                requiere_accion=requiere_accion,
             )
         except Exception as notif_err:
             logger.warning(

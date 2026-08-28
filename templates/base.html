@@ -506,24 +506,42 @@
                                     </button>
                                 </div>
                             </div>
-                            {# Pestañas: Todas | Equipo disponible (filtro por categoria) #}
+                            {# Pestañas: Por hacer (acción) | Avisos (informativas) #}
                             <div class="notif-tabs" role="tablist" aria-label="Filtrar notificaciones">
                                 <button type="button"
                                         class="notif-tab active"
-                                        id="notif-tab-todas"
-                                        data-tab="todas"
+                                        id="notif-tab-accion"
+                                        data-tab="accion"
                                         role="tab"
                                         aria-selected="true">
-                                    Todas
+                                    <i class="bi bi-list-check" aria-hidden="true"></i>
+                                    Por hacer
+                                    <span id="notif-tab-accion-count" class="notif-tab-count d-none">0</span>
                                 </button>
                                 <button type="button"
                                         class="notif-tab"
-                                        id="notif-tab-equipo"
-                                        data-tab="equipo_disponible"
+                                        id="notif-tab-avisos"
+                                        data-tab="avisos"
                                         role="tab"
                                         aria-selected="false">
+                                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                    Avisos
+                                    <span id="notif-tab-avisos-count" class="notif-tab-count d-none">0</span>
+                                </button>
+                            </div>
+                            {# Chip visible solo en «Por hacer»: atajo de Recepción #}
+                            <div class="notif-chips" id="notif-chips-accion">
+                                <span class="notif-chips-label">Filtrar</span>
+                                <button type="button"
+                                        class="notif-chip"
+                                        id="notif-chip-equipo"
+                                        data-chip="equipo_disponible"
+                                        aria-pressed="false"
+                                        title="Mostrar solo equipos listos para avisar al cliente">
+                                    <i class="bi bi-laptop" aria-hidden="true"></i>
                                     Equipo disponible
-                                    <span id="notif-tab-equipo-count" class="notif-tab-count d-none">0</span>
+                                    <i class="bi bi-check-lg notif-chip-check" aria-hidden="true"></i>
+                                    <span id="notif-chip-equipo-count" class="notif-tab-count d-none">0</span>
                                 </button>
                             </div>
                             <ul id="notif-lista" class="notif-lista">

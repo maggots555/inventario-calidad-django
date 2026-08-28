@@ -2784,13 +2784,94 @@ input[readonly].form-control:focus {
     color: #dc2626 !important;
 }
 
-/* ── Pestañas de filtro (Todas / Equipo disponible) ── */
+/* ── Pestañas de filtro (Por hacer / Avisos) ── */
 .notif-tabs {
     display: flex;
     gap: 6px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border-color, #e5e7eb);
     background: var(--gray-50, #f9fafb);
+    position: sticky;
+    top: 49px;
+    z-index: 1;
+}
+
+/* Chip extra (Equipo disponible) debajo de las pestañas, solo en Por hacer */
+.notif-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px 10px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    background: var(--gray-50, #f9fafb);
+    position: sticky;
+    top: 89px;
+    z-index: 1;
+}
+
+.notif-chips.d-none {
+    display: none !important;
+}
+
+.notif-chips-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500, #6b7280);
+}
+
+.notif-chip {
+    border: 1px solid var(--gray-300, #d1d5db);
+    background: var(--white, #fff);
+    color: var(--gray-700, #374151);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    min-height: 32px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notif-chip .bi-laptop {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.notif-chip-check {
+    display: none;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.notif-chip.active .notif-chip-check {
+    display: inline-flex;
+}
+
+.notif-chip:hover {
+    background: var(--gray-100, #f3f4f6);
+    color: var(--gray-900, #111827);
+    border-color: var(--gray-400, #9ca3af);
+}
+
+.notif-chip.active {
+    /* Azul de marca para relleno (no --primary-color: en oscuro es texto claro). */
+    background: #1f6391;
+    color: #fff;
+    border-color: #1f6391;
+    box-shadow: 0 1px 3px rgba(31, 99, 145, 0.35);
+}
+
+.notif-chip:not(.active) .notif-tab-count {
+    background: var(--gray-200, #e5e7eb);
+    color: var(--gray-700, #374151);
 }
 
 .notif-tab {
@@ -2816,9 +2897,14 @@ input[readonly].form-control:focus {
 }
 
 .notif-tab.active {
-    background: var(--primary-color, #1f6391);
+    /*
+     * EXPLICACIÓN: En modo oscuro --primary-color es #60a5fa (acento de TEXTO).
+     * Si se usa de fondo, el tab queda lavado y el blanco casi no contrastaba.
+     * Aquí usamos el azul de marca SIGMA (#1f6391) en ambos temas.
+     */
+    background: #1f6391;
     color: #fff;
-    border-color: var(--primary-color, #1f6391);
+    border-color: #1a547a;
 }
 
 .notif-tab-count {
@@ -2843,10 +2929,41 @@ input[readonly].form-control:focus {
 [data-bs-theme="dark"] .notif-tabs {
     background: var(--card-bg, #1e293b);
     border-bottom-color: var(--border-color, #334155);
-    /* Queda fijo debajo del header sticky al hacer scroll en la lista */
-    position: sticky;
-    top: 49px;
-    z-index: 1;
+}
+
+[data-bs-theme="dark"] .notif-chips {
+    background: var(--card-bg, #1e293b);
+    border-bottom-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .notif-chips-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .notif-chip {
+    /* Superficie más clara que el panel: se lee como pastilla, no como texto suelto. */
+    background: #334155;
+    color: #e2e8f0;
+    border-color: #64748b;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+[data-bs-theme="dark"] .notif-chip:hover {
+    background: #475569;
+    color: #f8fafc;
+    border-color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .notif-chip.active {
+    background: #1f6391;
+    color: #fff;
+    border-color: #3b82c4;
+    box-shadow: 0 1px 4px rgba(31, 99, 145, 0.45);
+}
+
+[data-bs-theme="dark"] .notif-chip:not(.active) .notif-tab-count {
+    background: #1e293b;
+    color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .notif-tab {
@@ -2855,6 +2972,12 @@ input[readonly].form-control:focus {
 
 [data-bs-theme="dark"] .notif-tab:hover {
     background: rgba(148, 163, 184, 0.12);
+}
+
+[data-bs-theme="dark"] .notif-tab.active {
+    background: #1f6391;
+    color: #fff;
+    border-color: #3b82c4;
 }
 
 [data-bs-theme="dark"] .notif-tab:not(.active) .notif-tab-count {

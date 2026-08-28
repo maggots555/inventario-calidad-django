@@ -20,12 +20,20 @@ class NotificacionAdmin(admin.ModelAdmin):
         'titulo',
         'tipo',
         'categoria',
+        'requiere_accion',
         'usuario',
         'leida',
         'app_origen',
         'fecha_creacion',
     )
-    list_filter = ('tipo', 'categoria', 'leida', 'app_origen', 'fecha_creacion')
+    list_filter = (
+        'tipo',
+        'categoria',
+        'requiere_accion',
+        'leida',
+        'app_origen',
+        'fecha_creacion',
+    )
     search_fields = ('titulo', 'mensaje', 'usuario__username')
     ordering = ['-fecha_creacion']
     readonly_fields = ('fecha_creacion', 'task_id')

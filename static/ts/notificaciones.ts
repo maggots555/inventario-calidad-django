@@ -7,9 +7,10 @@
  *
  * ¿Qué hace?
  * 1. Consulta al servidor periódicamente: "¿Hay notificaciones nuevas?"
- * 2. Si hay, muestra un badge rojo con el número en la campanita
- * 3. Cuando el usuario hace clic, se abre un dropdown con la lista
- * 4. Al abrir el dropdown, se marcan todas como leídas automáticamente
+ * 2. El badge rojo cuenta SOLO las de «Por hacer» (trabajo pendiente)
+ * 3. Pestañas: Por hacer (requiere acción) | Avisos (informativas)
+ * 4. Al abrir, se marcan leídos los avisos; las de acción siguen pendientes
+ *    hasta que haces clic en ellas o pulsas ✓✓
  *
  * Optimizaciones de producción:
  * - Polling adaptativo: 15s cuando hay actividad, 60s cuando está inactivo
@@ -29,22 +30,26 @@
 // ============================================================================
 
 /**
+ * Pestaña activa: trabajo pendiente vs solo informativas.
+ */
+type NotifTabActiva = 'accion' | 'avisos';
+
+/**
  * Representa una notificación individual que viene del servidor.
  *
  * EXPLICACIÓN: Cuando TypeScript conoce la forma de los datos,
  * tu editor (VS Code) te sugiere las propiedades disponibles
  * y te avisa si intentas usar una que no existe.
  */
-/** Pestaña activa en el filtro de la campanita. */
-type NotifTabActiva = 'todas' | 'equipo_disponible';
-
 interface NotificacionItem {
     id: number;
     titulo: string;
     mensaje: string;
     tipo: 'exito' | 'error' | 'warning' | 'info';
-    /** Agrupación para pestañas (general, equipo_disponible, …) */
+    /** Dominio (general, equipo_disponible, …) */
     categoria: string;
+    /** True = pestaña Por hacer; False = Avisos */
+    requiere_accion: boolean;
     leida: boolean;
     fecha: string;
     app: string;
@@ -54,15 +59,16 @@ interface NotificacionItem {
 /**
  * Respuesta completa del endpoint /notificaciones/api/listar/.
  *
- * EXPLICACIÓN: El servidor devuelve un JSON con esta estructura:
- * {
- *   "no_leidas": 3,
- *   "notificaciones": [{...}, {...}, {...}]
- * }
+ * EXPLICACIÓN: El servidor devuelve DOS listas independientes (tope 20 c/u)
+ * para que un correo de «video listo» no tape un pago por validar.
  */
 interface NotificacionesResponse {
     no_leidas: number;
-    notificaciones: NotificacionItem[];
+    no_leidas_accion: number;
+    no_leidas_avisos: number;
+    no_leidas_equipo: number;
+    accion: NotificacionItem[];
+    avisos: NotificacionItem[];
 }
 
 /**
@@ -115,9 +121,13 @@ class PanelNotificaciones {
     private readonly lista: HTMLElement | null;
     private readonly btnTodas: HTMLElement | null;
     private readonly btnLimpiar: HTMLElement | null;
-    private readonly tabTodas: HTMLElement | null;
-    private readonly tabEquipo: HTMLElement | null;
-    private readonly tabEquipoCount: HTMLElement | null;
+    private readonly tabAccion: HTMLElement | null;
+    private readonly tabAvisos: HTMLElement | null;
+    private readonly tabAccionCount: HTMLElement | null;
+    private readonly tabAvisosCount: HTMLElement | null;
+    private readonly chipsAccion: HTMLElement | null;
+    private readonly chipEquipo: HTMLElement | null;
+    private readonly chipEquipoCount: HTMLElement | null;
     private intervalo: number | null = null;
 
     // ── Polling adaptativo ──
@@ -132,10 +142,17 @@ class PanelNotificaciones {
     private pollingsSinCambio: number = 0;
     private ultimoNoLeidas: number = -1;
 
-    /** Copia completa de la última respuesta (filtro de pestañas en cliente). */
-    private notificacionesCache: NotificacionItem[] = [];
-    /** Pestaña activa: 'todas' muestra todo; 'equipo_disponible' solo esa categoría. */
-    private tabActiva: NotifTabActiva = 'todas';
+    /** Cortes independientes que mandó el servidor. */
+    private cacheAccion: NotificacionItem[] = [];
+    private cacheAvisos: NotificacionItem[] = [];
+    /** Contadores de no leídas (badge y pestañas). */
+    private noLeidasAccion: number = 0;
+    private noLeidasAvisos: number = 0;
+    private noLeidasEquipo: number = 0;
+    /** Pestaña activa: 'accion' = Por hacer; 'avisos' = informativas. */
+    private tabActiva: NotifTabActiva = 'accion';
+    /** Chip Equipo disponible (solo filtra dentro de Por hacer). */
+    private chipEquipoActivo: boolean = false;
 
     /**
      * Constructor: se ejecuta automáticamente al hacer `new PanelNotificaciones()`.
@@ -144,13 +161,17 @@ class PanelNotificaciones {
      * Si no lo encuentra, devuelve null.
      */
     constructor() {
-        this.badge      = document.getElementById('notif-badge');
-        this.lista      = document.getElementById('notif-lista');
-        this.btnTodas   = document.getElementById('notif-marcar-todas');
+        this.badge = document.getElementById('notif-badge');
+        this.lista = document.getElementById('notif-lista');
+        this.btnTodas = document.getElementById('notif-marcar-todas');
         this.btnLimpiar = document.getElementById('notif-limpiar-todas');
-        this.tabTodas = document.getElementById('notif-tab-todas');
-        this.tabEquipo = document.getElementById('notif-tab-equipo');
-        this.tabEquipoCount = document.getElementById('notif-tab-equipo-count');
+        this.tabAccion = document.getElementById('notif-tab-accion');
+        this.tabAvisos = document.getElementById('notif-tab-avisos');
+        this.tabAccionCount = document.getElementById('notif-tab-accion-count');
+        this.tabAvisosCount = document.getElementById('notif-tab-avisos-count');
+        this.chipsAccion = document.getElementById('notif-chips-accion');
+        this.chipEquipo = document.getElementById('notif-chip-equipo');
+        this.chipEquipoCount = document.getElementById('notif-chip-equipo-count');
 
         // Solo iniciar si los elementos existen en el HTML
         // (no existen si el usuario no está logueado)
@@ -191,7 +212,7 @@ class PanelNotificaciones {
             }
         });
 
-        // Evento: botón "Marcar todas como leídas"
+        // Evento: botón "Marcar todas como leídas" (incluye Por hacer)
         if (this.btnTodas) {
             this.btnTodas.addEventListener('click', (e: Event) => {
                 e.preventDefault();
@@ -209,49 +230,83 @@ class PanelNotificaciones {
             });
         }
 
-        // Evento: eliminar notificación individual (delegación de eventos)
-        // EXPLICACIÓN: En lugar de agregar un listener a cada botón ✕,
-        // escuchamos clicks en la lista completa y verificamos si el click
-        // fue en un botón de eliminar. Esto funciona aunque las notificaciones
-        // se añadan dinámicamente después de cargar la página.
+        // Delegación: ✕ elimina; clic en un ítem de acción lo marca leído.
         if (this.lista) {
             this.lista.addEventListener('click', (e: Event) => {
-                const target = e.target as HTMLElement;
-                const btnEliminar: HTMLElement | null = target.closest('.notif-btn-eliminar');
-                if (btnEliminar) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const id: string | undefined = btnEliminar.dataset.id;
-                    if (id) {
-                        this.eliminarNotificacion(parseInt(id, 10), btnEliminar);
-                    }
-                }
+                this.onClickLista(e);
             });
         }
 
-        // Evento: cuando se ABRE el dropdown (Bootstrap dispara 'shown.bs.dropdown')
+        // Al ABRIR: solo avisos informativos (el badge de Por hacer no se apaga)
         const dropdownEl = document.getElementById('notif-dropdown');
         if (dropdownEl) {
             dropdownEl.addEventListener('shown.bs.dropdown', () => {
-                this.marcarTodasLeidas();
+                this.marcarAvisosLeidos();
             });
         }
 
-        // Pestañas de filtro (Todas / Equipo disponible)
         this.registrarClicksTabs();
+        this.registrarClickChipEquipo();
     }
 
     /**
-     * Registra clics en las pestañas de filtro de la campanita.
+     * Clic en la lista: eliminar o marcar una de «Por hacer» como leída.
+     *
+     * EXPLICACIÓN: Si el usuario pulsa el enlace de un pendiente, primero
+     * avisamos al servidor (marcar/<id>/) y luego navegamos. Si no
+     * preventDefault, el cambio de página cancela el fetch.
+     */
+    private onClickLista(e: Event): void {
+        const target = e.target as HTMLElement;
+        const btnEliminar: HTMLElement | null = target.closest('.notif-btn-eliminar');
+        if (btnEliminar) {
+            e.preventDefault();
+            e.stopPropagation();
+            const idEliminar: string | undefined = btnEliminar.dataset.id;
+            if (idEliminar) {
+                this.eliminarNotificacion(parseInt(idEliminar, 10), btnEliminar);
+            }
+            return;
+        }
+
+        const itemLi: HTMLElement | null = target.closest('.notif-item');
+        if (!itemLi) {
+            return;
+        }
+        const esAccion = itemLi.dataset.requiereAccion === 'true';
+        if (!esAccion) {
+            return;
+        }
+        const idStr = itemLi.dataset.id;
+        if (!idStr) {
+            return;
+        }
+        const id = parseInt(idStr, 10);
+        const link = target.closest('.notif-link') as HTMLAnchorElement | null;
+        const urlDestino = link && link.getAttribute('href') ? link.getAttribute('href') : '';
+
+        // Paso: marcar en servidor; si hay URL, ir después para no perder el POST.
+        if (urlDestino) {
+            e.preventDefault();
+            void this.marcarUnaLeida(id).then(() => {
+                window.location.href = urlDestino;
+            });
+        } else {
+            void this.marcarUnaLeida(id);
+        }
+    }
+
+    /**
+     * Registra clics en las pestañas Por hacer / Avisos.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * No volvemos a pedir datos al servidor: filtramos la lista que ya
-     * tenemos en memoria (notificacionesCache).
+     * No volvemos a pedir datos al servidor: filtramos las listas que ya
+     * tenemos en memoria (cacheAccion / cacheAvisos).
      */
     private registrarClicksTabs(): void {
         const tabs: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
-            { el: this.tabTodas, tab: 'todas' },
-            { el: this.tabEquipo, tab: 'equipo_disponible' },
+            { el: this.tabAccion, tab: 'accion' },
+            { el: this.tabAvisos, tab: 'avisos' },
         ];
 
         for (const { el, tab } of tabs) {
@@ -267,21 +322,38 @@ class PanelNotificaciones {
     }
 
     /**
+     * Chip «Equipo disponible»: atajo de Recepción dentro de Por hacer.
+     */
+    private registrarClickChipEquipo(): void {
+        if (!this.chipEquipo) {
+            return;
+        }
+        this.chipEquipo.addEventListener('click', (e: Event) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.chipEquipoActivo = !this.chipEquipoActivo;
+            this.actualizarEstadoVisualTabs();
+            this.renderListaFiltrada();
+        });
+    }
+
+    /**
      * Cambia la pestaña activa y vuelve a dibujar la lista filtrada.
      */
     private cambiarTab(tab: NotifTabActiva): void {
         this.tabActiva = tab;
+        // Al salir de Por hacer el chip deja de aplicar (sigue el estado visual).
         this.actualizarEstadoVisualTabs();
         this.renderListaFiltrada();
     }
 
     /**
-     * Marca visualmente qué pestaña está activa (clase + aria-selected).
+     * Marca visualmente pestaña activa, visibilidad del chip y aria.
      */
     private actualizarEstadoVisualTabs(): void {
         const pares: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
-            { el: this.tabTodas, tab: 'todas' },
-            { el: this.tabEquipo, tab: 'equipo_disponible' },
+            { el: this.tabAccion, tab: 'accion' },
+            { el: this.tabAvisos, tab: 'avisos' },
         ];
         for (const { el, tab } of pares) {
             if (!el) {
@@ -291,39 +363,58 @@ class PanelNotificaciones {
             el.classList.toggle('active', activa);
             el.setAttribute('aria-selected', activa ? 'true' : 'false');
         }
+
+        if (this.chipsAccion) {
+            this.chipsAccion.classList.toggle('d-none', this.tabActiva !== 'accion');
+        }
+        if (this.chipEquipo) {
+            this.chipEquipo.classList.toggle('active', this.chipEquipoActivo);
+            this.chipEquipo.setAttribute(
+                'aria-pressed',
+                this.chipEquipoActivo ? 'true' : 'false'
+            );
+        }
     }
 
     /**
-     * Actualiza el contador del tab "Equipo disponible" (no leídas de esa categoría).
+     * Actualiza los numeritos de pestañas y del chip Equipo.
      */
-    private actualizarContadorTabEquipo(): void {
-        if (!this.tabEquipoCount) {
+    private actualizarContadoresTabs(): void {
+        this.pintarContador(this.tabAccionCount, this.noLeidasAccion);
+        this.pintarContador(this.tabAvisosCount, this.noLeidasAvisos);
+        this.pintarContador(this.chipEquipoCount, this.noLeidasEquipo);
+    }
+
+    /**
+     * Muestra u oculta un badge numérico (0 → d-none).
+     */
+    private pintarContador(el: HTMLElement | null, cantidad: number): void {
+        if (!el) {
             return;
         }
-        const noLeidasEquipo = this.notificacionesCache.filter(
-            (n) =>
-                (n.categoria || 'general') === 'equipo_disponible' && !n.leida
-        ).length;
-
-        if (noLeidasEquipo > 0) {
-            this.tabEquipoCount.textContent = String(noLeidasEquipo);
-            this.tabEquipoCount.classList.remove('d-none');
+        if (cantidad > 0) {
+            el.textContent = String(cantidad);
+            el.classList.remove('d-none');
         } else {
-            this.tabEquipoCount.classList.add('d-none');
+            el.classList.add('d-none');
         }
     }
 
     /**
-     * Aplica el filtro de la pestaña activa y dibuja la lista.
+     * Aplica el filtro de la pestaña (y el chip) y dibuja la lista.
      */
     private renderListaFiltrada(): void {
-        const filtradas =
-            this.tabActiva === 'todas'
-                ? this.notificacionesCache
-                : this.notificacionesCache.filter(
-                      (n) => (n.categoria || 'general') === this.tabActiva
-                  );
-        this.renderLista(filtradas);
+        let items: NotificacionItem[];
+        if (this.tabActiva === 'avisos') {
+            items = this.cacheAvisos;
+        } else if (this.chipEquipoActivo) {
+            items = this.cacheAccion.filter(
+                (n) => (n.categoria || 'general') === 'equipo_disponible'
+            );
+        } else {
+            items = this.cacheAccion;
+        }
+        this.renderLista(items);
     }
 
     // ── Gestión del intervalo de polling ──
@@ -370,6 +461,17 @@ class PanelNotificaciones {
     }
 
     /**
+     * Normaliza un ítem del JSON (cache viejo o campos opcionales).
+     */
+    private normalizarItem(n: NotificacionItem): NotificacionItem {
+        return {
+            ...n,
+            categoria: n.categoria || 'general',
+            requiere_accion: Boolean(n.requiere_accion),
+        };
+    }
+
+    /**
      * Consulta el servidor y actualiza la UI.
      *
      * EXPLICACIÓN:
@@ -378,7 +480,7 @@ class PanelNotificaciones {
      * - response.json() convierte el texto JSON en un objeto TypeScript.
      *
      * Polling adaptativo:
-     * - Compara no_leidas con la última vez. Si cambió, resetea el contador.
+     * - Compara no_leidas_accion con la última vez. Si cambió, resetea el contador.
      * - Si no cambió, incrementa pollingsSinCambio.
      * - Al cruzar el umbral (4 rondas), cambia de 15s a 60s automáticamente.
      * - Si llega algo nuevo, vuelve a 15s.
@@ -396,36 +498,32 @@ class PanelNotificaciones {
             }
 
             const data: NotificacionesResponse = await response.json() as NotificacionesResponse;
+            const noLeidasAccion = data.no_leidas_accion ?? data.no_leidas ?? 0;
 
             // ── Polling adaptativo: ajustar velocidad según actividad ──
             const eraIdle: boolean = this.pollingsSinCambio >= this.UMBRAL_IDLE;
 
-            if (data.no_leidas !== this.ultimoNoLeidas) {
-                // Algo cambió → resetear a modo activo
+            if (noLeidasAccion !== this.ultimoNoLeidas) {
                 this.pollingsSinCambio = 0;
-
-                // Si estábamos en modo idle, cambiar a intervalo rápido
                 if (eraIdle && !document.hidden) {
                     this.iniciarPolling(this.POLLING_ACTIVO_MS);
                 }
             } else {
-                // Sin cambios → incrementar contador
                 this.pollingsSinCambio++;
-
-                // Si acabamos de cruzar el umbral, cambiar a intervalo lento
                 if (this.pollingsSinCambio === this.UMBRAL_IDLE && !document.hidden) {
                     this.iniciarPolling(this.POLLING_IDLE_MS);
                 }
             }
 
-            this.ultimoNoLeidas = data.no_leidas;
-            // Normalizar categoria por si el backend aún no la envía (cache viejo).
-            this.notificacionesCache = data.notificaciones.map((n) => ({
-                ...n,
-                categoria: n.categoria || 'general',
-            }));
-            this.renderBadge(data.no_leidas);
-            this.actualizarContadorTabEquipo();
+            this.ultimoNoLeidas = noLeidasAccion;
+            this.noLeidasAccion = noLeidasAccion;
+            this.noLeidasAvisos = data.no_leidas_avisos ?? 0;
+            this.noLeidasEquipo = data.no_leidas_equipo ?? 0;
+            this.cacheAccion = (data.accion || []).map((n) => this.normalizarItem(n));
+            this.cacheAvisos = (data.avisos || []).map((n) => this.normalizarItem(n));
+            this.renderBadge(this.noLeidasAccion);
+            this.actualizarContadoresTabs();
+            this.actualizarEstadoVisualTabs();
             this.renderListaFiltrada();
 
         } catch (error: unknown) {
@@ -438,8 +536,7 @@ class PanelNotificaciones {
      * Actualiza el número rojo (badge) en la campanita.
      *
      * EXPLICACIÓN:
-     * - Si hay notificaciones sin leer: muestra el badge con el número.
-     * - Si NO hay: oculta el badge con la clase CSS "d-none" (Bootstrap: display:none).
+     * - Solo cuenta «Por hacer» no leídas: el ruido de Celery no enciende el punto.
      * - Si hay más de 99, muestra "99+" para que el badge no se deforme.
      */
     private renderBadge(cantidad: number): void {
@@ -448,8 +545,6 @@ class PanelNotificaciones {
         if (cantidad > 0) {
             this.badge.textContent = cantidad > 99 ? '99+' : String(cantidad);
             this.badge.classList.remove('d-none');
-
-            // Agregar animación de pulso si hay nuevas
             this.badge.classList.add('notif-pulse');
         } else {
             this.badge.classList.add('d-none');
@@ -464,16 +559,17 @@ class PanelNotificaciones {
      * - .map() transforma cada notificación en un string de HTML.
      * - .join('') une todos los strings en uno solo.
      * - innerHTML reemplaza el contenido existente con el nuevo HTML.
-     * - Template literals (`...`) permiten insertar variables con ${variable}.
      */
     private renderLista(notificaciones: NotificacionItem[]): void {
         if (!this.lista) return;
 
         if (notificaciones.length === 0) {
-            const mensajeVacio =
-                this.tabActiva === 'equipo_disponible'
-                    ? 'Sin avisos de equipo disponible'
-                    : 'Sin notificaciones recientes';
+            let mensajeVacio = 'Sin avisos recientes';
+            if (this.tabActiva === 'accion' && this.chipEquipoActivo) {
+                mensajeVacio = 'Sin avisos de equipo disponible';
+            } else if (this.tabActiva === 'accion') {
+                mensajeVacio = 'Nada pendiente por hacer';
+            }
             this.lista.innerHTML = `
                 <li class="notif-vacia">
                     <i class="bi bi-bell-slash text-muted"></i>
@@ -490,8 +586,6 @@ class PanelNotificaciones {
              * Si la notificación tiene URL, envolvemos el contenido en un <a>
              * para que sea navegable al pulsar. El botón de eliminar queda fuera
              * del <a> para no interferir con la navegación.
-             * Si no hay URL, el contenido es solo un <div> estático (comportamiento
-             * original — compatible con todas las notificaciones existentes).
              */
             const contenidoHtml = `
                     <div class="notif-icono">${cfg.icono}</div>
@@ -509,7 +603,7 @@ class PanelNotificaciones {
                 : `<div class="notif-link notif-link--static">${contenidoHtml}</div>`;
 
             return `
-                <li class="notif-item ${claseLeida}" data-id="${n.id}">
+                <li class="notif-item ${claseLeida}" data-id="${n.id}" data-requiere-accion="${n.requiere_accion ? 'true' : 'false'}">
                     ${innerHtml}
                     <button class="notif-btn-eliminar" data-id="${n.id}" title="Eliminar notificación">
                         <i class="bi bi-x-lg"></i>
@@ -519,36 +613,101 @@ class PanelNotificaciones {
     }
 
     /**
-     * Llama al endpoint para marcar todas como leídas.
+     * Headers comunes de POST (CSRF + AJAX).
+     */
+    private headersPost(): Record<string, string> {
+        return {
+            'X-CSRFToken': this.getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+    }
+
+    /**
+     * Marca una notificación de acción como leída (clic en el ítem).
+     */
+    private async marcarUnaLeida(id: number): Promise<void> {
+        try {
+            await fetch(`/notificaciones/api/marcar/${id}/`, {
+                method: 'POST',
+                headers: this.headersPost(),
+            });
+            this.marcarLocalmente(id);
+            this.recalcularContadoresLocales();
+            this.renderBadge(this.noLeidasAccion);
+            this.actualizarContadoresTabs();
+            this.renderListaFiltrada();
+        } catch (error: unknown) {
+            void error;
+        }
+    }
+
+    /**
+     * Pone leida=true en el cache local de un id.
+     */
+    private marcarLocalmente(id: number): void {
+        this.cacheAccion = this.cacheAccion.map((n) =>
+            n.id === id ? { ...n, leida: true } : n
+        );
+        this.cacheAvisos = this.cacheAvisos.map((n) =>
+            n.id === id ? { ...n, leida: true } : n
+        );
+    }
+
+    /**
+     * Recuenta no leídas desde el cache (puede subestimar si hay >20; el
+     * próximo polling corrige con el count real de la BD).
+     */
+    private recalcularContadoresLocales(): void {
+        this.noLeidasAccion = this.cacheAccion.filter((n) => !n.leida).length;
+        this.noLeidasAvisos = this.cacheAvisos.filter((n) => !n.leida).length;
+        this.noLeidasEquipo = this.cacheAccion.filter(
+            (n) => !n.leida && (n.categoria || 'general') === 'equipo_disponible'
+        ).length;
+        this.ultimoNoLeidas = this.noLeidasAccion;
+    }
+
+    /**
+     * Al abrir la campanita: solo marca Avisos (informativas).
      *
-     * EXPLICACIÓN:
-     * - method: 'POST' indica que estamos MODIFICANDO datos (no solo leyendo).
-     * - X-CSRFToken es obligatorio en Django para proteger contra ataques CSRF.
-     *   Sin este header, Django rechaza la petición con error 403.
+     * EXPLICACIÓN: El badge rojo = trabajo pendiente. Si marcáramos todo
+     * al abrir, parecería que ya no hay nada que hacer.
+     */
+    private async marcarAvisosLeidos(): Promise<void> {
+        try {
+            await fetch('/notificaciones/api/marcar-avisos/', {
+                method: 'POST',
+                headers: this.headersPost(),
+            });
+            this.cacheAvisos = this.cacheAvisos.map((n) => ({ ...n, leida: true }));
+            this.noLeidasAvisos = 0;
+            this.actualizarContadoresTabs();
+            if (this.tabActiva === 'avisos') {
+                this.renderListaFiltrada();
+            }
+        } catch (error: unknown) {
+            void error;
+        }
+    }
+
+    /**
+     * Botón ✓✓: marca TODAS (Por hacer + Avisos) como leídas.
      */
     private async marcarTodasLeidas(): Promise<void> {
-        const csrfToken: string = this.getCsrfToken();
-
         try {
             await fetch('/notificaciones/api/marcar-todas/', {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken':      csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: this.headersPost(),
             });
 
-            // Actualiza badge a 0 inmediatamente (sin esperar al próximo polling)
             this.renderBadge(0);
+            this.cacheAccion = this.cacheAccion.map((n) => ({ ...n, leida: true }));
+            this.cacheAvisos = this.cacheAvisos.map((n) => ({ ...n, leida: true }));
+            this.noLeidasAccion = 0;
+            this.noLeidasAvisos = 0;
+            this.noLeidasEquipo = 0;
+            this.ultimoNoLeidas = 0;
+            this.actualizarContadoresTabs();
 
-            // Sincronizar cache local (contadores de pestaña + re-render)
-            this.notificacionesCache = this.notificacionesCache.map((n) => ({
-                ...n,
-                leida: true,
-            }));
-            this.actualizarContadorTabEquipo();
-
-            // Marca visualmente todas como leídas
             if (this.lista) {
                 const nuevas: NodeListOf<Element> = this.lista.querySelectorAll('.notif-nueva');
                 nuevas.forEach((el: Element) => {
@@ -557,7 +716,6 @@ class PanelNotificaciones {
             }
 
         } catch (error: unknown) {
-            // Silencioso: si falla, el próximo polling actualizará correctamente
             void error;
         }
     }
@@ -570,35 +728,28 @@ class PanelNotificaciones {
      * 1. Envía un POST al servidor para borrarla de la BD
      * 2. Anima el item (se desliza hacia afuera)
      * 3. Lo remueve del DOM
-     * 4. Si no quedan notificaciones, muestra el mensaje vacío
      */
     private async eliminarNotificacion(id: number, btnElement: HTMLElement): Promise<void> {
-        const csrfToken: string = this.getCsrfToken();
         const itemLi: HTMLElement | null = btnElement.closest('.notif-item');
 
         try {
             const response: Response = await fetch(`/notificaciones/api/eliminar/${id}/`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken':      csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: this.headersPost(),
             });
 
             if (!response.ok) return;
 
-            this.notificacionesCache = this.notificacionesCache.filter(
-                (n) => n.id !== id
-            );
-            this.actualizarContadorTabEquipo();
+            this.cacheAccion = this.cacheAccion.filter((n) => n.id !== id);
+            this.cacheAvisos = this.cacheAvisos.filter((n) => n.id !== id);
+            this.recalcularContadoresLocales();
+            this.renderBadge(this.noLeidasAccion);
+            this.actualizarContadoresTabs();
 
-            // Animación de salida: el item se desliza y desvanece
             if (itemLi) {
                 itemLi.classList.add('notif-removing');
-                // Esperar a que termine la animación CSS (300ms) antes de remover
                 setTimeout(() => {
                     itemLi.remove();
-                    // Si ya no quedan items visibles, re-render filtrado (mensaje vacío)
                     if (this.lista && this.lista.querySelectorAll('.notif-item').length === 0) {
                         this.renderListaFiltrada();
                     }
@@ -617,23 +768,22 @@ class PanelNotificaciones {
      * Borra todo del servidor y limpia la UI de una vez.
      */
     private async eliminarTodas(): Promise<void> {
-        const csrfToken: string = this.getCsrfToken();
-
         try {
             const response: Response = await fetch('/notificaciones/api/eliminar-todas/', {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken':      csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
+                headers: this.headersPost(),
             });
 
             if (!response.ok) return;
 
-            // Limpiar la UI y el cache local
-            this.notificacionesCache = [];
+            this.cacheAccion = [];
+            this.cacheAvisos = [];
+            this.noLeidasAccion = 0;
+            this.noLeidasAvisos = 0;
+            this.noLeidasEquipo = 0;
+            this.ultimoNoLeidas = 0;
             this.renderBadge(0);
-            this.actualizarContadorTabEquipo();
+            this.actualizarContadoresTabs();
             this.renderListaFiltrada();
 
         } catch (error: unknown) {
@@ -648,12 +798,6 @@ class PanelNotificaciones {
      * Django pone una cookie llamada "csrftoken" (o "sigma_csrftoken" en producción)
      * en tu navegador. Es un código de seguridad que debes enviar en cada petición POST.
      * Sin él, Django piensa que la petición es un ataque y la rechaza.
-     *
-     * document.cookie contiene TODAS las cookies como un string:
-     * "csrftoken=abc123; sessionid=xyz789; otros=valores"
-     *
-     * Esta función busca el token en ese string con una expresión regular.
-     * Busca ambos nombres de cookie (desarrollo y producción).
      */
     private getCsrfToken(): string {
         // Helper global: static/ts/csrf.ts (cargado en base.html)

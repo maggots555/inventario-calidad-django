@@ -34,10 +34,40 @@ from django.contrib.auth.models import User
 
 logger = logging.getLogger('notificaciones')
 
+# Prefijo de cache Redis del panel. El "v2" evita servir 10 s el JSON viejo
+# (una sola lista de 20) cuando el cliente ya espera dos cortes.
+CACHE_KEY_PREFIX = 'notif:v2'
+
+
+def clave_cache_notificaciones(user_id: int) -> str:
+    """Clave Redis única por usuario para el JSON de la campanita.
+
+    Args:
+        user_id: PK del usuario destinatario.
+
+    Returns:
+        str: ej. ``notif:v2:42``.
+    """
+    return f'{CACHE_KEY_PREFIX}:{user_id}'
+
+
+def invalidar_cache_notificaciones(user_id: int) -> None:
+    """Borra el cache de la campanita de un usuario.
+
+    EXPLICACIÓN: Tras crear, marcar o borrar, el próximo polling debe
+    ir a la BD. También se borra la clave vieja ``notif:{id}`` por si
+    quedó algo de la versión anterior durante el despliegue.
+
+    Args:
+        user_id: PK del usuario.
+    """
+    cache.delete(clave_cache_notificaciones(user_id))
+    cache.delete(f'notif:{user_id}')
+
 
 def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
                        task_id=None, app_origen=None, url=None,
-                       categoria='general'):
+                       categoria='general', requiere_accion=False):
     """
     Función base para crear una notificación en la base de datos.
 
@@ -53,7 +83,8 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
         task_id (str, optional): ID de la tarea Celery.
         app_origen (str, optional): App que originó la notificación.
         url (str, optional): URL a la que navega el usuario al pulsar la notif.
-        categoria (str): Pestaña de la campanita (default 'general').
+        categoria (str): Dominio (default 'general'; ej. equipo_disponible).
+        requiere_accion (bool): True = pestaña «Por hacer»; False = «Avisos».
 
     Returns:
         list[Notificacion]: Lista de notificaciones creadas (usuario + superusers).
@@ -65,6 +96,8 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
 
     notificaciones_creadas = []
     categoria_limpia = (categoria or 'general').strip() or 'general'
+    # Paso: normalizar a bool real (por si llega 0/1 o None desde un caller).
+    es_accion = bool(requiere_accion)
 
     # ── 1. Crear notificación para el usuario que disparó la tarea ──
     if usuario:
@@ -77,10 +110,11 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
             app_origen=app_origen,
             url=url,
             categoria=categoria_limpia,
+            requiere_accion=es_accion,
         )
         notificaciones_creadas.append(notif)
         # Invalidar cache para que el próximo polling muestre la nueva notificación
-        cache.delete(f'notif:{usuario.pk}')
+        invalidar_cache_notificaciones(usuario.pk)
         logger.info(f"[NOTIF] Creada para usuario '{usuario.username}': {titulo}")
 
     # ── 2. Crear notificación para superusuarios (que no sean el mismo usuario) ──
@@ -100,10 +134,11 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
             app_origen=app_origen,
             url=url,
             categoria=categoria_limpia,
+            requiere_accion=es_accion,
         )
         notificaciones_creadas.append(notif_su)
         # Invalidar cache de cada superusuario
-        cache.delete(f'notif:{su.pk}')
+        invalidar_cache_notificaciones(su.pk)
 
     if superusers.exists():
         logger.info(f"[NOTIF] Creada para {superusers.count()} superusuario(s): {titulo}")

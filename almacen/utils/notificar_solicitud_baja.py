@@ -461,6 +461,7 @@ def _notificar_solicitud_baja_procesada_interno(
                 titulo=titulo,
                 mensaje=mensaje,
                 url=url,
+                requiere_accion=False,
             )
             logger.info(
                 '[NOTIF-BAJA] Solicitud #%s procesada: push/campanita al solicitante',

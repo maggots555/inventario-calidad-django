@@ -265,6 +265,7 @@ def crear_solicitud_cotizacion(request):
                                     usuario=comprador.user,
                                     url=url_solicitud,
                                     app_origen='almacen',
+                                    requiere_accion=True,
                                 )
                             except Exception as notif_err:
                                 logger.warning(

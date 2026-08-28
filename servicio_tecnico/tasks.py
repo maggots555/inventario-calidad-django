@@ -2854,6 +2854,7 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
                     usuario=inspector.user,
                     app_origen='servicio_tecnico',
                     url=url_orden,
+                    requiere_accion=True,
                 )
                 destinatarios_notificados += 1
             except Exception as exc_push:
@@ -2887,6 +2888,7 @@ def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias=
                 usuario=tecnico.user,
                 app_origen='servicio_tecnico',
                 url=url_orden,
+                requiere_accion=True,
             )
             destinatarios_notificados = 1
         except Exception as exc_push:

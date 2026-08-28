@@ -339,6 +339,7 @@ def notificar_pago_validado(pago: 'PagoOrden') -> int:
         mensaje=mensaje,
         url=url,
         app_origen='servicio_tecnico',
+        requiere_accion=False,
     )
     _encolar_email_validacion(pago, TIPO_PAGO_VALIDADO)
     logger.info(
