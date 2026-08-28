@@ -33,9 +33,9 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 
 from .models import Notificacion, PushSubscription
@@ -76,6 +76,80 @@ def _invalidar_cache(user_id: int) -> None:
     invalidar_cache_notificaciones(user_id)
 
 
+def _contadores_usuario(user) -> dict:
+    """Cuenta no leídas reales en BD (no el tope de 20 de la lista).
+
+    EXPLICACIÓN: El badge y los numeritos de pestaña deben reflejar TODAS
+    las pendientes, aunque la lista solo muestre las 20 más recientes.
+    Un solo ``aggregate`` evita tres COUNT separados.
+
+    Args:
+        user: Usuario autenticado dueño de las notificaciones.
+
+    Returns:
+        dict: no_leidas, no_leidas_accion, no_leidas_avisos, no_leidas_equipo.
+    """
+    agg = Notificacion.objects.filter(usuario=user).aggregate(
+        no_leidas_accion=Count(
+            'pk', filter=Q(requiere_accion=True, leida=False)
+        ),
+        no_leidas_avisos=Count(
+            'pk', filter=Q(requiere_accion=False, leida=False)
+        ),
+        no_leidas_equipo=Count(
+            'pk',
+            filter=Q(
+                requiere_accion=True,
+                leida=False,
+                categoria='equipo_disponible',
+            ),
+        ),
+    )
+    accion = int(agg['no_leidas_accion'] or 0)
+    avisos = int(agg['no_leidas_avisos'] or 0)
+    equipo = int(agg['no_leidas_equipo'] or 0)
+    return {
+        'no_leidas': accion,
+        'no_leidas_accion': accion,
+        'no_leidas_avisos': avisos,
+        'no_leidas_equipo': equipo,
+    }
+
+
+def _cortar_lista(queryset, limite: int) -> tuple[list, bool]:
+    """Devuelve hasta ``limite`` filas y si había más detrás.
+
+    Pide limite+1 para no hacer un COUNT extra: si llegan 21, hay más.
+
+    Args:
+        queryset: QuerySet ya filtrado y ordenado.
+        limite: Tope visible (20).
+
+    Returns:
+        tuple: (lista de modelos, hay_mas).
+    """
+    filas = list(queryset[: limite + 1])
+    hay_mas = len(filas) > limite
+    return filas[:limite], hay_mas
+
+
+def _json_escritura_ok(user, extra: dict | None = None) -> JsonResponse:
+    """Respuesta POST exitosa con contadores frescos (el cliente no adivina).
+
+    Args:
+        user: Usuario de la request.
+        extra: Campos extra (actualizadas, eliminadas, …).
+
+    Returns:
+        JsonResponse con ok=True y contadores.
+    """
+    payload = {'ok': True}
+    payload.update(_contadores_usuario(user))
+    if extra:
+        payload.update(extra)
+    return JsonResponse(payload)
+
+
 def _serializar_notificacion(n: Notificacion) -> dict:
     """Convierte un registro Notificacion al dict que consume TypeScript.
 
@@ -114,6 +188,7 @@ def obtener_notificaciones(request):
     - no_leidas / no_leidas_accion: pendientes de acción (badge de la campanita)
     - no_leidas_avisos: informativas sin leer
     - no_leidas_equipo: acción + categoria equipo_disponible (chip)
+    - hay_mas_accion / hay_mas_avisos: True si hay más de 20 en ese corte
     - accion / avisos: listas (leídas y no leídas, más recientes primero)
 
     Optimización con cache:
@@ -133,30 +208,25 @@ def obtener_notificaciones(request):
     if data is None:
         # Cache vacío o expirado → consultar la BD (un queryset base).
         qs = Notificacion.objects.filter(usuario=user)
-        # Paso 1: dos cortes para que el ruido de Celery no tape el trabajo.
-        accion_qs = qs.filter(requiere_accion=True).order_by('-fecha_creacion')
-        avisos_qs = qs.filter(requiere_accion=False).order_by('-fecha_creacion')
-        accion = list(accion_qs[:LIMITE_LISTA_NOTIF])
-        avisos = list(avisos_qs[:LIMITE_LISTA_NOTIF])
+        # Paso 1: dos cortes; limite+1 detecta si hay más sin un COUNT extra.
+        accion, hay_mas_accion = _cortar_lista(
+            qs.filter(requiere_accion=True).order_by('-fecha_creacion'),
+            LIMITE_LISTA_NOTIF,
+        )
+        avisos, hay_mas_avisos = _cortar_lista(
+            qs.filter(requiere_accion=False).order_by('-fecha_creacion'),
+            LIMITE_LISTA_NOTIF,
+        )
 
         # Paso 2: contadores sobre TODA la BD del usuario, no solo las 20.
-        no_leidas_accion = qs.filter(requiere_accion=True, leida=False).count()
-        no_leidas_avisos = qs.filter(requiere_accion=False, leida=False).count()
-        no_leidas_equipo = qs.filter(
-            requiere_accion=True,
-            leida=False,
-            categoria='equipo_disponible',
-        ).count()
-
+        data = _contadores_usuario(user)
         # Paso 3: el badge usa no_leidas_accion (trabajo pendiente, no ruido).
-        data = {
-            'no_leidas': no_leidas_accion,
-            'no_leidas_accion': no_leidas_accion,
-            'no_leidas_avisos': no_leidas_avisos,
-            'no_leidas_equipo': no_leidas_equipo,
+        data.update({
+            'hay_mas_accion': hay_mas_accion,
+            'hay_mas_avisos': hay_mas_avisos,
             'accion': [_serializar_notificacion(n) for n in accion],
             'avisos': [_serializar_notificacion(n) for n in avisos],
-        }
+        })
 
         # Guardar en Redis por CACHE_TTL_NOTIF segundos
         cache.set(key, data, CACHE_TTL_NOTIF)
@@ -183,7 +253,7 @@ def marcar_leida(request, notificacion_id):
         notif.leida = True
         notif.save(update_fields=['leida'])
         _invalidar_cache(request.user.id)
-        return JsonResponse({'ok': True})
+        return _json_escritura_ok(request.user)
     except Notificacion.DoesNotExist:
         return JsonResponse(
             {'ok': False, 'error': 'Notificación no encontrada'},
@@ -214,7 +284,7 @@ def marcar_todas_leidas(request):
         f"[NOTIF] {request.user.username} marcó {actualizadas} notificación(es) como leída(s)."
     )
 
-    return JsonResponse({'ok': True, 'actualizadas': actualizadas})
+    return _json_escritura_ok(request.user, extra={'actualizadas': actualizadas})
 
 
 @login_required
@@ -244,7 +314,7 @@ def marcar_avisos_leidos(request):
         f"informativo(s) como leído(s)."
     )
 
-    return JsonResponse({'ok': True, 'actualizadas': actualizadas})
+    return _json_escritura_ok(request.user, extra={'actualizadas': actualizadas})
 
 
 @login_required
@@ -265,7 +335,7 @@ def eliminar_notificacion(request, notificacion_id):
         )
         notif.delete()
         _invalidar_cache(request.user.id)
-        return JsonResponse({'ok': True})
+        return _json_escritura_ok(request.user)
     except Notificacion.DoesNotExist:
         return JsonResponse(
             {'ok': False, 'error': 'Notificación no encontrada'},
@@ -293,7 +363,7 @@ def eliminar_todas(request):
         f"[NOTIF] {request.user.username} eliminó {eliminadas} notificación(es)."
     )
 
-    return JsonResponse({'ok': True, 'eliminadas': eliminadas})
+    return _json_escritura_ok(request.user, extra={'eliminadas': eliminadas})
 
 
 # ══════════════════════════════════════════════════════════════════════════════

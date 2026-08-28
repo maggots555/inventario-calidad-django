@@ -2862,10 +2862,9 @@ input[readonly].form-control:focus {
 }
 
 .notif-chip.active {
-    /* Azul de marca para relleno (no --primary-color: en oscuro es texto claro). */
-    background: #1f6391;
+    background: var(--brand-fill, #1f6391);
     color: #fff;
-    border-color: #1f6391;
+    border-color: var(--brand-fill-border, #1a547a);
     box-shadow: 0 1px 3px rgba(31, 99, 145, 0.35);
 }
 
@@ -2898,13 +2897,12 @@ input[readonly].form-control:focus {
 
 .notif-tab.active {
     /*
-     * EXPLICACIÓN: En modo oscuro --primary-color es #60a5fa (acento de TEXTO).
-     * Si se usa de fondo, el tab queda lavado y el blanco casi no contrastaba.
-     * Aquí usamos el azul de marca SIGMA (#1f6391) en ambos temas.
+     * EXPLICACIÓN: --brand-fill (base.css) es el azul de marca para FONDOS.
+     * No usamos --primary-color: en oscuro es acento de texto (#60a5fa).
      */
-    background: #1f6391;
+    background: var(--brand-fill, #1f6391);
     color: #fff;
-    border-color: #1a547a;
+    border-color: var(--brand-fill-border, #1a547a);
 }
 
 .notif-tab-count {
@@ -2955,9 +2953,9 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-chip.active {
-    background: #1f6391;
+    background: var(--brand-fill, #1f6391);
     color: #fff;
-    border-color: #3b82c4;
+    border-color: var(--brand-fill-border, #3b82c4);
     box-shadow: 0 1px 4px rgba(31, 99, 145, 0.45);
 }
 
@@ -2975,14 +2973,27 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-tab.active {
-    background: #1f6391;
+    background: var(--brand-fill, #1f6391);
     color: #fff;
-    border-color: #3b82c4;
+    border-color: var(--brand-fill-border, #3b82c4);
 }
 
 [data-bs-theme="dark"] .notif-tab:not(.active) .notif-tab-count {
     background: #334155;
     color: #e2e8f0;
+}
+
+.notif-hay-mas {
+    padding: 8px 14px 12px;
+    font-size: 0.72rem;
+    color: var(--gray-500, #6b7280);
+    text-align: center;
+    border-top: 1px dashed var(--border-color, #e5e7eb);
+}
+
+[data-bs-theme="dark"] .notif-hay-mas {
+    color: #94a3b8;
+    border-top-color: var(--border-color, #334155);
 }
 
 /* ── Lista de notificaciones ── */

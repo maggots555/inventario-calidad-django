@@ -90,6 +90,15 @@
     --text-primary: #111827;
     --text-secondary: #4b5563;
 
+    /*
+     * Relleno de marca (pestañas/chips activos con texto blanco).
+     * EXPLICACIÓN: --primary-color en oscuro es #60a5fa, pensado para TEXTO.
+     * Si se usa de fondo, el control queda lavado. Este token se queda
+     * en el azul SIGMA (#1f6391) en claro y oscuro.
+     */
+    --brand-fill: #1f6391;
+    --brand-fill-border: #1a547a;
+
     /* Tipografía */
     --font-sans: 'Plus Jakarta Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
@@ -235,6 +244,10 @@
     --border-color: #334155;
     --text-primary: #e2e8f0;
     --text-secondary: #cbd5e1;
+
+    /* Mismo relleno que en claro: texto blanco sobre azul de marca. */
+    --brand-fill: #1f6391;
+    --brand-fill-border: #3b82c4;
 
     /* Sombras oscuras */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);

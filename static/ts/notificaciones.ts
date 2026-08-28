@@ -67,8 +67,18 @@ interface NotificacionesResponse {
     no_leidas_accion: number;
     no_leidas_avisos: number;
     no_leidas_equipo: number;
+    hay_mas_accion?: boolean;
+    hay_mas_avisos?: boolean;
     accion: NotificacionItem[];
     avisos: NotificacionItem[];
+}
+
+/** Contadores que también devuelven los POST (marcar / eliminar). */
+interface ContadoresNotif {
+    no_leidas?: number;
+    no_leidas_accion?: number;
+    no_leidas_avisos?: number;
+    no_leidas_equipo?: number;
 }
 
 /**
@@ -149,6 +159,13 @@ class PanelNotificaciones {
     private noLeidasAccion: number = 0;
     private noLeidasAvisos: number = 0;
     private noLeidasEquipo: number = 0;
+    private hayMasAccion: boolean = false;
+    private hayMasAvisos: boolean = false;
+    /**
+     * Generación del último GET /listar/. Si llega una respuesta vieja
+     * (carrera con un POST), se ignora.
+     */
+    private listarSeq: number = 0;
     /** Pestaña activa: 'accion' = Por hacer; 'avisos' = informativas. */
     private tabActiva: NotifTabActiva = 'accion';
     /** Chip Equipo disponible (solo filtra dentro de Por hacer). */
@@ -252,9 +269,9 @@ class PanelNotificaciones {
     /**
      * Clic en la lista: eliminar o marcar una de «Por hacer» como leída.
      *
-     * EXPLICACIÓN: Si el usuario pulsa el enlace de un pendiente, primero
-     * avisamos al servidor (marcar/<id>/) y luego navegamos. Si no
-     * preventDefault, el cambio de página cancela el fetch.
+     * EXPLICACIÓN: No interceptamos la navegación del <a> (Ctrl+clic y
+     * clic rueda deben abrir otra pestaña). El POST usa keepalive para
+     * que sobreviva si la página se descarga.
      */
     private onClickLista(e: Event): void {
         const target = e.target as HTMLElement;
@@ -270,11 +287,10 @@ class PanelNotificaciones {
         }
 
         const itemLi: HTMLElement | null = target.closest('.notif-item');
-        if (!itemLi) {
+        if (!itemLi || itemLi.classList.contains('notif-leida')) {
             return;
         }
-        const esAccion = itemLi.dataset.requiereAccion === 'true';
-        if (!esAccion) {
+        if (itemLi.dataset.requiereAccion !== 'true') {
             return;
         }
         const idStr = itemLi.dataset.id;
@@ -282,18 +298,16 @@ class PanelNotificaciones {
             return;
         }
         const id = parseInt(idStr, 10);
-        const link = target.closest('.notif-link') as HTMLAnchorElement | null;
-        const urlDestino = link && link.getAttribute('href') ? link.getAttribute('href') : '';
-
-        // Paso: marcar en servidor; si hay URL, ir después para no perder el POST.
-        if (urlDestino) {
-            e.preventDefault();
-            void this.marcarUnaLeida(id).then(() => {
-                window.location.href = urlDestino;
-            });
-        } else {
-            void this.marcarUnaLeida(id);
+        if (Number.isNaN(id)) {
+            return;
         }
+        const mouse = e as MouseEvent;
+        const abreOtraPestana =
+            mouse.ctrlKey || mouse.metaKey || mouse.shiftKey || mouse.button === 1;
+        const link = target.closest('a.notif-link');
+        // keepalive solo si esta pestaña se va (clic normal en el enlace).
+        const abandonaPagina = Boolean(link && !abreOtraPestana);
+        void this.marcarUnaLeida(id, { keepalive: abandonaPagina });
     }
 
     /**
@@ -415,6 +429,7 @@ class PanelNotificaciones {
             items = this.cacheAccion;
         }
         this.renderLista(items);
+        this.pintarHayMas();
     }
 
     // ── Gestión del intervalo de polling ──
@@ -486,6 +501,7 @@ class PanelNotificaciones {
      * - Si llega algo nuevo, vuelve a 15s.
      */
     private async actualizarNotificaciones(): Promise<void> {
+        const seq = ++this.listarSeq;
         try {
             const response: Response = await fetch('/notificaciones/api/listar/', {
                 headers: {
@@ -498,6 +514,11 @@ class PanelNotificaciones {
             }
 
             const data: NotificacionesResponse = await response.json() as NotificacionesResponse;
+            // Respuesta vieja (un POST invalidó este GET): no pintar datos stale.
+            if (seq !== this.listarSeq) {
+                return;
+            }
+
             const noLeidasAccion = data.no_leidas_accion ?? data.no_leidas ?? 0;
 
             // ── Polling adaptativo: ajustar velocidad según actividad ──
@@ -515,14 +536,11 @@ class PanelNotificaciones {
                 }
             }
 
-            this.ultimoNoLeidas = noLeidasAccion;
-            this.noLeidasAccion = noLeidasAccion;
-            this.noLeidasAvisos = data.no_leidas_avisos ?? 0;
-            this.noLeidasEquipo = data.no_leidas_equipo ?? 0;
+            this.hayMasAccion = Boolean(data.hay_mas_accion);
+            this.hayMasAvisos = Boolean(data.hay_mas_avisos);
             this.cacheAccion = (data.accion || []).map((n) => this.normalizarItem(n));
             this.cacheAvisos = (data.avisos || []).map((n) => this.normalizarItem(n));
-            this.renderBadge(this.noLeidasAccion);
-            this.actualizarContadoresTabs();
+            this.aplicarContadores(data);
             this.actualizarEstadoVisualTabs();
             this.renderListaFiltrada();
 
@@ -530,6 +548,41 @@ class PanelNotificaciones {
             // Silencioso: errores de red son esperados (usuario sin conexión, etc.)
             void error;
         }
+    }
+
+    /**
+     * Aplica contadores que vienen del servidor (GET o POST).
+     *
+     * EXPLICACIÓN: Nunca recuentas desde las 20 de la lista: si hay 25
+     * pendientes, el badge debe decir 25, no 19.
+     */
+    private aplicarContadores(data: ContadoresNotif): void {
+        const accion = data.no_leidas_accion ?? data.no_leidas ?? 0;
+        this.noLeidasAccion = accion;
+        this.noLeidasAvisos = data.no_leidas_avisos ?? this.noLeidasAvisos;
+        this.noLeidasEquipo = data.no_leidas_equipo ?? this.noLeidasEquipo;
+        this.ultimoNoLeidas = accion;
+        this.renderBadge(accion);
+        this.actualizarContadoresTabs();
+    }
+
+    /**
+     * Pie de lista si hay más de 20 en esa pestaña.
+     */
+    private pintarHayMas(): void {
+        if (!this.lista || this.lista.querySelector('.notif-vacia')) {
+            return;
+        }
+        const hayMas =
+            this.tabActiva === 'avisos' ? this.hayMasAvisos : this.hayMasAccion;
+        if (!hayMas || this.chipEquipoActivo) {
+            return;
+        }
+        const li = document.createElement('li');
+        li.className = 'notif-hay-mas';
+        li.textContent =
+            'Se muestran las 20 más recientes. El número de la pestaña cuenta todas.';
+        this.lista.appendChild(li);
     }
 
     /**
@@ -624,46 +677,35 @@ class PanelNotificaciones {
 
     /**
      * Marca una notificación de acción como leída (clic en el ítem).
+     *
+     * Args:
+     *   id: PK de la notificación.
+     *   keepalive: true si la página se va a descargar (navegación o Ctrl+clic).
      */
-    private async marcarUnaLeida(id: number): Promise<void> {
+    private async marcarUnaLeida(
+        id: number,
+        opciones: { keepalive?: boolean } = {}
+    ): Promise<void> {
         try {
-            await fetch(`/notificaciones/api/marcar/${id}/`, {
+            const response: Response = await fetch(`/notificaciones/api/marcar/${id}/`, {
                 method: 'POST',
                 headers: this.headersPost(),
+                keepalive: Boolean(opciones.keepalive),
             });
-            this.marcarLocalmente(id);
-            this.recalcularContadoresLocales();
-            this.renderBadge(this.noLeidasAccion);
-            this.actualizarContadoresTabs();
-            this.renderListaFiltrada();
+            if (!response.ok) {
+                return;
+            }
+            // La pestaña se descarga: no hace falta pintar ni reconsultar.
+            if (opciones.keepalive) {
+                return;
+            }
+            const data = await response.json() as ContadoresNotif;
+            this.listarSeq += 1;
+            this.aplicarContadores(data);
+            await this.actualizarNotificaciones();
         } catch (error: unknown) {
             void error;
         }
-    }
-
-    /**
-     * Pone leida=true en el cache local de un id.
-     */
-    private marcarLocalmente(id: number): void {
-        this.cacheAccion = this.cacheAccion.map((n) =>
-            n.id === id ? { ...n, leida: true } : n
-        );
-        this.cacheAvisos = this.cacheAvisos.map((n) =>
-            n.id === id ? { ...n, leida: true } : n
-        );
-    }
-
-    /**
-     * Recuenta no leídas desde el cache (puede subestimar si hay >20; el
-     * próximo polling corrige con el count real de la BD).
-     */
-    private recalcularContadoresLocales(): void {
-        this.noLeidasAccion = this.cacheAccion.filter((n) => !n.leida).length;
-        this.noLeidasAvisos = this.cacheAvisos.filter((n) => !n.leida).length;
-        this.noLeidasEquipo = this.cacheAccion.filter(
-            (n) => !n.leida && (n.categoria || 'general') === 'equipo_disponible'
-        ).length;
-        this.ultimoNoLeidas = this.noLeidasAccion;
     }
 
     /**
@@ -673,17 +715,21 @@ class PanelNotificaciones {
      * al abrir, parecería que ya no hay nada que hacer.
      */
     private async marcarAvisosLeidos(): Promise<void> {
+        if (this.noLeidasAvisos === 0) {
+            return;
+        }
         try {
-            await fetch('/notificaciones/api/marcar-avisos/', {
+            const response: Response = await fetch('/notificaciones/api/marcar-avisos/', {
                 method: 'POST',
                 headers: this.headersPost(),
             });
-            this.cacheAvisos = this.cacheAvisos.map((n) => ({ ...n, leida: true }));
-            this.noLeidasAvisos = 0;
-            this.actualizarContadoresTabs();
-            if (this.tabActiva === 'avisos') {
-                this.renderListaFiltrada();
+            if (!response.ok) {
+                return;
             }
+            const data = await response.json() as ContadoresNotif;
+            this.listarSeq += 1;
+            this.aplicarContadores(data);
+            await this.actualizarNotificaciones();
         } catch (error: unknown) {
             void error;
         }
@@ -694,27 +740,17 @@ class PanelNotificaciones {
      */
     private async marcarTodasLeidas(): Promise<void> {
         try {
-            await fetch('/notificaciones/api/marcar-todas/', {
+            const response: Response = await fetch('/notificaciones/api/marcar-todas/', {
                 method: 'POST',
                 headers: this.headersPost(),
             });
-
-            this.renderBadge(0);
-            this.cacheAccion = this.cacheAccion.map((n) => ({ ...n, leida: true }));
-            this.cacheAvisos = this.cacheAvisos.map((n) => ({ ...n, leida: true }));
-            this.noLeidasAccion = 0;
-            this.noLeidasAvisos = 0;
-            this.noLeidasEquipo = 0;
-            this.ultimoNoLeidas = 0;
-            this.actualizarContadoresTabs();
-
-            if (this.lista) {
-                const nuevas: NodeListOf<Element> = this.lista.querySelectorAll('.notif-nueva');
-                nuevas.forEach((el: Element) => {
-                    el.classList.replace('notif-nueva', 'notif-leida');
-                });
+            if (!response.ok) {
+                return;
             }
-
+            const data = await response.json() as ContadoresNotif;
+            this.listarSeq += 1;
+            this.aplicarContadores(data);
+            await this.actualizarNotificaciones();
         } catch (error: unknown) {
             void error;
         }
@@ -724,10 +760,8 @@ class PanelNotificaciones {
      * Elimina una notificación individual.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Cuando el usuario hace clic en la ✕ de una notificación:
-     * 1. Envía un POST al servidor para borrarla de la BD
-     * 2. Anima el item (se desliza hacia afuera)
-     * 3. Lo remueve del DOM
+     * Tras borrar, volvemos a listar: si había 21 pendientes, la 21ª
+     * ocupa el hueco. Recuentar las 20 del cache dejaría el badge mal.
      */
     private async eliminarNotificacion(id: number, btnElement: HTMLElement): Promise<void> {
         const itemLi: HTMLElement | null = btnElement.closest('.notif-item');
@@ -740,22 +774,13 @@ class PanelNotificaciones {
 
             if (!response.ok) return;
 
-            this.cacheAccion = this.cacheAccion.filter((n) => n.id !== id);
-            this.cacheAvisos = this.cacheAvisos.filter((n) => n.id !== id);
-            this.recalcularContadoresLocales();
-            this.renderBadge(this.noLeidasAccion);
-            this.actualizarContadoresTabs();
-
+            const data = await response.json() as ContadoresNotif;
+            this.listarSeq += 1;
+            this.aplicarContadores(data);
             if (itemLi) {
                 itemLi.classList.add('notif-removing');
-                setTimeout(() => {
-                    itemLi.remove();
-                    if (this.lista && this.lista.querySelectorAll('.notif-item').length === 0) {
-                        this.renderListaFiltrada();
-                    }
-                }, 300);
             }
-
+            await this.actualizarNotificaciones();
         } catch (error: unknown) {
             void error;
         }
@@ -776,16 +801,14 @@ class PanelNotificaciones {
 
             if (!response.ok) return;
 
+            const data = await response.json() as ContadoresNotif;
+            this.listarSeq += 1;
             this.cacheAccion = [];
             this.cacheAvisos = [];
-            this.noLeidasAccion = 0;
-            this.noLeidasAvisos = 0;
-            this.noLeidasEquipo = 0;
-            this.ultimoNoLeidas = 0;
-            this.renderBadge(0);
-            this.actualizarContadoresTabs();
+            this.hayMasAccion = false;
+            this.hayMasAvisos = false;
+            this.aplicarContadores(data);
             this.renderListaFiltrada();
-
         } catch (error: unknown) {
             void error;
         }

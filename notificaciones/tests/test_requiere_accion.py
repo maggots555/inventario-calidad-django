@@ -11,6 +11,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 """
 
 from unittest.mock import patch
+import json
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -81,7 +82,6 @@ class ApiListarDosCortesTest(TestCase):
         request.user = self.user
         response = notif_views.obtener_notificaciones(request)
         self.assertEqual(response.status_code, 200)
-        import json
         return json.loads(response.content.decode())
 
     def test_listar_incluye_cortes_y_contadores(self):
@@ -105,6 +105,8 @@ class ApiListarDosCortesTest(TestCase):
         self.assertEqual(data['no_leidas'], 1)
         self.assertEqual(len(data['accion']), 1)
         self.assertEqual(len(data['avisos']), 1)
+        self.assertFalse(data.get('hay_mas_accion'))
+        self.assertFalse(data.get('hay_mas_avisos'))
         self.assertTrue(data['accion'][0]['requiere_accion'])
         self.assertFalse(data['avisos'][0]['requiere_accion'])
 
@@ -135,6 +137,8 @@ class ApiListarDosCortesTest(TestCase):
         self.assertIn(accion.pk, ids_accion)
         self.assertEqual(len(data['avisos']), 20)
         self.assertEqual(data['no_leidas_accion'], 1)
+        self.assertTrue(data.get('hay_mas_avisos'))
+        self.assertFalse(data.get('hay_mas_accion'))
 
     def test_contador_equipo_solo_accion_no_leida(self):
         Notificacion.objects.create(
@@ -193,6 +197,9 @@ class MarcarAvisosNoTocaAccionTest(TestCase):
         self.aviso.refresh_from_db()
         self.assertFalse(self.accion.leida)
         self.assertTrue(self.aviso.leida)
+        body = json.loads(response.content.decode())
+        self.assertEqual(body.get('no_leidas_accion'), 1)
+        self.assertEqual(body.get('no_leidas_avisos'), 0)
 
 
 class EnviarPushYCampanitaFlagTest(TestCase):
