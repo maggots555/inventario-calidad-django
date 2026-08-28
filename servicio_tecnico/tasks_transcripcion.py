@@ -32,8 +32,11 @@ logger = logging.getLogger('servicio_tecnico')
     bind=True,
     max_retries=0,
     name='servicio_tecnico.transcribir_audio_diagnostico',
-    time_limit=360,
-    soft_time_limit=300,
+    # EXPLICACIÓN: Transcribe puede tardar 180s; si falla, Flash y Ollama
+    # suman más. 10 min (igual que CELERY_TASK_TIME_LIMIT) cubre la cascada
+    # sin dejar el worker colgado para siempre.
+    time_limit=600,
+    soft_time_limit=540,
 )
 def transcribir_audio_diagnostico_task(
     self,

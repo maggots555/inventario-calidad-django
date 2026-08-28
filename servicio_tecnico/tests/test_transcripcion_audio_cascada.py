@@ -352,8 +352,10 @@ class TranscripcionCeleryVistaTests(SimpleTestCase):
     """
 
     def setUp(self) -> None:
+        from django.core.cache import cache
         from django.test import RequestFactory
 
+        cache.clear()
         self.factory = RequestFactory()
         self.user = MagicMock()
         self.user.pk = 7
@@ -462,6 +464,123 @@ class TranscripcionCeleryVistaTests(SimpleTestCase):
         self.assertEqual(respuesta.status_code, 403)
         mock_ar.assert_not_called()
 
+    @patch('celery.result.AsyncResult')
+    def test_get_sin_dueno_404_no_403(self, mock_ar: MagicMock) -> None:
+        """Dueño ausente (TTL/Redis) es 'expiró', no 'sin permiso'."""
+        from django.urls import reverse
+
+        from servicio_tecnico.views_ia_diagnostico import estado_transcripcion_audio
+
+        request = self.factory.get(
+            reverse(
+                'servicio_tecnico:estado_transcripcion_audio',
+                kwargs={'task_id': 'nunca-existio'},
+            )
+        )
+        request.user = self.user
+        respuesta = estado_transcripcion_audio(request, task_id='nunca-existio')
+        self.assertEqual(respuesta.status_code, 404)
+        data = json.loads(respuesta.content)
+        self.assertIn('expiró', data['error'])
+        mock_ar.assert_not_called()
+
+    def test_get_task_id_invalido_400(self) -> None:
+        from servicio_tecnico.views_ia_diagnostico import estado_transcripcion_audio
+
+        request = self.factory.get('/x')
+        request.user = self.user
+        respuesta = estado_transcripcion_audio(request, task_id='x' * 81)
+        self.assertEqual(respuesta.status_code, 400)
+
+    @patch('celery.result.AsyncResult')
+    def test_get_revoked_marca_listo(self, mock_ar: MagicMock) -> None:
+        from django.core.cache import cache
+        from django.urls import reverse
+
+        from servicio_tecnico.services.transcripcion_audio import (
+            CACHE_TTL_TRANSCRIPCION,
+            clave_cache_owner,
+        )
+        from servicio_tecnico.views_ia_diagnostico import estado_transcripcion_audio
+
+        cache.set(clave_cache_owner('abc'), 7, CACHE_TTL_TRANSCRIPCION)
+        mock_ar.return_value.state = 'REVOKED'
+        mock_ar.return_value.result = None
+        request = self.factory.get(
+            reverse(
+                'servicio_tecnico:estado_transcripcion_audio',
+                kwargs={'task_id': 'abc'},
+            )
+        )
+        request.user = self.user
+        respuesta = estado_transcripcion_audio(request, task_id='abc')
+        data = json.loads(respuesta.content)
+        self.assertTrue(data['listo'])
+        self.assertFalse(data['success'])
+        self.assertIn('canceló', data['error'])
+
+    @patch('servicio_tecnico.tasks_transcripcion.transcribir_audio_diagnostico_task.delay')
+    @patch('config.paises_config.get_pais_actual')
+    def test_post_cache_falla_no_encola(
+        self,
+        mock_pais: MagicMock,
+        mock_delay: MagicMock,
+    ) -> None:
+        """Si Redis/cache.set falla en silencio, no encolamos una tarea huérfana."""
+        mock_pais.return_value = {'db_alias': 'default'}
+        with patch(
+            'servicio_tecnico.services.transcripcion_audio.guardar_en_cache',
+            return_value=False,
+        ):
+            respuesta = self._post_audio()
+        self.assertEqual(respuesta.status_code, 503)
+        mock_delay.assert_not_called()
+
+    @patch('servicio_tecnico.views_ia_diagnostico.uuid.uuid4')
+    @patch('servicio_tecnico.tasks_transcripcion.transcribir_audio_diagnostico_task.delay')
+    @patch('config.paises_config.get_pais_actual')
+    def test_post_delay_falla_limpia_cache(
+        self,
+        mock_pais: MagicMock,
+        mock_delay: MagicMock,
+        mock_uuid: MagicMock,
+    ) -> None:
+        """Si Celery/broker cae, borramos el audio del cache para no dejar basura."""
+        from django.core.cache import cache
+
+        from servicio_tecnico.services.transcripcion_audio import clave_cache_audio
+
+        mock_pais.return_value = {'db_alias': 'default'}
+        mock_uuid.return_value = MagicMock(hex='aabbccdd')
+        mock_delay.side_effect = RuntimeError('broker caído')
+
+        respuesta = self._post_audio()
+        self.assertEqual(respuesta.status_code, 503)
+        data = json.loads(respuesta.content)
+        self.assertIn('encolar', data['error'])
+        self.assertIsNone(cache.get(clave_cache_audio('aabbccdd')))
+
+    def test_post_audio_vacio_400(self) -> None:
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.urls import reverse
+
+        from servicio_tecnico.views_ia_diagnostico import transcribir_audio_diagnostico
+
+        audio = SimpleUploadedFile(
+            'diagnostico.webm',
+            b'',
+            content_type='audio/webm',
+        )
+        request = self.factory.post(
+            reverse('servicio_tecnico:transcribir_audio_diagnostico'),
+            {'idioma': 'es', 'audio': audio},
+        )
+        request.user = self.user
+        respuesta = transcribir_audio_diagnostico(request)
+        self.assertEqual(respuesta.status_code, 400)
+        data = json.loads(respuesta.content)
+        self.assertIn('vacío', data['error'])
+
 
 @override_settings(
     CACHES={
@@ -532,3 +651,63 @@ class TranscripcionCeleryTareaTests(SimpleTestCase):
         )
         self.assertFalse(resultado['success'])
         self.assertIn('expiró', resultado['error'])
+
+
+@override_settings(
+    CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'transcribe-guardar-cache-tests',
+        }
+    },
+)
+class GuardarEnCacheTests(SimpleTestCase):
+    """Redis con IGNORE_EXCEPTIONS puede devolver None; LocMem también (pero sí guarda)."""
+
+    def setUp(self) -> None:
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def test_locmem_cuenta_como_exito_aunque_set_devuelva_none(self) -> None:
+        from django.core.cache import cache
+
+        from servicio_tecnico.services.transcripcion_audio import guardar_en_cache
+
+        self.assertTrue(guardar_en_cache('transcribe_audio:x', {'a': 1}))
+        self.assertEqual(cache.get('transcribe_audio:x'), {'a': 1})
+
+    @patch('django.core.cache.cache.set', return_value=False)
+    def test_false_cuenta_como_fallo(self, _mock_set: MagicMock) -> None:
+        from servicio_tecnico.services.transcripcion_audio import guardar_en_cache
+
+        self.assertFalse(guardar_en_cache('transcribe_audio:x', {'a': 1}))
+
+    @patch('django.core.cache.cache.get', return_value=None)
+    @patch('django.core.cache.cache.set', return_value=None)
+    def test_none_y_get_vacio_cuenta_como_fallo(
+        self,
+        _mock_set: MagicMock,
+        _mock_get: MagicMock,
+    ) -> None:
+        from servicio_tecnico.services.transcripcion_audio import guardar_en_cache
+
+        self.assertFalse(guardar_en_cache('transcribe_audio:x', {'a': 1}))
+
+    @patch('django.core.cache.cache.set', return_value=True)
+    def test_true_cuenta_como_exito(self, _mock_set: MagicMock) -> None:
+        from servicio_tecnico.services.transcripcion_audio import guardar_en_cache
+
+        self.assertTrue(guardar_en_cache('transcribe_audio:x', 7))
+
+
+class LimitesTareaCeleryTests(SimpleTestCase):
+    """La tarea debe durar lo que la cascada, no menos."""
+
+    def test_time_limit_cubre_cascada(self) -> None:
+        from servicio_tecnico.tasks_transcripcion import (
+            transcribir_audio_diagnostico_task,
+        )
+
+        self.assertEqual(transcribir_audio_diagnostico_task.time_limit, 600)
+        self.assertEqual(transcribir_audio_diagnostico_task.soft_time_limit, 540)

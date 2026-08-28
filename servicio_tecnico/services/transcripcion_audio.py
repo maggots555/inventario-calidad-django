@@ -109,6 +109,49 @@ def clave_cache_owner(task_id: str) -> str:
     return f'transcribe_owner:{task_id}'
 
 
+def guardar_en_cache(clave: str, valor: object, ttl: int = CACHE_TTL_TRANSCRIPCION) -> bool:
+    """
+    Escribe en cache y confirma que sí se guardó.
+
+    Objetivo:
+        Redis está con IGNORE_EXCEPTIONS=True. Si Redis cae, cache.set no
+        lanza error: traga el fallo y el worker encontraría la clave vacía.
+        Por eso comprobamos el booleano de retorno.
+
+    Args:
+        clave: Nombre de la clave (ya con prefijo transcribe_*).
+        valor: Dict o int (audio o user.pk).
+        ttl: Segundos de vida.
+
+    Returns:
+        True si el valor quedó persistido. False si Redis/cache falló.
+    """
+    from django.core.cache import cache
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # django-redis: True si guardó, False si no, None si Redis cayó
+    # (IGNORE_EXCEPTIONS=True). LocMemCache de Django NI SIQUIERA
+    # retorna True: el `set` termina en None aunque sí haya guardado.
+    # Por eso no basta con `is True`: si el retorno es ambiguo, leemos.
+    resultado = cache.set(clave, valor, ttl)
+    if resultado is False:
+        return False
+    if resultado is True:
+        return True
+    return cache.get(clave) is not None
+
+
+def borrar_de_cache(*claves: str) -> None:
+    """Borra una o más claves. Ignora fallos de Redis (no hay nada que hacer)."""
+    from django.core.cache import cache
+
+    for clave in claves:
+        try:
+            cache.delete(clave)
+        except Exception:
+            logger.warning('[AudioCache] No se pudo borrar %s', clave)
+
+
 def _extraer_texto_interaccion(response_data: dict) -> str:
     """
     Saca el texto transcrito de la respuesta REST de Interactions API.

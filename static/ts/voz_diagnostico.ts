@@ -37,8 +37,12 @@ const VOZ_ENDPOINT: string = '/servicio-tecnico/api/transcribir-audio-diagnostic
 /** Cada cuánto preguntamos a Celery si ya hay texto */
 const VOZ_POLL_MS: number = 2_000;
 
-/** Tope de espera del polling (5 minutos). Si Celery está caído, avisamos. */
-const VOZ_POLL_MAX_MS: number = 5 * 60_000;
+/**
+ * Tope de espera del polling (10 minutos).
+ * EXPLICACIÓN: Celery tiene time_limit=600s para la cascada completa
+ * (Transcribe 180s + Flash + Ollama). El navegador debe esperar al menos eso.
+ */
+const VOZ_POLL_MAX_MS: number = 10 * 60_000;
 
 /** Tiempo máximo de grabación en milisegundos (60 segundos) */
 const VOZ_MAX_DURACION_MS: number = 60_000;
@@ -89,6 +93,10 @@ class VozDiagnostico {
     private pollingIntervalId: number | null = null;
     private cronometroIntervalId: number | null = null;
     private pollingStartTime: number = 0;
+    /** True mientras hay un GET de estado en vuelo (evita polls solapados). */
+    private pollEnCurso: boolean = false;
+    /** Sube al cancelar/terminar: ignora respuestas de un GET viejo. */
+    private pollingGeneracion: number = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private reconocedor: any = null;   // Referencia al SpeechRecognition activo
     private sesionReconocimientoId: number = 0;
@@ -155,9 +163,13 @@ class VozDiagnostico {
             try { rec.stop(); } catch { /* ignorar si ya estaba inactivo */ }
         }
 
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        const grabacionActiva =
+            this.mediaRecorder !== null && this.mediaRecorder.state !== 'inactive';
+        if (grabacionActiva && this.mediaRecorder) {
             this.mediaRecorder.stop();
-            // El resto del flujo lo maneja el evento 'onstop'
+            // EXPLICACIÓN: no poner 'inactivo' aquí. onstop envía el audio y
+            // pasa a 'procesando'. Si lo ponemos ahora, el botón parpadea.
+            return;
         }
 
         this.setEstado('inactivo');
@@ -360,15 +372,29 @@ class VozDiagnostico {
             },
             body: formData,
         })
-            .then(res => res.json())
-            .then((data: TranscripcionEncolarResponse) => {
-                if (data.success && data.task_id) {
-                    this.iniciarPolling(data.task_id);
+            .then(async (res: Response): Promise<void> => {
+                let data: TranscripcionEncolarResponse = { success: false };
+                try {
+                    data = await res.json() as TranscripcionEncolarResponse;
+                } catch {
+                    this.detenerEspera();
+                    this.mostrarError(
+                        `El servidor respondió ${res.status}. Intenta de nuevo.`,
+                    );
+                    this.setEstado('inactivo');
                     return;
                 }
-                this.detenerEspera();
-                this.mostrarError(data.error || 'No se pudo encolar la transcripción.');
-                this.setEstado('inactivo');
+                // EXPLICACIÓN: 503 (Redis/Celery caído) llega con success=false.
+                // No arrancar polling si no hay task_id.
+                if (!res.ok || !data.success || !data.task_id) {
+                    this.detenerEspera();
+                    this.mostrarError(
+                        data.error || 'No se pudo encolar la transcripción.',
+                    );
+                    this.setEstado('inactivo');
+                    return;
+                }
+                this.iniciarPolling(data.task_id);
             })
             .catch((err: Error) => {
                 this.detenerEspera();
@@ -379,19 +405,28 @@ class VozDiagnostico {
 
     /** Pregunta a Django si Celery ya terminó. No mantiene el POST abierto. */
     private iniciarPolling(taskId: string): void {
-        this.pollingStartTime = Date.now();
+        // EXPLICACIÓN: no resetear pollingStartTime — el cronómetro ya corre
+        // desde el POST. Así el tope de 10 min cuenta toda la espera del técnico.
+        this.pollingGeneracion += 1;
+        const generacion = this.pollingGeneracion;
+
         const consultar = (): void => {
+            if (generacion !== this.pollingGeneracion) {
+                return;
+            }
+            if (this.pollEnCurso) {
+                return;
+            }
             const transcurrido = Date.now() - this.pollingStartTime;
             if (transcurrido >= VOZ_POLL_MAX_MS) {
-                this.detenerEspera();
-                this.mostrarError(
-                    'La transcripción tardó más de 5 minutos. '
+                this.finalizarPollingConError(
+                    'La transcripción tardó más de 10 minutos. '
                     + '¿Está corriendo Celery? Intenta de nuevo o escribe el diagnóstico.',
                 );
-                this.setEstado('inactivo');
                 return;
             }
 
+            this.pollEnCurso = true;
             const url = `${VOZ_ENDPOINT}estado/${encodeURIComponent(taskId)}/`;
             fetch(url, {
                 method: 'GET',
@@ -399,13 +434,35 @@ class VozDiagnostico {
                     'X-CSRFToken': window.getCsrfToken?.() ?? '',
                 },
             })
-                .then(res => {
-                    if (res.status === 403) {
-                        throw new Error('Sin permiso para esta transcripción.');
+                .then(async (res: Response): Promise<void> => {
+                    if (generacion !== this.pollingGeneracion) {
+                        return;
                     }
-                    return res.json();
-                })
-                .then((data: TranscripcionEstadoResponse) => {
+
+                    let data: TranscripcionEstadoResponse = { estado: '', listo: false };
+                    try {
+                        data = await res.json() as TranscripcionEstadoResponse;
+                    } catch {
+                        if (res.status === 400 || res.status === 403 || res.status === 404) {
+                            this.finalizarPollingConError(
+                                'La transcripción expiró o no se pudo consultar. Vuelve a dictar.',
+                            );
+                            return;
+                        }
+                        throw new Error(`HTTP ${res.status}`);
+                    }
+
+                    // EXPLICACIÓN: 403/404 no son "inténtalo en 2 s". Paramos.
+                    if (res.status === 400 || res.status === 403 || res.status === 404) {
+                        this.finalizarPollingConError(
+                            data.error
+                            || 'La transcripción expiró o no tienes permiso. Vuelve a dictar.',
+                        );
+                        return;
+                    }
+                    if (!res.ok) {
+                        throw new Error(data.error || `HTTP ${res.status}`);
+                    }
                     if (!data.listo) {
                         return;
                     }
@@ -422,12 +479,27 @@ class VozDiagnostico {
                     this.setEstado('inactivo');
                 })
                 .catch((err: Error) => {
+                    if (generacion !== this.pollingGeneracion) {
+                        return;
+                    }
                     console.warn('[VozDiagnostico] Polling reintentará:', err);
+                })
+                .finally(() => {
+                    if (generacion === this.pollingGeneracion) {
+                        this.pollEnCurso = false;
+                    }
                 });
         };
 
         consultar();
         this.pollingIntervalId = window.setInterval(consultar, VOZ_POLL_MS);
+    }
+
+    /** Corta el polling y muestra el error (403/404/timeout). */
+    private finalizarPollingConError(mensaje: string): void {
+        this.detenerEspera();
+        this.mostrarError(mensaje);
+        this.setEstado('inactivo');
     }
 
     /** Mensaje + cronómetro 0:00 mientras espera a Celery */
@@ -452,6 +524,8 @@ class VozDiagnostico {
     }
 
     private detenerEspera(): void {
+        this.pollingGeneracion += 1;
+        this.pollEnCurso = false;
         if (this.pollingIntervalId !== null) {
             window.clearInterval(this.pollingIntervalId);
             this.pollingIntervalId = null;

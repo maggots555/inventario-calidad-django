@@ -284,13 +284,13 @@ def transcribir_audio_diagnostico(request):
     """
     import base64
 
-    from django.core.cache import cache
-
     from config.paises_config import get_pais_actual
     from servicio_tecnico.services.transcripcion_audio import (
         CACHE_TTL_TRANSCRIPCION,
+        borrar_de_cache,
         clave_cache_audio,
         clave_cache_owner,
+        guardar_en_cache,
     )
     from servicio_tecnico.tasks_transcripcion import transcribir_audio_diagnostico_task
 
@@ -322,15 +322,23 @@ def transcribir_audio_diagnostico(request):
     audio_nombre = audio_file.name or 'audio.webm'
     audio_content_type = audio_file.content_type or 'audio/webm'
 
+    if not audio_bytes:
+        return JsonResponse({
+            'success': False,
+            'error': 'El archivo de audio llegó vacío. Vuelve a dictar.',
+        }, status=400)
+
     logger.info(
         f"[AudioDiag] Encolando transcripción | Usuario: {request.user.username} | "
         f"Archivo: {audio_nombre} | Tamaño: {len(audio_bytes)} bytes | Idioma: {idioma}"
     )
 
-    # EXPLICACIÓN: base64 en cache es JSON-safe (Redis pickle o JSON).
+    # EXPLICACIÓN: base64 en cache es JSON-safe. Confirmamos cache.set porque
+    # Redis puede fallar en silencio (IGNORE_EXCEPTIONS=True).
     cache_key = uuid.uuid4().hex
-    cache.set(
-        clave_cache_audio(cache_key),
+    clave_audio = clave_cache_audio(cache_key)
+    if not guardar_en_cache(
+        clave_audio,
         {
             'audio_b64': base64.b64encode(audio_bytes).decode('ascii'),
             'audio_filename': audio_nombre,
@@ -338,18 +346,35 @@ def transcribir_audio_diagnostico(request):
             'idioma': idioma,
         },
         CACHE_TTL_TRANSCRIPCION,
-    )
+    ):
+        logger.error('[AudioDiag] cache.set falló al guardar audio | usuario=%s', request.user.username)
+        return JsonResponse({
+            'success': False,
+            'error': 'No se pudo guardar el audio en cache (¿Redis?). Intenta de nuevo.',
+        }, status=503)
 
-    tarea = transcribir_audio_diagnostico_task.delay(
-        cache_key=cache_key,
-        usuario_id=request.user.pk,
-        db_alias=get_pais_actual()['db_alias'],
-    )
-    cache.set(
-        clave_cache_owner(tarea.id),
-        request.user.pk,
-        CACHE_TTL_TRANSCRIPCION,
-    )
+    try:
+        tarea = transcribir_audio_diagnostico_task.delay(
+            cache_key=cache_key,
+            usuario_id=request.user.pk,
+            db_alias=get_pais_actual()['db_alias'],
+        )
+    except Exception:
+        logger.exception('[AudioDiag] Celery .delay() falló | cache_key=%s', cache_key)
+        borrar_de_cache(clave_audio)
+        return JsonResponse({
+            'success': False,
+            'error': 'No se pudo encolar la transcripción. ¿Está corriendo Celery/Redis?',
+        }, status=503)
+
+    if not guardar_en_cache(clave_cache_owner(tarea.id), request.user.pk):
+        logger.error('[AudioDiag] cache.set falló al guardar dueño | task_id=%s', tarea.id)
+        # La tarea ya está en cola; el poll fallaría con 404. Avisamos igual.
+        return JsonResponse({
+            'success': False,
+            'error': 'La tarea se encoló pero no se pudo registrar el dueño. Intenta de nuevo.',
+            'task_id': tarea.id,
+        }, status=503)
 
     logger.info(
         f"[AudioDiag] Tarea encolada | task_id={tarea.id} | cache_key={cache_key}"
@@ -381,8 +406,22 @@ def estado_transcripcion_audio(request, task_id):
 
     from servicio_tecnico.services.transcripcion_audio import clave_cache_owner
 
+    # UUID de Celery; rechazamos basura para no armar claves raras en Redis.
+    task_id = (task_id or '').strip()
+    if not task_id or len(task_id) > 80:
+        return JsonResponse({
+            'success': False,
+            'error': 'Identificador de tarea inválido.',
+        }, status=400)
+
     dueno_id = cache.get(clave_cache_owner(task_id))
-    if dueno_id is None or int(dueno_id) != int(request.user.pk):
+    if dueno_id is None:
+        # No hay dueño: expiró el TTL, Redis falló, o el task_id es inventado.
+        return JsonResponse({
+            'success': False,
+            'error': 'La transcripción expiró o no existe. Vuelve a dictar.',
+        }, status=404)
+    if int(dueno_id) != int(request.user.pk):
         return JsonResponse({
             'success': False,
             'error': 'No tienes permiso para consultar esta transcripción.',
@@ -392,7 +431,7 @@ def estado_transcripcion_audio(request, task_id):
     estado = resultado.state
     respuesta = {
         'estado': estado,
-        'listo': estado in ('SUCCESS', 'FAILURE'),
+        'listo': estado in ('SUCCESS', 'FAILURE', 'REVOKED'),
     }
 
     if estado == 'SUCCESS':
@@ -416,6 +455,11 @@ def estado_transcripcion_audio(request, task_id):
             respuesta['error'] = str(error)[:300]
         else:
             respuesta['error'] = 'Error desconocido al transcribir el audio.'
+
+    elif estado == 'REVOKED':
+        respuesta['success'] = False
+        respuesta['listo'] = True
+        respuesta['error'] = 'La transcripción se canceló. Vuelve a dictar.'
 
     return JsonResponse(respuesta)
 
