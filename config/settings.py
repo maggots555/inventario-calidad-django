@@ -908,11 +908,21 @@ OLLAMA_MODELS: list[str] = (
 #
 # GEMINI_TIMEOUT:
 #   Segundos antes de abortar la llamada. 60s es suficiente para la API de Google.
+#
+# GEMINI_TRANSCRIBE_MODEL / GEMINI_TRANSCRIBE_ENABLED:
+#   Modelo STT dedicado (ago 2026) para dictado Diagnóstico SIC.
+#   Va PRIMERO en la cascada de audio; NO se agrega al selector de pulir.
+#   Si falla (preview, cuota, error), cae a GEMINI_MODELS y luego a Ollama.
 
 GEMINI_ENABLED = config('GEMINI_ENABLED', default=False, cast=bool)
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-3.6-flash')
 GEMINI_TIMEOUT = config('GEMINI_TIMEOUT', default=60, cast=int)
+GEMINI_TRANSCRIBE_ENABLED = config('GEMINI_TRANSCRIBE_ENABLED', default=True, cast=bool)
+GEMINI_TRANSCRIBE_MODEL = config(
+    'GEMINI_TRANSCRIBE_MODEL',
+    default='gemini-3.5-transcribe',
+)
 
 # GEMINI_MODELS: lista de modelos Gemini disponibles para el selector.
 # Formato: nombres separados por coma.

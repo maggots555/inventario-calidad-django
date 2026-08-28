@@ -3,7 +3,8 @@ Vistas AJAX de IA para diagnóstico SIC (Fase 2 modularización).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 - pulir_diagnostico_sic_ia: mejora la redacción del diagnóstico (Ollama/Gemini).
-- transcribir_audio_diagnostico: fallback servidor cuando no hay Web Speech API.
+- transcribir_audio_diagnostico: fallback servidor cuando no hay Web Speech API
+  (cascada: Gemini 3.5 Transcribe → Gemini Flash → Ollama).
 
 NO incluyen el chat del portal cliente (chat_seguimiento_cliente) — eso
 va en la Fase 3 (views_seguimiento_cliente.py).
@@ -12,6 +13,7 @@ urls.py sigue usando views.pulir_diagnostico_sic_ia etc. porque views.py reexpor
 """
 
 import logging
+import time
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -255,15 +257,14 @@ def guardar_diagnostico_sic_ia(request):
 # ============================================================================
 # VISTA AJAX: transcribir_audio_diagnostico
 # Endpoint que recibe un archivo de audio grabado por el técnico en el campo
-# Diagnóstico SIC y lo transcribe usando IA (Ollama Whisper o Gemini).
+# Diagnóstico SIC y lo transcribe usando IA.
 #
 # FLUJO:
 # 1. El navegador graba audio con MediaRecorder (WebM/OGG/MP4 según soporte)
 # 2. Si Web Speech API funcionó en el cliente, NO llega aquí (se maneja en JS)
 # 3. Si Web Speech API no está disponible, el cliente envía el audio aquí
-# 4. Esta vista detecta el proveedor disponible:
-#    - OLLAMA_ENABLED=True  → usa transcribir_audio_ollama() (Whisper vía Ollama)
-#    - GEMINI_ENABLED=True  → usa transcribir_audio_gemini() como fallback
+# 4. La vista valida el archivo y delega la cascada al service:
+#    Transcribe (STT) → Gemini Flash/Lite → Ollama
 # 5. Devuelve JSON con el texto transcrito
 #
 # Endpoint: POST /api/transcribir-audio-diagnostico/
@@ -276,7 +277,7 @@ def guardar_diagnostico_sic_ia(request):
 @require_http_methods(["POST"])
 def transcribir_audio_diagnostico(request):
     """
-    API AJAX: Transcribe un audio a texto usando Ollama (Whisper) o Gemini.
+    API AJAX: Transcribe un audio a texto (cascada Transcribe → Gemini → Ollama).
 
     Este endpoint es el fallback del lado servidor cuando el navegador no
     soporta la Web Speech API (principalmente Firefox y algunos Android).
@@ -286,8 +287,11 @@ def transcribir_audio_diagnostico(request):
         - idioma (str, opcional): Código de idioma (default: 'es')
 
     Devuelve JSON:
-        {'success': True, 'texto': '...transcripcion...', 'proveedor': 'ollama'|'gemini'}
+        {'success': True, 'texto': '...', 'proveedor': 'gemini-transcribe'|'gemini'|'ollama'}
         {'success': False, 'error': '...mensaje de error amigable...'}
+
+    Efectos secundarios:
+        Llama APIs de Google y/o Ollama. No escribe en la base de datos.
     """
     ollama_enabled = getattr(settings, 'OLLAMA_ENABLED', False)
     gemini_enabled = getattr(settings, 'GEMINI_ENABLED', False)
@@ -327,76 +331,42 @@ def transcribir_audio_diagnostico(request):
         f"Archivo: {audio_nombre} | Tamaño: {len(audio_bytes)} bytes | Idioma: {idioma}"
     )
 
-    import time as _time
+    from servicio_tecnico.services.transcripcion_audio import transcribir_audio_cascada
 
-    # --- Intento 1: Ollama (Whisper local) ---
-    if ollama_enabled:
-        from .ollama_client import transcribir_audio_ollama
-        _t = _time.monotonic()
-        resultado = transcribir_audio_ollama(
-            audio_bytes=audio_bytes,
-            audio_filename=audio_nombre,
-            audio_content_type=audio_content_type,
-            idioma=idioma,
+    # La cascada vive en services/: Transcribe → Flash/Lite → Ollama.
+    _t = time.monotonic()
+    resultado = transcribir_audio_cascada(
+        audio_bytes=audio_bytes,
+        audio_filename=audio_nombre,
+        audio_content_type=audio_content_type,
+        idioma=idioma,
+    )
+    tiempo_ms = int((time.monotonic() - _t) * 1000)
+
+    if resultado.get('success'):
+        logger.info(
+            f"[AudioDiag] Transcripción OK "
+            f"({resultado.get('proveedor')}/{resultado.get('modelo_usado')}) | "
+            f"{tiempo_ms}ms | Intentos: {resultado.get('intentos', 1)} | "
+            f"Chars: {len(resultado.get('texto', ''))}"
         )
-        tiempo_ms = int((_time.monotonic() - _t) * 1000)
+        return JsonResponse({
+            'success': True,
+            'texto': resultado['texto'],
+            'proveedor': resultado.get('proveedor', ''),
+            'modelo_usado': resultado.get('modelo_usado', ''),
+            'tiempo_ms': tiempo_ms,
+        })
 
-        if resultado['success']:
-            logger.info(
-                f"[AudioDiag] Transcripción OK (Ollama) | {tiempo_ms}ms | "
-                f"Chars: {len(resultado.get('texto', ''))}"
-            )
-            return JsonResponse({
-                'success': True,
-                'texto': resultado['texto'],
-                'proveedor': 'ollama',
-                'tiempo_ms': tiempo_ms,
-            })
-        else:
-            # Ollama falló — intentar con Gemini si está disponible
-            logger.warning(
-                f"[AudioDiag] Ollama falló, intentando Gemini | Error: {resultado.get('error')}"
-            )
-
-    # --- Intento 2: Gemini con fallback por modelos (GEMINI_MODELS) ---
-    # Si el primer modelo falla (rate limit, tráfico, mantenimiento),
-    # transcribir_audio_gemini_con_fallback prueba automáticamente cada modelo
-    # de GEMINI_MODELS en orden hasta que uno responda con éxito.
-    if gemini_enabled:
-        from .gemini_client import transcribir_audio_gemini_con_fallback
-        _t = _time.monotonic()
-        resultado = transcribir_audio_gemini_con_fallback(
-            audio_bytes=audio_bytes,
-            audio_content_type=audio_content_type,
-            idioma=idioma,
-        )
-        tiempo_ms = int((_time.monotonic() - _t) * 1000)
-
-        if resultado['success']:
-            logger.info(
-                f"[AudioDiag] Transcripción OK (Gemini/{resultado.get('modelo_usado')}) | "
-                f"{tiempo_ms}ms | Intentos: {resultado.get('intentos', 1)} | "
-                f"Chars: {len(resultado.get('texto', ''))}"
-            )
-            return JsonResponse({
-                'success': True,
-                'texto': resultado['texto'],
-                'proveedor': 'gemini',
-                'tiempo_ms': tiempo_ms,
-            })
-        else:
-            logger.error(
-                f"[AudioDiag] Gemini agotó todos los modelos ({resultado.get('intentos', '?')} intentos) | "
-                f"Error: {resultado.get('error')}"
-            )
-            return JsonResponse({
-                'success': False,
-                'error': resultado.get('error', 'Error al transcribir con Gemini.')
-            })
-
-     # Si Ollama fue el único proveedor y falló, devolvemos su error
+    logger.error(
+        f"[AudioDiag] Cascada agotada ({resultado.get('intentos', '?')} intentos) | "
+        f"Error: {resultado.get('error')}"
+    )
     return JsonResponse({
         'success': False,
-        'error': 'No se pudo transcribir el audio. Intenta de nuevo o escribe el diagnóstico manualmente.'
+        'error': resultado.get(
+            'error',
+            'No se pudo transcribir el audio. Intenta de nuevo o escribe el diagnóstico manualmente.',
+        )
     })
 

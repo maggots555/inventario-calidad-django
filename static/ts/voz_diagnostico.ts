@@ -6,21 +6,17 @@
  * textarea de Diagnóstico SIC en detalle_orden.html. Permite al técnico
  * dictar el diagnóstico en lugar de escribirlo.
  *
- * ARQUITECTURA DE 3 CAPAS (fallback en cascada):
+ * ARQUITECTURA (el frontend elige 1 o 2; el backend ya trae su propia cascada):
  *
  * Capa 1 — Web Speech API (navegador nativo):
  *   - Funciona en Chrome, Edge y la mayoría de Android.
- *   - No necesita backend ni internet (la transcripción la hace el navegador).
  *   - El texto va apareciendo en tiempo real mientras el técnico habla.
  *   - Se detiene automáticamente cuando deja de hablar (~2 segundos de silencio).
  *
- * Capa 2 — Ollama Whisper (backend, vía /api/transcribir-audio-diagnostico/):
- *   - Activo cuando Web Speech API NO está disponible (Firefox, iOS Safari sin permisos).
+ * Capa 2 — Backend POST /api/transcribir-audio-diagnostico/ (Firefox / iOS):
  *   - Graba audio con MediaRecorder y lo envía al servidor.
- *   - El servidor usa el modelo Whisper instalado en Ollama para transcribir.
- *
- * Capa 3 — Gemini API (backend, automático si Ollama falla):
- *   - El backend maneja este fallback internamente.
+ *   - El servidor prueba en este orden:
+ *       Gemini 3.5 Transcribe → Gemini Flash/Lite → Ollama local.
  *   - El frontend no necesita saber qué proveedor respondió.
  *
  * COMPORTAMIENTO:

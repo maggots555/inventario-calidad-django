@@ -1209,6 +1209,7 @@ def transcribir_audio_gemini_con_fallback(
     audio_bytes: bytes,
     audio_content_type: str = "audio/webm",
     idioma: str = "es",
+    modelos: list[str] | None = None,
 ) -> dict:
     """
     Transcribe audio intentando cada modelo de GEMINI_MODELS en orden hasta que uno funcione.
@@ -1226,6 +1227,9 @@ def transcribir_audio_gemini_con_fallback(
         audio_bytes: Bytes del audio a transcribir
         audio_content_type: MIME type del audio (audio/webm, audio/wav, etc.)
         idioma: Código de idioma (es = español)
+        modelos: Lista opcional a recorrer. Si es None, usa GEMINI_MODELS.
+            La cascada de Diagnóstico SIC pasa aquí solo Flash/Lite (sin
+            gemini-3.5-transcribe, que ya se intentó por Interactions API).
 
     Returns:
         dict con el resultado del primer modelo que respondió con éxito:
@@ -1233,7 +1237,8 @@ def transcribir_audio_gemini_con_fallback(
         O el error del último modelo si todos fallaron:
             {'success': False, 'error': '...', 'intentos': N}
     """
-    modelos = getattr(settings, 'GEMINI_MODELS', [])
+    if modelos is None:
+        modelos = getattr(settings, 'GEMINI_MODELS', [])
 
     # Garantizar que siempre haya al menos el modelo predeterminado
     if not modelos:

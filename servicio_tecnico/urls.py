@@ -320,7 +320,7 @@ urlpatterns = [
 
     # Transcripción de audio a texto para el campo Diagnóstico SIC.
     # Fallback del servidor cuando Web Speech API no está disponible en el navegador.
-    # Usa Ollama (Whisper) como primer intento y Gemini como respaldo.
+    # Cascada: Gemini 3.5 Transcribe → Gemini Flash/Lite → Ollama.
     path('api/transcribir-audio-diagnostico/',
          views.transcribir_audio_diagnostico,
          name='transcribir_audio_diagnostico'),
