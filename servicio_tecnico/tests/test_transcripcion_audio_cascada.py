@@ -316,7 +316,8 @@ class TranscribirConGeminiTranscribeHttpTests(SimpleTestCase):
         payload = json.loads(request.data.decode('utf-8'))
         self.assertEqual(payload['model'], 'gemini-3.5-transcribe')
         self.assertEqual(payload['input'][0]['type'], 'audio')
-        self.assertEqual(
-            payload['generation_config']['transcription_config']['mode']['type'],
-            'smart',
-        )
+        config_stt = payload['generation_config']['transcription_config']
+        self.assertEqual(config_stt['mode']['type'], 'smart')
+        self.assertEqual(config_stt['language_codes'], ['es-MX'])
+        # Google responde HTTP 400 si mandamos language_hints (campo inexistente).
+        self.assertNotIn('language_hints', config_stt)

@@ -196,9 +196,8 @@ def transcribir_con_gemini_transcribe(
         ],
         'generation_config': {
             'transcription_config': {
-                # language_hints = schema oficial; language_codes = cookbook.
-                # Mandamos ambos por si el preview cambia el nombre del campo.
-                'language_hints': [language_tag],
+                # EXPLICACIÓN: Google rechaza language_hints (HTTP 400).
+                # El cookbook oficial usa language_codes (BCP-47, ej. es-MX).
                 'language_codes': [language_tag],
                 'mode': {'type': 'smart'},
                 'custom_vocabulary': list(VOCABULARIO_SIC),
