@@ -24,8 +24,10 @@ en cada tarea, usas atajos como:
         app_origen="servicio_tecnico"
     )
 
-Estas funciones también crean notificaciones para superusuarios automáticamente,
-para que los administradores siempre estén al tanto de lo que pasa.
+Estas funciones también pueden clonar el aviso a superusuarios
+(tareas Celery de una sola persona). En un broadcast a N destinatarios
+NO se debe clonar por cada persona: eso duplica la campanita del admin.
+Usa ``copiar_a_superusers=False`` + ``copiar_notificacion_a_superusers_ausentes``.
 """
 
 import logging
@@ -65,9 +67,76 @@ def invalidar_cache_notificaciones(user_id: int) -> None:
     cache.delete(f'notif:{user_id}')
 
 
+def copiar_notificacion_a_superusers_ausentes(
+        user_ids_ya_notificados,
+        *,
+        titulo,
+        mensaje,
+        tipo='info',
+        task_id=None,
+        app_origen=None,
+        url=None,
+        categoria='general',
+        requiere_accion=False):
+    """
+    Crea UNA copia del aviso para cada superusuario que aún no lo recibió.
+
+    Objetivo de negocio:
+        Los admins siguen viendo el flujo, pero sin N filas idénticas
+        cuando el aviso se mandó a N personas de Compras/Recepción.
+
+    Args:
+        user_ids_ya_notificados: PKs de User que ya tienen su fila (destinatarios).
+        titulo, mensaje, tipo, task_id, app_origen, url, categoria,
+        requiere_accion: mismos campos que ``crear_notificacion``.
+
+    Returns:
+        list[Notificacion]: Filas creadas para superusers ausentes.
+
+    Efectos secundarios:
+        Inserta en BD e invalida cache de campanita de cada superuser.
+    """
+    from .models import Notificacion
+
+    # Paso: IDs ya avisados no deben recibir un clon extra.
+    ids_excluir = {int(pk) for pk in (user_ids_ya_notificados or []) if pk}
+    categoria_limpia = (categoria or 'general').strip() or 'general'
+    es_accion = bool(requiere_accion)
+
+    superusers = User.objects.filter(is_superuser=True)
+    if ids_excluir:
+        superusers = superusers.exclude(pk__in=ids_excluir)
+
+    creadas = []
+    for su in superusers:
+        # Paso: una fila por admin; el destinatario de rol ya se avisó arriba.
+        notif_su = Notificacion.objects.create(
+            titulo=titulo,
+            mensaje=mensaje,
+            tipo=tipo,
+            usuario=su,
+            task_id=task_id,
+            app_origen=app_origen,
+            url=url,
+            categoria=categoria_limpia,
+            requiere_accion=es_accion,
+        )
+        creadas.append(notif_su)
+        invalidar_cache_notificaciones(su.pk)
+
+    if creadas:
+        logger.info(
+            '[NOTIF] Copia única a %s superusuario(s): %s',
+            len(creadas),
+            titulo,
+        )
+    return creadas
+
+
 def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
                        task_id=None, app_origen=None, url=None,
-                       categoria='general', requiere_accion=False):
+                       categoria='general', requiere_accion=False,
+                       copiar_a_superusers=True):
     """
     Función base para crear una notificación en la base de datos.
 
@@ -85,9 +154,12 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
         url (str, optional): URL a la que navega el usuario al pulsar la notif.
         categoria (str): Dominio (default 'general'; ej. equipo_disponible).
         requiere_accion (bool): True = pestaña «Por hacer»; False = «Avisos».
+        copiar_a_superusers (bool): True (default) clona a otros superusers.
+            En broadcasts a un equipo, pasar False y luego el helper
+            ``copiar_notificacion_a_superusers_ausentes`` una sola vez.
 
     Returns:
-        list[Notificacion]: Lista de notificaciones creadas (usuario + superusers).
+        list[Notificacion]: Lista de notificaciones creadas (usuario + clones).
     """
     # EXPLICACIÓN: Import local para evitar importaciones circulares.
     # Si importamos el modelo al inicio del archivo, puede causar problemas
@@ -99,7 +171,7 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
     # Paso: normalizar a bool real (por si llega 0/1 o None desde un caller).
     es_accion = bool(requiere_accion)
 
-    # ── 1. Crear notificación para el usuario que disparó la tarea ──
+    # ── 1. Crear notificación para el usuario destinatario ──
     if usuario:
         notif = Notificacion.objects.create(
             titulo=titulo,
@@ -117,31 +189,21 @@ def crear_notificacion(titulo, mensaje, tipo='info', usuario=None,
         invalidar_cache_notificaciones(usuario.pk)
         logger.info(f"[NOTIF] Creada para usuario '{usuario.username}': {titulo}")
 
-    # ── 2. Crear notificación para superusuarios (que no sean el mismo usuario) ──
-    # EXPLICACIÓN: Los superusuarios ven TODO. Si el usuario que disparó la tarea
-    # ya es superusuario, no le duplicamos la notificación.
-    superusers = User.objects.filter(is_superuser=True)
-    if usuario:
-        superusers = superusers.exclude(pk=usuario.pk)
-
-    for su in superusers:
-        notif_su = Notificacion.objects.create(
+    # ── 2. Clon a superusers (tareas de una sola persona; no usar en broadcast) ──
+    if copiar_a_superusers:
+        ids_ya = [usuario.pk] if usuario else []
+        clones = copiar_notificacion_a_superusers_ausentes(
+            ids_ya,
             titulo=titulo,
             mensaje=mensaje,
             tipo=tipo,
-            usuario=su,
             task_id=task_id,
             app_origen=app_origen,
             url=url,
             categoria=categoria_limpia,
             requiere_accion=es_accion,
         )
-        notificaciones_creadas.append(notif_su)
-        # Invalidar cache de cada superusuario
-        invalidar_cache_notificaciones(su.pk)
-
-    if superusers.exists():
-        logger.info(f"[NOTIF] Creada para {superusers.count()} superusuario(s): {titulo}")
+        notificaciones_creadas.extend(clones)
 
     return notificaciones_creadas
 

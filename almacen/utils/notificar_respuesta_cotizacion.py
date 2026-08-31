@@ -127,6 +127,10 @@ def enviar_push_y_campanita(
     """
     Envía push + campanita a cada empleado (fallos aislados por persona).
 
+    EXPLICACIÓN: no clona a superusers por cada destinatario. Si el admin
+    ya está en la lista (p. ej. también es Compras), ve 1 fila. Si no está,
+    recibe 1 copia al final. Así no salen N avisos idénticos en la campanita.
+
     Args:
         empleados: Destinatarios con user activo.
         titulo: Título corto de la notificación.
@@ -136,15 +140,27 @@ def enviar_push_y_campanita(
         requiere_accion: True (default) = pestaña «Por hacer»; False = «Avisos».
 
     Returns:
-        Cantidad de empleados a los que se intentó notificar.
+        Cantidad de empleados únicos a los que se intentó notificar.
     """
     from notificaciones.push_service import enviar_push_a_usuario
-    from notificaciones.utils import notificar_info
+    from notificaciones.utils import (
+        copiar_notificacion_a_superusers_ausentes,
+        notificar_info,
+    )
 
+    # Paso: un user_id una sola vez (dos filas Empleado no deben duplicar).
+    vistos: Set[int] = set()
+    user_ids_notificados: List[int] = []
     contador = 0
     for empleado in empleados:
+        user = getattr(empleado, 'user', None)
+        if user is None or not user.is_active:
+            continue
+        if user.pk in vistos:
+            continue
+        vistos.add(user.pk)
+
         contador += 1
-        user = empleado.user
         nombre = getattr(empleado, 'nombre_completo', str(empleado))
         try:
             enviar_push_a_usuario(
@@ -160,6 +176,7 @@ def enviar_push_y_campanita(
                 push_err,
             )
         try:
+            # False: el clon a admins va UNA vez al final, no por cada comprador.
             notificar_info(
                 titulo=titulo,
                 mensaje=mensaje,
@@ -167,13 +184,25 @@ def enviar_push_y_campanita(
                 url=url,
                 app_origen=app_origen,
                 requiere_accion=requiere_accion,
+                copiar_a_superusers=False,
             )
+            user_ids_notificados.append(user.pk)
         except Exception as notif_err:
             logger.warning(
                 '[NOTIF-COTIZ] Error campanita a %s: %s',
                 nombre,
                 notif_err,
             )
+
+    # Paso: admin que NO es destinatario ve 1 copia; el que sí es, ya la tiene.
+    copiar_notificacion_a_superusers_ausentes(
+        user_ids_notificados,
+        titulo=titulo,
+        mensaje=mensaje,
+        url=url,
+        app_origen=app_origen,
+        requiere_accion=requiere_accion,
+    )
     return contador
 
 

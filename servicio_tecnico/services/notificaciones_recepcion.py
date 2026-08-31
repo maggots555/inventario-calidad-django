@@ -59,7 +59,10 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
     """
     # Import local: evita ciclos al cargar apps (models ↔ services ↔ notificaciones).
     from notificaciones.push_service import enviar_push_a_usuario
-    from notificaciones.utils import notificar_info
+    from notificaciones.utils import (
+        copiar_notificacion_a_superusers_ausentes,
+        notificar_info,
+    )
     from servicio_tecnico.models import OrdenServicio
 
     if not orden or not getattr(orden, 'pk', None):
@@ -111,10 +114,16 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
     )
 
     enviados = 0
+    user_ids_notificados: list[int] = []
+    vistos: set[int] = set()
     for empleado in destinatarios:
         usuario = getattr(empleado, 'user', None)
         if not usuario or not usuario.is_active:
             continue
+        # Paso: el mismo User no debe recibir dos filas del mismo aviso.
+        if usuario.pk in vistos:
+            continue
+        vistos.add(usuario.pk)
 
         try:
             notificar_info(
@@ -125,7 +134,9 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
                 app_origen='servicio_tecnico',
                 categoria='equipo_disponible',
                 requiere_accion=True,
+                copiar_a_superusers=False,
             )
+            user_ids_notificados.append(usuario.pk)
         except Exception as exc:
             logger.warning(
                 '[AVISO-EQUIPO-LISTO] Campanita falló para %s: %s',
@@ -148,6 +159,17 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
             )
 
         enviados += 1
+
+    # Paso: superuser que no es recepción/dispatcher ve 1 copia, no N.
+    copiar_notificacion_a_superusers_ausentes(
+        user_ids_notificados,
+        titulo=titulo,
+        mensaje=mensaje,
+        url=url_orden,
+        app_origen='servicio_tecnico',
+        categoria='equipo_disponible',
+        requiere_accion=True,
+    )
 
     _registrar_historial_aviso(orden, motivo, enviados=enviados, audiencia=audiencia)
     logger.info(

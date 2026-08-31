@@ -216,63 +216,40 @@ def crear_solicitud_cotizacion(request):
             #   3. Email en segundo plano vía Celery (no bloquea al usuario)
             if solicitud.sin_orden_activa:
                 try:
-                    from notificaciones.push_service import enviar_push_a_usuario
-                    from notificaciones.utils import notificar_info
+                    from almacen.utils.notificar_respuesta_cotizacion import (
+                        enviar_push_y_campanita,
+                        obtener_empleados_compras,
+                    )
                     from .tasks import notificar_compras_nueva_cotizacion_task
 
-                    # Buscar todos los empleados con rol "Compras" que tengan
-                    # usuario activo en el sistema (pueden recibir notificaciones)
-                    compradores = Empleado.objects.filter(
-                        rol='compras',
-                        user__is_active=True,
-                    ).select_related('user')
+                    # Mismo helper que cotización/SIC: 1 fila por persona,
+                    # 1 copia a superusers que no son Compras (no N clones).
+                    compradores = obtener_empleados_compras()
 
-                    if compradores.exists():
-                        # Construir la URL al detalle de la solicitud para que
-                        # al hacer clic en la notificación los lleve directamente
+                    if compradores:
                         url_solicitud = reverse(
                             'almacen:detalle_solicitud_cotizacion',
                             kwargs={'pk': solicitud.pk}
                         )
-
-                        # Texto de la notificación — incluye el nombre del
-                        # cliente y el service tag para identificación rápida
-                        titulo_push = f'📋 Nueva cotización sin orden: {solicitud.numero_solicitud}'
+                        titulo_push = (
+                            f'📋 Nueva cotización sin orden: '
+                            f'{solicitud.numero_solicitud}'
+                        )
                         mensaje_push = (
                             f'Cliente: {solicitud.nombre_cliente or "Sin nombre"} — '
                             f'S/T: {solicitud.service_tag or "N/A"}. '
                             f'Requiere atención para procesar la cotización.'
                         )
 
-                        # Enviar push + campanita a cada empleado de Compras
-                        for comprador in compradores:
-                            try:
-                                enviar_push_a_usuario(
-                                    usuario=comprador.user,
-                                    titulo=titulo_push,
-                                    mensaje=mensaje_push,
-                                    url=url_solicitud,
-                                )
-                            except Exception as push_err:
-                                logger.warning(
-                                    f"[COTIZACION] Error enviando push a {comprador.nombre_completo}: {push_err}"
-                                )
+                        enviados = enviar_push_y_campanita(
+                            compradores,
+                            titulo=titulo_push,
+                            mensaje=mensaje_push,
+                            url=url_solicitud,
+                            app_origen='almacen',
+                            requiere_accion=True,
+                        )
 
-                            try:
-                                notificar_info(
-                                    titulo=titulo_push,
-                                    mensaje=mensaje_push,
-                                    usuario=comprador.user,
-                                    url=url_solicitud,
-                                    app_origen='almacen',
-                                    requiere_accion=True,
-                                )
-                            except Exception as notif_err:
-                                logger.warning(
-                                    f"[COTIZACION] Error creando notificación para {comprador.nombre_completo}: {notif_err}"
-                                )
-
-                        # Enviar email en segundo plano vía Celery (no bloquea)
                         from config.paises_config import get_pais_actual
                         notificar_compras_nueva_cotizacion_task.delay(
                             solicitud.pk,
@@ -280,8 +257,9 @@ def crear_solicitud_cotizacion(request):
                             get_pais_actual()['db_alias'],
                         )
                         logger.info(
-                            f"[COTIZACION] Notificaciones enviadas a {compradores.count()} "
-                            f"empleado(s) de Compras para solicitud {solicitud.numero_solicitud}"
+                            f"[COTIZACION] Notificaciones enviadas a {enviados} "
+                            f"empleado(s) de Compras para solicitud "
+                            f"{solicitud.numero_solicitud}"
                         )
                 except Exception as e:
                     # Si falla la notificación, NO debe impedir que la solicitud
