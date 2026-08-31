@@ -290,3 +290,125 @@ class FeedbackSatisfaccionOneClickVistaTest(TestCase):
         self.assertIn('section-detalle-calificaciones', html)
         self.assertIn('fs-section-hidden', html)
         self.assertNotIn('Calificaciones adicionales', html)
+
+
+@override_settings(
+    RATELIMIT_ENABLE=False,
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class FeedbackSatisfaccionNotificaResponsableTest(TestCase):
+    """
+    Objetivo: al responder la encuesta, el responsable recibe campanita.
+
+    El modelo Empleado usa ``user`` (no ``usuario``). Un typo anterior
+    tragaba AttributeError y el aviso nunca se creaba.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Encuesta Notif',
+            ciudad='CDMX',
+        )
+        self.user_tec = User.objects.create_user(
+            username='tec_encuesta_notif',
+            password='testpass123',
+        )
+        self.tecnico = Empleado.objects.create(
+            nombre_completo='Técnico Encuesta Notif',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tec.encuesta.notif@test.local',
+            sucursal=self.sucursal,
+            user=self.user_tec,
+            rol='tecnico',
+        )
+        self.user_resp = User.objects.create_user(
+            username='resp_encuesta_notif',
+            password='testpass123',
+        )
+        self.responsable = Empleado.objects.create(
+            nombre_completo='Responsable Encuesta Notif',
+            cargo='Dispatcher',
+            area='Front',
+            email='resp.encuesta.notif@test.local',
+            sucursal=self.sucursal,
+            user=self.user_resp,
+            rol='dispatcher',
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='entregado',
+            tecnico_asignado_actual=self.tecnico,
+            responsable_seguimiento=self.responsable,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='OOW-ENC-NOTIF-01',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='XPS',
+            numero_serie='SN-ENC-NOTIF-01',
+            email_cliente='cli.encuesta.notif@test.local',
+            nombre_cliente='Cliente Encuesta Notif',
+            falla_principal='Falla',
+        )
+        self.token = 'token-encuesta-notif-responsable-abc'
+        self.feedback = FeedbackCliente.objects.create(
+            orden=self.orden,
+            token=self.token,
+            tipo='satisfaccion',
+            utilizado=False,
+        )
+        self.path = reverse(
+            'feedback_satisfaccion_publico',
+            kwargs={'token': self.token},
+        )
+
+    def _post(self):
+        request = self.factory.post(
+            self.path,
+            data={'calificacion_general': '5', 'nps': '9'},
+        )
+        request.META['REMOTE_ADDR'] = '127.0.0.1'
+        return feedback_satisfaccion_cliente(request, token=self.token)
+
+    def test_post_crea_campanita_para_responsable_user(self):
+        """Feliz: el responsable (Empleado.user) recibe la notificación."""
+        from notificaciones.models import Notificacion
+
+        response = self._post()
+        self.assertEqual(response.status_code, 200)
+        notif = Notificacion.objects.filter(
+            usuario=self.user_resp,
+            titulo__icontains='Encuesta de satisfacción',
+        ).first()
+        self.assertIsNotNone(notif)
+        self.assertIn('NPS: 9/10', notif.mensaje)
+        self.assertFalse(notif.requiere_accion)
+
+    def test_post_sin_user_en_empleado_no_revienta(self):
+        """Borde: responsable sin cuenta Django → encuesta se guarda igual."""
+        from notificaciones.models import Notificacion
+
+        self.responsable.user = None
+        self.responsable.save(update_fields=['user'])
+        response = self._post()
+        self.assertEqual(response.status_code, 200)
+        self.feedback.refresh_from_db()
+        self.assertTrue(self.feedback.utilizado)
+        self.assertFalse(
+            Notificacion.objects.filter(
+                titulo__icontains='Encuesta de satisfacción',
+            ).exists()
+        )

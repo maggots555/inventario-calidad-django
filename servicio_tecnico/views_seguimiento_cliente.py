@@ -917,6 +917,7 @@ def feedback_satisfaccion_cliente(request, token):
         feedback = FeedbackCliente.objects.select_related(
             'orden__detalle_equipo',
             'orden__sucursal',
+            'orden__responsable_seguimiento__user',
         ).get(token=token, tipo='satisfaccion')
     except FeedbackCliente.DoesNotExist:
         logger.warning(
@@ -978,11 +979,15 @@ def feedback_satisfaccion_cliente(request, token):
                 'comentario_cliente', 'utilizado', 'fecha_respuesta', 'ip_respuesta',
             ])
 
-            # Notificar a responsable de seguimiento y superusers
+            # Campanita al responsable de seguimiento.
+            # EXPLICACIÓN: Empleado guarda la cuenta Django en ``user``,
+            # no en ``usuario``. El nombre viejo lanzaba AttributeError y
+            # el except silencioso hacía que el aviso nunca naciera.
             try:
                 from notificaciones.utils import notificar_info
                 responsable = orden.responsable_seguimiento
-                if responsable and responsable.usuario:
+                usuario_resp = getattr(responsable, 'user', None) if responsable else None
+                if usuario_resp is not None and usuario_resp.is_active:
                     notificar_info(
                         titulo="Encuesta de satisfacción respondida",
                         mensaje=(
@@ -991,11 +996,15 @@ def feedback_satisfaccion_cliente(request, token):
                             f"NPS: {nps}/10 | "
                             f"Recomienda: {'Sí' if recomienda else 'No'}"
                         ),
-                        usuario=responsable.usuario,
+                        usuario=usuario_resp,
                         app_origen='servicio_tecnico',
                     )
             except Exception:
-                pass
+                logger.exception(
+                    '[ENCUESTA] No se pudo crear campanita de satisfacción '
+                    'para orden %s',
+                    getattr(orden, 'pk', None),
+                )
 
             # Registrar en historial de la orden
             try:
