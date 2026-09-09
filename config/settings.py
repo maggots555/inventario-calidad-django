@@ -900,8 +900,10 @@ OLLAMA_MODELS: list[str] = (
 #   NUNCA la expongas en código o commits.
 #
 # GEMINI_MODEL:
-#   Modelo predeterminado. Recomendados (GA jul 2026):
-#     gemini-3.6-flash       → workhorse: multimodal, calidad, menos tokens de salida
+#   Modelo predeterminado. Recomendados (GA sep 2026):
+#     gemini-3.8-flash       → workhorse: más capaz; thinking low/medium/high
+#     gemini-3.7-flash       → workhorse previo; respaldo si 3.8 da 429/5xx
+#     gemini-3.6-flash       → workhorse jul 2026: multimodal, calidad
 #     gemini-3.5-flash-lite  → más rápido/barato 3.5; alto throughput
 #     gemini-2.5-flash       → reserva estable 2.5 si el free tier 3.x se satura
 #     gemini-2.5-flash-lite  → último recurso ligero
@@ -916,7 +918,7 @@ OLLAMA_MODELS: list[str] = (
 
 GEMINI_ENABLED = config('GEMINI_ENABLED', default=False, cast=bool)
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
-GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-3.6-flash')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-3.8-flash')
 GEMINI_TIMEOUT = config('GEMINI_TIMEOUT', default=60, cast=int)
 GEMINI_TRANSCRIBE_ENABLED = config('GEMINI_TRANSCRIBE_ENABLED', default=True, cast=bool)
 GEMINI_TRANSCRIBE_MODEL = config(
@@ -929,7 +931,7 @@ GEMINI_TRANSCRIBE_TIMEOUT = config('GEMINI_TRANSCRIBE_TIMEOUT', default=180, cas
 
 # GEMINI_MODELS: lista de modelos Gemini disponibles para el selector.
 # Formato: nombres separados por coma.
-# Ejemplo: gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite
+# Ejemplo: gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite
 # Si no se define, se usa GEMINI_MODEL como única opción.
 _gemini_models_raw = config('GEMINI_MODELS', default='')
 GEMINI_MODELS: list[str] = (
@@ -946,7 +948,7 @@ GEMINI_MODELS: list[str] = (
 # Los prefijos visuales ("[Gemini] ", "[Ollama] ") se remueven antes de llamar a la API.
 #
 # Ejemplo de lista resultante:
-#   ["[Ollama] gemma4:e2b", "[Gemini] gemini-3.6-flash", "[Gemini] gemini-3.5-flash-lite"]
+#   ["[Ollama] gemma4:e2b", "[Gemini] gemini-3.8-flash", "[Gemini] gemini-3.5-flash-lite"]
 
 _ai_models: list[str] = []
 

@@ -432,7 +432,7 @@ def transcribir_audio_cascada(
         modelos_settings = getattr(settings, 'GEMINI_MODELS', []) or []
         modelos_generales = [m for m in modelos_settings if not _es_modelo_transcribe(m)]
         if not modelos_generales:
-            default_modelo = getattr(settings, 'GEMINI_MODEL', 'gemini-3.6-flash')
+            default_modelo = getattr(settings, 'GEMINI_MODEL', 'gemini-3.8-flash')
             if not _es_modelo_transcribe(default_modelo):
                 modelos_generales = [default_modelo]
 

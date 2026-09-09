@@ -40,8 +40,30 @@ logger = logging.getLogger(__name__)
 # URL base de la API REST de Gemini (v1beta — soporta todos los modelos actuales)
 GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-# Default canónico si settings no define GEMINI_MODEL (alineado con .env.example jul 2026)
-GEMINI_MODEL_DEFAULT = 'gemini-3.6-flash'
+# Default canónico si settings no define GEMINI_MODEL (alineado con .env.example sep 2026)
+GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash'
+
+
+def _nombre_modelo_gemini(modelo: str) -> str:
+    """
+    Quita el prefijo visual de la UI y deja el ID en minúsculas.
+
+    Objetivo:
+        El selector del modal manda "[Gemini] gemini-3.8-flash". La API
+        solo entiende el ID. Centralizamos esa limpieza para no repetirla.
+
+    Args:
+        modelo: Nombre crudo (con o sin prefijo "[Gemini] ").
+
+    Returns:
+        ID en minúsculas, sin prefijo (ej. "gemini-3.8-flash").
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES: strip() quita espacios; el prefijo
+    # de 9 caracteres "[Gemini] " es lo que pinta el <select> del modal.
+    nombre = modelo.strip()
+    if nombre.lower().startswith('[gemini] '):
+        nombre = nombre[len('[Gemini] '):]
+    return nombre.lower().strip()
 
 
 def usa_api_gemini_sin_sampling(modelo: str) -> bool:
@@ -49,8 +71,8 @@ def usa_api_gemini_sin_sampling(modelo: str) -> bool:
     Indica si el modelo usa la API Gemini “nueva” (jul 2026 en adelante).
 
     Objetivo de negocio:
-        A partir de gemini-3.6-flash y gemini-3.5-flash-lite, Google deprecó
-        temperature / top_p / top_k (se ignoran hoy; en el futuro pueden dar HTTP 400)
+        A partir de gemini-3.6-flash / 3.7 / 3.8 y gemini-3.5-flash-lite,
+        Google deprecó temperature / top_p / top_k (pueden dar HTTP 400)
         y pide thinking_level en lugar de thinkingBudget.
 
     Args:
@@ -59,19 +81,46 @@ def usa_api_gemini_sin_sampling(modelo: str) -> bool:
     Returns:
         True si debemos armar generationConfig sin sampling params y con thinkingLevel.
     """
-    # EXPLICACIÓN PARA PRINCIPIANTES: limpiamos el prefijo de la UI y comparamos
-    # por prefijo de ID, no por igualdad exacta (así cubrimos variantes -preview).
-    nombre = modelo.strip()
-    if nombre.lower().startswith('[gemini] '):
-        nombre = nombre[len('[Gemini] '):]
-    nombre = nombre.lower().strip()
+    # EXPLICACIÓN PARA PRINCIPIANTES: comparamos por prefijo de ID, no por
+    # igualdad exacta (así cubrimos variantes -preview del mismo número).
+    nombre = _nombre_modelo_gemini(modelo)
 
-    if nombre.startswith('gemini-3.6'):
+    # Workhorses 3.6 / 3.7 / 3.8: thinkingLevel, sin temperature.
+    if nombre.startswith(('gemini-3.6', 'gemini-3.7', 'gemini-3.8')):
         return True
     # 3.5 Flash-Lite GA (y previews del mismo ID) — no confundir con gemini-3.5-flash
     if '3.5-flash-lite' in nombre:
         return True
     return False
+
+
+def _normalizar_thinking_level(modelo: str, thinking_level: str) -> str:
+    """
+    Ajusta thinkingLevel al enum que el modelo realmente acepta.
+
+    Objetivo de negocio:
+        3.7 Flash y 3.8 Flash NO soportan "minimal" (Google responde HTTP 400).
+        Solo aceptan low / medium / high. Para tareas de throughput (pulir
+        texto, sentimiento, chat) mapeamos minimal → low.
+
+    Args:
+        modelo: ID del modelo (con o sin prefijo UI).
+        thinking_level: Valor pedido por el caller ('minimal', 'medium', etc.).
+
+    Returns:
+        Nivel seguro para enviar en generationConfig.thinkingConfig.thinkingLevel.
+
+    Efectos secundarios:
+        Ninguno (pura transformación de string).
+    """
+    nombre = _nombre_modelo_gemini(modelo)
+    nivel = (thinking_level or '').strip().lower()
+    # EXPLICACIÓN PARA PRINCIPIANTES: 3.6 y 3.5-flash-lite SÍ aceptan "minimal".
+    # Solo 3.7 y 3.8 lo rechazan; "low" es el equivalente más cercano (poca
+    # latencia, pocos tokens de razonamiento).
+    if nivel == 'minimal' and nombre.startswith(('gemini-3.7', 'gemini-3.8')):
+        return 'low'
+    return thinking_level
 
 
 def construir_generation_config(
@@ -81,11 +130,11 @@ def construir_generation_config(
     temperature: float = 0.3,
     top_p: float | None = 0.9,
     thinking_budget: int = 0,
-    thinking_level: str = 'minimal',
+    thinking_level: str = 'medium',
     response_mime_type: str | None = None,
 ) -> dict:
     """
-    Arma generationConfig compatible con Gemini 2.5 y con 3.6 / 3.5 Flash-Lite.
+    Arma generationConfig compatible con Gemini 2.5 y con 3.6+ / 3.5 Flash-Lite.
 
     Args:
         modelo: ID del modelo Gemini (decide qué campos enviar).
@@ -93,7 +142,9 @@ def construir_generation_config(
         temperature: Solo para modelos 2.5 y anteriores (deprecado en 3.6+).
         top_p: Solo para modelos 2.5 y anteriores; None = no incluir topP.
         thinking_budget: Solo 2.5: 0 = sin thinking, -1 = dinámico.
-        thinking_level: Solo API nueva: 'minimal' | 'medium' | 'high'.
+        thinking_level: API nueva: 'minimal' | 'low' | 'medium' | 'high'.
+            Default 'medium' (calidad equilibrada; soportado en 3.5-lite / 3.6 / 3.7 / 3.8).
+            En 3.7/3.8, 'minimal' se reescribe a 'low' (ese enum no existe ahí).
         response_mime_type: Opcional, ej. 'application/json' (sentimiento).
 
     Returns:
@@ -109,11 +160,12 @@ def construir_generation_config(
     if response_mime_type:
         config['responseMimeType'] = response_mime_type
 
-    # ── Rama API nueva (3.6 Flash / 3.5 Flash-Lite): sin temperature/topP ──
+    # ── Rama API nueva (3.8 / 3.7 / 3.6 / 3.5 Flash-Lite): sin temperature/topP ──
     # EXPLICACIÓN PARA PRINCIPIANTES: Google pidió quitar sampling params y usar
     # thinkingLevel (string). Si mandamos temperature, hoy se ignora; mañana puede fallar.
     if usa_api_gemini_sin_sampling(modelo):
-        config['thinkingConfig'] = {'thinkingLevel': thinking_level}
+        nivel = _normalizar_thinking_level(modelo, thinking_level)
+        config['thinkingConfig'] = {'thinkingLevel': nivel}
         return config
 
     # ── Rama clásica (2.5-flash, 2.0-flash, etc.): temperature + thinkingBudget ──
@@ -215,7 +267,8 @@ def mejorar_diagnostico(
 
     # ── Payload para la API de Gemini ──
     # Estructura: contents[].parts[].text
-    # thinking_level minimal / budget 0: corrección de texto no necesita razonamiento profundo.
+    # thinking_level medium: calidad equilibrada (3.6+ / 3.5-lite lo soportan).
+    # En 2.5 thinking_budget=0 sigue sin thinking (otra API, no hay "medium").
     payload = {
         "contents": [
             {
@@ -230,7 +283,7 @@ def mejorar_diagnostico(
             temperature=0.3,
             top_p=0.9,
             thinking_budget=0,
-            thinking_level='minimal',
+            thinking_level='medium',
         ),
     }
 
@@ -478,7 +531,7 @@ def analizar_sentimiento_encuestas(
 
     Args:
         encuestas: Lista de dicts (campos según tipo)
-        modelo:    Nombre del modelo Gemini (default: gemini-3.6-flash)
+        modelo:    Nombre del modelo Gemini (default: gemini-3.8-flash)
         tipo:      'satisfaccion' | 'rechazo'
 
     Returns:
@@ -539,7 +592,7 @@ def analizar_sentimiento_encuestas(
 
     # ── Payload Gemini generateContent ──────────────────────────────────────
     # systemInstruction + contents (rol user) + responseMimeType=application/json
-    # thinking_level minimal: clasificación de sentimiento es throughput.
+    # thinking_level medium: un poco más de razonamiento en el JSON de sentimiento.
     # max_output_tokens=2048: deja margen para JSON denso (p. ej. muchos rechazos).
     payload = {
         'systemInstruction': {
@@ -557,7 +610,7 @@ def analizar_sentimiento_encuestas(
             temperature=0.2,
             top_p=0.9,
             thinking_budget=0,
-            thinking_level='minimal',
+            thinking_level='medium',
             response_mime_type='application/json',
         ),
     }
@@ -1007,7 +1060,8 @@ def analizar_imagenes_ingreso_gemini(
 # igual que las imágenes. Se envía en base64 con el MIME type correspondiente.
 # Soporta: audio/wav, audio/webm, audio/mp3, audio/ogg, audio/aac, audio/flac.
 #
-# Modelos compatibles: gemini-3.6-flash, gemini-3.5-flash-lite, gemini-2.5-flash.
+# Modelos compatibles: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash,
+# gemini-3.5-flash-lite, gemini-2.5-flash.
 # El modelo recibe el audio y el prompt juntos en el mismo "turn".
 # ============================================================================
 
@@ -1102,7 +1156,7 @@ def transcribir_audio_gemini(
             temperature=0.0,
             top_p=None,
             thinking_budget=0,
-            thinking_level='minimal',
+            thinking_level='medium',
         ),
     }
 
@@ -1519,7 +1573,8 @@ def analizar_video_evidencia_gemini(
 # la cascada de fallback: Gemini → Ollama → lista predefinida.
 #
 # A diferencia de las funciones de diagnóstico (temperature 0.3 en modelos 2.5),
-# aquí pedimos temperature 0.9 en la rama clásica; en 3.6+ se usa thinking_level=minimal.
+# aquí pedimos temperature 0.9 en la rama clásica; en 3.6+ se usa thinking_level
+# medium (calidad equilibrada; soportado en 3.5-lite / 3.6 / 3.7 / 3.8).
 # ============================================================================
 
 # Prompt fijo para la generación de citas — se reutiliza en Ollama para consistencia.
@@ -1595,7 +1650,7 @@ def generar_cita_nihilismo_gemini(
 
     # ── Construir el payload ──
     # Cita creativa: en 2.5 usamos temperature alta; en 3.6+ Google ignora temperature
-    # y controlamos el esfuerzo con thinking_level=minimal (respuesta corta y directa).
+    # y controlamos el esfuerzo con thinking_level=medium.
     payload = {
         "contents": [
             {
@@ -1610,7 +1665,7 @@ def generar_cita_nihilismo_gemini(
             temperature=0.9,
             top_p=None,
             thinking_budget=0,
-            thinking_level='minimal',
+            thinking_level='medium',
         ),
     }
 

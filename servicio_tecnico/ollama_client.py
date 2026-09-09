@@ -787,7 +787,7 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
     if not historial_gemini:
         return {'success': False, 'error': 'No hay mensajes para procesar.'}
 
-    # Construir payload de Gemini (chat = throughput → thinking minimal / budget 0)
+    # Construir payload de Gemini (chat: thinking medium en 3.x; budget 0 en 2.5)
     payload: dict = {
         "contents": historial_gemini,
         "generationConfig": construir_generation_config(
@@ -796,7 +796,7 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
             temperature=0.6,
             top_p=0.9,
             thinking_budget=0,
-            thinking_level='minimal',
+            thinking_level='medium',
         ),
     }
 
@@ -1810,7 +1810,7 @@ def analizar_sentimiento_dispatch(
 #
 # MODELOS COMPATIBLES:
 #   Ollama: gemma4:e4b, gemma4:e2b (ambos soportan visión de forma nativa)
-#   Gemini: gemini-3.6-flash, gemini-3.5-flash-lite, gemini-2.5-flash-lite (visión)
+#   Gemini: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite (visión)
 #
 # LÍMITE DE IMÁGENES:
 #   Configurable via OLLAMA_MAX_IMAGENES_IA (default: 8).
@@ -3203,7 +3203,7 @@ def generar_cita_nihilismo_dispatch() -> dict:
 
     if not gemini_models_configurados:
         # Si no hay modelos configurados, usar el modelo por defecto
-        default_model = getattr(settings, 'GEMINI_MODEL', 'gemini-3.6-flash')
+        default_model = getattr(settings, 'GEMINI_MODEL', 'gemini-3.8-flash')
         gemini_models_configurados = [default_model]
 
     logger.info(

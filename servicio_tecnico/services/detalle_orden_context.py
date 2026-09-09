@@ -413,7 +413,7 @@ def build_detalle_orden_context(request, orden):
         # AI_ENABLED es True si al menos un proveedor está habilitado en .env.
         'ollama_enabled': getattr(settings, 'AI_ENABLED', False),
         # Lista unificada de modelos de todos los proveedores habilitados.
-        # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-3.6-flash"
+        # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-3.8-flash"
         'ollama_models': getattr(settings, 'AI_MODELS', []),
 
         # Cobros / facturación (pagos + saldo + flags de factura)
