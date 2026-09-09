@@ -3264,7 +3264,10 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     from django.core.files.base import ContentFile
 
     from .models import OrdenServicio, VideoOrden, ImagenOrden, HistorialOrden
-    from servicio_tecnico.services.rewind_slides import generar_slides_rewind
+    from servicio_tecnico.services.rewind_slides import (
+        generar_slides_rewind,
+        transicion_xfade,
+    )
 
     logger.info(f"[VIDEO-RESUMEN] Iniciando tarea para Orden ID {orden_id}")
 
@@ -3454,7 +3457,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
         #
         # El filtergraph funciona así:
         # - Cada foto se procesa con "zoompan" (Ken Burns)
-        # - Los clips se encadenan con "xfade=transition=fade"
+        # - Los clips se encadenan con xfade (paleta sutil: fade/fadeblack/dissolve/smoothleft)
         # - Intro, tarjetas y cierre ya vienen pintados como PNG (rewind_slides.py)
         #   FFmpeg solo los recorre en loop; ya no usa drawtext.
         #
@@ -3617,8 +3620,10 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
             next_label, next_dur = clips_sequence[i]
             output_label = f"[xf{i}]"
             offset_str   = f"{offset_acumulado - DURACION_FADE:.3f}"
+            # Cada corte usa un efecto distinto de la paleta sutil (ciclo, no azar).
+            nombre_xfade = transicion_xfade(i - 1)
             filter_parts.append(
-                f"{ultimo_label}{next_label}xfade=transition=fade"
+                f"{ultimo_label}{next_label}xfade=transition={nombre_xfade}"
                 f":duration={DURACION_FADE}:offset={offset_str}{output_label}"
             )
             ultimo_label      = output_label

@@ -1,12 +1,13 @@
 """
-Tests unitarios de las diapositivas Pillow del rewind.
+Tests unitarios de las diapositivas Pillow del rewind y de las transiciones xfade.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 No generamos el MP4 ni llamamos FFmpeg/Celery. Solo comprobamos que
 el "pintor" (rewind_slides.py) escribe PNG del tamaño correcto, con
-4 tarjetas en diagnóstico / 3 en venta mostrador, y el copy del cierre
-que acordamos con el cliente (confianza + siguiente paso).
+4 tarjetas en diagnóstico / 3 en venta mostrador, el copy del cierre,
+y que las transiciones de video ciclan de forma predecible (fade,
+fadeblack, dissolve, smoothleft).
 """
 
 from __future__ import annotations
@@ -26,8 +27,10 @@ from servicio_tecnico.services.rewind_slides import (
     TEXTO_CIERRE_TITULO,
     TEXTO_SECCIONES,
     TEXTO_SECCIONES_VM,
+    TRANSICIONES_XFADE,
     generar_slides_rewind,
     lineas_cierre,
+    transicion_xfade,
 )
 
 TIPOS_DIAGNOSTICO = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
@@ -50,6 +53,26 @@ def _assert_png_valido(test: SimpleTestCase, ruta: str) -> Image.Image:
     img = Image.open(ruta)
     test.assertEqual(img.size, (ANCHO, ALTO), f'{ruta} no es 1280×720')
     return img
+
+
+class TransicionXfadeTest(SimpleTestCase):
+    """Paleta sutil: ciclo determinista, sin efectos de plantilla."""
+
+    def test_ciclo_determinista_solo_paleta_sutil(self):
+        """Corte 0..3 recorre la paleta; el 4 vuelve a fade. Siempre los mismos 4 nombres."""
+        esperados = ('fade', 'fadeblack', 'dissolve', 'smoothleft')
+        self.assertEqual(TRANSICIONES_XFADE, esperados)
+        for indice, nombre in enumerate(esperados):
+            self.assertEqual(transicion_xfade(indice), nombre)
+        # El ciclo se reinicia: mismo video = mismas transiciones.
+        self.assertEqual(transicion_xfade(4), 'fade')
+        self.assertEqual(transicion_xfade(5), 'fadeblack')
+        self.assertEqual(
+            {transicion_xfade(i) for i in range(12)},
+            set(esperados),
+        )
+        # Índice negativo no rompe FFmpeg: se trata como el primer corte.
+        self.assertEqual(transicion_xfade(-1), 'fade')
 
 
 class CopyCierreRewindTest(SimpleTestCase):

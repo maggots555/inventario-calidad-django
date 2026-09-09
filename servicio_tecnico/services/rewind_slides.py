@@ -119,6 +119,32 @@ def lineas_cierre() -> tuple[str, str, str]:
     )
 
 
+# Paleta corta de xfade: cinematográfica, repetible (no al azar).
+# Se evitan pixelize/squeeze/wind: se ven de plantilla y pelean con Ken Burns.
+TRANSICIONES_XFADE = ('fade', 'fadeblack', 'dissolve', 'smoothleft')
+
+
+def transicion_xfade(indice_corte: int) -> str:
+    """
+    Elige el efecto xfade del corte N. El mismo índice siempre da el mismo efecto.
+
+    Args:
+        indice_corte: 0 = primer corte (intro→primera tarjeta, o foto→foto
+            en modo simple). Puede ser mayor que 3: el ciclo se reinicia.
+
+    Returns:
+        Nombre de transición que FFmpeg entiende en ``xfade=transition=...``.
+
+    Efectos secundarios:
+        Ninguno (solo lectura de la tupla).
+    """
+    # EXPLICACIÓN: el módulo (%) da la posición dentro de la paleta.
+    # Corte 0 → fade, 1 → fadeblack, 2 → dissolve, 3 → smoothleft, 4 → fade...
+    if indice_corte < 0:
+        indice_corte = 0
+    return TRANSICIONES_XFADE[indice_corte % len(TRANSICIONES_XFADE)]
+
+
 def generar_slides_rewind(
     dest_dir: str,
     *,
