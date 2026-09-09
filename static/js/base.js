@@ -3,18 +3,11 @@
    JAVASCRIPT BASE - Sistema de Inventario
    Descripción: Funciones JavaScript globales y utilidades del sistema
    ============================================================================= */
-// Auto-hide de mensajes después de 5 segundos
 document.addEventListener('DOMContentLoaded', function () {
-    // Configurar auto-hide de alertas
-    setTimeout(function () {
-        var alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function (alert) {
-            if (alert.classList.contains('show')) {
-                var bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            }
-        });
-    }, 5000);
+    // Toasts de sistema (messages de Django): X + auto-cierre.
+    // EXPLICACIÓN: ya NO cerramos todos los .alert de la página;
+    // eso apagaba avisos permanentes de formularios/dashboards.
+    inicializarToastsSistema();
     // Inicializar tooltips de Bootstrap
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -35,38 +28,188 @@ document.addEventListener('DOMContentLoaded', function () {
 function confirmarEliminacion(mensaje = '¿Estás seguro de que quieres eliminar este elemento?') {
     return confirm(mensaje);
 }
+/** Cuánto tarda en cerrarse solo, según la gravedad */
+const DURACION_TOAST_MS = {
+    success: 5000,
+    info: 5000,
+    warning: 7000,
+    error: 8000,
+};
 /**
- * Función para mostrar notificaciones toast
- * @param {string} mensaje - Mensaje a mostrar
- * @param {string} tipo - Tipo de notificación (success, error, warning, info)
+ * Normaliza un string suelto al tipo del toast.
+ *
+ * @param tipo - Valor crudo (p. ej. "danger", "debug", "success")
+ * @returns Uno de success | error | warning | info
+ */
+function normalizarTipoToast(tipo) {
+    if (tipo === 'success' || tipo === 'error' || tipo === 'warning' || tipo === 'info') {
+        return tipo;
+    }
+    // Bootstrap usa "danger"; Django a veces manda "debug"
+    if (tipo === 'danger') {
+        return 'error';
+    }
+    return 'info';
+}
+/**
+ * Título corto que se muestra arriba del texto.
+ *
+ * @param tipo - Tipo ya normalizado
+ * @returns Título en español
+ */
+function tituloDeTipoToast(tipo) {
+    if (tipo === 'success') {
+        return 'Éxito';
+    }
+    if (tipo === 'error') {
+        return 'Error';
+    }
+    if (tipo === 'warning') {
+        return 'Aviso';
+    }
+    return 'Información';
+}
+/**
+ * Clase de Bootstrap Icons para el círculo de la izquierda.
+ *
+ * @param tipo - Tipo ya normalizado
+ * @returns Nombre de clase bi-*
+ */
+function iconoDeTipoToast(tipo) {
+    if (tipo === 'success') {
+        return 'bi-check-lg';
+    }
+    if (tipo === 'error') {
+        return 'bi-x-lg';
+    }
+    if (tipo === 'warning') {
+        return 'bi-exclamation-lg';
+    }
+    return 'bi-info-lg';
+}
+/**
+ * Escapa HTML para no inyectar scripts si el mensaje viene de un input.
+ *
+ * @param texto - Texto plano
+ * @returns Texto seguro para innerHTML
+ */
+function escaparHtmlToast(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto;
+    return div.innerHTML;
+}
+/**
+ * Devuelve (o crea) el contenedor fijo #sigma-toast-stack.
+ *
+ * @returns El elemento de la pila
+ */
+function obtenerStackToasts() {
+    let stack = document.getElementById('sigma-toast-stack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'sigma-toast-stack';
+        stack.className = 'sigma-toast-stack';
+        stack.setAttribute('aria-live', 'polite');
+        document.body.appendChild(stack);
+    }
+    return stack;
+}
+/**
+ * Cierra un toast con la animación de salida y luego lo quita del DOM.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function cerrarToastSistema(toast) {
+    if (toast.classList.contains('sigma-toast--saliendo')) {
+        return;
+    }
+    toast.classList.add('sigma-toast--saliendo');
+    // 260 ms = duración de sigmaToastSalir; un poco más de colchón
+    window.setTimeout(function () {
+        toast.remove();
+    }, 280);
+}
+/**
+ * Programa el auto-cierre según el tipo (errores duran más).
+ *
+ * @param toast - Tarjeta .sigma-toast
+ * @param tipo - Tipo ya normalizado
+ */
+function programarCierreToast(toast, tipo) {
+    const delay = DURACION_TOAST_MS[tipo];
+    // No tocamos --toast-duracion aquí: ya la pone el CSS por tipo
+    // (.sigma-toast--success = 5s, etc.). Si la cambiamos al cargar,
+    // la barra se reinicia y se desincroniza.
+    window.setTimeout(function () {
+        if (document.body.contains(toast)) {
+            cerrarToastSistema(toast);
+        }
+    }, delay);
+}
+/**
+ * Enlaza el botón X de un toast.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function enlazarCierreToast(toast) {
+    const btn = toast.querySelector('.sigma-toast__close');
+    if (!btn) {
+        return;
+    }
+    btn.addEventListener('click', function () {
+        cerrarToastSistema(toast);
+    });
+}
+/**
+ * Activa X + auto-cierre en los toasts que Django ya pintó en el HTML.
+ */
+function inicializarToastsSistema() {
+    const stack = document.getElementById('sigma-toast-stack');
+    if (!stack) {
+        return;
+    }
+    const toasts = stack.querySelectorAll('.sigma-toast');
+    toasts.forEach(function (toast) {
+        const tipo = normalizarTipoToast(toast.dataset.toastTipo || 'info');
+        enlazarCierreToast(toast);
+        programarCierreToast(toast, tipo);
+    });
+}
+/**
+ * Muestra un toast desde JavaScript (mismo look que los de Django).
+ *
+ * @param mensaje - Texto a mostrar (se escapa; no uses HTML)
+ * @param tipo - success | error | warning | info (también acepta "danger")
  */
 function mostrarNotificacion(mensaje, tipo = 'info') {
-    // Crear elemento toast
-    const toastHtml = `
-        <div class="toast align-items-center text-white bg-${tipo === 'error' ? 'danger' : tipo}" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${mensaje}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>
-    `;
-    // Agregar al contenedor de toasts (si existe)
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
-    }
-    toastContainer.innerHTML = toastHtml;
-    const toastElement = toastContainer.querySelector('.toast');
-    if (toastElement) {
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-    }
+    const tipoNormalizado = normalizarTipoToast(tipo);
+    const stack = obtenerStackToasts();
+    const toast = document.createElement('div');
+    toast.className = 'sigma-toast sigma-toast--' + tipoNormalizado;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', tipoNormalizado === 'error' ? 'assertive' : 'polite');
+    toast.dataset.toastTipo = tipoNormalizado;
+    // Paso 1: escapar el texto (el usuario/API puede mandar <script>)
+    const textoSeguro = escaparHtmlToast(mensaje);
+    const titulo = tituloDeTipoToast(tipoNormalizado);
+    const icono = iconoDeTipoToast(tipoNormalizado);
+    // Paso 2: mismo markup que pinta Django en base.html
+    toast.innerHTML =
+        '<div class="sigma-toast__icon" aria-hidden="true"><i class="bi ' + icono + '"></i></div>' +
+            '<div class="sigma-toast__body">' +
+            '<p class="sigma-toast__title">' + titulo + '</p>' +
+            '<p class="sigma-toast__text">' + textoSeguro + '</p>' +
+            '</div>' +
+            '<button type="button" class="sigma-toast__close" aria-label="Cerrar notificación">' +
+            '<i class="bi bi-x"></i>' +
+            '</button>' +
+            '<div class="sigma-toast__timer" aria-hidden="true"><span class="sigma-toast__timer-bar"></span></div>';
+    stack.appendChild(toast);
+    enlazarCierreToast(toast);
+    programarCierreToast(toast, tipoNormalizado);
 }
+// Expone la función para otros .ts (window.mostrarNotificacion)
+window.mostrarNotificacion = mostrarNotificacion;
 /**
  * Función para formatear números con separadores de miles
  * @param {number} numero - Número a formatear

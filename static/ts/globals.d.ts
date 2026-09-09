@@ -39,6 +39,11 @@ interface Window {
      * Definido en static/ts/csrf.ts y cargado desde base.html.
      */
     getCsrfToken?: () => string;
+    /**
+     * Toast de sistema (static/ts/base.ts). Mismo look que django.contrib.messages.
+     * tipo: success | error | warning | info (también acepta "danger").
+     */
+    mostrarNotificacion?: (mensaje: string, tipo?: string) => void;
     /** Venta mostrador (static/ts/venta_mostrador.ts) — onclick del detalle de orden */
     abrirModalVentaMostrador?: () => void;
     abrirModalPiezaVentaMostrador?: (esEdicion?: boolean, piezaId?: number | null) => void;

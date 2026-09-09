@@ -51,6 +51,7 @@
     <!-- CSS personalizado - Carga los archivos estáticos de Django -->
     {% load static %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/toasts.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/pwa_install.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/components.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/forms.css' %}">
@@ -588,33 +589,87 @@
     </nav>
 
     <!--
+      Toasts de sistema (django.contrib.messages).
+      EXPLICACIÓN PARA PRINCIPIANTES:
+      Cuando una vista hace messages.success/error/..., Django los guarda
+      en la sesión y esta plantilla los pinta. Antes eran barras .alert
+      que empujaban el contenido. Ahora flotan arriba-derecha (toasts)
+      y no mueven la página.
+      El contenedor SIEMPRE existe (aunque esté vacío) para que
+      mostrarNotificacion() en JS pinte en el mismo sitio.
+      NO va dentro de .main-wrapper: ese div recorta overflow en tablet.
+      Usamos message.level_tag (un solo valor: success/error/warning/info)
+      y no message.tags, porque tags puede traer extras ("error extra").
+    -->
+    <div id="sigma-toast-stack" class="sigma-toast-stack" aria-live="polite">
+        {% if messages %}
+        {% for message in messages %}
+        {% if message.level_tag == 'error' %}
+        <div class="sigma-toast sigma-toast--error" role="alert" aria-live="assertive" data-toast-tipo="error">
+            <div class="sigma-toast__icon" aria-hidden="true"><i class="bi bi-x-lg"></i></div>
+            <div class="sigma-toast__body">
+                <p class="sigma-toast__title">Error</p>
+                <p class="sigma-toast__text">{{ message }}</p>
+            </div>
+            <button type="button" class="sigma-toast__close" aria-label="Cerrar notificación">
+                <i class="bi bi-x"></i>
+            </button>
+            {# Barra que se llena en 8s (mismo tiempo que el auto-cierre) #}
+            <div class="sigma-toast__timer" aria-hidden="true"><span class="sigma-toast__timer-bar"></span></div>
+        </div>
+        {% elif message.level_tag == 'success' %}
+        <div class="sigma-toast sigma-toast--success" role="alert" data-toast-tipo="success">
+            <div class="sigma-toast__icon" aria-hidden="true"><i class="bi bi-check-lg"></i></div>
+            <div class="sigma-toast__body">
+                <p class="sigma-toast__title">Éxito</p>
+                <p class="sigma-toast__text">{{ message }}</p>
+            </div>
+            <button type="button" class="sigma-toast__close" aria-label="Cerrar notificación">
+                <i class="bi bi-x"></i>
+            </button>
+            {# Barra que se llena en 5s #}
+            <div class="sigma-toast__timer" aria-hidden="true"><span class="sigma-toast__timer-bar"></span></div>
+        </div>
+        {% elif message.level_tag == 'warning' %}
+        <div class="sigma-toast sigma-toast--warning" role="alert" data-toast-tipo="warning">
+            <div class="sigma-toast__icon" aria-hidden="true"><i class="bi bi-exclamation-lg"></i></div>
+            <div class="sigma-toast__body">
+                <p class="sigma-toast__title">Aviso</p>
+                <p class="sigma-toast__text">{{ message }}</p>
+            </div>
+            <button type="button" class="sigma-toast__close" aria-label="Cerrar notificación">
+                <i class="bi bi-x"></i>
+            </button>
+            {# Barra que se llena en 7s #}
+            <div class="sigma-toast__timer" aria-hidden="true"><span class="sigma-toast__timer-bar"></span></div>
+        </div>
+        {% else %}
+        {# info, debug u otro tag desconocido → mismo look informativo #}
+        <div class="sigma-toast sigma-toast--info" role="alert" data-toast-tipo="info">
+            <div class="sigma-toast__icon" aria-hidden="true"><i class="bi bi-info-lg"></i></div>
+            <div class="sigma-toast__body">
+                <p class="sigma-toast__title">Información</p>
+                <p class="sigma-toast__text">{{ message }}</p>
+            </div>
+            <button type="button" class="sigma-toast__close" aria-label="Cerrar notificación">
+                <i class="bi bi-x"></i>
+            </button>
+            {# Barra que se llena en 5s (info / debug) #}
+            <div class="sigma-toast__timer" aria-hidden="true"><span class="sigma-toast__timer-bar"></span></div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!--
       Wrapper del contenido principal (sin sidebar lateral).
       EXPLICACIÓN PARA PRINCIPIANTES: antes había una barra lateral fija;
       la navegación quedó solo en la navbar superior. Este div envuelve
-      mensajes + contenido para el layout a ancho completo.
+      el contenido a ancho completo. Los messages ya no viven aquí:
+      flotan en #sigma-toast-stack (arriba).
     -->
     <div class="main-wrapper" id="mainWrapper">
-        <!-- Messages de Sistema -->
-        {% if messages %}
-        <div class="container-fluid mt-3">
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {% if message.tags == 'success' %}
-                <i class="bi bi-check-circle-fill"></i>
-                {% elif message.tags == 'error' %}
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                {% elif message.tags == 'warning' %}
-                <i class="bi bi-exclamation-circle-fill"></i>
-                {% else %}
-                <i class="bi bi-info-circle-fill"></i>
-                {% endif %}
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
         <!-- Contenido Principal -->
         <div class="container-fluid main-content">
             <main class="py-4">
