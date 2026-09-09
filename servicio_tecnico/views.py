@@ -88,6 +88,7 @@ from .views_envios_cliente import (  # noqa: F401
     obtener_destinatarios_egreso,
     preview_pdf_diagnostico,
 )
+from .views_rewind import enviar_rewinds_pendientes  # noqa: F401
 from .services.ventas_mostrador_analytics import (  # noqa: F401
     determinar_categoria_venta,
     obtener_top_productos_vendidos,
