@@ -26,7 +26,6 @@ import traceback
 
 from celery import shared_task
 from notificaciones.utils import notificar_exito, notificar_error
-from config.constants import FFMPEG_DRAWTEXT_FONT
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -3233,7 +3232,8 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     2. Aplicar efecto Ken Burns a cada foto (zoom + paneo suave cinematográfico)
     3. Añadir transiciones "fade" entre cada foto con el filtro xfade
     4. Agregar música de fondo en loop
-    5. Añadir texto de cierre "Gracias por su preferencia, vuelva pronto"
+    5. En modo rewind, insertar intro/tarjetas/cierre pintados con Pillow
+       (look cinematográfico oscuro; ver services/rewind_slides.py)
     6. Guardar el resultado como VideoOrden(tipo='resumen')
     7. Notificar al usuario cuando termina
 
@@ -3264,6 +3264,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     from django.core.files.base import ContentFile
 
     from .models import OrdenServicio, VideoOrden, ImagenOrden, HistorialOrden
+    from servicio_tecnico.services.rewind_slides import generar_slides_rewind
 
     logger.info(f"[VIDEO-RESUMEN] Iniciando tarea para Orden ID {orden_id}")
 
@@ -3276,9 +3277,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     DURACION_FADE = 1
     # Resolución de salida del video
     RESOLUCION = '1280x720'
-    # Texto de cierre que aparece al final
-    TEXTO_CIERRE = "Gracias por su preferencia, vuelva pronto"
-    # Duración de la pantalla de cierre con el texto (segundos)
+    # Duración de la pantalla de cierre (segundos)
     DURACION_CIERRE = 4
     # Tipos de foto que se incluyen en el video (en orden del flujo de trabajo)
     # NOTA: Esta lista es para diagnóstico (4 tipos). Venta mostrador usa 3 (sin diagnóstico).
@@ -3286,42 +3285,8 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     TIPOS_FOTO = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
     # Duración de la pantalla de intro del rewind (logo + datos del equipo)
     DURACION_INTRO = 4
-    # Duración de cada tarjeta de sección en el rewind (fondo azul + texto)
-    DURACION_SECCION = 2
-    # Textos para las tarjetas de sección del rewind (diagnóstico — 4 tipos)
-    TEXTO_SECCIONES = {
-        'ingreso':     'Así ingresó tu equipo',
-        'diagnostico': 'Fue diagnosticado minuciosamente',
-        'reparacion':  'Así se reparó',
-        'egreso':      'Tu equipo ahora...',
-    }
-    # Textos para venta mostrador (3 tipos, sin diagnóstico)
-    TEXTO_SECCIONES_VM = {
-        'ingreso':    'Así llegó tu equipo',
-        'reparacion': 'Así se realizó el servicio',
-        'egreso':     'Tu equipo ahora...',
-    }
-
-    # =========================================================================
-    # HELPER: ESCAPADO DE TEXTO PARA DRAWTEXT
-    # =========================================================================
-    def _escape_ffmpeg_text(text: str) -> str:
-        """
-        Escapa caracteres especiales para el filtro drawtext de FFmpeg.
-
-        EXPLICACIÓN PARA PRINCIPIANTES:
-        El filtro drawtext de FFmpeg tiene su propio lenguaje de escape.
-        Si el texto contiene apóstrofes, dos puntos o barras invertidas,
-        FFmpeg los interpreta como parte de la sintaxis del filtro y falla.
-        Esta función los escapa para que FFmpeg los trate como texto literal.
-        """
-        if not text:
-            return ''
-        text = text.replace('\\', '\\\\')  # \ → \\ (debe ir primero)
-        text = text.replace("'", "\\'")    # ' → \'
-        text = text.replace(':', '\\:')    # : → \: (separa opciones en FFmpeg)
-        text = text.replace('%', '%%')     # % → %% (expansión de variables drawtext)
-        return text
+    # Duración de cada tarjeta de sección (2.5 s: hay kicker + título, 2 s se siente corto)
+    DURACION_SECCION = 2.5
 
     # =========================================================================
     # PATHS TEMPORALES Y DE TRABAJO
@@ -3364,10 +3329,8 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
         _es_venta_mostrador = orden.tipo_servicio == 'venta_mostrador'
         if _es_venta_mostrador:
             TIPOS_FOTO_ACTIVOS = ['ingreso', 'reparacion', 'egreso']
-            TEXTO_SECCIONES_ACTIVO = TEXTO_SECCIONES_VM
         else:
             TIPOS_FOTO_ACTIVOS = TIPOS_FOTO
-            TEXTO_SECCIONES_ACTIVO = TEXTO_SECCIONES
 
         logger.info(
             f"[VIDEO-RESUMEN] Orden {folio} — tipo_servicio='{orden.tipo_servicio}' "
@@ -3486,20 +3449,19 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
 
         # =====================================================================
         # PASO 4: CONSTRUIR EL FILTERGRAPH DE FFMPEG
-        # Ken Burns (zoompan) + xfade transiciones + pantalla de cierre con texto
-        # En modo rewind: también incluye intro con logo y tarjetas de sección.
+        # Ken Burns (zoompan) + xfade + diapositivas Pillow (intro/tarjetas/cierre)
         # =====================================================================
         #
         # El filtergraph funciona así:
-        # - Cada imagen de entrada se procesa con "zoompan" (Ken Burns)
-        # - zoompan: hace zoom gradual del 100% al 130% durante toda la duración
-        # - Todos los clips se encadenan con "xfade=transition=fade"
-        # - Al final se añade una pantalla negra con el texto de cierre
+        # - Cada foto se procesa con "zoompan" (Ken Burns)
+        # - Los clips se encadenan con "xfade=transition=fade"
+        # - Intro, tarjetas y cierre ya vienen pintados como PNG (rewind_slides.py)
+        #   FFmpeg solo los recorre en loop; ya no usa drawtext.
         #
-        # MODO REWIND (activado si hay fotos de los 4 tipos):
-        # - Pantalla de intro: logo SIC + folio + tipo/marca/modelo
-        # - Tarjetas de sección (fondo azul #1f6391) antes de cada grupo de fotos
-        # - Secuencia: intro → [sec_ingreso → fotos ingreso] × 4 tipos → cierre
+        # MODO REWIND (activado si hay fotos de todos los tipos activos):
+        # - Intro: logo + folio + equipo
+        # - Tarjeta de sección antes de cada grupo de fotos
+        # - Secuencia: intro → [sec → fotos] × N tipos → cierre
         #
         # Cálculo de offsets para xfade (generalizado):
         # offset_acumulado = suma de duraciones visibles de clips anteriores.
@@ -3574,174 +3536,63 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
                 f"setsar=1,format=yuv420p[kbv{i}]"
             )
 
-        # ── Pantalla negra de cierre (aplica en ambos modos) ──
-        # Usamos color=black y drawtext para el mensaje final
-        filter_parts.append(
-            f"color=black:size=1280x720:rate={fps}:duration={DURACION_CIERRE + DURACION_FADE},"
-            f"drawtext="
-            f"fontfile={FFMPEG_DRAWTEXT_FONT}:"
-            f"text='{TEXTO_CIERRE}':"
-            f"fontcolor=white:"
-            f"fontsize=36:"
-            f"x=(w-text_w)/2:"
-            f"y=(h-text_h)/2:"
-            f"enable='gte(t,1)'"
-            f"[cierre]"
+        # ── Diapositivas Pillow: intro/tarjetas (rewind) + cierre (ambos modos) ──
+        # EXPLICACIÓN: el diseño ya está en el PNG. FFmpeg solo lo muestra
+        # el tiempo suficiente para el fade (duración visible + DURACION_FADE).
+        try:
+            detalle = orden.detalle_equipo
+            folio_display = detalle.orden_cliente or orden.numero_orden_interno
+            equipo_texto = f"{detalle.tipo_equipo} {detalle.marca} {detalle.modelo}"
+        except Exception:
+            folio_display = orden.numero_orden_interno
+            equipo_texto = ''
+
+        slides = generar_slides_rewind(
+            tmp_dir,
+            folio=folio_display,
+            equipo=equipo_texto,
+            tipos_activos=TIPOS_FOTO_ACTIVOS,
+            es_venta_mostrador=_es_venta_mostrador,
+            incluir_intro_y_secciones=es_rewind,
         )
 
-        # ──────────────────────────────────────────────────────────────────────
-        # MODO REWIND: intro con logo + tarjetas de sección
-        # ──────────────────────────────────────────────────────────────────────
+        def _filtro_slide_estatico(input_idx: int, label: str) -> str:
+            """Escala el PNG a 1280×720 y lo deja listo para xfade (sin zoom)."""
+            return (
+                f"[{input_idx}:v]scale=1280:720:flags=lanczos,"
+                f"fps={fps},setsar=1,format=yuv420p[{label}]"
+            )
+
+        # Índice del siguiente input FFmpeg después de las fotos (0 .. n_fotos-1).
+        next_input_idx = n_fotos
         if es_rewind:
-            # ── Preparar logo para la intro ──
-            # Estrategia (en orden de preferencia):
-            # 0. logo_sic_white.png estático → usar directamente sin conversión
-            #    (generado una vez con rsvg-convert, 480×150 RGBA)
-            # 1. logo_sic_white.svg → rasterizar con rsvg-convert a PNG temporal
-            #    (fallback por si el PNG estático no existiera)
-            # 2. logo_sic.png original → usar con filtro colorkey en FFmpeg para
-            #    eliminar el fondo blanco
-            # 3. Si ninguno existe → degradar a modo simple
-            ruta_logo     = None   # ruta del archivo que pasará a FFmpeg
-            logo_colorkey = False  # True si es el PNG original con fondo blanco
-
-            # Paso 0: PNG estático pre-generado (ruta directa, sin dependencia externa)
-            ruta_png_white = finders.find('images/logos/logo_sic_white.png')
-            if not ruta_png_white:
-                ruta_png_white_fb = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    'static', 'images', 'logos', 'logo_sic_white.png'
-                )
-                if os.path.isfile(ruta_png_white_fb):
-                    ruta_png_white = ruta_png_white_fb
-
-            if ruta_png_white and os.path.isfile(ruta_png_white):
-                ruta_logo = ruta_png_white
-                logger.info(
-                    "[VIDEO-RESUMEN] Logo: PNG estático logo_sic_white.png encontrado"
-                )
-
-            # Paso 1: fallback — SVG blanco + rsvg-convert (solo si el PNG no existe)
-            if not ruta_logo:
-                ruta_svg = finders.find('images/logos/logo_sic_white.svg')
-                if not ruta_svg:
-                    ruta_svg_fb = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'static', 'images', 'logos', 'logo_sic_white.svg'
-                    )
-                    if os.path.isfile(ruta_svg_fb):
-                        ruta_svg = ruta_svg_fb
-
-                if ruta_svg and os.path.isfile(ruta_svg):
-                    rsvg_bin = shutil.which('rsvg-convert')
-                    if rsvg_bin:
-                        tmp_logo_png = os.path.join(tmp_dir, 'logo_intro.png')
-                        res_svg = subprocess.run(
-                            [rsvg_bin, '-w', '480', ruta_svg, '-o', tmp_logo_png],
-                            capture_output=True, text=True, timeout=15,
-                        )
-                        if res_svg.returncode == 0 and os.path.isfile(tmp_logo_png):
-                            ruta_logo = tmp_logo_png
-                            logger.info(
-                                "[VIDEO-RESUMEN] Logo: SVG blanco rasterizado con rsvg-convert"
-                            )
-                        else:
-                            logger.warning(
-                                f"[VIDEO-RESUMEN] rsvg-convert falló: {res_svg.stderr[:200]}"
-                            )
-
-            # Paso 2: fallback al PNG original con colorkey
-            if not ruta_logo:
-                ruta_png = finders.find('images/logos/logo_sic.png')
-                if not ruta_png:
-                    ruta_png_fb = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'static', 'images', 'logos', 'logo_sic.png'
-                    )
-                    if os.path.isfile(ruta_png_fb):
-                        ruta_png = ruta_png_fb
-                if ruta_png and os.path.isfile(ruta_png):
-                    ruta_logo     = ruta_png
-                    logo_colorkey = True
-                    logger.info(
-                        "[VIDEO-RESUMEN] Logo: usando PNG original con colorkey"
-                    )
-
-            if not ruta_logo:
-                logger.warning(
-                    "[VIDEO-RESUMEN] Ningún logo encontrado — "
-                    "degradando a modo simple sin regresión"
-                )
-                es_rewind = False  # degradar silenciosamente al modo simple
-
-        if es_rewind:
-            # El logo es el input adicional al final de las fotos
-            logo_idx = n_fotos
             cmd_inputs += [
                 '-loop', '1',
                 '-t', str(DURACION_INTRO + DURACION_FADE),
-                '-i', ruta_logo,
+                '-i', slides['intro'],
             ]
-
-            # Obtener datos del equipo para mostrar en la intro
-            try:
-                detalle       = orden.detalle_equipo
-                folio_display = detalle.orden_cliente or orden.numero_orden_interno
-                equipo_texto  = f"{detalle.tipo_equipo} {detalle.marca} {detalle.modelo}"
-            except Exception:
-                folio_display = orden.numero_orden_interno
-                equipo_texto  = ''
-
-            folio_esc  = _escape_ffmpeg_text(folio_display)
-            equipo_esc = _escape_ffmpeg_text(equipo_texto)
-
-            # ── Filtro de intro: fondo azul + logo centrado + texto ──
-            # color= genera un clip de fondo sólido azul (color de marca #1f6391)
-            filter_parts.append(
-                f"color=0x1f6391:size=1280x720:rate={fps}"
-                f":duration={DURACION_INTRO + DURACION_FADE}[bg_intro]"
-            )
-            # Escalar logo a 480px de ancho, mantener proporción, preparar alpha.
-            # - SVG rasterizado: ya tiene alpha limpio → solo scale + format=rgba
-            # - PNG original:    fondo blanco → colorkey elimina el blanco primero
-            if logo_colorkey:
-                filter_parts.append(
-                    f"[{logo_idx}:v]scale=480:-1,"
-                    f"colorkey=white:0.2:0.05,"
-                    f"format=rgba[logo_sc]"
-                )
-            else:
-                filter_parts.append(
-                    f"[{logo_idx}:v]scale=480:-1,format=rgba[logo_sc]"
-                )
-            # Superponer logo centrado horizontalmente, desplazado hacia arriba
-            filter_parts.append(
-                f"[bg_intro][logo_sc]overlay=(W-w)/2:(H-h)/2-100[introlog]"
-            )
-            # Texto del folio (número de orden) debajo del logo
-            filter_parts.append(
-                f"[introlog]drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
-                f"text='{folio_esc}':fontcolor=white:fontsize=48:"
-                f"x=(w-text_w)/2:y=(h-text_h)/2+60[introtext1]"
-            )
-            # Texto del equipo (tipo + marca + modelo) debajo del folio
-            filter_parts.append(
-                f"[introtext1]drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
-                f"text='{equipo_esc}':fontcolor=white:fontsize=28:"
-                f"x=(w-text_w)/2:y=(h-text_h)/2+115[intro]"
-            )
-
-            # ── Filtros de tarjetas de sección (fondo azul + texto grande) ──
+            filter_parts.append(_filtro_slide_estatico(next_input_idx, 'intro'))
+            next_input_idx += 1
             for tipo in TIPOS_FOTO_ACTIVOS:
-                texto_sec_esc = _escape_ffmpeg_text(TEXTO_SECCIONES_ACTIVO[tipo])
-                filter_parts.append(
-                    f"color=0x1f6391:size=1280x720:rate={fps}"
-                    f":duration={DURACION_SECCION + DURACION_FADE},"
-                    f"drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
-                    f"text='{texto_sec_esc}':fontcolor=white:fontsize=40:"
-                    f"x=(w-text_w)/2:y=(h-text_h)/2[sec_{tipo}]"
-                )
+                cmd_inputs += [
+                    '-loop', '1',
+                    '-t', str(DURACION_SECCION + DURACION_FADE),
+                    '-i', slides['secciones'][tipo],
+                ]
+                filter_parts.append(_filtro_slide_estatico(next_input_idx, f'sec_{tipo}'))
+                next_input_idx += 1
 
+        cmd_inputs += [
+            '-loop', '1',
+            '-t', str(DURACION_CIERRE + DURACION_FADE),
+            '-i', slides['cierre'],
+        ]
+        filter_parts.append(_filtro_slide_estatico(next_input_idx, 'cierre'))
+        next_input_idx += 1
+        # Cuántos PNG de diapositiva se añadieron (para el índice del audio).
+        n_slides = next_input_idx - n_fotos
+
+        if es_rewind:
             # ── Secuencia de clips rewind ──
             # (label, duración_visible_en_segundos)
             clips_sequence = [('[intro]', DURACION_INTRO)]
@@ -3800,10 +3651,10 @@ def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
         # =====================================================================
         # PASO 6: EJECUTAR FFMPEG — GENERAR VIDEO FINAL
         # =====================================================================
-        # Índice del stream de audio:
-        # - Modo simple:  fotos son inputs 0..n_fotos-1, audio es n_fotos
-        # - Modo rewind:  fotos son 0..n_fotos-1, logo es n_fotos, audio es n_fotos+1
-        audio_stream_idx = n_fotos + (1 if es_rewind else 0)
+        # Índice del stream de audio: fotos (0..n_fotos-1) + PNG de diapositivas,
+        # luego la música. n_slides vale 1 en modo simple (solo cierre) o
+        # 1 intro + N tarjetas + 1 cierre en modo rewind.
+        audio_stream_idx = n_fotos + n_slides
 
         cmd_final = (
             [ffmpeg_bin, '-protocol_whitelist', 'file,pipe,fd']
