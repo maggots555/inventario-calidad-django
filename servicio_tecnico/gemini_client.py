@@ -176,6 +176,39 @@ def construir_generation_config(
     return config
 
 
+def texto_visible_parts_gemini(parts: list | None) -> str:
+    """
+    Junta el texto visible de las parts de Gemini, ignorando el thinking.
+
+    Objetivo de negocio:
+        Gemini 3.x a veces pone el razonamiento interno en parts[0]
+        (campo thought=True) y la cita real en parts[1]. Si solo leemos
+        parts[0].text, la cita diaria sale vacía aunque el modelo sí escribió.
+
+    Args:
+        parts: Lista de dicts de candidates[0].content.parts. Puede ser None.
+
+    Returns:
+        Texto visible concatenado (sin thought), o cadena vacía.
+
+    Efectos secundarios:
+        Ninguno (pura transformación de datos).
+    """
+    # EXPLICACIÓN PARA PRINCIPIANTES: cada "part" es un pedazo de la
+    # respuesta. Las de thought=True son el "borrador mental" del modelo;
+    # no las queremos mostrar en el dashboard.
+    textos: list[str] = []
+    for part in parts or []:
+        if not isinstance(part, dict):
+            continue
+        if part.get('thought'):
+            continue
+        texto = (part.get('text') or '').strip()
+        if texto:
+            textos.append(texto)
+    return '\n'.join(textos).strip()
+
+
 def mejorar_diagnostico(
     diagnostico_sic: str,
     tipo_equipo: str = "",
@@ -1573,9 +1606,15 @@ def analizar_video_evidencia_gemini(
 # la cascada de fallback: Gemini → Ollama → lista predefinida.
 #
 # A diferencia de las funciones de diagnóstico (temperature 0.3 en modelos 2.5),
-# aquí pedimos temperature 0.9 en la rama clásica; en 3.6+ se usa thinking_level
-# medium (calidad equilibrada; soportado en 3.5-lite / 3.6 / 3.7 / 3.8).
+# aquí pedimos temperature 0.9 en la rama clásica. En 3.6+ Google ignora
+# temperature: usamos thinking_level=minimal (low en 3.7/3.8). Una cita de
+# 1-3 oraciones no necesita thinking medium; con 150 tokens + medium el
+# thinking se comía el presupuesto y la cita salía cortada (MAX_TOKENS).
 # ============================================================================
+
+# Tope de salida: 1024 deja margen para thinking residual de Gemini 3.x + cita.
+# 150 era suficiente en 2.5 (thinkingBudget=0) y falló en 3.8/3.7 (sep 2026).
+CITA_MAX_OUTPUT_TOKENS = 1024
 
 # Prompt fijo para la generación de citas — se reutiliza en Ollama para consistencia.
 PROMPT_CITA_NIHILISMO = (
@@ -1649,8 +1688,9 @@ def generar_cita_nihilismo_gemini(
     timeout = min(getattr(settings, 'GEMINI_TIMEOUT', 60), 15)
 
     # ── Construir el payload ──
-    # Cita creativa: en 2.5 usamos temperature alta; en 3.6+ Google ignora temperature
-    # y controlamos el esfuerzo con thinking_level=medium.
+    # Cita creativa: en 2.5 usamos temperature alta; en 3.6+ Google ignora
+    # temperature. thinking minimal/low: no gastar el presupuesto en razonar
+    # una frase corta. CITA_MAX_OUTPUT_TOKENS deja margen si aún piensa un poco.
     payload = {
         "contents": [
             {
@@ -1661,11 +1701,11 @@ def generar_cita_nihilismo_gemini(
         ],
         "generationConfig": construir_generation_config(
             model,
-            max_output_tokens=150,
+            max_output_tokens=CITA_MAX_OUTPUT_TOKENS,
             temperature=0.9,
             top_p=None,
             thinking_budget=0,
-            thinking_level='medium',
+            thinking_level='minimal',
         ),
     }
 
@@ -1726,12 +1766,25 @@ def generar_cita_nihilismo_gemini(
                 'error_type': 'safety_block',
             }
 
-        cita = (
-            candidates[0]
-            .get('content', {})
-            .get('parts', [{}])[0]
-            .get('text', '')
-            .strip()
+        # MAX_TOKENS = la cita se cortó a media frase (ej. "Pinta sobre el
+        # silencio", 15 chars). Es recuperable: el dispatcher prueba el
+        # siguiente modelo en vez de cachear el recorte 24 h.
+        if finish_reason == 'MAX_TOKENS':
+            logger.warning(
+                f"[CitaNihilismo][Gemini] Respuesta TRUNCADA (MAX_TOKENS) | "
+                f"Modelo: {model}"
+            )
+            return {
+                'success': False,
+                'error': (
+                    'Gemini cortó la cita por límite de tokens (MAX_TOKENS).'
+                ),
+                'error_type': 'server_error',
+            }
+
+        # 3.x a veces manda thought en parts[0] y la cita en parts[1].
+        cita = texto_visible_parts_gemini(
+            candidates[0].get('content', {}).get('parts', [])
         )
 
         if not cita:
