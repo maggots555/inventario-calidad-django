@@ -1,0 +1,260 @@
+/* =============================================================================
+   FORMULARIO DE SUCURSAL — alta / edición de sedes (Administración)
+   Misma familia visual que lista_sucursales.css. Sin cards de color sólido.
+   También cubre la pantalla de confirmar eliminación.
+   ============================================================================= */
+
+.form-sucursal-page {
+    --fs-surface: var(--card-bg, #ffffff);
+    --fs-border: var(--border-color, #e2e8f0);
+    --fs-muted: var(--text-muted, #64748b);
+    --fs-text: var(--text-primary, #0f172a);
+    --fs-accent: var(--primary-color, #1f6391);
+    --fs-accent-soft: color-mix(in srgb, var(--fs-accent) 12%, transparent);
+    --fs-radius: 10px;
+    --fs-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --fs-warn: #d97706;
+    --fs-danger: #dc2626;
+    max-width: 760px;
+    margin: 0 auto;
+    padding-bottom: 2.5rem;
+}
+
+[data-bs-theme="dark"] .form-sucursal-page {
+    --fs-surface: var(--card-bg, #1e293b);
+    --fs-border: var(--border-color, #334155);
+    --fs-muted: #94a3b8;
+    --fs-text: var(--text-primary, #e2e8f0);
+    --fs-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Encabezado (espejo de la lista) ────────────────────────────────────── */
+
+.fs-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.fs-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--fs-text);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.fs-header h1 i {
+    color: var(--fs-accent);
+}
+
+.fs-subtitle {
+    margin: 0;
+    color: var(--fs-muted);
+    font-size: 0.9rem;
+}
+
+.fs-header-actions .btn {
+    min-height: 44px;
+}
+
+/* ── Superficie única del formulario ────────────────────────────────────── */
+
+.fs-panel {
+    background: var(--fs-surface);
+    border: 1px solid var(--fs-border);
+    border-radius: var(--fs-radius);
+    box-shadow: var(--fs-shadow);
+    overflow: hidden;
+}
+
+.fs-section {
+    padding: 1.25rem 1.35rem;
+    border-bottom: 1px solid var(--fs-border);
+}
+
+.fs-section:last-of-type {
+    border-bottom: none;
+}
+
+.fs-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fs-muted);
+    margin: 0 0 1rem;
+}
+
+.fs-section .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--fs-text);
+    margin-bottom: 0.35rem;
+}
+
+.fs-section .form-text {
+    color: var(--fs-muted);
+    font-size: 0.78rem;
+}
+
+.fs-section .form-control,
+.fs-section .form-select {
+    border-color: var(--fs-border);
+    background: var(--body-bg, #f8fafc);
+    color: var(--fs-text);
+}
+
+.fs-section .form-control:focus,
+.fs-section .form-select:focus {
+    border-color: var(--fs-accent);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--fs-accent) 18%, transparent);
+}
+
+[data-bs-theme="dark"] .fs-section .form-control,
+[data-bs-theme="dark"] .fs-section .form-select {
+    background: #0f172a;
+}
+
+.fs-required {
+    color: var(--fs-danger);
+    font-weight: 700;
+}
+
+/* ── Interruptor de sucursal activa ─────────────────────────────────────── */
+
+.fs-switch {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    padding-left: 1rem;
+    border: 1px solid var(--fs-border);
+    border-radius: var(--fs-radius);
+    background: var(--fs-accent-soft);
+    min-height: 44px;
+}
+
+/* Bootstrap .form-check empuja el checkbox con padding-left; lo anulamos. */
+.fs-switch.form-check {
+    padding-left: 1rem;
+    margin-bottom: 0;
+}
+
+.fs-switch .form-check-input {
+    margin-top: 0.2rem;
+    margin-left: 0;
+    float: none;
+    width: 2.25rem;
+    height: 1.2rem;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.fs-switch-copy {
+    min-width: 0;
+}
+
+.fs-switch-copy .form-check-label {
+    font-weight: 600;
+    color: var(--fs-text);
+    cursor: pointer;
+}
+
+.fs-switch-copy .form-text {
+    margin: 0.15rem 0 0;
+}
+
+/* ── Pie de acciones ────────────────────────────────────────────────────── */
+
+.fs-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.35rem;
+    background: color-mix(in srgb, var(--fs-accent) 6%, var(--fs-surface));
+    border-top: 1px solid var(--fs-border);
+}
+
+.fs-actions .btn {
+    min-height: 44px;
+}
+
+/* ── Confirmar eliminación ──────────────────────────────────────────────── */
+
+.fs-confirm-lead {
+    margin: 0 0 1rem;
+    color: var(--fs-text);
+    font-size: 1rem;
+}
+
+.fs-confirm-ficha {
+    padding: 0.9rem 1rem;
+    border-radius: var(--fs-radius);
+    border: 1px solid var(--fs-border);
+    background: color-mix(in srgb, var(--fs-accent) 6%, var(--fs-surface));
+    margin-bottom: 1rem;
+}
+
+.fs-confirm-ficha strong {
+    display: block;
+    color: var(--fs-text);
+    margin-bottom: 0.2rem;
+}
+
+.fs-confirm-ficha p {
+    margin: 0;
+    color: var(--fs-muted);
+    font-size: 0.85rem;
+}
+
+.fs-aviso {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--fs-radius);
+    font-size: 0.875rem;
+    color: var(--fs-text);
+}
+
+.fs-aviso i {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.fs-aviso--warn {
+    border: 1px solid color-mix(in srgb, var(--fs-warn) 35%, var(--fs-border));
+    background: color-mix(in srgb, var(--fs-warn) 10%, var(--fs-surface));
+}
+
+.fs-aviso--warn i {
+    color: var(--fs-warn);
+}
+
+.fs-aviso--danger {
+    border: 1px solid color-mix(in srgb, var(--fs-danger) 35%, var(--fs-border));
+    background: color-mix(in srgb, var(--fs-danger) 10%, var(--fs-surface));
+}
+
+.fs-aviso--danger i {
+    color: var(--fs-danger);
+}
+
+[data-bs-theme="dark"] .fs-aviso--warn i {
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .fs-aviso--danger i {
+    color: #f87171;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fs-section .form-control,
+    .fs-section .form-select {
+        transition: none;
+    }
+}

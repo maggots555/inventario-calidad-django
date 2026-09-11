@@ -789,7 +789,17 @@ def lista_sucursales(request):
 @permission_required_with_message('inventario.add_sucursal', message='No tienes permisos para crear nuevas sucursales.')
 def crear_sucursal(request):
     """
-    Crear una nueva sucursal
+    Alta de una sucursal (sede física).
+
+    Objetivo de negocio:
+        Registrar una sede nueva para inventario, ST y datos públicos de contacto.
+
+    Argumentos:
+        request: HttpRequest GET (form vacío) o POST (datos del formulario).
+
+    Efectos secundarios:
+        POST válido crea una fila Sucursal y redirige a la lista con mensaje.
+        Si codigo viene vacío, el save() del modelo genera SUC001, SUC002…
     """
     if request.method == 'POST':
         form = SucursalForm(request.POST)
@@ -799,18 +809,29 @@ def crear_sucursal(request):
             return redirect('lista_sucursales')
     else:
         form = SucursalForm()
-    
+
     return render(request, 'inventario/form_sucursal.html', {
         'form': form,
-        'titulo': 'Crear Sucursal',
-        'boton_texto': 'Crear Sucursal'
+        'titulo': 'Nueva sucursal',
+        'boton_texto': 'Crear sucursal',
+        'es_edicion': False,
     })
 
 @login_required
 @permission_required_with_message('inventario.change_sucursal', message='No tienes permisos para modificar sucursales existentes.')
 def editar_sucursal(request, sucursal_id):
     """
-    Editar una sucursal existente
+    Edición de una sucursal existente.
+
+    Objetivo de negocio:
+        Corregir datos de una sede (contacto, horario, activa/inactiva).
+
+    Argumentos:
+        request: HttpRequest GET o POST.
+        sucursal_id: pk de Sucursal.
+
+    Efectos secundarios:
+        POST válido guarda cambios y redirige a la lista con mensaje.
     """
     sucursal = get_object_or_404(Sucursal, id=sucursal_id)
     if request.method == 'POST':
@@ -821,12 +842,13 @@ def editar_sucursal(request, sucursal_id):
             return redirect('lista_sucursales')
     else:
         form = SucursalForm(instance=sucursal)
-    
+
     return render(request, 'inventario/form_sucursal.html', {
         'form': form,
         'sucursal': sucursal,
-        'titulo': f'Editar: {sucursal.nombre}',
-        'boton_texto': 'Guardar Cambios'
+        'titulo': sucursal.nombre,
+        'boton_texto': 'Guardar cambios',
+        'es_edicion': True,
     })
 
 @login_required

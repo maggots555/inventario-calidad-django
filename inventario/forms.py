@@ -216,12 +216,22 @@ class MovimientoForm(forms.ModelForm):
 
 class SucursalForm(forms.ModelForm):
     """
-    Formulario para crear y editar sucursales
+    Formulario de alta/edición de sucursales.
+
+    Objetivo de negocio:
+        Capturar datos de una sede física (identidad, ubicación, contacto).
+
+    Argumentos:
+        *args, **kwargs: los de ModelForm (instance= para editar).
+
+    Efectos secundarios:
+        Ninguno por sí solo. El save() escribe en Sucursal; si codigo está
+        vacío, el modelo genera SUC001, SUC002…
     """
     class Meta:
         model = Sucursal
         fields = [
-            'codigo', 'nombre', 
+            'codigo', 'nombre',
             'direccion', 'ciudad', 'estado_provincia',
             'responsable', 'telefono', 'email', 'horario_atencion',
             'activa', 'observaciones'
@@ -229,7 +239,9 @@ class SucursalForm(forms.ModelForm):
         widgets = {
             'codigo': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Código único (se genera automáticamente si se deja vacío)'
+                'placeholder': 'Vacío = automático',
+                'autocomplete': 'off',
+                'spellcheck': 'false',
             }),
             'nombre': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -266,7 +278,8 @@ class SucursalForm(forms.ModelForm):
                 'placeholder': 'Ej: Lunes a viernes 9:00 - 18:00, Sábados 9:00 - 14:00'
             }),
             'activa': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
+                'class': 'form-check-input',
+                'role': 'switch',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',

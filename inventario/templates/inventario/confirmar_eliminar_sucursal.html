@@ -1,57 +1,66 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Confirmar Eliminación - {{ block.super }}{% endblock %}
+{% block title %}Confirmar eliminación - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/form_sucursal.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">
-                        <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <h6>¿Estás seguro de que deseas eliminar la sucursal?</h6>
-                    <div class="bg-light p-3 rounded mb-3">
-                        <strong>{{ sucursal.nombre }}</strong><br>
-                        {% if sucursal.direccion %}
-                            <small class="text-muted">{{ sucursal.direccion }}</small><br>
-                        {% endif %}
-                        {% if sucursal.responsable %}
-                            <small class="text-muted">Responsable: {{ sucursal.responsable }}</small>
-                        {% endif %}
-                    </div>
-                    
-                    {% if movimientos_asociados > 0 %}
-                        <div class="alert alert-danger">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>No se puede eliminar:</strong> Esta sucursal tiene {{ movimientos_asociados }} movimiento(s) asociado(s).
-                        </div>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>Advertencia:</strong> Esta acción no se puede deshacer.
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="card-footer">
-                    <div class="d-flex justify-content-between">
-                        <a href="{% url 'lista_sucursales' %}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancelar
-                        </a>
-                        {% if movimientos_asociados == 0 %}
-                            <form method="post">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger">
-                                    <i class="bi bi-trash"></i> Confirmar Eliminación
-                                </button>
-                            </form>
-                        {% endif %}
-                    </div>
-                </div>
+<div class="container-fluid form-sucursal-page">
+
+    <div class="fs-header">
+        <div>
+            <h1><i class="bi bi-trash"></i> Eliminar sucursal</h1>
+            <p class="fs-subtitle">Esta acción no se puede deshacer</p>
+        </div>
+        <div class="fs-header-actions">
+            <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver a sucursales
+            </a>
+        </div>
+    </div>
+
+    <div class="fs-panel">
+        <section class="fs-section">
+            <p class="fs-confirm-lead">¿Eliminar la sucursal?</p>
+            <div class="fs-confirm-ficha">
+                <strong>{{ sucursal.nombre }}</strong>
+                {% if sucursal.codigo %}
+                    <p>{{ sucursal.codigo }}</p>
+                {% endif %}
+                {% if sucursal.direccion %}
+                    <p>{{ sucursal.direccion }}</p>
+                {% endif %}
+                {% if sucursal.responsable %}
+                    <p>Encargado: {{ sucursal.responsable }}</p>
+                {% endif %}
             </div>
+
+            {% if movimientos_asociados > 0 %}
+                <div class="fs-aviso fs-aviso--danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>No se puede eliminar: tiene {{ movimientos_asociados }} movimiento{{ movimientos_asociados|pluralize }} asociado{{ movimientos_asociados|pluralize }}.</span>
+                </div>
+            {% else %}
+                <div class="fs-aviso fs-aviso--warn">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span>Si la sucursal tiene movimientos, el sistema bloqueará el borrado.</span>
+                </div>
+            {% endif %}
+        </section>
+
+        <div class="fs-actions">
+            <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">Cancelar</a>
+            {% if movimientos_asociados == 0 %}
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Eliminar sucursal
+                    </button>
+                </form>
+            {% endif %}
         </div>
     </div>
 </div>
