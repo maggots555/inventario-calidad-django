@@ -1,0 +1,280 @@
+/* =============================================================================
+   LISTA ÓRDENES — Header / toolbar de acciones
+   ---------------------------------------------------------------------------
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Esta barra vive arriba de la lista (título a la izquierda, botones a la
+   derecha). Los botones NO van sueltos: se agrupan por intención.
+
+     1. Navegar      → Ver Cerrados / Ver Activos
+     2. Cierre masivo → Cerrar Garantía / Cerrar Finalizados
+     3. Crear        → Mandar Rewind + Nueva Orden (único sólido)
+
+   Prefijo BEM: lista-ordenes-header__*
+   Tono: industrial de taller — denso, alineado, sin glassmorphism.
+   ============================================================================= */
+
+.lista-ordenes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.85rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El título NO crece (flex-grow: 0). Si creciera, le robaba espacio a los
+ * botones y estos se cortaban ("Cerrar Fina…"). Si no caben título +
+ * toolbar en la misma fila, la toolbar baja ENTERA debajo del título.
+ */
+.lista-ordenes-header__title {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.lista-ordenes-header__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.2rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text-primary, #111827);
+}
+
+.lista-ordenes-header__heading i {
+    font-size: 1.35rem;
+    color: var(--primary-color, #3498db);
+}
+
+.lista-ordenes-header__subtitle {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted, #6b7280);
+}
+
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * role="toolbar" en el HTML + flex aquí = una "caja de herramientas".
+ * Cada __group es una familia. El borde izquierdo (separador) se pinta
+ * solo a partir del SEGUNDO grupo, para no poner una raya al inicio.
+ */
+.lista-ordenes-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 0.55rem 0;
+    flex: 0 1 auto;
+    margin-left: auto;
+}
+
+.lista-ordenes-header__group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0 0.75rem;
+}
+
+.lista-ordenes-header__group:first-child {
+    padding-left: 0;
+}
+
+.lista-ordenes-header__group:last-child {
+    padding-right: 0;
+}
+
+.lista-ordenes-header__group + .lista-ordenes-header__group {
+    border-left: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* El formulario POST (cerrar / rewind) no debe empujar el botón fuera de línea. */
+.lista-ordenes-header__form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.lista-ordenes-header__form .btn {
+    width: 100%;
+}
+
+/*
+ * Altura táctil ≥ 44px (dedo en celular).
+ * white-space: nowrap evita que "Cerrar Finalizados Garantía" se parta
+ * a media palabra en escritorio.
+ */
+.lista-ordenes-header__actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 44px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    border-radius: 0.5rem;
+}
+
+.lista-ordenes-header__actions .btn i {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Nueva Orden: único sólido, un poco más presente que el resto. */
+.lista-ordenes-header__group--primary .btn-primary {
+    padding-inline: 1.05rem;
+    letter-spacing: 0.01em;
+}
+
+/*
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Los outline de Bootstrap en fondo oscuro se ven como texto suelto.
+ * Aquí les damos un relleno muy suave para que se lean como BOTONES,
+ * sin quitarle protagonismo al sólido de Nueva Orden.
+ */
+.lista-ordenes-header__actions .btn-outline-secondary,
+.lista-ordenes-header__actions .btn-outline-success,
+.lista-ordenes-header__actions .btn-outline-primary {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+/* =============================================================================
+   DARK MODE
+   EXPLICACIÓN: Bootstrap ya pinta .btn-outline-* / .btn-primary.
+   Aquí solo afinamos título, subtítulo y el separador entre grupos.
+   ============================================================================= */
+
+[data-bs-theme="dark"] .lista-ordenes-header__heading {
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__heading i {
+    color: var(--primary-color, #60a5fa);
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__subtitle {
+    color: var(--text-muted, #94a3b8);
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__group + .lista-ordenes-header__group {
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-secondary,
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-success,
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-primary {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-secondary {
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-success {
+    color: #34d399;
+    border-color: #065f46;
+}
+
+[data-bs-theme="dark"] .lista-ordenes-header__actions .btn-outline-primary {
+    color: #60a5fa;
+    border-color: #1e3a5f;
+}
+
+/*
+ * Laptop / panel angosto: la toolbar ocupa su propia fila (debajo del
+ * título) para que los 5 botones de gerencia no se recorten al borde.
+ */
+@media (max-width: 1280px) {
+    .lista-ordenes-header__actions {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
+
+/* =============================================================================
+   TABLET (~768px): tipografía un poco más compacta, mismos grupos.
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .lista-ordenes-header {
+        align-items: flex-start;
+    }
+
+    .lista-ordenes-header__heading {
+        font-size: 1.3rem;
+    }
+
+    .lista-ordenes-header__group {
+        flex-wrap: wrap;
+    }
+
+    .lista-ordenes-header__actions .btn {
+        font-size: 0.8125rem;
+        padding: 0.4rem 0.75rem;
+    }
+}
+
+/* =============================================================================
+   MÓVIL (~576px): título arriba, toolbar a ancho completo.
+   Los grupos se apilan (raya horizontal en vez de vertical) para no
+   quedar una torre de 5 botones ni un wrap caótico.
+   ============================================================================= */
+
+@media (max-width: 576px) {
+    .lista-ordenes-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.9rem;
+    }
+
+    .lista-ordenes-header__actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 0;
+    }
+
+    .lista-ordenes-header__group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+        width: 100%;
+        padding: 0.65rem 0 0;
+        gap: 0.45rem;
+    }
+
+    .lista-ordenes-header__group:first-child {
+        padding-top: 0;
+    }
+
+    .lista-ordenes-header__group + .lista-ordenes-header__group {
+        border-left: none;
+        border-top: 1px solid var(--border-color, #e5e7eb);
+    }
+
+    .lista-ordenes-header__form,
+    .lista-ordenes-header__group > .btn {
+        min-width: 0;
+    }
+
+    .lista-ordenes-header__actions .btn {
+        width: 100%;
+        white-space: normal;
+        text-align: center;
+        font-size: 0.8rem;
+        padding: 0.45rem 0.6rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .lista-ordenes-header__actions .btn {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.5rem;
+    }
+}
