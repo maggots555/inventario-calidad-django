@@ -1355,8 +1355,8 @@ def enviar_diagnostico_cliente_task(
     bind=True,
     max_retries=3,
     default_retry_delay=60,
-    soft_time_limit=300,  # 5 min: mismo aviso global; la IA debe cortar antes
-    time_limit=420,       # 7 min: margen para SMTP si un HTTP de 180s se pasa un poco
+    soft_time_limit=420,  # 7 min: comprimir + 5 min de IA + un poco de colchón
+    time_limit=480,       # 8 min: si la IA cortó a los 300s, aún cabe el SMTP
     name='servicio_tecnico.enviar_imagenes_cliente'
 )
 def enviar_imagenes_cliente_task(
@@ -1376,10 +1376,10 @@ def enviar_imagenes_cliente_task(
         modelo_ia_inspeccion  : Modelo IA seleccionado en el modal (vacío = automático)
 
     Límites de tiempo:
-        soft_time_limit=300, time_limit=420. El HTTP de IA usa
-        INSPECCION_IA_HTTP_TIMEOUT (180s). Si Celery avisa con
-        SoftTimeLimitExceeded durante la IA, se omite el análisis y el
-        correo se envía igual (la IA es no crítica).
+        La IA tiene 5 min (INSPECCION_IA_HTTP_TIMEOUT=300). Si no responde,
+        se omite el análisis y el correo se envía igual. soft_time_limit=420
+        y time_limit=480 cubren comprimir + esos 5 min + SMTP. Si Celery
+        avisa con SoftTimeLimitExceeded, tampoco se re-lanza: el correo sale.
 
     Efectos secundarios:
         Envía EmailMessage, escribe HistorialOrden y notifica al usuario.
@@ -1486,9 +1486,10 @@ def enviar_imagenes_cliente_task(
         #   - Si falla por cualquier motivo → analisis_ia_texto queda None
         #     y el template simplemente omite la sección (el correo se envía igual)
         #
-        # TIMEOUT: usa INSPECCION_IA_HTTP_TIMEOUT (default 180s), menor que el
-        # soft limit de esta tarea (300s). Así urlopen corta ANTES de que Celery
-        # mande SIGKILL. Un timeout de IA aborta la cascada; el correo sigue.
+        # TIMEOUT: INSPECCION_IA_HTTP_TIMEOUT (default 300s = 5 min de IA).
+        # Si Gemini/Ollama no contestan, urlopen corta, se aborta la cascada
+        # y el correo sale sin análisis. El hard kill de esta tarea es 480s,
+        # así que el SMTP todavía tiene margen después de esos 5 min.
         analisis_ia_texto = None
         analisis_ia_modelo = None
 
@@ -1539,10 +1540,10 @@ def enviar_imagenes_cliente_task(
 
         except SoftTimeLimitExceeded:
             # EXPLICACIÓN PARA PRINCIPIANTES:
-            # Celery lanza esto a los 300s (soft). La IA es no crítica: NO
-            # re-lanzamos la excepción. Si se escapara al except de afuera,
-            # self.retry() reintentaría TODA la tarea. Aquí solo omitimos
-            # el análisis y seguimos al Paso 3 (correo).
+            # Celery lanza esto al llegar al soft_time_limit de la tarea.
+            # La IA es no crítica: NO re-lanzamos. Si se escapara al except
+            # de afuera, self.retry() reintentaría TODA la tarea. Aquí solo
+            # omitimos el análisis y seguimos al Paso 3 (correo).
             logger.warning(
                 "[IMAGENES] SoftTimeLimitExceeded durante análisis IA "
                 "(no crítico). El correo se enviará sin sección de análisis."

@@ -1866,18 +1866,19 @@ def timeout_inspeccion_ia_http() -> int:
     Segundos máximos de urllib para el análisis visual de fotos de INGRESO.
 
     Objetivo de negocio:
-        La IA es no crítica. Este tope debe ser menor que el soft limit de
-        Celery (300s) para que, si Gemini/Ollama se cuelgan, urlopen corte
-        y el correo al cliente sí se envíe.
+        La IA es no crítica. Este tope (5 min) es SOLO del HTTP de visión.
+        Debe ser menor que el soft_time_limit de enviar_imagenes_cliente
+        (420s) para que, si Gemini/Ollama se cuelgan, urlopen corte y el
+        correo al cliente sí se envíe.
 
     Returns:
-        int: INSPECCION_IA_HTTP_TIMEOUT del .env, o 180 si no está definido.
+        int: INSPECCION_IA_HTTP_TIMEOUT del .env, o 300 si no está definido.
 
     Efectos secundarios:
         Ninguno. Solo lee settings; no llama a la red ni escribe en BD.
     """
-    # Fallback 180 = el default de settings.py. No usar 600 (visión de video).
-    return int(getattr(settings, 'INSPECCION_IA_HTTP_TIMEOUT', 180))
+    # Fallback 300 = el default de settings.py. No usar 600 (visión de video).
+    return int(getattr(settings, 'INSPECCION_IA_HTTP_TIMEOUT', 300))
 
 
 def analizar_imagenes_ingreso_ollama(
@@ -1922,7 +1923,8 @@ def analizar_imagenes_ingreso_ollama(
     model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
     # EXPLICACIÓN PARA PRINCIPIANTES: fotos de ingreso NO usan los 600s de
     # OLLAMA_VISION_TIMEOUT (eso es para video). Si este HTTP dura 10 min,
-    # Celery mata al worker y el correo no sale. 180s deja margen para SMTP.
+    # Celery mata al worker y el correo no sale. 300s = 5 min de IA; luego
+    # se corta y el correo sale sin análisis.
     timeout = timeout_inspeccion_ia_http()
     max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
 
@@ -2128,7 +2130,7 @@ def analizar_imagenes_ingreso_dispatch(
     )
 
     # Errores de Gemini que justifican probar el siguiente modelo de la lista.
-    # timeout NO está aquí: un HTTP que se agotó ya consumió ~180s; otro
+    # timeout NO está aquí: un HTTP que se agotó ya consumió hasta 5 min; otro
     # intento más empujaría al worker contra el SIGKILL de Celery.
     # Todos los demás (hard_error, safety_block, config_error) son irrecuperables:
     # no tiene sentido enviar el mismo request a otro modelo si el problema es

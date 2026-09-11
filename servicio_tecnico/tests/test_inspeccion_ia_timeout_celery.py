@@ -10,7 +10,7 @@ el cliente nunca recibía el correo.
 Estos tests NO llaman a Google ni a Ollama de verdad, ni envían correo real.
 Comprobamos tres reglas:
 
-1. El HTTP de fotos de ingreso usa INSPECCION_IA_HTTP_TIMEOUT (180s), no los
+1. El HTTP de fotos de ingreso usa INSPECCION_IA_HTTP_TIMEOUT (300s), no los
    600s del análisis de video.
 2. Si el primer Gemini da timeout, NO se prueba el segundo ni Ollama.
 3. Si Celery lanza SoftTimeLimitExceeded durante la IA, EmailMessage.send
@@ -47,14 +47,15 @@ def _jpeg_bytes() -> bytes:
 
 
 @override_settings(
-    INSPECCION_IA_HTTP_TIMEOUT=180,
+    INSPECCION_IA_HTTP_TIMEOUT=300,
     OLLAMA_VISION_TIMEOUT=600,
     CELERY_TASK_SOFT_TIME_LIMIT=300,
     CELERY_TASK_TIME_LIMIT=600,
 )
 class TimeoutInspeccionIaHttpTests(SimpleTestCase):
     """
-    El timeout de fotos de ingreso debe caber DENTRO del soft limit de Celery.
+    El HTTP de IA (5 min) debe caber DENTRO de los límites de ESTA tarea
+    (soft 420 / hard 480), no del global de Celery (300/600).
 
     No toca BD. Solo settings y urllib mockeado.
     """
@@ -63,28 +64,27 @@ class TimeoutInspeccionIaHttpTests(SimpleTestCase):
         """INSPECCION_IA_HTTP_TIMEOUT manda; OLLAMA_VISION_TIMEOUT no se cuela."""
         from servicio_tecnico.ollama_client import timeout_inspeccion_ia_http
 
-        self.assertEqual(timeout_inspeccion_ia_http(), 180)
+        self.assertEqual(timeout_inspeccion_ia_http(), 300)
 
-    def test_invariante_menor_que_soft_limit_celery(self) -> None:
+    def test_invariante_http_cabe_en_limites_de_la_tarea(self) -> None:
         """
-        Si el HTTP dura tanto como el soft/hard de Celery, SIGKILL gana.
-        Este assert documenta el contrato del .env.
+        Si el HTTP dura tanto como el hard kill, SIGKILL gana.
+        Esta tarea overridea el global: comparamos contra sus propios límites.
         """
-        from django.conf import settings
-
-        from servicio_tecnico.ollama_client import timeout_inspeccion_ia_http
-
-        timeout_http = timeout_inspeccion_ia_http()
-        self.assertLess(timeout_http, settings.CELERY_TASK_SOFT_TIME_LIMIT)
-        self.assertLess(timeout_http, settings.CELERY_TASK_TIME_LIMIT)
-
-    def test_tarea_time_limit_cubre_http_de_ia(self) -> None:
-        """La tarea debe poder terminar el SMTP después de un HTTP de 180s."""
         from servicio_tecnico.ollama_client import timeout_inspeccion_ia_http
         from servicio_tecnico.tasks import enviar_imagenes_cliente_task
 
-        self.assertEqual(enviar_imagenes_cliente_task.soft_time_limit, 300)
-        self.assertEqual(enviar_imagenes_cliente_task.time_limit, 420)
+        timeout_http = timeout_inspeccion_ia_http()
+        self.assertLess(timeout_http, enviar_imagenes_cliente_task.soft_time_limit)
+        self.assertLess(timeout_http, enviar_imagenes_cliente_task.time_limit)
+
+    def test_tarea_time_limit_cubre_http_de_ia(self) -> None:
+        """La tarea debe poder terminar el SMTP después de 5 min de IA."""
+        from servicio_tecnico.ollama_client import timeout_inspeccion_ia_http
+        from servicio_tecnico.tasks import enviar_imagenes_cliente_task
+
+        self.assertEqual(enviar_imagenes_cliente_task.soft_time_limit, 420)
+        self.assertEqual(enviar_imagenes_cliente_task.time_limit, 480)
         self.assertLess(timeout_inspeccion_ia_http(), enviar_imagenes_cliente_task.soft_time_limit)
         self.assertLess(timeout_inspeccion_ia_http(), enviar_imagenes_cliente_task.time_limit)
 
@@ -98,13 +98,13 @@ class TimeoutInspeccionIaHttpTests(SimpleTestCase):
         self,
         mock_urlopen: MagicMock,
     ) -> None:
-        """urlopen de Gemini visión recibe 180s, no los 600s de video."""
+        """urlopen de Gemini visión recibe 300s, no los 600s de video."""
         from servicio_tecnico.gemini_client import analizar_imagenes_ingreso_gemini
 
         mock_urlopen.side_effect = TimeoutError('timed out')
         resultado = analizar_imagenes_ingreso_gemini(imagenes_bytes=[_jpeg_bytes()])
 
-        self.assertEqual(mock_urlopen.call_args.kwargs.get('timeout'), 180)
+        self.assertEqual(mock_urlopen.call_args.kwargs.get('timeout'), 300)
         self.assertFalse(resultado['success'])
         self.assertEqual(resultado['error_type'], 'timeout')
 
@@ -140,13 +140,13 @@ class TimeoutInspeccionIaHttpTests(SimpleTestCase):
         self,
         mock_urlopen: MagicMock,
     ) -> None:
-        """urlopen de Ollama visión de ingreso también usa 180s."""
+        """urlopen de Ollama visión de ingreso también usa 300s."""
         from servicio_tecnico.ollama_client import analizar_imagenes_ingreso_ollama
 
         mock_urlopen.side_effect = TimeoutError('timed out')
         resultado = analizar_imagenes_ingreso_ollama(imagenes_bytes=[_jpeg_bytes()])
 
-        self.assertEqual(mock_urlopen.call_args.kwargs.get('timeout'), 180)
+        self.assertEqual(mock_urlopen.call_args.kwargs.get('timeout'), 300)
         self.assertFalse(resultado['success'])
         self.assertEqual(resultado['error_type'], 'timeout')
 
@@ -161,7 +161,7 @@ class DispatchTimeoutAbortaCascadaTests(SimpleTestCase):
     """
     Un timeout de visión debe cortar YA: no más Gemini ni Ollama.
 
-    Objetivo: no encadenar varios HTTP de 180s que sumen más que Celery.
+    Objetivo: no encadenar varios HTTP de 300s que sumen más que Celery.
     """
 
     def _kwargs(self) -> dict:
@@ -185,7 +185,7 @@ class DispatchTimeoutAbortaCascadaTests(SimpleTestCase):
 
         mock_gemini.return_value = {
             'success': False,
-            'error': 'Gemini tardó más de 180s en responder.',
+            'error': 'Gemini tardó más de 300s en responder.',
             'error_type': 'timeout',
         }
 
