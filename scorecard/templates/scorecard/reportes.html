@@ -109,7 +109,7 @@
                     </div>
                 </div>
                 <div class="mt-2">
-                    <small class="text-white-50">
+                    <small class="text-muted">
                         <i class="bi bi-info-circle"></i> Los filtros se aplican a todos los tabs del reporte
                     </small>
                 </div>
@@ -166,38 +166,52 @@
              ========================================== -->
         <div id="tab-resumen" class="tab-pane active">
             <!-- Resumen Ejecutivo -->
-            <div class="row mb-4">
+            <!--
+                EXPLICACIÓN PARA PRINCIPIANTES:
+                Estas tarjetas usan el mismo estilo del Dashboard (.kpi-card):
+                fondo sobrio + borde izquierdo de color. El JavaScript solo
+                cambia el texto de los id (report-total, report-criticas, etc.).
+            -->
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-clipboard-data"></i> Resumen Ejecutivo
                     </h3>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: #1f6391;">
-                        <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-                        <h3 id="report-total">-</h3>
-                        <p>Total Incidencias</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--primary h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-exclamation-triangle stat-icon text-primary"></i>
+                            <div class="kpi-label">Total Incidencias</div>
+                            <div class="kpi-value text-primary" id="report-total">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <i class="bi bi-exclamation-octagon" style="font-size: 2rem;"></i>
-                        <h3 id="report-criticas">-</h3>
-                        <p>Incidencias Críticas</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--danger h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-exclamation-octagon stat-icon text-danger"></i>
+                            <div class="kpi-label">Incidencias Críticas</div>
+                            <div class="kpi-value text-danger" id="report-criticas">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <i class="bi bi-arrow-repeat" style="font-size: 2rem;"></i>
-                        <h3 id="report-reincidencias">-</h3>
-                        <p>Reincidencias</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--info h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-arrow-repeat stat-icon text-info"></i>
+                            <div class="kpi-label">Reincidencias</div>
+                            <div class="kpi-value text-info" id="report-reincidencias">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
-                        <i class="bi bi-calendar-check" style="font-size: 2rem;"></i>
-                        <h3 id="report-promedio">-</h3>
-                        <p>Días Promedio Cierre</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--success h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-calendar-check stat-icon text-success"></i>
+                            <div class="kpi-label">Días Promedio Cierre</div>
+                            <div class="kpi-value text-success" id="report-promedio">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -285,7 +299,7 @@
              ========================================== -->
         <div id="tab-atribuibilidad" class="tab-pane">
             <!-- KPIs de Atribuibilidad -->
-            <div class="row mb-4">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-diagram-3"></i> Análisis de Atribuibilidad
@@ -294,18 +308,24 @@
                         Análisis detallado de incidencias atribuibles vs no atribuibles al técnico responsable
                     </p>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);">
-                        <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-atribuibles">-</h3>
-                        <p>Atribuibles <span class="badge-percentage" id="kpi-porcentaje-atribuibles">-</span></p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--success h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-check-circle stat-icon text-success"></i>
+                            <div class="kpi-label">Atribuibles</div>
+                            <div class="kpi-value text-success" id="kpi-atribuibles">-</div>
+                            <small class="text-muted badge-percentage" id="kpi-porcentaje-atribuibles">-</small>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #FF9800 0%, #FFB74D 100%);">
-                        <i class="bi bi-x-circle" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-no-atribuibles">-</h3>
-                        <p>No Atribuibles <span class="badge-percentage" id="kpi-porcentaje-no-atribuibles">-</span></p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--warning h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-x-circle stat-icon text-warning"></i>
+                            <div class="kpi-label">No Atribuibles</div>
+                            <div class="kpi-value text-warning" id="kpi-no-atribuibles">-</div>
+                            <small class="text-muted badge-percentage" id="kpi-porcentaje-no-atribuibles">-</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -478,38 +498,46 @@
              ========================================== -->
         <div id="tab-reincidencias" class="tab-pane">
             <!-- KPIs de Reincidencias -->
-            <div class="row mb-4">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-arrow-repeat"></i> Análisis de Reincidencias
                     </h3>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
-                        <i class="bi bi-arrow-repeat" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-total-reincidencias">-</h3>
-                        <p>Total Reincidencias</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--warning h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-arrow-repeat stat-icon text-warning"></i>
+                            <div class="kpi-label">Total Reincidencias</div>
+                            <div class="kpi-value text-warning" id="kpi-total-reincidencias">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                        <i class="bi bi-percent" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-porcentaje-reincidencias">-</h3>
-                        <p>% Reincidencias</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--danger h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-percent stat-icon text-danger"></i>
+                            <div class="kpi-label">% Reincidencias</div>
+                            <div class="kpi-value text-danger" id="kpi-porcentaje-reincidencias">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
-                        <i class="bi bi-calendar-range" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-tiempo-entre-reincidencias">-</h3>
-                        <p>Días Entre Reincidencias</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--info h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-calendar-range stat-icon text-info"></i>
+                            <div class="kpi-label">Días Entre Reincidencias</div>
+                            <div class="kpi-value text-info" id="kpi-tiempo-entre-reincidencias">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);">
-                        <i class="bi bi-link-45deg" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-cadenas-largas">-</h3>
-                        <p>Cadenas Largas (3+)</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--secondary h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-link-45deg stat-icon text-secondary"></i>
+                            <div class="kpi-label">Cadenas Largas (3+)</div>
+                            <div class="kpi-value text-secondary" id="kpi-cadenas-largas">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -582,38 +610,46 @@
              ========================================== -->
         <div id="tab-tiempos" class="tab-pane">
             <!-- KPIs de Tiempos -->
-            <div class="row mb-4">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-clock-history"></i> Análisis de Tiempos de Cierre
                     </h3>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
-                        <i class="bi bi-clock" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-tiempo-promedio-cierre">-</h3>
-                        <p>Tiempo Promedio Cierre</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--info h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-clock stat-icon text-info"></i>
+                            <div class="kpi-label">Tiempo Promedio Cierre</div>
+                            <div class="kpi-value text-info" id="kpi-tiempo-promedio-cierre">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%);">
-                        <i class="bi bi-speedometer2" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-tiempo-minimo">-</h3>
-                        <p>Tiempo Mínimo</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--success h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-speedometer2 stat-icon text-success"></i>
+                            <div class="kpi-label">Tiempo Mínimo</div>
+                            <div class="kpi-value text-success" id="kpi-tiempo-minimo">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                        <i class="bi bi-hourglass-split" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-tiempo-maximo">-</h3>
-                        <p>Tiempo Máximo</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--danger h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-hourglass-split stat-icon text-danger"></i>
+                            <div class="kpi-label">Tiempo Máximo</div>
+                            <div class="kpi-value text-danger" id="kpi-tiempo-maximo">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
-                        <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
-                        <h3 id="kpi-total-alertas">-</h3>
-                        <p>Alertas de Tiempo</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--warning h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-exclamation-triangle stat-icon text-warning"></i>
+                            <div class="kpi-label">Alertas de Tiempo</div>
+                            <div class="kpi-value text-warning" id="kpi-total-alertas">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -700,38 +736,46 @@
              ========================================== -->
         <div id="tab-componentes" class="tab-pane">
             <!-- KPIs de Componentes -->
-            <div class="row mb-4">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-gear-fill"></i> Análisis de Componentes Defectuosos
                     </h3>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
-                        <i class="bi bi-gear-fill" style="font-size: 2rem;"></i>
-                        <h3 id="total-con-componente">-</h3>
-                        <p>Incidencias con Componente</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--info h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-gear-fill stat-icon text-info"></i>
+                            <div class="kpi-label">Incidencias con Componente</div>
+                            <div class="kpi-value text-info" id="total-con-componente">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);">
-                        <i class="bi bi-percent" style="font-size: 2rem;"></i>
-                        <h3 id="porcentaje-con-componente">-</h3>
-                        <p>% Con Componente Identificado</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--primary h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-percent stat-icon text-primary"></i>
+                            <div class="kpi-label">% Con Componente Identificado</div>
+                            <div class="kpi-value text-primary" id="porcentaje-con-componente">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
-                        <i class="bi bi-collection" style="font-size: 2rem;"></i>
-                        <h3 id="componentes-unicos">-</h3>
-                        <p>Componentes Únicos</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--warning h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-collection stat-icon text-warning"></i>
+                            <div class="kpi-label">Componentes Únicos</div>
+                            <div class="kpi-value text-warning" id="componentes-unicos">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                        <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem;"></i>
-                        <h3 id="componente-mas-frecuente">-</h3>
-                        <p>Componente Más Frecuente</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--danger h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-exclamation-triangle-fill stat-icon text-danger"></i>
+                            <div class="kpi-label">Componente Más Frecuente</div>
+                            <div class="kpi-value kpi-value--texto text-danger" id="componente-mas-frecuente">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -797,38 +841,46 @@
              ========================================== -->
         <div id="tab-notificaciones" class="tab-pane">
             <!-- KPIs de Notificaciones -->
-            <div class="row mb-4">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <h3 class="report-title">
                         <i class="bi bi-envelope-fill"></i> Análisis de Notificaciones del Sistema
                     </h3>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
-                        <i class="bi bi-envelope-fill" style="font-size: 2rem;"></i>
-                        <h3 id="total-notificaciones">-</h3>
-                        <p>Total Notificaciones</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--info h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-envelope-fill stat-icon text-info"></i>
+                            <div class="kpi-label">Total Notificaciones</div>
+                            <div class="kpi-value text-info" id="total-notificaciones">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%);">
-                        <i class="bi bi-check-circle-fill" style="font-size: 2rem;"></i>
-                        <h3 id="tasa-exito">-</h3>
-                        <p>Tasa de Éxito</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--success h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-check-circle-fill stat-icon text-success"></i>
+                            <div class="kpi-label">Tasa de Éxito</div>
+                            <div class="kpi-value text-success" id="tasa-exito">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
-                        <i class="bi bi-clock-fill" style="font-size: 2rem;"></i>
-                        <h3 id="tiempo-promedio-notif">-</h3>
-                        <p>Tiempo Promedio (min)</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--warning h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-clock-fill stat-icon text-warning"></i>
+                            <div class="kpi-label">Tiempo Promedio (min)</div>
+                            <div class="kpi-value text-warning" id="tiempo-promedio-notif">-</div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                        <i class="bi bi-x-circle-fill" style="font-size: 2rem;"></i>
-                        <h3 id="notificaciones-fallidas">-</h3>
-                        <p>Notificaciones Fallidas</p>
+                <div class="col-xl-3 col-md-6">
+                    <div class="card kpi-card kpi-card--danger h-100">
+                        <div class="card-body position-relative">
+                            <i class="bi bi-x-circle-fill stat-icon text-danger"></i>
+                            <div class="kpi-label">Notificaciones Fallidas</div>
+                            <div class="kpi-value text-danger" id="notificaciones-fallidas">-</div>
+                        </div>
                     </div>
                 </div>
             </div>

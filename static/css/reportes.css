@@ -92,53 +92,50 @@
 }
 
 /* ============================================
-   FILTROS MEJORADOS
+   FILTROS (estilo sobrio, igual que el resto de tarjetas)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Antes este bloque era azul/morado de fondo completo y resaltaba
+   demasiado. Ahora usa el mismo fondo de panel que los gráficos y
+   las KPI (.kpi-card): claro en modo light, #1e293b en dark.
    ============================================ */
 .filter-card {
-    background: #1f6391;
-    color: white;
+    background: var(--card-bg, #fff);
+    color: var(--text-primary, #111827);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: var(--reporte-shadow);
     margin-bottom: 2rem;
+    border: 1px solid var(--border-color, var(--reporte-border));
 }
 
 .filter-card h5 {
-    color: white;
+    color: var(--text-primary, #1e293b);
     font-weight: 600;
     margin-bottom: 1rem;
 }
 
+.filter-card h5 i {
+    color: var(--reporte-primary);
+}
+
 .filter-card .form-label {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--gray-600, #64748b);
     font-weight: 500;
     font-size: 0.9rem;
 }
 
 .filter-card .form-control,
 .filter-card .form-select {
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.95);
-    transition: all 0.3s ease;
+    border: 1px solid var(--border-color, var(--reporte-border));
+    background: var(--card-bg, #fff);
+    color: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .filter-card .form-control:focus,
 .filter-card .form-select:focus {
-    border-color: white;
-    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
-}
-
-.filter-card .btn-primary {
-    background: white;
-    color: #1f6391;
-    border: none;
-    font-weight: 600;
-}
-
-.filter-card .btn-primary:hover {
-    background: rgba(255, 255, 255, 0.9);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-color: var(--reporte-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.2);
 }
 
 /* ============================================
@@ -185,39 +182,54 @@
 }
 
 /* ============================================
-   TARJETAS DE ESTADÍSTICAS
+   TARJETAS DE ESTADÍSTICAS (estilo Dashboard)
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Ya no pintamos todo el fondo de color. Reutilizamos .kpi-card del
+   Dashboard: fondo sobrio + borde izquierdo de color.
+
+   ¿Por qué .card.kpi-card.kpi-card--*?
+   Bootstrap 5 en modo oscuro usa [data-bs-theme="dark"] .card { border: ... }
+   y esa regla gana a un simple .kpi-card--primary. Encadenar las 3 clases
+   da más especificidad y el borde de acento sí se ve (como el Dashboard,
+   que lo logra con style="" inline).
    ============================================ */
-.stat-box {
-    background: #1f6391;
-    color: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: var(--reporte-shadow);
-    text-align: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    margin-bottom: 1.5rem;
+.card.kpi-card[class*="kpi-card--"] {
+    min-height: 140px;
 }
 
-.stat-box:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--reporte-shadow-hover);
+.card.kpi-card.kpi-card--primary {
+    border-left: 5px solid var(--reporte-primary);
 }
 
-.stat-box h3 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 0.5rem 0;
+.card.kpi-card.kpi-card--success {
+    border-left: 5px solid var(--reporte-success);
 }
 
-.stat-box p {
-    margin: 0;
-    font-size: 1rem;
-    opacity: 0.95;
-    font-weight: 500;
+.card.kpi-card.kpi-card--danger {
+    border-left: 5px solid var(--reporte-danger);
 }
 
-.stat-box i {
-    opacity: 0.8;
+.card.kpi-card.kpi-card--warning {
+    border-left: 5px solid var(--reporte-warning);
+}
+
+.card.kpi-card.kpi-card--info {
+    border-left: 5px solid var(--reporte-info);
+}
+
+.card.kpi-card.kpi-card--secondary {
+    border-left: 5px solid #6c757d;
+}
+
+/*
+    EXPLICACIÓN: el KPI "componente más frecuente" muestra un nombre,
+    no un número. Bajamos el tamaño para que quepa sin desbordar.
+*/
+.kpi-value--texto {
+    font-size: 1.35rem;
+    letter-spacing: 0;
+    line-height: 1.25;
+    word-break: break-word;
 }
 
 /* ============================================
@@ -490,8 +502,8 @@
         padding: 0.5rem;
     }
     
-    .stat-box h3 {
-        font-size: 2rem;
+    .kpi-value--texto {
+        font-size: 1.15rem;
     }
     
     .export-buttons {
@@ -532,6 +544,17 @@
     
     body {
         font-size: 11pt;
+    }
+
+    /*
+        EXPLICACIÓN: al imprimir no queremos fondo oscuro ni sombras.
+        El borde izquierdo de color sí se queda para identificar cada KPI.
+    */
+    .kpi-card {
+        box-shadow: none !important;
+        background: #fff !important;
+        break-inside: avoid;
+        border: 1px solid #ddd;
     }
 }
 
@@ -601,33 +624,37 @@
     background: #1e293b;
 }
 
-/* Filtros */
+/* Filtros: mismo panel oscuro que gráficos / KPI, sin degradado */
 [data-bs-theme="dark"] .filter-card {
-    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .filter-card h5 {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .filter-card h5 i {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .filter-card .form-label {
+    color: #94a3b8;
 }
 
 [data-bs-theme="dark"] .filter-card .form-control,
 [data-bs-theme="dark"] .filter-card .form-select {
-    background: rgba(15, 23, 42, 0.85) !important;
-    color: #e2e8f0 !important;
-    border-color: rgba(148, 163, 184, 0.4) !important;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-color: #334155;
 }
 
 [data-bs-theme="dark"] .filter-card .form-control:focus,
 [data-bs-theme="dark"] .filter-card .form-select:focus {
-    border-color: #93c5fd !important;
-    box-shadow: 0 0 0 0.2rem rgba(147, 197, 253, 0.25) !important;
-}
-
-[data-bs-theme="dark"] .filter-card .btn-primary {
-    background: #1e293b;
-    color: #93c5fd;
-    border: 1px solid #334155;
-}
-
-[data-bs-theme="dark"] .filter-card .btn-primary:hover {
-    background: #0f172a;
-    color: #bfdbfe;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.25);
 }
 
 /* Contenedores de gráficos */
@@ -641,9 +668,12 @@
     border-bottom-color: #334155;
 }
 
-/* Tarjetas de estadísticas */
-[data-bs-theme="dark"] .stat-box {
-    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+/*
+    EXPLICACIÓN: el fondo oscuro de .kpi-card ya vive en components.css.
+    Aquí solo afinamos el acento gris para que se lea en dark mode.
+*/
+[data-bs-theme="dark"] .card.kpi-card.kpi-card--secondary {
+    border-left-color: #94a3b8;
 }
 
 /* Tabla scorecard */
