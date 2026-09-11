@@ -1,0 +1,426 @@
+/* =============================================================================
+   LISTA DE SUCURSALES — directorio operativo de sedes (Administración)
+   Estética industrial-utilitaria SIGMA. Usa variables de base.css.
+   Espejo de lista_empleados.css (prefijo ls-). Sin tarjetas Bootstrap
+   de color sólido (bg-primary / bg-success / etc.).
+   ============================================================================= */
+
+.lista-sucursales-page {
+    --ls-surface: var(--card-bg, #ffffff);
+    --ls-border: var(--border-color, #e2e8f0);
+    --ls-muted: var(--text-muted, #64748b);
+    --ls-text: var(--text-primary, #0f172a);
+    --ls-accent: var(--primary-color, #1f6391);
+    --ls-accent-soft: color-mix(in srgb, var(--ls-accent) 12%, transparent);
+    --ls-radius: 10px;
+    --ls-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --ls-ok: #16a34a;
+    --ls-warn: #d97706;
+    padding-bottom: 2.5rem;
+}
+
+[data-bs-theme="dark"] .lista-sucursales-page {
+    --ls-surface: var(--card-bg, #1e293b);
+    --ls-border: var(--border-color, #334155);
+    --ls-muted: #94a3b8;
+    --ls-text: var(--text-primary, #e2e8f0);
+    --ls-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Encabezado ─────────────────────────────────────────────────────────── */
+
+.ls-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.ls-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ls-text);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+}
+
+.ls-header h1 i {
+    color: var(--ls-accent);
+}
+
+.ls-header .ls-subtitle {
+    margin: 0;
+    color: var(--ls-muted);
+    font-size: 0.9rem;
+}
+
+.ls-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* ── Chips de resumen (clic = filtro) ───────────────────────────────────── */
+
+.ls-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.ls-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    min-height: 44px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid var(--ls-border);
+    background: var(--ls-surface);
+    color: var(--ls-text);
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ls-chip:hover {
+    border-color: var(--ls-accent);
+    color: var(--ls-text);
+}
+
+.ls-chip:focus-visible {
+    outline: 2px solid var(--ls-accent);
+    outline-offset: 2px;
+}
+
+.ls-chip .ls-chip-count {
+    font-variant-numeric: tabular-nums;
+    min-width: 1.25rem;
+    text-align: center;
+}
+
+.ls-chip--activa {
+    border-color: color-mix(in srgb, var(--ls-ok) 40%, var(--ls-border));
+}
+
+.ls-chip--inactiva {
+    border-color: color-mix(in srgb, #64748b 40%, var(--ls-border));
+}
+
+.ls-chip--encargado {
+    border-color: color-mix(in srgb, var(--ls-accent) 40%, var(--ls-border));
+}
+
+.ls-chip.is-active {
+    background: var(--ls-accent-soft);
+    border-color: var(--ls-accent);
+    color: var(--ls-accent);
+}
+
+/* ── Filtros ────────────────────────────────────────────────────────────── */
+
+.ls-filtros {
+    background: var(--ls-surface);
+    border: 1px solid var(--ls-border);
+    border-radius: var(--ls-radius);
+    box-shadow: var(--ls-shadow);
+    padding: 1rem 1.15rem;
+    margin-bottom: 1.25rem;
+}
+
+.ls-filtros .form-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--ls-muted);
+    margin-bottom: 0.3rem;
+}
+
+.ls-filtros .form-control,
+.ls-filtros .form-select {
+    border-color: var(--ls-border);
+    background: var(--body-bg, #f8fafc);
+    color: var(--ls-text);
+}
+
+[data-bs-theme="dark"] .ls-filtros .form-control,
+[data-bs-theme="dark"] .ls-filtros .form-select {
+    background: #0f172a;
+}
+
+.ls-filtros-actions {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.ls-filtros-actions .btn {
+    flex: 1;
+    min-height: 44px;
+}
+
+/* ── Contador de resultados ─────────────────────────────────────────────── */
+
+.ls-counter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    color: var(--ls-muted);
+    font-size: 0.9rem;
+}
+
+.ls-counter strong {
+    color: var(--ls-text);
+}
+
+/* ── Tabla escritorio ───────────────────────────────────────────────────── */
+
+.ls-table-wrap {
+    background: var(--ls-surface);
+    border: 1px solid var(--ls-border);
+    border-radius: var(--ls-radius);
+    box-shadow: var(--ls-shadow);
+    overflow: hidden;
+}
+
+.ls-table {
+    margin-bottom: 0;
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--ls-text);
+}
+
+.ls-table thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--ls-muted);
+    background: color-mix(in srgb, var(--ls-accent) 8%, var(--ls-surface));
+    border-bottom: 1px solid var(--ls-border);
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+}
+
+.ls-table tbody td {
+    vertical-align: middle;
+    padding: 0.85rem 1rem;
+    border-color: var(--ls-border);
+}
+
+.ls-table tbody tr.is-inactive {
+    opacity: 0.62;
+}
+
+.ls-nombre {
+    font-weight: 600;
+    color: var(--ls-text);
+    margin: 0;
+}
+
+.ls-meta {
+    font-size: 0.8rem;
+    color: var(--ls-muted);
+    margin: 0.15rem 0 0;
+}
+
+.ls-codigo {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--ls-accent) 10%, transparent);
+    color: var(--ls-accent);
+    border: 1px solid color-mix(in srgb, var(--ls-accent) 22%, transparent);
+}
+
+.ls-contacto {
+    font-size: 0.85rem;
+    color: var(--ls-text);
+}
+
+.ls-contacto i {
+    color: var(--ls-muted);
+    margin-right: 0.25rem;
+}
+
+/* ── Chips de estado (no badges Bootstrap chillones) ────────────────────── */
+
+.ls-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.ls-status--activa {
+    background: color-mix(in srgb, var(--ls-ok) 16%, transparent);
+    color: #15803d;
+}
+
+.ls-status--inactiva {
+    background: color-mix(in srgb, #64748b 14%, transparent);
+    color: var(--ls-muted);
+}
+
+[data-bs-theme="dark"] .ls-status--activa {
+    color: #4ade80;
+}
+
+[data-bs-theme="dark"] .ls-status--inactiva {
+    color: #94a3b8;
+}
+
+.ls-acciones {
+    display: inline-flex;
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+
+.ls-acciones .btn {
+    min-width: 44px;
+    min-height: 36px;
+}
+
+/* ── Tarjetas móvil ─────────────────────────────────────────────────────── */
+
+.ls-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+@media (min-width: 576px) {
+    .ls-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.ls-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--ls-surface);
+    border: 1px solid var(--ls-border);
+    border-radius: var(--ls-radius);
+    box-shadow: var(--ls-shadow);
+    color: inherit;
+    min-height: 44px;
+}
+
+.ls-card.is-inactive {
+    opacity: 0.65;
+}
+
+.ls-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ls-card-nombre {
+    font-weight: 650;
+    font-size: 0.95rem;
+    margin: 0;
+    color: var(--ls-text);
+}
+
+.ls-card-body p {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--ls-text);
+}
+
+.ls-card-body p:last-child {
+    margin-bottom: 0;
+}
+
+.ls-card-body i {
+    color: var(--ls-muted);
+    margin-right: 0.3rem;
+}
+
+.ls-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--ls-border);
+}
+
+.ls-card-footer .btn {
+    min-height: 44px;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+
+.ls-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: var(--ls-surface);
+    border: 1px dashed var(--ls-border);
+    border-radius: var(--ls-radius);
+}
+
+.ls-empty i {
+    font-size: 3rem;
+    color: var(--ls-muted);
+}
+
+.ls-empty h4 {
+    margin-top: 1rem;
+    color: var(--ls-text);
+}
+
+.ls-empty p {
+    color: var(--ls-muted);
+}
+
+/* ── Modal eliminar ─────────────────────────────────────────────────────── */
+
+.ls-modal-aviso {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--ls-radius);
+    border: 1px solid color-mix(in srgb, var(--ls-warn) 35%, var(--ls-border));
+    background: color-mix(in srgb, var(--ls-warn) 10%, var(--ls-surface));
+    color: var(--ls-text);
+    font-size: 0.875rem;
+}
+
+.ls-modal-aviso i {
+    color: var(--ls-warn);
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+[data-bs-theme="dark"] .ls-modal-aviso i {
+    color: #fbbf24;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ls-chip,
+    .ls-card {
+        transition: none;
+    }
+}

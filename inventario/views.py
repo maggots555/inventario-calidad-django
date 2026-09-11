@@ -712,10 +712,78 @@ def movimiento_fraccionario(request):
 @permission_required_with_message('inventario.view_sucursal', message='No tienes permisos para ver la lista de sucursales.')
 def lista_sucursales(request):
     """
-    Lista de todas las sucursales
+    Lista administrativa de sucursales con filtros y resumen.
+
+    Objetivo de negocio:
+        Directorio de sedes físicas (Administración) para ver, filtrar
+        y editar sucursales. Distinta del dashboard de distribución de Almacén.
+
+    Argumentos:
+        request: HttpRequest con GET opcionales:
+            - busqueda (str): nombre, código o ciudad
+            - estado (str): 'activa' | 'inactiva' | ''
+            - ciudad (str): ciudad exacta del catálogo
+            - con_encargado (str): '1' si el chip "Con encargado" está activo
+
+    Efectos secundarios:
+        Solo lectura de BD. No crea ni borra sucursales.
     """
     sucursales = Sucursal.objects.all()
-    return render(request, 'inventario/lista_sucursales.html', {'sucursales': sucursales})
+
+    busqueda = request.GET.get('busqueda', '').strip()
+    estado = request.GET.get('estado', '')
+    ciudad = request.GET.get('ciudad', '')
+    con_encargado = request.GET.get('con_encargado', '') == '1'
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Q(...) junta condiciones con OR. Sin Q, filter(nombre=..., codigo=...)
+    # exigiría que AMBOS coincidan (AND), y la búsqueda fallaría.
+    if busqueda:
+        sucursales = sucursales.filter(
+            Q(nombre__icontains=busqueda) |
+            Q(codigo__icontains=busqueda) |
+            Q(ciudad__icontains=busqueda)
+        )
+
+    if ciudad:
+        sucursales = sucursales.filter(ciudad=ciudad)
+
+    # Contadores ANTES de estado/encargado para que los chips no se pongan a 0
+    # al hacer clic (el usuario ve el desglose de la búsqueda/ciudad actual).
+    contadores = {
+        'total': sucursales.count(),
+        'activas': sucursales.filter(activa=True).count(),
+        'inactivas': sucursales.filter(activa=False).count(),
+        'con_encargado': sucursales.exclude(responsable='').count(),
+    }
+
+    if estado == 'activa':
+        sucursales = sucursales.filter(activa=True)
+    elif estado == 'inactiva':
+        sucursales = sucursales.filter(activa=False)
+
+    if con_encargado:
+        sucursales = sucursales.exclude(responsable='')
+
+    sucursales = sucursales.order_by('nombre')
+
+    ciudades_disponibles = (
+        Sucursal.objects.exclude(ciudad='')
+        .values_list('ciudad', flat=True)
+        .distinct()
+        .order_by('ciudad')
+    )
+
+    context = {
+        'sucursales': sucursales,
+        'busqueda': busqueda,
+        'estado_seleccionado': estado,
+        'ciudad_seleccionada': ciudad,
+        'con_encargado_seleccionado': con_encargado,
+        'ciudades_disponibles': ciudades_disponibles,
+        'contadores': contadores,
+    }
+    return render(request, 'inventario/lista_sucursales.html', context)
 
 @login_required
 @permission_required_with_message('inventario.add_sucursal', message='No tienes permisos para crear nuevas sucursales.')
