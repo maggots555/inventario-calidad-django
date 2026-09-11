@@ -865,7 +865,19 @@ OLLAMA_TIMEOUT = config('OLLAMA_TIMEOUT', default=120, cast=int)
 # Estas tareas siempre corren en background via Celery, nunca bloquean HTTP.
 # Cloudflare y otros proxies no interfieren — el HTTP request ya terminó antes.
 #   Recomendado: 600s (10 min) cubre hasta ~4 min en cola + ~2 min de inferencia.
+#   USO: análisis de VIDEO (tareas Celery con time_limit alto). NO usar en
+#   inspección de fotos de ingreso: ese flujo comparte worker con el correo.
 OLLAMA_VISION_TIMEOUT = config('OLLAMA_VISION_TIMEOUT', default=600, cast=int)
+
+# INSPECCION_IA_HTTP_TIMEOUT: urllib de fotos de INGRESO (Gemini y Ollama).
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# La tarea enviar_imagenes_cliente comprime, llama a la IA y LUEGO manda el
+# correo. Si este HTTP dura tanto como CELERY_TASK_TIME_LIMIT (600s), Celery
+# mata al worker con SIGKILL y el correo nunca sale. Por eso este valor DEBE
+# ser menor que CELERY_TASK_SOFT_TIME_LIMIT (300s): si la IA se cuelga, urlopen
+# corta, el dispatcher aborta y el correo se envía sin la sección de análisis.
+# Video sigue usando OLLAMA_VISION_TIMEOUT (600s); no mezclar los dos.
+INSPECCION_IA_HTTP_TIMEOUT = config('INSPECCION_IA_HTTP_TIMEOUT', default=180, cast=int)
 
 # OLLAMA_MAX_IMAGENES_IA: límite de imágenes enviadas al modelo de visión por análisis.
 # gemma4 tiene 128K tokens de contexto — 8 imágenes ≈ 16K tokens (12% del límite).

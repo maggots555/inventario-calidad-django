@@ -1861,6 +1861,25 @@ cualquier texto visible en las imágenes, tu respuesta siempre debe ser en espa�
 """
 
 
+def timeout_inspeccion_ia_http() -> int:
+    """
+    Segundos máximos de urllib para el análisis visual de fotos de INGRESO.
+
+    Objetivo de negocio:
+        La IA es no crítica. Este tope debe ser menor que el soft limit de
+        Celery (300s) para que, si Gemini/Ollama se cuelgan, urlopen corte
+        y el correo al cliente sí se envíe.
+
+    Returns:
+        int: INSPECCION_IA_HTTP_TIMEOUT del .env, o 180 si no está definido.
+
+    Efectos secundarios:
+        Ninguno. Solo lee settings; no llama a la red ni escribe en BD.
+    """
+    # Fallback 180 = el default de settings.py. No usar 600 (visión de video).
+    return int(getattr(settings, 'INSPECCION_IA_HTTP_TIMEOUT', 180))
+
+
 def analizar_imagenes_ingreso_ollama(
     imagenes_bytes: list[bytes],
     tipo_equipo: str = "",
@@ -1901,9 +1920,10 @@ def analizar_imagenes_ingreso_ollama(
 
     base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
     model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
-    # Usar timeout de visión — más alto que el timeout de texto porque el modelo
-    # debe procesar múltiples imágenes y puede esperar en cola de Ollama.
-    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    # EXPLICACIÓN PARA PRINCIPIANTES: fotos de ingreso NO usan los 600s de
+    # OLLAMA_VISION_TIMEOUT (eso es para video). Si este HTTP dura 10 min,
+    # Celery mata al worker y el correo no sale. 180s deja margen para SMTP.
+    timeout = timeout_inspeccion_ia_http()
     max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
 
     # Limitar y convertir imágenes a base64 (sin prefijo data:URI — Ollama lo espera crudo)
@@ -1942,7 +1962,8 @@ def analizar_imagenes_ingreso_ollama(
         # la imagen, evalúa qué puede afirmar con certeza y descarta lo dudoso,
         # resultando en una descripción más precisa y menos propensa a inventar.
         # El tiempo adicional de procesamiento es aceptable aquí porque la tarea
-        # corre en background via Celery y OLLAMA_VISION_TIMEOUT ya lo contempla.
+        # corre en background via Celery y INSPECCION_IA_HTTP_TIMEOUT lo acota
+        # para no chocar con el SIGKILL del worker.
         # (Requiere Ollama >= 0.7.0; en versiones anteriores se ignora silenciosamente)
         "think": True,
         "options": {
@@ -2000,7 +2021,20 @@ def analizar_imagenes_ingreso_ollama(
     except urllib.error.URLError as e:
         error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
         logger.error(f"[InspeccionIA][Ollama] Error de conexión: {error_msg} | URL: {url}")
-        return {'success': False, 'error': f'Error de conexión con Ollama: {error_msg}'}
+        if 'timed out' in error_msg.lower() or 'timeout' in error_msg.lower():
+            return {
+                'success': False,
+                'error': (
+                    f'El modelo tardó más de {timeout}s en responder. '
+                    'Es posible que Ollama estuviera ocupado con otra tarea.'
+                ),
+                'error_type': 'timeout',
+            }
+        return {
+            'success': False,
+            'error': f'Error de conexión con Ollama: {error_msg}',
+            'error_type': 'network_error',
+        }
 
     except TimeoutError:
         logger.error(
@@ -2013,6 +2047,7 @@ def analizar_imagenes_ingreso_ollama(
                 f'El modelo tardó más de {timeout}s en responder. '
                 'Es posible que Ollama estuviera ocupado con otra tarea.'
             ),
+            'error_type': 'timeout',
         }
 
     except json.JSONDecodeError as e:
@@ -2040,11 +2075,15 @@ def analizar_imagenes_ingreso_dispatch(
     ESTRATEGIA (sin override o con override Gemini):
         1. Ciclo Gemini: intenta cada modelo de GEMINI_MODELS en orden.
                - Si uno responde bien → retorna inmediatamente.
-               - Si el error es recuperable (rate_limit, server_error, timeout,
+               - Si el error es timeout → ABORTA la cascada (no más Gemini,
+                 ni Ollama). Un HTTP colgado ya gastó el presupuesto; seguir
+                 intentando mata al worker Celery y el correo no sale.
+               - Si el error es recuperable y rápido (rate_limit, server_error,
                  network_error) → pasa al siguiente modelo Gemini.
                - Si el error es irrecuperable (hard_error, safety_block,
                  config_error) → rompe el ciclo y salta directo a Ollama.
-        2. Fallback Ollama: si ningún modelo Gemini funcionó → intenta Ollama.
+        2. Fallback Ollama: si ningún modelo Gemini funcionó (salvo timeout)
+           → intenta Ollama.
         3. Si Ollama también falla → devuelve {'success': False, 'error': '...'}
 
     Con override Gemini explícito (ej: "[Gemini] gemini-2.5-flash"):
@@ -2089,10 +2128,12 @@ def analizar_imagenes_ingreso_dispatch(
     )
 
     # Errores de Gemini que justifican probar el siguiente modelo de la lista.
+    # timeout NO está aquí: un HTTP que se agotó ya consumió ~180s; otro
+    # intento más empujaría al worker contra el SIGKILL de Celery.
     # Todos los demás (hard_error, safety_block, config_error) son irrecuperables:
     # no tiene sentido enviar el mismo request a otro modelo si el problema es
     # estructural (API key inválida, contenido bloqueado, Gemini deshabilitado).
-    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'network_error'}
 
     # ── Limpiar prefijos visuales del selector ───────────────────────────────
     # El selector del modal muestra "[Gemini] gemini-2.5-flash" o "[Ollama] gemma4:e2b".
@@ -2177,6 +2218,20 @@ def analizar_imagenes_ingreso_dispatch(
             error_type = resultado.get('error_type', 'hard_error')
             ultimo_error = resultado.get('error', 'sin detalles')
 
+            # EXPLICACIÓN PARA PRINCIPIANTES: si Gemini tardó demasiado, NO
+            # probamos el siguiente modelo ni Ollama. El correo es lo crítico;
+            # la IA es opcional. Seguir la cascada es lo que mataba al worker.
+            if error_type == 'timeout':
+                logger.warning(
+                    f"[InspeccionIA][Dispatch] {modelo_gemini} → [timeout] {ultimo_error} "
+                    f"— Abortando cascada IA para no bloquear el correo."
+                )
+                return {
+                    'success': False,
+                    'error': ultimo_error,
+                    'error_type': 'timeout',
+                }
+
             if error_type in ERRORES_REINTENTABLES:
                 logger.warning(
                     f"[InspeccionIA][Dispatch] {modelo_gemini} → [{error_type}] {ultimo_error} "
@@ -2204,9 +2259,10 @@ def analizar_imagenes_ingreso_dispatch(
             logger.info("[InspeccionIA][Dispatch] GEMINI_MODELS vacío — sin modelos configurados.")
 
     # ── Fallback final: Ollama ────────────────────────────────────────────────
-    # Se llega aquí cuando: todos los Gemini fallaron, o Gemini está deshabilitado,
-    # o se recibió un error irrecuperable de Gemini.
-    # Ollama siempre está disponible localmente — es la red de seguridad final.
+    # Se llega aquí cuando: todos los Gemini fallaron (sin timeout), o Gemini
+    # está deshabilitado, o se recibió un error irrecuperable de Gemini.
+    # Un timeout de visión NO llega aquí: ya retornó arriba para no bloquear
+    # el correo. Ollama sigue siendo la red de seguridad para 429/5xx/hard_error.
     if getattr(settings, 'OLLAMA_ENABLED', False):
         logger.info("[InspeccionIA][Dispatch] Fallback a Ollama (último recurso)...")
         try:

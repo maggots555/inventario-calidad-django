@@ -878,7 +878,8 @@ def analizar_imagenes_ingreso_gemini(
         Tipos de error:
             'rate_limit'    → HTTP 429, cuota momentáneamente agotada (reintentable)
             'server_error'  → HTTP 5xx o respuesta vacía (reintentable)
-            'timeout'       → Timeout de red (reintentable)
+            'timeout'       → Timeout de red (el dispatcher ABORTA la cascada:
+                              no reintenta más modelos para no matar al worker)
             'network_error' → URLError, sin conexión (reintentable)
             'hard_error'    → HTTP 4xx, API key inválida (no reintentable)
             'safety_block'  → Filtro de seguridad de Google (no reintentable)
@@ -893,9 +894,9 @@ def analizar_imagenes_ingreso_gemini(
     para decidir si tiene sentido probar el siguiente modelo Gemini, o si el
     error es irrecuperable y conviene saltar directamente a Ollama.
     """
-    # Importar el prompt desde ollama_client para no duplicar la definición.
+    # Importar el prompt y el timeout de ingreso desde ollama_client.
     # Mismo prompt → mismo estándar de respuesta entre Ollama y Gemini.
-    from .ollama_client import PROMPT_INSPECCION_ESTETICA
+    from .ollama_client import PROMPT_INSPECCION_ESTETICA, timeout_inspeccion_ia_http
 
     if not imagenes_bytes:
         return {'success': False, 'error': 'No se proporcionaron imágenes para analizar.', 'error_type': 'config_error'}
@@ -909,9 +910,10 @@ def analizar_imagenes_ingreso_gemini(
         return {'success': False, 'error': 'GEMINI_API_KEY no configurada.', 'error_type': 'config_error'}
 
     model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', GEMINI_MODEL_DEFAULT)
-    # Para visión usamos el mismo timeout que Ollama vision: más generoso
-    # porque el payload de imágenes es más grande y la red puede ser el cuello.
-    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    # EXPLICACIÓN PARA PRINCIPIANTES: este timeout es SOLO de fotos de ingreso.
+    # No usamos OLLAMA_VISION_TIMEOUT (600s): ese valor empata con el hard kill
+    # de Celery y el correo nunca se envía. Ver timeout_inspeccion_ia_http().
+    timeout = timeout_inspeccion_ia_http()
     max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
     max_output_tokens = getattr(settings, 'GEMINI_INSPECCION_MAX_TOKENS', 3072)
 
@@ -1064,6 +1066,15 @@ def analizar_imagenes_ingreso_gemini(
     except urllib.error.URLError as e:
         error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
         logger.error(f"[InspeccionIA][Gemini] Error de red: {error_msg}")
+        # urllib suele envolver el timeout del socket en URLError, no en
+        # TimeoutError suelto. Si no lo clasificamos aquí, el dispatcher
+        # pensaría que es un error de red rápido y probaría otro modelo.
+        if 'timed out' in error_msg.lower() or 'timeout' in error_msg.lower():
+            return {
+                'success': False,
+                'error': f'Gemini tardó más de {timeout}s en responder.',
+                'error_type': 'timeout',
+            }
         return {'success': False, 'error': f'Error de red al conectar con Gemini: {error_msg}', 'error_type': 'network_error'}
 
     except TimeoutError:
