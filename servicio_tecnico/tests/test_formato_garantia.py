@@ -810,7 +810,9 @@ class FormatoGarantiaEmailTaskTest(TestCase):
     La task Celery envía HTML profesional (template) conservando el asunto.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Mockeamos EmailMessage.send para no mandar correos reales en CI.
+    Mockeamos EmailMessage.send (EmailMultiAlternatives lo hereda) para
+    no mandar correos reales en CI. El HTML vive en alternatives; el
+    text/plain va en body.
     """
 
     databases = {'default', 'mexico'}
@@ -905,13 +907,17 @@ class FormatoGarantiaEmailTaskTest(TestCase):
             msg.subject,
             'Formato de Servicio Garantía Dell — 999888777',
         )
+        html = msg.alternatives[0][0]
         body = msg.body
-        self.assertIn('FORMATO DE SERVICIO GARANTÍA DELL', body)
-        self.assertIn('equipment-info', body)
-        self.assertIn('cid:logo_sic', body)
+        self.assertIn('Formato de servicio garantía Dell', html)
+        self.assertIn('Información de su equipo', html)
+        self.assertIn('cid:logo_sic', html)
+        self.assertIn('999888777', html)
+        self.assertIn('GARSTAG01', html)
+        self.assertNotIn('Estimado(a) cliente', html)
+        self.assertIn('Formato de Servicio en Garantía Dell', body)
         self.assertIn('999888777', body)
         self.assertIn('GARSTAG01', body)
-        self.assertNotIn('Estimado(a) cliente', body)
         self.assertTrue(
             HistorialOrden.objects.filter(
                 orden=self.orden,

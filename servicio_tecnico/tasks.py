@@ -5580,13 +5580,13 @@ def enviar_formato_garantia_email_task(
         db_alias: Alias de BD del país
 
     Efectos secundarios:
-        Envía EmailMessage con PDF adjunto + logo/iconos CID;
-        registra historial en la orden.
+        Envía EmailMultiAlternatives (HTML + texto plano) con PDF adjunto
+        + logo/iconos CID; registra historial en la orden.
     """
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.contrib.staticfiles import finders
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from email.mime.application import MIMEApplication
@@ -5689,13 +5689,21 @@ def enviar_formato_garantia_email_task(
                 else getattr(settings, 'DEFAULT_FROM_EMAIL', None)
             )
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El DPS y el aviso del PDF firmado deben
+        # llegar aunque Gmail/Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_formato_garantia import (
+            construir_texto_plano_formato_garantia,
+        )
+        texto_plano = construir_texto_plano_formato_garantia(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=from_email,
             to=destinatarios,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         try:
             logo_path = finders.find('images/logos/logo_sic.png')
