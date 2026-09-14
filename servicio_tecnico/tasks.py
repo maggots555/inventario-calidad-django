@@ -1824,7 +1824,7 @@ def enviar_imagenes_egreso_cliente_task(
     import io
     import re
     from pathlib import Path
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -1973,14 +1973,22 @@ def enviar_imagenes_egreso_cliente_task(
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El aviso de “aún no recolectar” debe llegar
+        # aunque Gmail/Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_imagenes_egreso import (
+            construir_texto_plano_imagenes_egreso,
+        )
+        texto_plano = construir_texto_plano_imagenes_egreso(context)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # Adjuntar logo SIC
         try:
