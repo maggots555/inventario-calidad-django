@@ -2155,7 +2155,7 @@ def enviar_notificacion_equipo_disponible_task(
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.contrib.staticfiles import finders
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from email.mime.image import MIMEImage
 
@@ -2280,14 +2280,22 @@ def enviar_notificacion_equipo_disponible_task(
         _agregar_cc(getattr(settings, 'JEFE_CALIDAD_EMAIL', None) or None)
         _agregar_cc(getattr(settings, 'JEFE_CALIDAD_2_EMAIL', None) or None)
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El aviso de recolección (y la cláusula 6 en OOW)
+        # debe llegar aunque Gmail/Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_equipo_disponible import (
+            construir_texto_plano_equipo_disponible,
+        )
+        texto_plano = construir_texto_plano_equipo_disponible(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=cc_list,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         try:
             logo_path = finders.find('images/logos/logo_sic.png')
