@@ -1,185 +1,224 @@
+{% comment %}
+  Correo transaccional: enlace público de seguimiento al cliente.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que imagenes_cliente.html (canónico AGENTS.md §5):
+  tablas, CSS en línea, ~600 px, paleta SIC #1f6391.
+  El texto de negocio no se reescribe; solo el layout.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seguimiento de tu orden — {{ folio }}</title>
-<style>
-  body { margin:0; padding:0; background:#f0f4f8; font-family:'Segoe UI',Arial,sans-serif; }
-  .wrapper { max-width:600px; margin:0 auto; }
-  /* Header */
-  .header {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
-    padding: 32px 32px 24px;
-    text-align: center;
-    border-bottom: 3px solid #38bdf8;
-  }
-  .header img.logo { height:48px; margin-bottom:16px; }
-  .header .emoji-big { font-size:3rem; display:block; margin-bottom:8px; }
-  .header h1 {
-    margin:0; font-size:1.5rem; font-weight:800;
-    color:#0c4a6e; letter-spacing:-0.5px;
-  }
-  .header p { margin:8px 0 0; color:#0369a1; font-size:0.95rem; }
-  /* Equipo info */
-  .equipo-box {
-    margin: 24px 32px;
-    background: white;
-    border-radius: 12px;
-    border-left: 5px solid #1f6391;
-    padding: 16px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-  .equipo-box .label {
-    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em;
-    color:#1f6391; font-weight:700; margin-bottom:4px;
-  }
-  .equipo-box .equipo-nombre {
-    font-size:1.1rem; font-weight:800; color:#0c4a6e; margin:0 0 8px;
-  }
-  .equipo-box .folio-badge {
-    display:inline-block; background:#e0f2fe; color:#0369a1;
-    border-radius:20px; padding:3px 12px; font-size:0.8rem; font-weight:600;
-  }
-  /* Mensaje principal */
-  .mensaje {
-    padding: 8px 32px 24px;
-    text-align: center;
-  }
-  .mensaje h2 { font-size:1.25rem; color:#374151; font-weight:700; margin:0 0 10px; }
-  .mensaje p  { color:#6b7280; font-size:0.92rem; line-height:1.6; margin:0 0 24px; }
-  /* CTA Button */
-  .cta-wrapper { text-align:center; padding:0 32px 32px; }
-  .cta-btn {
-    display:inline-block;
-    background: linear-gradient(135deg, #1f6391 0%, #0e4d6f 100%);
-    color:white !important;
-    text-decoration:none;
-    padding:16px 36px;
-    border-radius:50px;
-    font-size:1.05rem;
-    font-weight:700;
-    letter-spacing:0.3px;
-    box-shadow:0 6px 20px rgba(31,99,145,0.4);
-  }
-  /* Info lista */
-  .info-lista {
-    margin: 0 32px 28px;
-    padding: 16px 20px;
-    background: #f0fdf4;
-    border-radius: 10px;
-    border: 1px solid #bbf7d0;
-  }
-  .info-lista p {
-    margin:0 0 8px; font-size:0.8rem; color:#065f46; font-weight:600;
-  }
-  .info-lista ul {
-    margin:0; padding-left:18px;
-  }
-  .info-lista li {
-    font-size:0.8rem; color:#047857; margin-bottom:4px;
-  }
-  /* Footer */
-  .footer {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    padding: 24px 32px;
-    text-align: center;
-  }
-  .redes { margin-bottom: 12px; }
-  .redes a { display:inline-block; margin:0 6px; }
-  .redes img { width:24px; height:24px; opacity:0.85; }
-  .footer p { color:#94a3b8; font-size:0.75rem; margin:0; line-height:1.5; }
-  .footer a { color:#7dd3fc; text-decoration:none; }
-  /* Responsive */
-  @media (max-width:600px) {
-    .header, .equipo-box, .mensaje, .cta-wrapper, .info-lista {
-      padding-left:16px; padding-right:16px; margin-left:8px; margin-right:8px;
-    }
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Seguimiento de tu orden — {{ folio }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+        }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .logo-pad { background-color: #ffffff !important; }
+        }
+    </style>
 </head>
-<body>
-<div class="wrapper">
-
-  <!-- ── HEADER ── -->
-  <div class="header">
-    <img src="cid:logo_sic" alt="SIC" class="logo">
-    <span class="emoji-big">&#x1F4BB;</span>
-    <h1>Seguimiento de tu equipo</h1>
-    <p>Consulta el estado de tu orden en cualquier momento.</p>
-  </div>
-
-  <!-- ── INFO DEL EQUIPO ── -->
-  <div class="equipo-box">
-    <div class="label">Tu equipo en servicio</div>
-    <p class="equipo-nombre">
-      {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
-    </p>
-    <span class="folio-badge">Folio: {{ folio }}</span>
-  </div>
-
-  <!-- ── MENSAJE ── -->
-  <div class="mensaje">
-    <h2>Sigue de cerca tu reparación</h2>
-    <p>
-      Hemos creado un enlace personalizado para que puedas consultar el
-      <strong>estado actual de tu equipo</strong> en cualquier momento.
-      Verás cada paso del proceso de reparación conforme avance.
-    </p>
-  </div>
-
-  <!-- ── BOTÓN CTA ── -->
-  <div class="cta-wrapper">
-    <a href="{{ seguimiento_url }}" class="cta-btn">
-      🔍&nbsp;&nbsp;Ver estado de mi equipo
-    </a>
-  </div>
-
-  <!-- ── INFORMACIÓN ── -->
-  <div class="info-lista">
-    <p>ℹ️ Sobre este enlace:</p>
-    <ul>
-      <li>No requiere crear cuenta ni iniciar sesión</li>
-      <li>El enlace es personal y seguro</li>
-      <li>Puedes consultarlo las veces que necesites</li>
-      <li>Se actualiza automáticamente con cada cambio de estado</li>
-    </ul>
-  </div>
-
-  <!-- ── RESPONSABLE ── -->
-  <div class="equipo-box" style="border-left-color:#10b981;">
-    <div class="label" style="color:#065f46;">Tu responsable de seguimiento</div>
-    {% if nombre_responsable %}
-    <p class="equipo-nombre" style="color:#065f46;font-size:1rem;">{{ nombre_responsable }}</p>
-    {% if email_responsable %}
-    <p style="font-size:0.82rem;color:#6b7280;margin:4px 0 0;">
-      ✉️ {{ email_responsable }}
-    </p>
-    {% endif %}
-    {% else %}
-    <p class="equipo-nombre" style="color:#f59e0b;font-size:1rem;">Pendiente de asignar</p>
-    <p style="font-size:0.82rem;color:#6b7280;margin:4px 0 0;">
-      Se te notificará cuando se asigne a tu responsable.
-    </p>
-    {% endif %}
-  </div>
-
-  <!-- ── FOOTER ── -->
-  <div class="footer">
-    <div class="redes">
-      <a href="https://sicfix.mx"><img src="cid:icon_link" alt="Web"></a>
-      <a href="https://instagram.com/sicfix.mx"><img src="cid:icon_instagram" alt="Instagram"></a>
-      <a href="https://facebook.com/sicfix.mx"><img src="cid:icon_facebook" alt="Facebook"></a>
-      <a href="https://wa.me/523318189988"><img src="cid:icon_whatsapp" alt="WhatsApp"></a>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Consulta el estado de tu equipo en cualquier momento.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
-    <p>
-      SIC - Comercialización y Servicios<br>
-      <a href="https://sicfix.mx">sicfix.mx</a>
-      &nbsp;·&nbsp;
-      Este correo fue enviado el {{ fecha_envio }}
-    </p>
-  </div>
 
-</div>
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:28px 32px 20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td class="logo-pad" bgcolor="#ffffff" align="center" style="padding:8px 16px;background-color:#ffffff;">
+                                        <img src="cid:logo_sic" alt="SIC" width="160" style="display:block;width:160px;max-width:160px;height:auto;border:0;">
+                                    </td>
+                                </tr>
+                            </table>
+                            <p class="email-title" style="margin:16px 0 0 0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Seguimiento de tu equipo
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Consulta el estado de tu orden en cualquier momento.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 4px 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Tu equipo en servicio
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:16px;line-height:24px;font-weight:700;color:#0f172a;">
+                                            {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Folio: {{ folio }}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <p class="email-title" style="margin:0 0 10px 0;font-size:18px;line-height:24px;font-weight:700;color:#1e293b;">
+                                Sigue de cerca tu reparación
+                            </p>
+                            <p class="email-body-text" style="margin:0;font-size:16px;line-height:26px;color:#334155;">
+                                Hemos creado un enlace personalizado para que puedas consultar el
+                                <strong>estado actual de tu equipo</strong> en cualquier momento.
+                                Verás cada paso del proceso de reparación conforme avance.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 24px 32px;">
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ seguimiento_url }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver estado de mi equipo</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ seguimiento_url }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Ver estado de mi equipo</a>
+                            <!--<![endif]-->
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Sobre este enlace
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            No requiere crear cuenta ni iniciar sesión.<br>
+                                            El enlace es personal y seguro.<br>
+                                            Puedes consultarlo las veces que necesites.<br>
+                                            Se actualiza automáticamente con cada cambio de estado.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 28px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Tu responsable de seguimiento
+                                        </p>
+                                        {% if nombre_responsable %}
+                                        <p class="email-body-text" style="margin:0;font-size:16px;line-height:24px;font-weight:700;color:#0f172a;">
+                                            {{ nombre_responsable }}
+                                        </p>
+                                        {% if email_responsable %}
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                            {{ email_responsable }}
+                                        </p>
+                                        {% endif %}
+                                        {% else %}
+                                        <p class="email-body-text" style="margin:0;font-size:16px;line-height:24px;font-weight:700;color:#0f172a;">
+                                            Pendiente de asignar
+                                        </p>
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                            Se te notificará cuando se asigne a tu responsable.
+                                        </p>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítenos y síganos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://instagram.com/sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://facebook.com/sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://wa.me/523318189988" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                SIC - Comercialización y Servicios
+                            </p>
+                            <p style="margin:8px 0 0 0;font-size:13px;line-height:18px;">
+                                <a href="https://sicfix.mx" style="color:#7dd3fc;text-decoration:underline;">sicfix.mx</a>
+                            </p>
+                            <p style="margin:12px 0 0 0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Este correo fue enviado el {{ fecha_envio }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

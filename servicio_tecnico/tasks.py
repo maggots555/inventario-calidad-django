@@ -3052,10 +3052,14 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None, db_alias='d
     Envía correo al cliente con link de seguimiento público de su orden.
     Solo se dispara para órdenes fuera de garantía (es_fuera_garantia=True).
     Se invoca al crear la orden (si hay email), con fallback al enviar imágenes de ingreso.
+
+    Efectos secundarios:
+        EmailMultiAlternatives (HTML + texto plano), marca correo_enviado,
+        HistorialOrden y notificación in-app.
     """
     import re
     import secrets
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -3131,18 +3135,26 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None, db_alias='d
             context_email,
         )
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Igual que fotos de ingreso: texto plano + HTML, por si el cliente
+        # bloquea el diseño. La URL de seguimiento va en ambas versiones.
+        from servicio_tecnico.services.email_seguimiento_cliente import (
+            construir_texto_plano_seguimiento_cliente,
+        )
+        texto_plano = construir_texto_plano_seguimiento_cliente(context_email)
+
         asunto = f'Seguimiento de tu equipo — Folio {folio}'
         email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Logo SIC (CID inline) ──
         try:

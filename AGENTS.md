@@ -436,6 +436,27 @@ Preferir `var(--primary-color)`, `var(--gray-*)`, `var(--white)`, sombras del te
 ✅ En TS: document.documentElement.getAttribute('data-bs-theme')
 ```
 
+### Correos HTML (transaccionales)
+
+Un correo **no** es una página web. Outlook ignora flex/grid/gradientes; Gmail puede recortar el `<style>` del `<head>`. El CSS inline en correos es la excepción a “no CSS inline masivo” de templates web.
+
+**Canónico (copiar al tocar un correo):** `servicio_tecnico/templates/servicio_tecnico/emails/imagenes_cliente.html`  
+**Texto plano:** `servicio_tecnico/services/email_imagenes_ingreso.py` + `EmailMultiAlternatives` (`body` text/plain + `attach_alternative` HTML).
+
+```
+❌ flex, grid, float, box-shadow, :hover, ::before, filter, gradientes
+❌ CSS de página en <style> como layout (el layout va inline en cada celda)
+❌ Paleta genérica (#667eea / #764ba2); emojis en títulos
+❌ Rediseñar todos los correos de un golpe; MJML (choca con {% if %} Django)
+❌ Enviar solo HTML (sin text/plain)
+
+✅ Tablas role="presentation", ~600 px, CSS inline, paleta SIC #1f6391
+✅ <style> solo para @media y dark mode (si Gmail lo recorta, el correo se sigue leyendo)
+✅ Preheader; CTA HTML (no imagen); alt en fotos; texto visible junto a iconos CID
+✅ EmailMultiAlternatives: mismo mensaje y misma URL de seguimiento en texto plano
+✅ Copiar este esqueleto al tocar un correo; el texto de negocio no se reescribe
+```
+
 ---
 
 ## 6. ENVIRONMENT VARIABLES
@@ -464,7 +485,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 6. Dominio en español; tech estándar en inglés
 7. Widgets Bootstrap en forms
 8. `__str__()` en models
-9. No CSS/JS inline masivo en templates
+9. No CSS/JS inline masivo en templates **web** (los correos HTML sí van inline — ver §5 Correos HTML)
 10. `pnpm run build` antes de probar TS
 11. No romper PWA (`manifest`, apple-meta, `viewport-fit=cover`, registro SW)
 12. UI mobile-first; sin hover-only
@@ -482,6 +503,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 24. Comportamiento nuevo → test humo y/o integración según §1; excepción: docs/CSS cosmético o pedido del usuario
 25. No hinchar `models.py` grandes (`OrdenServicio`, `SolicitudCotizacion`, etc.) — §4 Fat models; lógica nueva en `services/`/`utils/`; extraer lo viejo solo si duele o de paso
 26. No hinchar `tasks.py` grandes — §4 Fat tasks; tarea nueva = `tasks_<dominio>.py` + reexport al final; no cambiar `name=`; no partir el gordo sin pedido explícito
+27. Correos HTML → tablas + CSS inline + paleta SIC; canónico `imagenes_cliente.html` — ver §5 Correos HTML; no rediseñar todos de un golpe
 
 ---
 
@@ -610,7 +632,7 @@ No “arreglar” quitando `select_for_update()`: eso elimina la protección con
 
 ---
 
-**Last Updated**: Agosto 2026  
+**Last Updated**: Septiembre 2026  
 **Django Version**: 5.2.14
 **Python Version**: 3.12+
 **TypeScript Version**: 5.9.3
