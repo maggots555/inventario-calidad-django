@@ -1382,12 +1382,13 @@ def enviar_imagenes_cliente_task(
         avisa con SoftTimeLimitExceeded, tampoco se re-lanza: el correo sale.
 
     Efectos secundarios:
-        Envía EmailMessage, escribe HistorialOrden y notifica al usuario.
+        Envía EmailMultiAlternatives (HTML + texto plano), escribe HistorialOrden
+        y notifica al usuario.
     """
     import io
     import re
     from pathlib import Path
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -1611,6 +1612,15 @@ def enviar_imagenes_cliente_task(
             context
         )
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # EmailMultiAlternatives manda DOS cuerpos: texto plano (body) y HTML
+        # (attach_alternative). Si Gmail/Outlook bloquean el HTML, el cliente
+        # igual lee el aviso y el enlace de seguimiento.
+        from servicio_tecnico.services.email_imagenes_ingreso import (
+            construir_texto_plano_imagenes_ingreso,
+        )
+        texto_plano = construir_texto_plano_imagenes_ingreso(context)
+
         # ===================================================================
         # PASO 4: CREAR Y ENVIAR EL CORREO
         # ===================================================================
@@ -1625,14 +1635,14 @@ def enviar_imagenes_cliente_task(
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # Adjuntar logo SIC
         try:

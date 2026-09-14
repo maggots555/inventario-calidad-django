@@ -13,7 +13,7 @@ Comprobamos tres reglas:
 1. El HTTP de fotos de ingreso usa INSPECCION_IA_HTTP_TIMEOUT (300s), no los
    600s del análisis de video.
 2. Si el primer Gemini da timeout, NO se prueba el segundo ni Ollama.
-3. Si Celery lanza SoftTimeLimitExceeded durante la IA, EmailMessage.send
+3. Si Celery lanza SoftTimeLimitExceeded durante la IA, EmailMultiAlternatives.send
    igual se llama (la IA es no crítica).
 """
 
@@ -243,8 +243,8 @@ class EnviarImagenesSoftTimeLimitTests(TestCase):
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Mockeamos el dispatcher para que lance la excepción de Celery, y
-    EmailMessage.send para no mandar correo real. Si el except está bien,
-    send() se llama una vez y la tarea responde success=True.
+    EmailMultiAlternatives.send para no mandar correo real. Si el except
+    está bien, send() se llama una vez y la tarea responde success=True.
     """
 
     databases = {'default', 'mexico'}
@@ -322,7 +322,7 @@ class EnviarImagenesSoftTimeLimitTests(TestCase):
             capturados.append(self_msg)
             return 1
 
-        with patch('django.core.mail.EmailMessage.send', new=_fake_send):
+        with patch('django.core.mail.EmailMultiAlternatives.send', new=_fake_send):
             resultado = enviar_imagenes_cliente_task.run(
                 orden_id=self.orden.pk,
                 imagenes_ids=[str(self.imagen.pk)],
@@ -335,6 +335,11 @@ class EnviarImagenesSoftTimeLimitTests(TestCase):
 
         self.assertTrue(resultado.get('success'))
         self.assertEqual(len(capturados), 1)
-        self.assertIn('cliente.timeout@test.local', capturados[0].to)
+        mensaje = capturados[0]
+        self.assertIn('cliente.timeout@test.local', mensaje.to)
+        # Paridad HTML + texto plano (el cliente igual lee el aviso sin HTML).
+        self.assertIn('Estimado/a', mensaje.body)
+        self.assertTrue(mensaje.alternatives)
+        self.assertEqual(mensaje.alternatives[0][1], 'text/html')
         mock_dispatch.assert_called_once()
         mock_notif.assert_called()
