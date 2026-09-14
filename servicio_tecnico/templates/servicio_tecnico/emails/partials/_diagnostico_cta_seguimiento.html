@@ -1,0 +1,18 @@
+{% if seguimiento_url %}
+<tr>
+    <td class="email-pad" align="center" style="padding:16px 32px 24px 32px;">
+        <p class="email-body-text" style="margin:0 0 12px 0;font-size:14px;line-height:22px;color:#334155;text-align:center;">
+            Consulte el <strong>estado de su equipo</strong> en cualquier momento:
+        </p>
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ seguimiento_url }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver seguimiento de mi equipo</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ seguimiento_url }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Ver seguimiento de mi equipo</a>
+        <!--<![endif]-->
+    </td>
+</tr>
+{% endif %}

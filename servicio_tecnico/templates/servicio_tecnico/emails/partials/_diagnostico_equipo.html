@@ -1,0 +1,77 @@
+{# Datos del equipo + mensaje extra del técnico. #}
+<tr>
+    <td class="email-pad" style="padding:0 32px 24px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+            <tr>
+                <td colspan="2" style="padding:16px 18px 8px 18px;">
+                    <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                        Información de su equipo
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                    Folio diagnóstico
+                </td>
+                <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                    {{ folio }}
+                </td>
+            </tr>
+            <tr>
+                <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                    Número de orden
+                </td>
+                <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">
+                    {% if detalle.orden_cliente %}
+                        {{ detalle.orden_cliente }}
+                    {% else %}
+                        {{ orden.numero_orden_interno }}
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                    Equipo
+                </td>
+                <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                    {{ detalle.tipo_equipo }} {{ detalle.marca }}{% if detalle.modelo %} {{ detalle.modelo }}{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                    Número de serie
+                </td>
+                <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                    {{ detalle.numero_serie }}
+                </td>
+            </tr>
+            <tr>
+                <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                    Fecha de ingreso
+                </td>
+                <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                    {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+
+{% if mensaje_personalizado %}
+<tr>
+    <td class="email-pad" style="padding:0 32px 24px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8f4fd" class="email-panel" style="background-color:#e8f4fd;border-left:4px solid #1f6391;">
+            <tr>
+                <td style="padding:16px 18px;">
+                    <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                        Mensaje adicional
+                    </p>
+                    <div class="email-body-text" style="font-size:15px;line-height:24px;color:#334155;font-style:italic;">
+                        {{ mensaje_personalizado|linebreaks }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+{% endif %}

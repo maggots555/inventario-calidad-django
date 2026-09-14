@@ -1,0 +1,25 @@
+<tr>
+    <td class="email-pad" style="padding:0 32px 24px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f7ff" class="email-panel" style="background-color:#f0f7ff;border:1px solid #c5d9e8;">
+            <tr>
+                <td align="center" style="padding:18px 16px;">
+                    <p class="email-label" style="margin:0 0 4px 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                        Archivos adjuntos
+                    </p>
+                    <p class="email-title" style="margin:0;font-size:28px;line-height:34px;font-weight:700;color:#1f6391;">
+                        {{ cantidad_imagenes|add:1 }}
+                    </p>
+                    <p class="email-muted" style="margin:4px 0 10px 0;font-size:14px;line-height:20px;color:#475569;">
+                        archivo{{ cantidad_imagenes|add:1|pluralize }} adjunto{{ cantidad_imagenes|add:1|pluralize }} a este correo
+                    </p>
+                    <p class="email-body-text" style="margin:0;font-size:13px;line-height:20px;color:#334155;text-align:left;">
+                        1 PDF — Diagnóstico completo con observaciones técnicas<br>
+                        {% if cantidad_imagenes > 0 %}
+                        {{ cantidad_imagenes }} imagen{{ cantidad_imagenes|pluralize:"es" }} — Fotografías del diagnóstico
+                        {% endif %}
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>

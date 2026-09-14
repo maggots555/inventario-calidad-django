@@ -798,7 +798,7 @@ def enviar_diagnostico_cliente_task(
     import io
     import re
     from pathlib import Path
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -1065,14 +1065,22 @@ def enviar_diagnostico_cliente_task(
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # EmailMultiAlternatives manda DOS cuerpos: texto plano (body) y HTML.
+        # Si Gmail/Outlook bloquean el HTML, el cliente igual lee folio, PDF y seguimiento.
+        from servicio_tecnico.services.email_diagnostico_cliente import (
+            construir_texto_plano_diagnostico,
+        )
+        texto_plano = construir_texto_plano_diagnostico(tipo_plantilla, context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # Adjuntar logo SIC
         try:

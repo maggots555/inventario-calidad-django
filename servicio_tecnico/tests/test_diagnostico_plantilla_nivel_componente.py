@@ -277,7 +277,7 @@ class PlantillaDiagnosticoNivelComponenteRenderTest(TestCase):
         self.assertIn('cid:rhitso_reballing', html)
         # Dominio del sitio corporativo en la plantilla (sicfix.mx)
         self.assertIn('https://sicfix.mx/reparacion-tarjeta-madre/', html)
-        self.assertIn('REPARACIÓN A NIVEL COMPONENTE', html)
+        self.assertIn('Diagnóstico — Reparación a nivel componente', html)
         self.assertIn('https://wa.me/525512345678', html)
         # No debe incluir diagrama.png (excluido a propósito)
         self.assertNotIn('diagrama', html.lower())
@@ -371,8 +371,8 @@ class PlantillaDiagnosticoValidacionRenderTest(TestCase):
         # Normalizamos espacios/saltos de línea del HTML para asserts de copy
         html_plano = ' '.join(html.split())
 
-        self.assertIn('DIAGNÓSTICO DE VALIDACIÓN', html_plano)
-        self.assertIn('GARANTÍA DE VALIDACIÓN ES DE 1 SEMANA', html_plano)
+        self.assertIn('Diagnóstico de validación', html_plano)
+        self.assertIn('garantía de validación es de 1 semana', html_plano.lower())
         self.assertIn('no será necesario cotizar ningún componente', html_plano)
         self.assertIn(self.sucursal.horario_atencion, html_plano)
         self.assertIn('Circuito Economistas 15-A', html_plano)
@@ -389,7 +389,7 @@ class PlantillaDiagnosticoValidacionRenderTest(TestCase):
             self._contexto_base(es_fuera_garantia=False),
         )
 
-        self.assertIn('GARANTÍA DE VALIDACIÓN ES DE 1 SEMANA', html)
+        self.assertIn('garantía de validación es de 1 semana', html.lower())
         self.assertNotIn('CLÁUSULA 6', html)
         self.assertNotIn('ALMACENAJE O DESTRUCCIÓN', html)
 
@@ -406,7 +406,7 @@ class PlantillaDiagnosticoValidacionRenderTest(TestCase):
         )
         html_plano = ' '.join(html.split())
 
-        self.assertIn('GARANTÍA DE VALIDACIÓN ES DE 1 SEMANA', html_plano)
+        self.assertIn('garantía de validación es de 1 semana', html_plano.lower())
         self.assertIn('espere la notificación de equipo disponible', html_plano)
         # No debe aparecer el bloque de recolección inmediata
         self.assertNotIn('listo para que pase a recolectar', html_plano)
