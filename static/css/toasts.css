@@ -94,6 +94,25 @@
     }
 }
 
+/*
+ * Pausa el temporizador VISUAL al leer el toast.
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * animation-play-state: paused CONGELA la barra donde iba; al quitar
+ * el mouse (o el foco) sigue desde el mismo punto, no se reinicia.
+ * Solo mouse (hover fino): en celular el "hover" a veces se queda pegado.
+ * El teclado usa :focus-within en cualquier dispositivo.
+ * El auto-cierre de JS se pausa aparte en base.ts (deben ir juntos).
+ */
+@media (hover: hover) and (pointer: fine) {
+    .sigma-toast:hover .sigma-toast__timer-bar {
+        animation-play-state: paused;
+    }
+}
+
+.sigma-toast:focus-within .sigma-toast__timer-bar {
+    animation-play-state: paused;
+}
+
 .sigma-toast--error {
     --toast-accent: var(--danger-color, #ef4444);
     --toast-icon-bg: var(--danger-light, #fef2f2);

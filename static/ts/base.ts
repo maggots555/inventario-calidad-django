@@ -51,6 +51,28 @@ const DURACION_TOAST_MS: Record<TipoToastSistema, number> = {
 };
 
 /**
+ * Reloj interno de un toast (para poder pausarlo).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * `setTimeout` no se puede "pausar": o corre o lo cancelas. Guardamos
+ * cuánto falta y cuándo arrancó, así al hover cancelamos el reloj y al
+ * salir del mouse armamos uno nuevo con el tiempo que quedaba.
+ */
+type EstadoTimerToast = {
+    timeoutId: number | null;
+    restanteMs: number;
+    iniciadoEn: number;
+    pausadoPorHover: boolean;
+    pausadoPorFoco: boolean;
+};
+
+/**
+ * Un WeakMap asocia cada tarjeta del DOM con su reloj, sin fugas de memoria:
+ * si el toast se borra, el navegador tira también este dato.
+ */
+const timersToast = new WeakMap<HTMLElement, EstadoTimerToast>();
+
+/**
  * Normaliza un string suelto al tipo del toast.
  *
  * @param tipo - Valor crudo (p. ej. "danger", "debug", "success")
@@ -138,11 +160,14 @@ function obtenerStackToasts(): HTMLElement {
  * Cierra un toast con la animación de salida y luego lo quita del DOM.
  *
  * @param toast - Tarjeta .sigma-toast
+ * @returns Nada. Efecto: cancela el auto-cierre y quita el nodo.
  */
 function cerrarToastSistema(toast: HTMLElement): void {
     if (toast.classList.contains('sigma-toast--saliendo')) {
         return;
     }
+    // Paso 1: apagar el reloj para que no intente cerrar otra vez
+    cancelarTimerToast(toast);
     toast.classList.add('sigma-toast--saliendo');
     // 260 ms = duración de sigmaToastSalir; un poco más de colchón
     window.setTimeout(function () {
@@ -151,21 +176,156 @@ function cerrarToastSistema(toast: HTMLElement): void {
 }
 
 /**
- * Programa el auto-cierre según el tipo (errores duran más).
+ * Indica si el toast está congelado por mouse, teclado o ambos.
+ *
+ * @param estado - Reloj interno de esa tarjeta
+ * @returns true si NO debe seguir la cuenta regresiva
+ */
+function toastEstaPausado(estado: EstadoTimerToast): boolean {
+    return estado.pausadoPorHover || estado.pausadoPorFoco;
+}
+
+/**
+ * Cancela el setTimeout pendiente (no calcula tiempo restante).
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function cancelarTimerToast(toast: HTMLElement): void {
+    const estado = timersToast.get(toast);
+    if (!estado || estado.timeoutId === null) {
+        return;
+    }
+    window.clearTimeout(estado.timeoutId);
+    estado.timeoutId = null;
+}
+
+/**
+ * Arranca (o reanuda) el auto-cierre con los milisegundos que faltan.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ * @param restanteMs - Tiempo que debe seguir visible
+ */
+function iniciarCuentaRegresiva(toast: HTMLElement, restanteMs: number): void {
+    const previo = timersToast.get(toast);
+    // Paso 1: si había un reloj viejo, lo apagamos para no tener dos
+    if (previo && previo.timeoutId !== null) {
+        window.clearTimeout(previo.timeoutId);
+    }
+    // Paso 2: cuando se acabe el tiempo, cerramos solo si el toast sigue en pantalla
+    const timeoutId = window.setTimeout(function () {
+        if (document.body.contains(toast)) {
+            cerrarToastSistema(toast);
+        }
+    }, restanteMs);
+    timersToast.set(toast, {
+        timeoutId,
+        restanteMs,
+        iniciadoEn: Date.now(),
+        pausadoPorHover: previo ? previo.pausadoPorHover : false,
+        pausadoPorFoco: previo ? previo.pausadoPorFoco : false,
+    });
+}
+
+/**
+ * Congela la cuenta: cancela el timeout y guarda cuánto faltaba.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function pausarCuentaRegresiva(toast: HTMLElement): void {
+    const estado = timersToast.get(toast);
+    // Ya estaba pausado (timeoutId null) o nunca se programó
+    if (!estado || estado.timeoutId === null) {
+        return;
+    }
+    window.clearTimeout(estado.timeoutId);
+    estado.timeoutId = null;
+    // Tiempo transcurrido desde el último arranque/reanudación
+    const transcurrido = Date.now() - estado.iniciadoEn;
+    estado.restanteMs = Math.max(0, estado.restanteMs - transcurrido);
+}
+
+/**
+ * Sigue la cuenta con lo que faltaba, salvo que hover o foco sigan activos.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function reanudarCuentaRegresiva(toast: HTMLElement): void {
+    const estado = timersToast.get(toast);
+    if (!estado) {
+        return;
+    }
+    // El mouse o el teclado todavía "sostienen" el toast
+    if (toastEstaPausado(estado) || estado.timeoutId !== null) {
+        return;
+    }
+    iniciarCuentaRegresiva(toast, estado.restanteMs);
+}
+
+/**
+ * Escucha mouse (solo puntero fino) y foco del botón X para pausar/reanudar.
+ *
+ * @param toast - Tarjeta .sigma-toast
+ */
+function enlazarPausaToast(toast: HTMLElement): void {
+    // pointerenter: el dedo en táctil NO pausa (hover "pegado" en celular)
+    toast.addEventListener('pointerenter', function (evento: PointerEvent) {
+        if (evento.pointerType !== 'mouse') {
+            return;
+        }
+        const estado = timersToast.get(toast);
+        if (!estado) {
+            return;
+        }
+        pausarCuentaRegresiva(toast);
+        estado.pausadoPorHover = true;
+    });
+    toast.addEventListener('pointerleave', function (evento: PointerEvent) {
+        if (evento.pointerType !== 'mouse') {
+            return;
+        }
+        const estado = timersToast.get(toast);
+        if (!estado) {
+            return;
+        }
+        estado.pausadoPorHover = false;
+        reanudarCuentaRegresiva(toast);
+    });
+    // Teclado: Tab hasta la X también debe congelar el cierre
+    toast.addEventListener('focusin', function () {
+        const estado = timersToast.get(toast);
+        if (!estado) {
+            return;
+        }
+        pausarCuentaRegresiva(toast);
+        estado.pausadoPorFoco = true;
+    });
+    toast.addEventListener('focusout', function (evento: FocusEvent) {
+        const destino = evento.relatedTarget;
+        // Si el foco se mueve dentro del mismo toast, no reanudamos
+        if (destino instanceof Node && toast.contains(destino)) {
+            return;
+        }
+        const estado = timersToast.get(toast);
+        if (!estado) {
+            return;
+        }
+        estado.pausadoPorFoco = false;
+        reanudarCuentaRegresiva(toast);
+    });
+}
+
+/**
+ * Programa el auto-cierre según el tipo (errores duran más) y habilita pausa.
  *
  * @param toast - Tarjeta .sigma-toast
  * @param tipo - Tipo ya normalizado
  */
 function programarCierreToast(toast: HTMLElement, tipo: TipoToastSistema): void {
-    const delay = DURACION_TOAST_MS[tipo];
     // No tocamos --toast-duracion aquí: ya la pone el CSS por tipo
     // (.sigma-toast--success = 5s, etc.). Si la cambiamos al cargar,
     // la barra se reinicia y se desincroniza.
-    window.setTimeout(function () {
-        if (document.body.contains(toast)) {
-            cerrarToastSistema(toast);
-        }
-    }, delay);
+    iniciarCuentaRegresiva(toast, DURACION_TOAST_MS[tipo]);
+    enlazarPausaToast(toast);
 }
 
 /**
