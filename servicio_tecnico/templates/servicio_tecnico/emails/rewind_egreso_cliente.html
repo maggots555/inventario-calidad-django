@@ -1,630 +1,328 @@
+{% comment %}
+  Correo transaccional: video rewind de egreso al cliente.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que imagenes_egreso_cliente.html. El thumbnail va CID
+  (cid:thumbnail_video). El aviso NO autoriza a recoger el equipo.
+  El texto de negocio y los if de venta mostrador se conservan.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Resumen del servicio de tu equipo - {{ detalle.orden_cliente }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
+            .video-thumb { width: 100% !important; max-width: 100% !important; }
         }
-
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
-        }
-
-        .container {
-            max-width: 700px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        /* ── HEADER — mismo estilo que los demás correos del sistema ── */
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #e8f4fd 50%, #90caf9 100%);
-            color: #051d63;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-
-        .header::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231565c0' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-
-        .logo-container {
-            position: relative;
-            z-index: 1;
-            margin-bottom: 15px;
-        }
-
-        .logo-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-
-        .header-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #051d63;
-            position: relative;
-            z-index: 1;
-            letter-spacing: -0.3px;
-        }
-
-        .header-subtitle {
-            font-size: 14px;
-            color: #1565c0;
-            position: relative;
-            z-index: 1;
-            margin-top: 6px;
-        }
-
-        /* ── CONTENIDO PRINCIPAL ── */
-        .content {
-            padding: 40px 30px;
-        }
-
-        .greeting {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .intro-text {
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 28px;
-            line-height: 1.75;
-        }
-
-        /* ── INFO DEL EQUIPO ── */
-        .equipment-info {
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 12px;
-            padding: 25px;
-            margin: 25px 0;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .info-title {
-            font-size: 20px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 700;
-            text-align: center;
-            border-bottom: 2px solid #1f6391;
-            padding-bottom: 10px;
-        }
-
-        .info-row {
-            display: flex;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .info-row:last-child {
-            border-bottom: none;
-        }
-
-        .info-label {
-            font-weight: 600;
-            color: #1f6391;
-            min-width: 170px;
-            font-size: 14px;
-        }
-
-        .info-value {
-            color: #333;
-            font-size: 15px;
-            flex: 1;
-        }
-
-        .info-value.highlight {
-            font-weight: 700;
-            color: #0d4a6e;
-        }
-
-        /* ── SECCIÓN THUMBNAIL DEL VIDEO ── */
-        .video-preview-box {
-            background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
-            border: 2px solid #bfdbfe;
-            border-radius: 12px;
-            padding: 28px 24px;
-            margin: 28px 0;
-            text-align: center;
-            box-shadow: 0 2px 12px rgba(31, 99, 145, 0.1);
-        }
-
-        .video-preview-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1e3a5f;
-            margin-bottom: 16px;
-        }
-
-        /* Tabla contenedora del thumbnail + overlay (compatible con clientes de correo) */
-        .video-thumb-table {
-            margin: 0 auto 20px;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .video-thumb-td {
-            position: relative;
-            line-height: 0;
-            font-size: 0;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .video-thumbnail {
-            display: block;
-            width: 420px;
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-        }
-
-        /* Ícono play — posicionado con margen negativo (compatible Outlook/Gmail) */
-        .play-overlay {
-            display: none; /* desactivado — se usa texto instruccional en su lugar */
-        }
-
-        /* Texto instruccional debajo del thumbnail */
-        .click-to-play {
-            display: block;
-            margin: 10px auto 18px;
-            font-size: 14px;
-            font-weight: 600;
-            color: #1f6391;
-            text-decoration: none;
-        }
-
-        .click-to-play:hover {
-            color: #0d4a6e;
-            text-decoration: underline;
-        }
-
-        .video-preview-desc {
-            font-size: 14px;
-            color: #3b5f80;
-            margin-bottom: 20px;
-            line-height: 1.6;
-        }
-
-        /* Botón CTA principal */
-        .cta-btn {
-            display: inline-block;
-            padding: 14px 32px;
-            background: linear-gradient(135deg, #1f6391 0%, #1558a8 100%);
-            color: #ffffff !important;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            box-shadow: 0 4px 12px rgba(31, 99, 145, 0.35);
-        }
-
-        /* Fallback texto cuando no hay thumbnail */
-        .video-no-thumb {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-
-        /* ── AVISO DE CONFIRMACIÓN PENDIENTE (tono informativo, no de error) ── */
-        .pending-confirmation-box {
-            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-            border: 2px solid #f59e0b;
-            border-left: 6px solid #d97706;
-            border-radius: 10px;
-            padding: 22px 20px;
-            margin: 25px 0;
-            box-shadow: 0 2px 10px rgba(245, 158, 11, 0.12);
-        }
-
-        .pending-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        .pending-icon {
-            font-size: 22px;
-            flex-shrink: 0;
-        }
-
-        .pending-title {
-            font-size: 17px;
-            font-weight: 700;
-            color: #92400e;
-        }
-
-        .pending-text {
-            font-size: 15px;
-            color: #78350f;
-            line-height: 1.75;
-        }
-
-        .pending-text strong {
-            color: #b45309;
-        }
-
-        /* ── SECCIÓN DE AYUDA ── */
-        .help-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #1f6391;
-        }
-
-        .help-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #1f6391;
-            margin-bottom: 10px;
-        }
-
-        .help-text {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.6;
-        }
-
-        /* ── FOOTER ── */
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            font-size: 18.2px;
-        }
-
-        .signature-area {
-            margin-top: 10px;
-            font-size: 16.9px;
-            line-height: 1.5;
-            opacity: 0.85;
-        }
-
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            text-align: center;
-        }
-
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-        }
-
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255,255,255,0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            border: 2px solid rgba(255,255,255,0.5);
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                margin: 10px;
-                border-radius: 0;
-            }
-
-            .content {
-                padding: 20px 15px;
-            }
-
-            .info-row {
-                flex-direction: column;
-            }
-
-            .info-label {
-                min-width: auto;
-                margin-bottom: 5px;
-            }
-
-            .video-thumbnail {
-                width: 100%;
-            }
-
-            .cta-btn {
-                display: block;
-                text-align: center;
-            }
-
-            .social-links {
-                gap: 8px;
-            }
-
-            .social-link {
-                padding: 6px 10px;
-                font-size: 11px;
-            }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .logo-pad { background-color: #ffffff !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
+            .email-warn-text { color: #fed7aa !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Resumen visual del servicio. Confirme disponibilidad antes de recoger el equipo.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+    </div>
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             HEADER
-             ═══════════════════════════════════════════════════════════════════ -->
-        <div class="header">
-            <div class="logo-container">
-                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            </div>
-            <div class="header-title">🎬 RESUMEN DE TU SERVICIO</div>
-            <div class="header-subtitle">Todo el proceso de reparación, de inicio a fin</div>
-        </div>
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
 
-        <!-- ═══════════════════════════════════════════════════════════════════
-             CONTENIDO
-             ═══════════════════════════════════════════════════════════════════ -->
-        <div class="content">
-
-            <div class="greeting">
-                Estimado/a cliente,
-            </div>
-
-            <div class="intro-text">
-                El servicio de su equipo ha concluido y queremos compartir
-                con usted un <strong>resumen visual completo</strong> de todo lo que se realizó:
-                {% if es_venta_mostrador %}
-                desde el estado de ingreso, la reparación, hasta el resultado final.
-                {% else %}
-                desde el estado de ingreso, el diagnóstico, la reparación, hasta el resultado final.
-                {% endif %}
-            </div>
-
-            <!-- ════════════════════════════════════════════════════════════════
-                 THUMBNAIL DEL VIDEO REWIND
-                 thumbnail_disponible → True si VideoOrden.thumbnail existe
-                 video_url            → URL directa al archivo de video
-                 ════════════════════════════════════════════════════════════════ -->
-            <div class="video-preview-box">
-                <div class="video-preview-title">▶️ Video resumen del proceso</div>
-
-                {% if thumbnail_disponible %}
-                <table cellpadding="0" cellspacing="0" border="0" class="video-thumb-table">
                     <tr>
-                        <td class="video-thumb-td">
-                            <a href="{{ video_url|default:seguimiento_url }}" target="_blank" style="display:block; line-height:0; font-size:0; border: 3px solid #1f6391; border-radius: 10px;">
-                                <img src="cid:thumbnail_video" alt="Vista previa del video resumen" class="video-thumbnail" />
-                            </a>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:28px 32px 20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td class="logo-pad" bgcolor="#ffffff" align="center" style="padding:8px 16px;background-color:#ffffff;">
+                                        <img src="cid:logo_sic" alt="SIC" width="160" style="display:block;width:160px;max-width:160px;height:auto;border:0;">
+                                    </td>
+                                </tr>
+                            </table>
+                            <p class="email-title" style="margin:16px 0 0 0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Resumen de tu servicio
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Todo el proceso de reparación, de inicio a fin
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Estimado/a cliente,
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                El servicio de su equipo ha concluido y queremos compartir
+                                con usted un <strong>resumen visual completo</strong> de todo lo que se realizó:
+                                {% if es_venta_mostrador %}
+                                desde el estado de ingreso, la reparación, hasta el resultado final.
+                                {% else %}
+                                desde el estado de ingreso, el diagnóstico, la reparación, hasta el resultado final.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f7ff" class="email-panel" style="background-color:#f0f7ff;border:1px solid #c5d9e8;">
+                                <tr>
+                                    <td align="center" style="padding:20px 16px;">
+                                        <p class="email-label" style="margin:0 0 14px 0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                            Video resumen del proceso
+                                        </p>
+                                        {% if thumbnail_disponible %}
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px auto;">
+                                            <tr>
+                                                <td align="center" bgcolor="#1f6391" style="padding:3px;background-color:#1f6391;">
+                                                    <a href="{{ video_url|default:seguimiento_url }}" target="_blank" style="display:block;line-height:0;font-size:0;text-decoration:none;">
+                                                        <img class="video-thumb" src="cid:thumbnail_video" alt="Vista previa del video resumen" width="420" style="display:block;width:420px;max-width:100%;height:auto;border:0;">
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin:0 0 14px 0;">
+                                            <a href="{{ video_url|default:seguimiento_url }}" target="_blank" class="email-label" style="font-size:14px;line-height:20px;font-weight:700;color:#1f6391;text-decoration:underline;">
+                                                Toca aquí para reproducir el video
+                                            </a>
+                                        </p>
+                                        {% endif %}
+                                        <p class="email-body-text" style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            Su equipo fue registrado fotográficamente en cada etapa del proceso.
+                                            {% if es_venta_mostrador %}
+                                            El video reúne ingreso, reparación y egreso en una sola presentación.
+                                            {% else %}
+                                            El video reúne ingreso, diagnóstico, reparación y egreso en una sola presentación.
+                                            {% endif %}
+                                        </p>
+                                        {% if seguimiento_url %}
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ seguimiento_url }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                            <w:anchorlock/>
+                                            <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver el estado de mi equipo</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]><!-->
+                                        <a href="{{ seguimiento_url }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Ver el estado de mi equipo</a>
+                                        <!--<![endif]-->
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Información de su equipo
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Número de orden
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                                        {% if detalle.orden_cliente %}{{ detalle.orden_cliente }}{% else %}{{ orden.numero_orden_interno }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Equipo
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.tipo_equipo }} {{ detalle.marca }}{% if detalle.modelo %} {{ detalle.modelo }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Número de serie
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.numero_serie }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Fecha de ingreso
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                                    </td>
+                                </tr>
+                                {% if orden.fecha_finalizacion %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Fecha de finalización
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ orden.fecha_finalizacion|date:"d/m/Y H:i" }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Cargador
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {% if detalle.tiene_cargador %}
+                                            Incluido{% if detalle.numero_serie_cargador %} (S/N: {{ detalle.numero_serie_cargador }}){% endif %}
+                                        {% else %}
+                                            No incluido
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 10px 0;font-size:16px;line-height:22px;font-weight:700;color:#c2410c;">
+                                            Importante — Confirme disponibilidad antes de recoger
+                                        </p>
+                                        <p class="email-warn-text" style="margin:0;font-size:15px;line-height:24px;color:#9a3412;">
+                                            Este correo le informa que el <strong>proceso técnico ha concluido</strong>
+                                            y le muestra el resumen visual del trabajo realizado.
+                                            <br><br>
+                                            Sin embargo, <strong>para recoger su equipo deberá esperar la confirmación
+                                            de disponibilidad</strong> por parte de su responsable de seguimiento.
+                                            Le notificaremos cuando su dispositivo esté listo para ser entregado.
+                                            <br><br>
+                                            Le pedimos paciencia y le agradecemos su confianza.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Información importante
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            El video resumen documenta el estado del equipo en cada etapa del servicio.<br>
+                                            Si tiene alguna pregunta sobre el trabajo realizado, no dude en contactarnos.<br>
+                                            Recuerde esperar la <strong>notificación de disponibilidad</strong> antes de acudir por su equipo.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:8px 32px 24px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:14px;line-height:20px;color:#64748b;text-align:center;">
+                                Gracias por confiar en nuestros servicios.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Servicio Técnico
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 16px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx/" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.instagram.com/sic_mexico/?hl=es" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.facebook.com/LatAmSic" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        {% if whatsapp_empleado %}
+                                        <a href="https://wa.me/{{ whatsapp_empleado }}" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
                         </td>
                     </tr>
                 </table>
-                <a href="{{ video_url|default:seguimiento_url }}" target="_blank" class="click-to-play">
-                    ▶ Toca aquí para reproducir el video
-                </a>
-                {% else %}
-                <div class="video-no-thumb">🎬</div>
-                {% endif %}
-
-                <div class="video-preview-desc">
-                    Su equipo fue registrado fotográficamente en cada etapa del proceso.
-                    {% if es_venta_mostrador %}
-                    El video reúne ingreso, reparación y egreso en una sola presentación.
-                    {% else %}
-                    El video reúne ingreso, diagnóstico, reparación y egreso en una sola presentación.
-                    {% endif %}
-                </div>
-
-                {% if seguimiento_url %}
-                <a href="{{ seguimiento_url }}" class="cta-btn">
-                    🔍 Ver el estado de mi equipo
-                </a>
-                {% endif %}
-            </div>
-
-            <!-- ════════════════════════════════════════════════════════════════
-                 INFORMACIÓN DEL EQUIPO
-                 ════════════════════════════════════════════════════════════════ -->
-            <div class="equipment-info">
-                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
-
-                <div class="info-row">
-                    <div class="info-label">🎯 Número de Orden:</div>
-                    <div class="info-value highlight">
-                        {% if detalle.orden_cliente %}{{ detalle.orden_cliente }}{% else %}{{ orden.numero_orden_interno }}{% endif %}
-                    </div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">💻 Equipo:</div>
-                    <div class="info-value">
-                        {{ detalle.tipo_equipo }} {{ detalle.marca }}
-                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
-                    </div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">🔢 Número de Serie:</div>
-                    <div class="info-value">{{ detalle.numero_serie }}</div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">📅 Fecha de Ingreso:</div>
-                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
-                </div>
-
-                {% if orden.fecha_finalizacion %}
-                <div class="info-row">
-                    <div class="info-label">✅ Fecha de Finalización:</div>
-                    <div class="info-value">{{ orden.fecha_finalizacion|date:"d/m/Y H:i" }}</div>
-                </div>
-                {% endif %}
-
-                <div class="info-row">
-                    <div class="info-label">🔌 Cargador:</div>
-                    <div class="info-value">
-                        {% if detalle.tiene_cargador %}
-                            ✅ Incluido
-                            {% if detalle.numero_serie_cargador %}(S/N: {{ detalle.numero_serie_cargador }}){% endif %}
-                        {% else %}
-                            ❌ No incluido
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════════════════════════
-                 AVISO: CONFIRMACIÓN PENDIENTE PARA RECOGER EL EQUIPO
-                 El servicio técnico CONCLUYÓ, pero la entrega física aún requiere
-                 que el responsable de seguimiento confirme disponibilidad.
-                 ════════════════════════════════════════════════════════════════ -->
-            <div class="pending-confirmation-box">
-                <div class="pending-header">
-                    <div class="pending-icon">📬</div>
-                    <div class="pending-title">Importante — Confirme disponibilidad antes de recoger</div>
-                </div>
-                <div class="pending-text">
-                    Este correo le informa que el <strong>proceso técnico ha concluido</strong>
-                    y le muestra el resumen visual del trabajo realizado.
-                    <br><br>
-                    Sin embargo, <strong>para recoger su equipo deberá esperar la confirmación
-                    de disponibilidad</strong> por parte de su responsable de seguimiento.
-                    Le notificaremos cuando su dispositivo esté listo para ser entregado.
-                    <br><br>
-                    Le pedimos paciencia y le agradecemos su confianza.
-                </div>
-            </div>
-
-            <!-- ════════════════════════════════════════════════════════════════
-                 SECCIÓN DE AYUDA
-                 ════════════════════════════════════════════════════════════════ -->
-            <div class="help-section">
-                <div class="help-title">ℹ️ Información Importante</div>
-                <div class="help-text">
-                    <strong>•</strong> El video resumen documenta el estado del equipo en cada etapa del servicio.<br>
-                    <strong>•</strong> Si tiene alguna pregunta sobre el trabajo realizado, no dude en contactarnos.<br>
-                    <strong>•</strong> Recuerde esperar la <strong>notificación de disponibilidad</strong> antes de acudir por su equipo.
-                </div>
-            </div>
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
-                <p style="margin: 0; font-size: 14px;">
-                    Gracias por confiar en nuestros servicios.
-                </p>
-            </div>
-
-        </div><!-- /.content -->
-
-        <!-- ═══════════════════════════════════════════════════════════════════
-             FOOTER
-             ═══════════════════════════════════════════════════════════════════ -->
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">Sistema de Servicio Técnico</div>
-                <div class="signature-role">
-                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
-                </div>
-            </div>
-
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width:18px;height:18px;vertical-align:middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width:18px;height:18px;vertical-align:middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width:18px;height:18px;vertical-align:middle;">
-                        <span>Facebook</span>
-                    </a>
-                    {% if whatsapp_empleado %}
-                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width:18px;height:18px;vertical-align:middle;">
-                        <span>WhatsApp</span>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="timestamp">
-                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
-
-    </div><!-- /.container -->
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

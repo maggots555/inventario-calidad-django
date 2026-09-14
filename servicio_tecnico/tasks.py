@@ -4626,7 +4626,7 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
     """
     import io
     from pathlib import Path
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -4773,14 +4773,22 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El aviso de “confirme disponibilidad” y la URL
+        # del video deben llegar aunque Gmail/Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_rewind_egreso import (
+            construir_texto_plano_rewind_egreso,
+        )
+        texto_plano = construir_texto_plano_rewind_egreso(context)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Thumbnail del video (embebido como cid:thumbnail_video) ──────────
         if thumbnail_path:
