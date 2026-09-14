@@ -85,7 +85,9 @@ class ImagenesClienteEmailTemplateTests(SimpleTestCase):
         self.assertIn('fotografía', html)
         self.assertIn('max-width:600px', html)
         self.assertIn('#1f6391', html)
-        self.assertIn('cid:logo_sic', html)
+        self.assertIn('cid:logo_sic_white', html)
+        self.assertIn('class="email-brandbar"', html)
+        self.assertIn('bgcolor="#1e293b"', html)
         # CSS de página web que Outlook rompe / paleta genérica de IA
         self.assertNotIn('display:flex', html)
         self.assertNotIn('#667eea', html)

@@ -41,11 +41,11 @@
             .email-body-text { color: #e2e8f0 !important; }
             .email-muted { color: #cbd5e1 !important; }
             .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
             .email-header { background-color: #1e293b !important; }
             .email-title { color: #7dd3fc !important; }
             .email-subtitle { color: #cbd5e1 !important; }
             .email-label { color: #7dd3fc !important; }
-            .logo-pad { background-color: #ffffff !important; }
         }
     </style>
 </head>
@@ -64,17 +64,10 @@
                 <![endif]-->
                 <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
 
-                    {# ----- Encabezado: fondo claro + barra de marca. El logo va sobre blanco por si el PNG es oscuro. ----- #}
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
                     <tr>
-                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:28px 32px 20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td class="logo-pad" bgcolor="#ffffff" align="center" style="padding:8px 16px;background-color:#ffffff;">
-                                        <img src="cid:logo_sic" alt="SIC" width="160" style="display:block;width:160px;max-width:160px;height:auto;border:0;">
-                                    </td>
-                                </tr>
-                            </table>
-                            <p class="email-title" style="margin:16px 0 0 0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
                                 Fotografías de ingreso
                             </p>
                             <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">

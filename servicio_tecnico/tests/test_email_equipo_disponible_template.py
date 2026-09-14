@@ -75,7 +75,9 @@ class EquipoDisponibleEmailTemplateTests(SimpleTestCase):
         self.assertIn('https://wa.me/523318189988', html_plano)
         self.assertIn('max-width:600px', html)
         self.assertIn('#1f6391', html)
-        self.assertIn('cid:logo_sic', html)
+        self.assertIn('cid:logo_sic_white', html)
+        self.assertIn('class="email-brandbar"', html)
+        self.assertIn('bgcolor="#1e293b"', html)
         self.assertNotIn('display:flex', html)
         self.assertNotIn('linear-gradient', html)
 

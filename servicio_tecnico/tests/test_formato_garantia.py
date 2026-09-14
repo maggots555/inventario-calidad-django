@@ -911,7 +911,7 @@ class FormatoGarantiaEmailTaskTest(TestCase):
         body = msg.body
         self.assertIn('Formato de servicio garantía Dell', html)
         self.assertIn('Información de su equipo', html)
-        self.assertIn('cid:logo_sic', html)
+        self.assertIn('cid:logo_sic_white', html)
         self.assertIn('999888777', html)
         self.assertIn('GARSTAG01', html)
         self.assertNotIn('Estimado(a) cliente', html)

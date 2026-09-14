@@ -1,0 +1,17 @@
+{% comment %}
+  Barra de marca de correos ST (estilo barra tipo Prime Video).
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Un correo NO usa flex/grid: Outlook los ignora. Esta barra es una
+  fila de tabla a todo el ancho de la tarjeta (~600 px), con fondo
+  sólido #1e293b (el mismo azul oscuro del pie) y el logo SIC blanco
+  por CID. El título del correo va en la SIGUIENTE fila, sobre blanco.
+
+  Outlook no pinta SVG: el PNG se adjunta en la tarea Celery como
+  cid:logo_sic_white. Si el cliente bloquea imágenes, queda el alt="SIC".
+{% endcomment %}
+<tr>
+    <td class="email-brandbar" bgcolor="#1e293b" align="center" style="padding:20px 32px;background-color:#1e293b;">
+        <img src="cid:logo_sic_white" alt="SIC" width="160" style="display:block;margin:0 auto;width:160px;max-width:160px;height:auto;border:0;">
+    </td>
+</tr>

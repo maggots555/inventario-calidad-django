@@ -1094,6 +1094,11 @@ def enviar_diagnostico_cliente_task(
         except Exception as e:
             logger.warning(f"[DIAGNOSTICO] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra de marca (cid:logo_sic_white). El a color
+        # (cid:logo_sic) se queda por si alguna plantilla vieja lo usa.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[DIAGNOSTICO]')
+
         # Adjuntar iconos de redes sociales
         try:
             iconos_sociales = {
@@ -1664,6 +1669,10 @@ def enviar_imagenes_cliente_task(
         except Exception as e:
             logger.warning(f"[IMAGENES] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[IMAGENES]')
+
         # Adjuntar iconos de redes sociales
         try:
             iconos_sociales = {
@@ -2002,6 +2011,10 @@ def enviar_imagenes_egreso_cliente_task(
         except Exception as e:
             logger.warning(f"[IMAGENES-EGRESO] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[IMAGENES-EGRESO]')
+
         # Adjuntar iconos de redes sociales
         try:
             iconos_sociales = {
@@ -2309,6 +2322,10 @@ def enviar_notificacion_equipo_disponible_task(
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning('[EQUIPO-DISPONIBLE] Logo CID: %s', e)
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[EQUIPO-DISPONIBLE]')
 
         iconos_sociales = {
             'icon_link': 'images/utilitys/link.png',
@@ -3191,6 +3208,10 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None, db_alias='d
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[SEGUIMIENTO-CLIENTE] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[SEGUIMIENTO-CLIENTE]')
 
         # ── Iconos de redes sociales ──
         iconos_sociales = {
@@ -4814,6 +4835,10 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
         except Exception as e:
             logger.warning(f"[REWIND-EMAIL] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[REWIND-EMAIL]')
+
         # ── Iconos de redes sociales ──────────────────────────────────────────
         try:
             iconos_sociales = {
@@ -5717,6 +5742,10 @@ def enviar_formato_garantia_email_task(
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning('[FORMATO_GARANTIA] Error al adjuntar logo: %s', e)
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[FORMATO_GARANTIA]')
 
         try:
             iconos_sociales = {
