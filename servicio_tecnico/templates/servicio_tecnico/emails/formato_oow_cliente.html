@@ -1,454 +1,260 @@
+{% comment %}
+  Correo transaccional: Formato de Servicio Fuera de Garantía (OOW, PDF firmado).
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Canónico AGENTS.md §5: tablas, CSS inline, paleta SIC #1f6391.
+  El texto de negocio no se reescribe; solo el layout.
+  El asunto lo arma la tarea Celery y NO se cambia.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Formato de Servicio OOW - {{ orden_sicser }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* Solo refuerzos. El layout NO depende de estas reglas. */
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
-        }
-
-        .container {
-            max-width: 700px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
-            color: #051d63;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-
-        .header::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-
-        .logo-container {
-            position: relative;
-            z-index: 1;
-            margin-bottom: 15px;
-        }
-
-        .logo-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .subtitle {
-            font-size: 16px;
-            opacity: 0.9;
-            position: relative;
-            z-index: 1;
-        }
-
-        .content {
-            padding: 40px 30px;
-        }
-
-        .greeting {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .intro-text {
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 25px;
-            line-height: 1.8;
-        }
-
-        .equipment-info {
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 12px;
-            padding: 25px;
-            margin: 25px 0;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .info-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #1565c0;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #1565c0;
-        }
-
-        .info-row {
-            display: flex;
-            margin-bottom: 12px;
-            align-items: center;
-        }
-
-        .info-label {
-            font-weight: 600;
-            color: #666;
-            min-width: 180px;
-            flex-shrink: 0;
-            font-size: 14px;
-        }
-
-        .info-value {
-            font-size: 15px;
-            color: #2c3e50;
-            font-weight: 500;
-        }
-
-        .info-value.highlight {
-            color: #1565c0;
-            font-weight: 700;
-            font-size: 16px;
-        }
-
-        .attachments-box {
-            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
-            border-radius: 12px;
-            padding: 25px;
-            margin: 25px 0;
-            text-align: center;
-            border: 1px solid #a5d6a7;
-        }
-
-        .attachments-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #2e7d32;
-            margin-bottom: 10px;
-        }
-
-        .attachments-count {
-            font-size: 36px;
-            font-weight: 800;
-            color: #1b5e20;
-            margin: 5px 0;
-        }
-
-        .attachments-text {
-            font-size: 14px;
-            color: #388e3c;
-        }
-
-        .attachments-detail {
-            margin-top: 15px;
-            font-size: 13px;
-            color: #2e7d32;
-            text-align: left;
-            padding: 10px;
-            background: rgba(255,255,255,0.5);
-            border-radius: 8px;
-        }
-
-        .help-section {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #1565c0;
-        }
-
-        .help-title {
-            font-weight: 700;
-            color: #1565c0;
-            margin-bottom: 10px;
-            font-size: 15px;
-        }
-
-        .help-text {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.8;
-        }
-
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .signature {
-            margin-bottom: 15px;
-        }
-
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-            text-align: center;
-        }
-
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            text-align: center;
-        }
-
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-        }
-
-        .social-link:hover {
-            background-color: rgba(255, 255, 255, 0.35);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.8);
-        }
-
-        @media only screen and (max-width: 600px) {
-            .container { margin: 10px; }
-            .content { padding: 20px; }
-            .info-row { flex-direction: column; }
-            .info-label { min-width: unset; margin-bottom: 3px; }
-            .header { padding: 20px; }
-            .logo { font-size: 20px; }
-            .subtitle { font-size: 14px; }
-
-            .social-media {
-                padding: 15px 5px;
-            }
-
-            .social-links {
-                gap: 8px;
-                padding: 0 5px;
-            }
-
-            .social-link {
-                padding: 6px 10px;
-                font-size: 11px;
-                gap: 6px;
-                flex: 0 1 auto;
-                min-width: 0;
-            }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo-container">
-                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            </div>
-            <div class="logo">FORMATO DE SERVICIO FUERA DE GARANTÍA</div>
-            <div class="subtitle">Orden: {{ orden_sicser }}</div>
-        </div>
-
-        <div class="content">
-            <div class="greeting">
-                Buen día estimado usuario
-            </div>
-
-            <div class="intro-text">
-                Me dirijo de <strong>{{ empresa_nombre }}</strong> para enviarle el
-                <strong>Formato de Servicio Fuera de Garantía (OOW)</strong> correspondiente
-                a su equipo de cómputo. El documento firmado se encuentra adjunto en este correo.
-            </div>
-
-            <div class="intro-text">
-                Agradecemos su preferencia y nos ponemos a sus órdenes para esta y futuras ocasiones.
-            </div>
-
-            <div class="equipment-info">
-                <div class="info-title">INFORMACIÓN DE SU EQUIPO</div>
-
-                <div class="info-row">
-                    <div class="info-label">Número de Orden:</div>
-                    <div class="info-value highlight">{{ orden_sicser }}</div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">Equipo:</div>
-                    <div class="info-value">
-                        {{ detalle.tipo_equipo }} {{ detalle.marca }}
-                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
-                    </div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">Service Tag:</div>
-                    <div class="info-value">{{ detalle.numero_serie|default:"—" }}</div>
-                </div>
-
-                <div class="info-row">
-                    <div class="info-label">Fecha de Ingreso:</div>
-                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
-                </div>
-            </div>
-
-            <div class="attachments-box">
-                <div class="attachments-title">ARCHIVOS ADJUNTOS</div>
-                <div class="attachments-count">1</div>
-                <div class="attachments-text">
-                    archivo adjunto a este correo
-                </div>
-                <div class="attachments-detail">
-                    <strong>1 PDF</strong> — Formato de Servicio Fuera de Garantía firmado
-                </div>
-            </div>
-
-            <div class="help-section">
-                <div class="help-title">Información Importante</div>
-                <div class="help-text">
-                    <strong>•</strong> El documento PDF adjunto es el formato oficial de servicio firmado.<br>
-                    <strong>•</strong> Conserve este archivo para su expediente y seguimiento.<br>
-                    <strong>•</strong> Si tiene alguna pregunta, contacte a su responsable de seguimiento.
-                </div>
-            </div>
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
-                <p style="margin: 0; font-size: 14px;">
-                    Gracias por confiar en nuestros servicios.
-                </p>
-            </div>
-        </div>
-
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">
-                    Sistema de Servicio Técnico
-                </div>
-                {% if email_empleado %}
-                <div class="signature-role" style="margin-top: 10px; font-size: 14px;">
-                    Contacto: {{ email_empleado }}
-                </div>
-                {% endif %}
-                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
-                    <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para seguimiento de su orden, contacte directamente a
-                    {% if nombre_empleado %}
-                        <strong>{{ nombre_empleado }}</strong>
-                        {% if email_empleado %}
-                            (<a href="mailto:{{ email_empleado }}" style="color: #ffffff;">{{ email_empleado }}</a>)
-                        {% endif %}
-                    {% else %}
-                        su responsable de seguimiento
-                    {% endif %}.
-                </div>
-            </div>
-
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Facebook</span>
-                    </a>
-                    {% if whatsapp_empleado %}
-                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>WhatsApp</span>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="timestamp">
-                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    {# Preheader: texto de la bandeja ANTES de abrir el correo. #}
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Formato de Servicio Fuera de Garantía (OOW) — Orden {{ orden_sicser }}. El documento firmado va adjunto.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Formato de servicio fuera de garantía
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden: {{ orden_sicser }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Buen día estimado usuario
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Me dirijo de <strong>{{ empresa_nombre }}</strong> para enviarle el
+                                <strong>Formato de Servicio Fuera de Garantía (OOW)</strong> correspondiente
+                                a su equipo de cómputo. El documento firmado se encuentra adjunto en este correo.
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Agradecemos su preferencia y nos ponemos a sus órdenes para esta y futuras ocasiones.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Información de su equipo
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Número de orden
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                                        {{ orden_sicser }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Equipo
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.tipo_equipo }} {{ detalle.marca }}{% if detalle.modelo %} {{ detalle.modelo }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Service Tag
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.numero_serie|default:"—" }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Fecha de ingreso
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f7ff" class="email-panel" style="background-color:#f0f7ff;border:1px solid #c5d9e8;">
+                                <tr>
+                                    <td align="center" style="padding:18px 16px;">
+                                        <p class="email-label" style="margin:0 0 4px 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Archivos adjuntos
+                                        </p>
+                                        <p class="email-title" style="margin:0;font-size:28px;line-height:34px;font-weight:700;color:#1f6391;">
+                                            1
+                                        </p>
+                                        <p class="email-muted" style="margin:4px 0 10px 0;font-size:14px;line-height:20px;color:#475569;">
+                                            archivo adjunto a este correo
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:13px;line-height:20px;color:#334155;text-align:left;">
+                                            <strong>1 PDF</strong> — Formato de Servicio Fuera de Garantía firmado
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Información importante
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            El documento PDF adjunto es el formato oficial de servicio firmado.<br>
+                                            Conserve este archivo para su expediente y seguimiento.<br>
+                                            Si tiene alguna pregunta, contacte a su responsable de seguimiento.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:8px 32px 24px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:14px;line-height:20px;color:#64748b;text-align:center;">
+                                Gracias por confiar en nuestros servicios.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Servicio Técnico
+                            </p>
+                            {% if email_empleado %}
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                Contacto: {{ email_empleado }}
+                            </p>
+                            {% endif %}
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para seguimiento de su orden, contacte directamente a
+                                {% if nombre_empleado %}
+                                    <strong>{{ nombre_empleado }}</strong>
+                                    {% if email_empleado %}
+                                        (<a href="mailto:{{ email_empleado }}" style="color:#7dd3fc;text-decoration:underline;">{{ email_empleado }}</a>)
+                                    {% endif %}
+                                {% else %}
+                                    su responsable de seguimiento
+                                {% endif %}.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 16px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx/" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.instagram.com/sic_mexico/?hl=es" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.facebook.com/LatAmSic" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        {% if whatsapp_empleado %}
+                                        <a href="https://wa.me/{{ whatsapp_empleado }}" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

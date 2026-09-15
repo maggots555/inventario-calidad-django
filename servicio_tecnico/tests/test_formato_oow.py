@@ -871,8 +871,9 @@ class FormatoOowEmailTaskTest(TestCase):
     La task Celery envía HTML profesional (template) conservando el asunto.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Mockeamos EmailMessage.send para no mandar correos reales en CI.
-    Creamos un PDF mínimo en el FileField (no hace falta regenerar ReportLab).
+    Mockeamos EmailMessage.send (EmailMultiAlternatives lo hereda) para
+    no mandar correos reales en CI. El HTML vive en alternatives; el
+    text/plain va en body.
     """
 
     databases = {'default', 'mexico'}
@@ -966,14 +967,17 @@ class FormatoOowEmailTaskTest(TestCase):
             msg.subject,
             'Formato de Servicio OOW — OOW-EMAIL01',
         )
+        html = msg.alternatives[0][0]
         body = msg.body
-        # Template profesional (no el HTML mínimo antiguo).
-        self.assertIn('FORMATO DE SERVICIO FUERA DE GARANTÍA', body)
-        self.assertIn('equipment-info', body)
-        self.assertIn('cid:logo_sic', body)
+        self.assertIn('Formato de servicio fuera de garantía', html)
+        self.assertIn('Información de su equipo', html)
+        self.assertIn('cid:logo_sic_white', html)
+        self.assertIn('OOW-EMAIL01', html)
+        self.assertIn('EMAILSTAG01', html)
+        self.assertNotIn('Estimado(a) cliente', html)
+        self.assertIn('Formato de Servicio Fuera de Garantía (OOW)', body)
         self.assertIn('OOW-EMAIL01', body)
         self.assertIn('EMAILSTAG01', body)
-        self.assertNotIn('Estimado(a) cliente', body)
         self.assertTrue(
             HistorialOrden.objects.filter(
                 orden=self.orden,

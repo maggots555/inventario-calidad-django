@@ -5419,8 +5419,8 @@ def enviar_formato_oow_email_task(
     EXPLICACIÓN PARA PRINCIPIANTES:
     Celery no pasa por PaisMiddleware; db_alias encola el tenant correcto
     (México=default, argentina, chile, colombia).
-    El HTML se arma con el template profesional (mismo header/footer que
-    diagnóstico); el asunto NO cambia respecto a la versión anterior.
+    El HTML se arma con el template canónico (tablas + paleta SIC);
+    el asunto NO cambia respecto a la versión anterior.
 
     Args:
         formato_id: PK de FormatoServicioOOW
@@ -5428,13 +5428,13 @@ def enviar_formato_oow_email_task(
         db_alias: Alias de BD del país
 
     Efectos secundarios:
-        Envía EmailMessage con PDF adjunto + logo/iconos CID;
-        registra historial en la orden.
+        Envía EmailMultiAlternatives (HTML + texto plano) con PDF adjunto
+        + logo/iconos CID; registra historial en la orden.
     """
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.contrib.staticfiles import finders
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from email.mime.application import MIMEApplication
@@ -5542,28 +5542,24 @@ def enviar_formato_oow_email_task(
             )
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # EmailMessage.to acepta una lista: se envía el mismo PDF a todos (máx. 3).
-        email_msg = EmailMessage(
+        # HTML + texto plano. El aviso del PDF firmado debe llegar aunque
+        # Gmail/Outlook bloqueen el HTML. to= acepta lista (máx. 3).
+        from servicio_tecnico.services.email_formato_oow import (
+            construir_texto_plano_formato_oow,
+        )
+        texto_plano = construir_texto_plano_formato_oow(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=from_email,
             to=destinatarios,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
-        # Logo e iconos inline (CID) — mismos assets que diagnóstico.
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header(
-                        'Content-Disposition', 'inline', filename='logo_sic.png',
-                    )
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning('[FORMATO_OOW] Error al adjuntar logo: %s', e)
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[FORMATO_OOW]')
 
         try:
             iconos_sociales = {
