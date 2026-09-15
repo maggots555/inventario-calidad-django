@@ -129,7 +129,12 @@ class PDFFormatoServicioOOW:
             elementos += self._construir_header()
             elementos.append(Spacer(1, 4 * mm))
             elementos += self._construir_titulo()
-            elementos.append(Spacer(1, 5 * mm))
+            elementos.append(Spacer(1, 4 * mm))
+            # QR de seguimiento: página 1, visible, sin pelear con el logo.
+            tarjeta_qr = self._construir_tarjeta_seguimiento()
+            if tarjeta_qr:
+                elementos += tarjeta_qr
+                elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_orden_servicio())
             elementos.append(Spacer(1, 5 * mm))
             elementos += self._envolver_seccion(self._construir_datos_cliente())
@@ -288,6 +293,22 @@ class PDFFormatoServicioOOW:
             textColor=COLOR_NEGRO,
             alignment=TA_CENTER,
         ))
+        self._estilos.add(ParagraphStyle(
+            'QrTitulo',
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            textColor=COLOR_NAVY,
+            alignment=TA_LEFT,
+            leading=12,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'QrLeyenda',
+            fontName='Helvetica',
+            fontSize=7.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_LEFT,
+            leading=10,
+        ))
 
     def _tiene_fotos_escaneo(self) -> bool:
         """True si la orden tiene al menos una foto de escaneo OOW."""
@@ -398,6 +419,68 @@ class PDFFormatoServicioOOW:
         return [self._crear_header_seccion(
             'FORMATO DE SERVICIO FUERA DE GARANTÍA CON COSTO'
         )]
+
+    def _construir_tarjeta_seguimiento(self) -> List:
+        """
+        Tarjeta de página 1: QR + texto para consultar el estatus.
+
+        Objetivo de negocio:
+            El cliente se lleva esta hoja. Escanea (papel) o toca el QR
+            (PDF en el celular) y abre el portal de seguimiento.
+
+        Returns:
+            Lista de flowables, o vacía si la orden aún no tiene enlace.
+        """
+        from servicio_tecnico.services.enlace_seguimiento import (
+            url_seguimiento_de_orden,
+        )
+        from servicio_tecnico.utils.qr_pdf import imagen_qr_para_pdf
+
+        url = url_seguimiento_de_orden(self.orden)
+        if not url:
+            return []
+
+        # 28 mm: tamaño seguro para escanear impreso; clicable en PDF digital.
+        qr_img = imagen_qr_para_pdf(url, lado_mm=28)
+        titulo = Paragraph(
+            'Consulta el estatus de tu servicio',
+            self._estilos['QrTitulo'],
+        )
+        leyenda = Paragraph(
+            'Escanea este código con tu celular para ver el avance de tu equipo.',
+            self._estilos['QrLeyenda'],
+        )
+        ancho_util = letter[0] - (2 * MARGEN)
+        ancho_qr = 32 * mm
+        ancho_texto = ancho_util - ancho_qr
+        bloque_texto = Table(
+            [[titulo], [leyenda]],
+            colWidths=[ancho_texto],
+        )
+        bloque_texto.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        # Columna QR + texto: fondo navy suave, mismo lenguaje visual que el resto.
+        celda_qr = qr_img if qr_img is not None else ''
+        fila = Table(
+            [[celda_qr, bloque_texto]],
+            colWidths=[ancho_qr, ancho_texto],
+        )
+        fila.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY_SUAVE),
+            ('BOX', (0, 0), (-1, -1), 0.7, COLOR_NAVY),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (0, 0), 2),
+            ('RIGHTPADDING', (0, 0), (0, 0), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return [KeepTogether([fila])]
 
     def _construir_orden_servicio(self) -> List:
         """

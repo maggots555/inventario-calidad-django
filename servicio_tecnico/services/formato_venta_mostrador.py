@@ -603,6 +603,7 @@ def finalizar_formato(
 
     Efectos secundarios:
         Genera PDF, guarda FileField, actualiza estado y finalizado_en.
+        Crea EnlaceSeguimientoCliente si la orden aún no tenía (para el QR).
     """
     if formato.estado == 'finalizado' and not forzar_regenerar:
         if formato.pdf:
@@ -611,6 +612,12 @@ def finalizar_formato(
     ahora = timezone.now()
     if not formato.finalizado_en:
         formato.finalizado_en = ahora
+
+    # Igual que OOW: el QR necesita el enlace aunque no se haya mandado correo.
+    from servicio_tecnico.services.enlace_seguimiento import (
+        obtener_o_crear_enlace_seguimiento,
+    )
+    obtener_o_crear_enlace_seguimiento(formato.orden)
 
     from servicio_tecnico.utils.pdf_formato_venta_mostrador import (
         PDFFormatoVentaMostrador,

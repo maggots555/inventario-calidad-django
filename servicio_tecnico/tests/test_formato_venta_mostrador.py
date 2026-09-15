@@ -23,6 +23,7 @@ from servicio_tecnico import views as st_views
 from servicio_tecnico import views_formato_venta_mostrador
 from servicio_tecnico.models import (
     DetalleEquipo,
+    EnlaceSeguimientoCliente,
     FormatoServicioVentaMostrador,
     OrdenServicio,
     PiezaVentaMostrador,
@@ -37,6 +38,27 @@ from servicio_tecnico.services.formato_venta_mostrador import (
 
 
 User = get_user_model()
+
+
+def _flowable_tiene_imagen_vm(flowables) -> bool:
+    """True si hay un Image de ReportLab dentro de tablas anidadas."""
+    from reportlab.platypus import Image as RLImage, KeepTogether, Table
+
+    pila = list(flowables)
+    while pila:
+        item = pila.pop()
+        if isinstance(item, RLImage):
+            return True
+        if isinstance(item, KeepTogether):
+            pila.extend(list(item._content or []))
+        elif isinstance(item, Table):
+            for fila in item._cellvalues:
+                for celda in fila:
+                    if isinstance(celda, list):
+                        pila.extend(celda)
+                    elif celda is not None:
+                        pila.append(celda)
+    return False
 
 
 class FormatoVmReexportsTest(SimpleTestCase):
@@ -183,6 +205,54 @@ class FormatoVmServiceTest(TestCase):
         self.assertIn(b'Nota de Venta Directa', raw)
         self.assertIn(b'/Count 2', raw)
         self.assertGreater(len(raw), 2000)
+
+    def test_finalizar_crea_enlace_sin_email_y_pdf_con_qr(self):
+        """Sin email igual se crea el enlace y la fila de título trae QR."""
+        from reportlab.lib.units import mm
+
+        from servicio_tecnico.utils.pdf_formato_venta_mostrador import (
+            PDFFormatoVentaMostrador,
+        )
+
+        detalle = self.orden.detalle_equipo
+        detalle.email_cliente = ''
+        detalle.save(update_fields=['email_cliente'])
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        final = finalizar_formato(formato, usuario=self.user)
+        self.assertTrue(
+            EnlaceSeguimientoCliente.objects.filter(orden=self.orden).exists()
+        )
+
+        generador = PDFFormatoVentaMostrador(final)
+        celda = generador._celda_qr_seguimiento(32 * mm)
+        self.assertIsNotNone(celda)
+        self.assertTrue(_flowable_tiene_imagen_vm([celda]))
+
+        resultado = generador.generar_pdf()
+        self.assertTrue(resultado['success'])
+        self.assertIn(b'Nota de Venta Directa', resultado['buffer'].getvalue())
+
+    def test_pdf_no_truena_si_falta_qrcode(self):
+        """Si qrcode no importa, la nota de venta se genera igual."""
+        from reportlab.lib.units import mm
+
+        from servicio_tecnico.utils.pdf_formato_venta_mostrador import (
+            PDFFormatoVentaMostrador,
+        )
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        final = finalizar_formato(formato, usuario=self.user)
+
+        with patch(
+            'servicio_tecnico.utils.qr_pdf._importar_qrcode',
+            side_effect=ImportError,
+        ):
+            resultado = PDFFormatoVentaMostrador(final).generar_pdf()
+            self.assertTrue(resultado['success'], resultado.get('error'))
+            celda = PDFFormatoVentaMostrador(final)._celda_qr_seguimiento(32 * mm)
+            self.assertIsNotNone(celda)
+            self.assertFalse(_flowable_tiene_imagen_vm([celda]))
 
     def test_formato_telefono_whatsapp_mx(self):
         """Los 10 dígitos de WhatsApp se leen con espacios en el PDF."""

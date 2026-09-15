@@ -8,6 +8,7 @@ responde 200 para una orden de diagnóstico.
 """
 
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -23,6 +24,7 @@ from servicio_tecnico import views_formato_oow
 from servicio_tecnico.models import (
     DetalleEquipo,
     DanoEsteticoVista,
+    EnlaceSeguimientoCliente,
     FormatoServicioOOW,
     OrdenServicio,
     _resolver_ref_carpeta_orden,
@@ -72,6 +74,33 @@ def _adjuntar_vistas_completas(formato) -> None:
             ContentFile(_png_bytes()),
             save=True,
         )
+
+
+def _flowable_tiene_imagen(flowables) -> bool:
+    """
+    Recorre tablas/KeepTogether y dice si hay un Image de ReportLab.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El QR no sale como texto plano en el PDF (va comprimido). En el test
+    inspeccionamos los bloques que Platypus va a pintar.
+    """
+    from reportlab.platypus import Image as RLImage, KeepTogether, Table
+
+    pila = list(flowables)
+    while pila:
+        item = pila.pop()
+        if isinstance(item, RLImage):
+            return True
+        if isinstance(item, KeepTogether):
+            pila.extend(list(item._content or []))
+        elif isinstance(item, Table):
+            for fila in item._cellvalues:
+                for celda in fila:
+                    if isinstance(celda, list):
+                        pila.extend(celda)
+                    elif celda is not None:
+                        pila.append(celda)
+    return False
 
 
 class FormatoOowReexportsTest(SimpleTestCase):
@@ -538,6 +567,79 @@ class FormatoOowServiceTest(TestCase):
             'Otros': 'SI' if f.accesorio_otros else 'NO',
         }
         self.assertEqual(pares_reales, pares_esperados)
+
+    def test_finalizar_crea_enlace_sin_email_y_pdf_con_qr(self):
+        """
+        Sin email igual se crea el enlace y el PDF trae la tarjeta QR.
+        """
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        detalle = self.orden.detalle_equipo
+        detalle.email_cliente = ''
+        detalle.save(update_fields=['email_cliente'])
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        _adjuntar_vistas_completas(formato)
+
+        final = finalizar_formato(formato, usuario=self.user)
+        self.assertTrue(
+            EnlaceSeguimientoCliente.objects.filter(orden=self.orden).exists()
+        )
+
+        generador = PDFFormatoServicioOOW(final)
+        tarjeta = generador._construir_tarjeta_seguimiento()
+        self.assertTrue(tarjeta)
+        self.assertTrue(_flowable_tiene_imagen(tarjeta))
+
+        resultado = generador.generar_pdf()
+        self.assertTrue(resultado['success'])
+        self.assertGreater(len(resultado['buffer'].getvalue()), 100)
+
+    def test_pdf_no_truena_si_falta_qrcode(self):
+        """Si qrcode no importa, el PDF OOW se genera igual (sin imagen QR)."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        _adjuntar_vistas_completas(formato)
+        final = finalizar_formato(formato, usuario=self.user)
+
+        with patch(
+            'servicio_tecnico.utils.qr_pdf._importar_qrcode',
+            side_effect=ImportError,
+        ):
+            resultado = PDFFormatoServicioOOW(final).generar_pdf()
+            self.assertTrue(resultado['success'], resultado.get('error'))
+            tarjeta = PDFFormatoServicioOOW(final)._construir_tarjeta_seguimiento()
+            self.assertTrue(tarjeta)
+            self.assertFalse(_flowable_tiene_imagen(tarjeta))
 
     def test_regenerar_pdf_ya_finalizado(self):
         """

@@ -296,6 +296,14 @@ class PDFFormatoVentaMostrador:
             textColor=COLOR_NAVY,
             leading=10,
         ))
+        self._estilos.add(ParagraphStyle(
+            'QrLeyendaVm',
+            fontName='Helvetica',
+            fontSize=6,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            leading=7.5,
+        ))
 
     def _envolver_seccion(self, partes: List) -> List:
         """KeepTogether para no partir título de sección y tabla."""
@@ -393,23 +401,86 @@ class PDFFormatoVentaMostrador:
         elementos.append(HRFlowable(width='100%', thickness=1, color=COLOR_GRIS_BORDE))
         return elementos
 
+    def _celda_qr_seguimiento(self, ancho_col: float):
+        """
+        QR compacto + leyenda para la fila de título (no ocupa una sección extra).
+
+        Args:
+            ancho_col: ancho de la columna del QR en puntos.
+
+        Returns:
+            Table con QR y texto, o None si no hay enlace.
+        """
+        from servicio_tecnico.services.enlace_seguimiento import (
+            url_seguimiento_de_orden,
+        )
+        from servicio_tecnico.utils.qr_pdf import imagen_qr_para_pdf
+
+        url = url_seguimiento_de_orden(self.orden)
+        if not url:
+            return None
+
+        # 22 mm: la página 1 de FL ya está llena; más grande empujaría WhatsApp.
+        qr_img = imagen_qr_para_pdf(url, lado_mm=22)
+        leyenda = Paragraph(
+            'Escanea para<br/>consultar el estatus',
+            self._estilos['QrLeyendaVm'],
+        )
+        # Si qrcode falla, igual mostramos la leyenda (el PDF no se cae).
+        filas = []
+        if qr_img is not None:
+            filas.append([qr_img])
+        filas.append([leyenda])
+        tabla = Table(filas, colWidths=[ancho_col])
+        tabla.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 1),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        return tabla
+
     def _construir_titulo_y_folio(self) -> List:
         """
-        Título NOTA DE VENTA DIRECTA + recuadro fecha/folio, sin solaparse.
+        Título NOTA DE VENTA DIRECTA + QR de seguimiento + recuadro fecha/folio.
 
         EXPLICACIÓN PARA PRINCIPIANTES:
         `_crear_header_seccion()` dibuja la barra navy al ANCHO COMPLETO de
         la hoja. Si esa barra se mete en una celda más estrecha (porque al
         lado va Fecha/Folio), ReportLab no recorta: la barra se sale y tapa
         el recuadro. Por eso aquí el título usa el ancho de SU columna.
+
+        El QR va en el centro (no una tarjeta extra) para no mandar el bloque
+        de WhatsApp a la página 2.
         """
         momento = self.formato.finalizado_en or timezone.now()
         fecha_txt = timezone.localtime(momento).strftime('%d/%m/%Y')
         folio = self._folio()
-        # Columna folio + hueco entre título y recuadro
-        hueco = 3 * mm
+        hueco = 2 * mm
         ancho_folio = 60 * mm
-        ancho_titulo = self._ancho_util() - ancho_folio - hueco
+        ancho_qr = 32 * mm
+        celda_qr = self._celda_qr_seguimiento(ancho_qr)
+        if celda_qr is None:
+            # Sin enlace: layout original título | hueco | folio.
+            ancho_titulo = self._ancho_util() - ancho_folio - hueco
+            celdas = [
+                Paragraph('NOTA DE VENTA DIRECTA', self._estilos['TituloFormatoVm']),
+                '',
+                None,  # se reemplaza abajo por recuadro
+            ]
+            anchos = [ancho_titulo, hueco, ancho_folio]
+        else:
+            ancho_titulo = self._ancho_util() - ancho_folio - ancho_qr - (2 * hueco)
+            celdas = [
+                Paragraph('NOTA DE VENTA DIRECTA', self._estilos['TituloFormatoVm']),
+                '',
+                celda_qr,
+                '',
+                None,
+            ]
+            anchos = [ancho_titulo, hueco, ancho_qr, hueco, ancho_folio]
 
         recuadro = Table(
             [
@@ -433,17 +504,10 @@ class PDFFormatoVentaMostrador:
             ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
-        fila = Table(
-            [[
-                Paragraph('NOTA DE VENTA DIRECTA', self._estilos['TituloFormatoVm']),
-                '',
-                recuadro,
-            ]],
-            colWidths=[ancho_titulo, hueco, ancho_folio],
-        )
-        fila.setStyle(TableStyle([
-            # Navy solo en la columna del título, hueco blanco, recuadro a la derecha.
-            # Así ambas celdas de contenido quedan a la misma altura (la del folio).
+        # El recuadro siempre es la última celda (índice 2 o 4).
+        celdas[-1] = recuadro
+        fila = Table([celdas], colWidths=anchos)
+        estilos_fila = [
             ('BACKGROUND', (0, 0), (0, 0), COLOR_NAVY),
             ('ALIGN', (0, 0), (0, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -453,7 +517,13 @@ class PDFFormatoVentaMostrador:
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
             ('LEFTPADDING', (0, 0), (0, 0), 4),
             ('RIGHTPADDING', (0, 0), (0, 0), 4),
-        ]))
+        ]
+        if celda_qr is not None:
+            # Columna del QR: fondo suave para que se distinga del título navy.
+            estilos_fila.append(('BACKGROUND', (2, 0), (2, 0), COLOR_NAVY_SUAVE))
+            estilos_fila.append(('ALIGN', (2, 0), (2, 0), 'CENTER'))
+            estilos_fila.append(('BOX', (2, 0), (2, 0), 0.5, COLOR_NAVY))
+        fila.setStyle(TableStyle(estilos_fila))
         return [fila]
 
     def _tabla_pares(self, pares: List[tuple]) -> Table:
