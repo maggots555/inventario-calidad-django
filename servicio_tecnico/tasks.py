@@ -70,9 +70,13 @@ def enviar_correo_rhitso_task(
     En su lugar, pasas el ID y dentro de la tarea lo buscas en la BD.
 
     Efectos secundarios:
-        Genera PDF temporal, comprime imágenes, envía EmailMessage y limpia temporales.
+        Genera PDF temporal, comprime imágenes, envía EmailMultiAlternatives
+        (HTML + texto plano) y limpia temporales.
     """
-    from django.core.mail import EmailMessage
+    from email.mime.image import MIMEImage
+
+    from django.contrib.staticfiles import finders
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -161,21 +165,33 @@ def enviar_correo_rhitso_task(
         imagenes_paths = [img['ruta_comprimida'] for img in analisis['imagenes_validas']]
 
         # ===================================================================
-        # PASO 4: PREPARAR HTML DEL CORREO
+        # PASO 4: PREPARAR HTML + TEXTO PLANO DEL CORREO
         # ===================================================================
-        ahora = timezone.now()
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # get_pais_actual() lee el país del hilo Celery (db_alias). Así el
+        # pie muestra empresa/país del tenant, no un "México" hardcodeado.
+        from config.paises_config import get_pais_actual, fecha_local_pais
+        _pais_email = get_pais_actual()
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+
         context = {
             'orden': orden,
-            'fecha_actual': ahora.strftime('%d/%m/%Y'),
-            'hora_actual': ahora.strftime('%H:%M'),
-            'agente_nombre': 'Equipo de Soporte Técnico',
-            'agente_celular': '55-35-45-81-92',
-            'agente_correo': settings.DEFAULT_FROM_EMAIL,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
         }
         html_content = render_to_string(
             'servicio_tecnico/emails/rhitso_envio.html',
             context
         )
+
+        # EmailMultiAlternatives manda DOS cuerpos: texto plano (body) y HTML.
+        # Si Gmail/Outlook bloquean el HTML, RHITSO igual lee orden y contacto.
+        from servicio_tecnico.services.email_rhitso_envio import (
+            construir_texto_plano_rhitso_envio,
+        )
+        texto_plano = construir_texto_plano_rhitso_envio(context)
 
         # ===================================================================
         # PASO 5: CREAR Y ENVIAR EL CORREO
@@ -198,14 +214,40 @@ def enviar_correo_rhitso_task(
             email_address = from_email_base
         from_email_rhitso = f'RHITSO System <{email_address}>'
 
-        email_msg = EmailMessage(
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=from_email_rhitso,
             to=destinatarios_principales,
             cc=copia_empleados if copia_empleados else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[RHITSO]')
+
+        # Iconos del pie (texto visible junto al CID: si bloquean fotos, se lee).
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header(
+                            'Content-Disposition',
+                            'inline',
+                            filename=f'{cid_name}.png',
+                        )
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[RHITSO] Error al adjuntar iconos: {e}")
 
         # Adjuntar PDF
         if os.path.exists(pdf_path):
