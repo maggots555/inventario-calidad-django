@@ -1,81 +1,135 @@
 """
-Tests del layout del bloque MOTIVO en el PDF RHITSO.
+Tests del PDF RHITSO (Platypus, estilo OOW / Venta mostrador).
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
-Antes, la caja de MOTIVO medía siempre 70 puntos. Si el diagnóstico era largo,
-el texto se salía y tapaba ACCESORIOS ENVIADOS.
+No enviamos correo ni tocamos la BD. Armamos una orden de mentira
+(SimpleNamespace) y pedimos a PDFGeneratorRhitso que escriba un PDF
+en un MEDIA_ROOT temporal.
 
-Estos tests verifican:
-1. Que el texto largo se parte en varias líneas (wrap por ancho).
-2. Que la altura de la caja crece cuando hay muchas líneas.
-3. Que un texto corto sigue respetando el mínimo de 70 pt.
+Así comprobamos:
+1. Que el archivo nace bien (%PDF, tamaño, ruta).
+2. Que un motivo largo ya no truena (Paragraph envuelve solo).
+3. Que sin detalle/cargador los fallbacks no rompen la generación.
 """
 
-from django.test import SimpleTestCase
+import tempfile
+from types import SimpleNamespace
+
+from django.contrib.staticfiles import finders
+from django.test import SimpleTestCase, override_settings
+from reportlab.platypus import Image as RLImage, Table
 
 from servicio_tecnico.utils.pdf_generator import PDFGeneratorRhitso
 
 
-class PdfRhitsoMotivoLayoutTest(SimpleTestCase):
+def _orden_completa(**overrides):
     """
-    Pruebas unitarias del wrap y la altura dinámica de MOTIVO.
+    Orden + detalle mínimos como los que usa el generador.
 
-    No tocan la base de datos: solo llaman helpers estáticos del generador.
+    Args:
+        **overrides: atributos extra sobre la orden (ej. descripcion_rhitso).
+
+    Returns:
+        SimpleNamespace listo para PDFGeneratorRhitso.
     """
+    detalle = SimpleNamespace(
+        orden_cliente='OOW-09647',
+        modelo='Inspiron 15 3535',
+        numero_serie='SN-RHITSO-01',
+        tiene_cargador=True,
+        numero_serie_cargador='CHG-001',
+    )
+    orden = SimpleNamespace(
+        id=2048,
+        numero_orden_interno='INT-2048',
+        descripcion_rhitso='Falla de motherboard. Se solicita envío a RHITSO.',
+        detalle_equipo=detalle,
+    )
+    for clave, valor in overrides.items():
+        setattr(orden, clave, valor)
+    return orden
 
-    def test_texto_corto_una_linea_y_altura_minima(self):
-        """
-        Caso feliz: un motivo breve cabe en una línea y la caja no baja de 70 pt.
-        """
-        # Ancho amplio (como el útil del PDF menos márgenes internos).
-        ancho_maximo = 500.0
-        lineas = PDFGeneratorRhitso._partir_texto_en_lineas(
-            'Falla de motherboard',
-            ancho_maximo,
-            'Helvetica',
-            9,
-        )
 
-        self.assertEqual(len(lineas), 1)
-        self.assertEqual(lineas[0], 'Falla de motherboard')
+class PdfRhitsoPlatypusTest(SimpleTestCase):
+    """Generación real del PDF sin BD ni correo."""
 
-        alto = PDFGeneratorRhitso._calcular_alto_contenido_motivo(len(lineas))
-        # EXPLICACIÓN: aunque quepa en 1 línea, el diseño pide mínimo 70 pt.
-        self.assertEqual(alto, 70)
+    def _generar(self, orden, imagenes=None):
+        """
+        Llama a generar_pdf() con MEDIA_ROOT temporal.
 
-    def test_texto_largo_varias_lineas_y_altura_crece(self):
+        Returns:
+            dict: resultado del generador.
         """
-        Caso borde: párrafo largo → varias líneas y altura mayor a 70 pt.
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+                generador = PDFGeneratorRhitso(orden, imagenes_autorizacion=imagenes or [])
+                resultado = generador.generar_pdf()
+                # Copiamos bytes antes de que el tmp se borre, para aserciones.
+                if resultado.get('success') and resultado.get('ruta'):
+                    with open(resultado['ruta'], 'rb') as archivo:
+                        resultado['_bytes'] = archivo.read()
+                return resultado
+
+    def test_feliz_genera_pdf_con_ruta_y_cabecera(self):
+        """Feliz: success, archivo en ruta, magic %PDF y tamaño > 100."""
+        resultado = self._generar(_orden_completa())
+
+        self.assertTrue(resultado['success'], resultado.get('error'))
+        self.assertTrue(resultado['archivo'].startswith('RHITSO_'))
+        self.assertTrue(resultado['archivo'].endswith('.pdf'))
+        self.assertGreater(resultado['size'], 100)
+        self.assertTrue(resultado['_bytes'].startswith(b'%PDF'))
+        self.assertIn('SN-RHITSO-01', resultado['archivo'])
+
+    def test_motivo_largo_genera_sin_error(self):
         """
-        # Mismo texto problemático reportado en producción (aprox.).
+        Borde: párrafo largo (el que antes tapaba ACCESORIOS).
+        Platypus envuelve; el PDF debe nacer igual.
+        """
         motivo_largo = (
             'Se realiza diagnostico a equipo, se observa que el LED de Caps Lock '
             'parpadea 3 veces y se queda prendido, se verifica que el SSD de 512 GB '
             'es reconocido en BIOS y se intenta arrancar, sin embargo el equipo no '
             'pasa de la pantalla de logo. Se determina falla en motherboard y se '
-            'solicita envio a RHITSO para diagnostico y cotizacion de reparacion.'
+            'solicita envio a RHITSO para diagnostico y cotizacion de reparacion. '
+            'El cliente autoriza el envio y se adjuntan fotografias de ingreso.'
         )
-        # Ancho estrecho a propósito para forzar varias líneas (como en el PDF).
-        ancho_maximo = 200.0
-        lineas = PDFGeneratorRhitso._partir_texto_en_lineas(
-            motivo_largo,
-            ancho_maximo,
-            'Helvetica',
-            9,
+        resultado = self._generar(_orden_completa(descripcion_rhitso=motivo_largo))
+
+        self.assertTrue(resultado['success'], resultado.get('error'))
+        self.assertGreater(resultado['size'], 100)
+        self.assertTrue(resultado['_bytes'].startswith(b'%PDF'))
+
+    def test_sin_detalle_ni_cargador_no_rompe(self):
+        """Borde: sin detalle → N/A / SIN CARGADOR; el PDF igual se genera."""
+        orden = SimpleNamespace(
+            id=99,
+            numero_orden_interno='INT-99',
+            descripcion_rhitso='',
+            detalle_equipo=None,
         )
+        resultado = self._generar(orden)
 
-        self.assertGreater(len(lineas), 1)
-        # Ninguna línea debe exceder el ancho máximo medido.
-        from reportlab.pdfbase.pdfmetrics import stringWidth
+        self.assertTrue(resultado['success'], resultado.get('error'))
+        self.assertTrue(resultado['_bytes'].startswith(b'%PDF'))
+        self.assertGreater(resultado['size'], 100)
+        self.assertIn('INT-99', resultado['archivo'])
 
-        for linea in lineas:
-            self.assertLessEqual(
-                stringWidth(linea, 'Helvetica', 9),
-                ancho_maximo,
-            )
+    def test_header_incluye_logo_rhitso_a_la_derecha(self):
+        """
+        El encabezado es SIC | empresa | RHITSO, como el formato original.
+        Si el PNG no está en static, la celda derecha queda vacía (fail-safe).
+        """
+        generador = PDFGeneratorRhitso(_orden_completa())
+        header = generador._construir_header()
+        tabla = header[0]
+        self.assertIsInstance(tabla, Table)
+        self.assertEqual(len(tabla._cellvalues[0]), 3)
 
-        alto = PDFGeneratorRhitso._calcular_alto_contenido_motivo(len(lineas))
-        # padding 20 + N*12 debe superar el mínimo histórico.
-        self.assertGreater(alto, 70)
-        self.assertEqual(alto, 20 + (len(lineas) * 12))
+        celda_derecha = tabla._cellvalues[0][2]
+        ruta_rhitso = finders.find('images/logos/logo_rhitso.png')
+        if ruta_rhitso:
+            self.assertIsInstance(celda_derecha, RLImage)
+        else:
+            self.assertEqual(celda_derecha, '')
