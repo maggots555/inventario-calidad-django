@@ -1000,6 +1000,36 @@ class FormatoOowServiceTest(TestCase):
         # Sin campañas y sin librería QR: no hay Image que pintar.
         self.assertFalse(_flowable_tiene_imagen(elementos))
 
+    def test_generar_pdf_completo_con_campania_vigente(self):
+        """El PDF entero (aviso + promociones) se arma con un flyer vigente."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        _crear_campania_pdf(leyenda='Flyer en PDF completo')
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        resultado = PDFFormatoServicioOOW(formato).generar_pdf()
+        self.assertTrue(resultado['success'], resultado.get('error'))
+        self.assertGreater(len(resultado['buffer'].getvalue()), 100)
+
+    def test_generar_pdf_sobrevive_si_fallan_campanias(self):
+        """Un error de publicidad no debe impedir entregar el formato legal."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        with patch(
+            'servicio_tecnico.services.campanias_pdf_oow.obtener_campanias_vigentes',
+            side_effect=RuntimeError('bd caida'),
+        ):
+            resultado = PDFFormatoServicioOOW(formato).generar_pdf()
+        self.assertTrue(resultado['success'], resultado.get('error'))
+
+        with patch.object(
+            PDFFormatoServicioOOW,
+            '_construir_promociones',
+            side_effect=RuntimeError('hoja promo rota'),
+        ):
+            resultado = PDFFormatoServicioOOW(formato).generar_pdf()
+        self.assertTrue(resultado['success'], resultado.get('error'))
+
     def test_pdf_muestra_accesorios_marcados(self):
         """
         Los checkboxes se guardan y el PDF se regenera sin fallar.

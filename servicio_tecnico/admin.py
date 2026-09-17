@@ -2282,8 +2282,9 @@ class CampaniaPdfOowAdmin(admin.ModelAdmin):
                     'border-radius:10px; object-fit:contain; '
                     'box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
                     '<p style="margin:6px 0 0; font-size:12px; color:#6b7280;">'
-                    'Recomendado: flyer horizontal ~1800×1000 px. '
-                    'No se recorta; si es más grande, se escala.</p>'
+                    'Retrato (ficha de producto) o flyer apaisado. '
+                    'No se recorta; si es más grande, se escala. '
+                    'El marco del PDF sigue el tamaño real de la imagen.</p>'
                     '</div>',
                     obj.imagen.url,
                 )

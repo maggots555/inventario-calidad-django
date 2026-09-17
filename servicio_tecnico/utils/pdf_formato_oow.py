@@ -169,8 +169,18 @@ class PDFFormatoServicioOOW:
             # --- Aviso de privacidad ---
             elementos += self._construir_aviso_privacidad()
 
-            # --- Promociones / catálogo (siempre, después del aviso) ---
-            elementos += self._construir_promociones()
+            # --- Promociones / catálogo (después del aviso; no tumba el PDF) ---
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Esta hoja es publicidad. Si falla (BD, archivo, ReportLab), el
+            # aviso de privacidad y el resto del formato igual deben salir.
+            try:
+                elementos += self._construir_promociones()
+            except Exception as exc:
+                logger.warning(
+                    '[PDF_FORMATO_OOW] Hoja de promociones omitida: %s',
+                    exc,
+                    exc_info=True,
+                )
 
             # EXPLICACIÓN PARA PRINCIPIANTES:
             # onFirstPage/onLaterPages dibujan el pie en CADA hoja con canvas
@@ -322,15 +332,6 @@ class PDFFormatoServicioOOW:
             textColor=COLOR_NEGRO,
             alignment=TA_LEFT,
             leading=10,
-        ))
-        self._estilos.add(ParagraphStyle(
-            'PromoTitulo',
-            fontName='Helvetica-Bold',
-            fontSize=11,
-            textColor=COLOR_NAVY,
-            alignment=TA_CENTER,
-            leading=14,
-            spaceAfter=4,
         ))
         self._estilos.add(ParagraphStyle(
             'PromoLeyenda',
@@ -1132,13 +1133,8 @@ class PDFFormatoServicioOOW:
         )
 
         elementos: List = [PageBreak()]
-        elementos.append(Paragraph(
-            self._esc(OOW_PROMO_TITULO_HOJA),
-            self._estilos['PromoTitulo'],
-        ))
-        elementos.append(self._crear_header_seccion(
-            'Promociones / Catálogo de equipos certificados',
-        ))
+        # Misma barra navy que el resto de secciones (un solo título, no dos).
+        elementos.append(self._crear_header_seccion(OOW_PROMO_TITULO_HOJA))
         elementos.append(Spacer(1, 3 * mm))
         elementos.append(self._construir_qrs_promo_fijos())
         elementos.append(Spacer(1, 4 * mm))
@@ -1147,7 +1143,15 @@ class PDFFormatoServicioOOW:
         # Las campañas se leen AHORA (al generar/regenerar). Si marketing
         # pausó una, el PDF nuevo ya no la trae; el PDF viejo no se reescribe
         # solo: hay que pulsar regenerar.
-        elementos += self._construir_rejilla_campanias(obtener_campanias_vigentes())
+        try:
+            campanias = obtener_campanias_vigentes()
+        except Exception as exc:
+            logger.warning(
+                '[PDF_FORMATO_OOW] No se pudieron leer campañas vigentes: %s',
+                exc,
+            )
+            campanias = []
+        elementos += self._construir_rejilla_campanias(campanias)
         return elementos
 
     def _construir_rejilla_campanias(self, campanias) -> List:
@@ -1160,9 +1164,7 @@ class PDFFormatoServicioOOW:
         Returns:
             Lista con la tabla (vacía si ninguna imagen se pudo leer).
         """
-        bloques = []
-        for campania in campanias:
-            bloques.append(campania)
+        bloques = [c for c in campanias]
         if not bloques:
             return []
 
@@ -1180,7 +1182,14 @@ class PDFFormatoServicioOOW:
                 ancho=ancho_col - 3 * mm,
                 alto=alto_img,
             )
-            celdas.append(pieza if pieza else '')
+            # Sin imagen (archivo perdido): no dejamos un hueco a la izquierda.
+            if pieza:
+                celdas.append(pieza)
+        if not celdas:
+            return []
+        # Si de 2 campañas solo una tenía archivo, no dejamos media tabla vacía.
+        columnas = 1 if len(celdas) == 1 else 2
+        ancho_col = ancho_util / columnas
 
         filas = []
         # De 2 en 2: si queda una suelta, la última fila lleva celda vacía.
@@ -1223,7 +1232,7 @@ class PDFFormatoServicioOOW:
                 qr_img=qr_img,
                 ancho=ancho_col - 2 * mm,
             ))
-        tabla = Table([celdas], colWidths=[ancho_col, ancho_col])
+        tabla = Table([celdas], colWidths=[ancho_col] * len(celdas))
         tabla.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('LEFTPADDING', (0, 0), (-1, -1), 1),
@@ -1353,12 +1362,11 @@ class PDFFormatoServicioOOW:
         enorme con la foto chica adentro. Aquí leemos drawWidth/drawHeight
         (el tamaño real que ReportLab va a pintar) y el marco es de eso.
         """
-        # lazy=1: la imagen aún no abrió el archivo; forzamos el cálculo.
-        if getattr(imagen, '_lazy', 0):
-            try:
-                imagen._setup_inner()
-            except Exception:
-                logger.warning('[PDF_FORMATO_OOW] No se midió el flyer para el marco')
+        # wrap() es la API pública de ReportLab: calcula drawWidth/drawHeight.
+        try:
+            imagen.wrap(imagen._width or 0, imagen._height or 0)
+        except Exception:
+            logger.warning('[PDF_FORMATO_OOW] No se midió el flyer para el marco')
         pad = 1.5 * mm
         ancho_real = float(getattr(imagen, 'drawWidth', 0) or 0)
         alto_real = float(getattr(imagen, 'drawHeight', 0) or 0)

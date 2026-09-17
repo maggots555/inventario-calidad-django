@@ -3684,8 +3684,9 @@ class CampaniaPdfOow(models.Model):
         ],
         verbose_name='Imagen de la campaña',
         help_text=(
-            'Flyer en JPG, PNG, GIF o WebP. Máx. 10 MB. Se escala si pasa de '
-            '1800 px de lado, sin recortar. Recomendado: horizontal ~1800×1000.'
+            'Flyer o ficha de producto (JPG, PNG, GIF o WebP). Máx. 10 MB. '
+            'Se escala si pasa de 1800 px de lado, sin recortar. '
+            'Retrato (laptop) o apaisado: el PDF ajusta el marco al ratio.'
         ),
     )
     url_destino = models.URLField(

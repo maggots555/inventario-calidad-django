@@ -52,7 +52,10 @@ def obtener_campanias_vigentes() -> List:
             activo=True,
             fecha_inicio__lte=ahora,
             fecha_fin__gte=ahora,
-        ).order_by('orden_display', '-fecha_creacion')
+        )
+        .exclude(imagen='')
+        .exclude(imagen=None)
+        .order_by('orden_display', '-fecha_creacion')
     )
 
 
