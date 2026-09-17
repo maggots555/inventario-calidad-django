@@ -13,7 +13,7 @@ from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.middleware import SessionMiddleware
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from inventario.models import Empleado, Sucursal
@@ -22,6 +22,8 @@ from servicio_tecnico.models import DetalleEquipo, OrdenServicio
 from servicio_tecnico.sicser_import import (
     SicserImportError,
     importar_orden_garantia_desde_sicser,
+    importar_orden_oow_desde_sicser,
+    mapear_nombres_cliente_oow,
 )
 
 
@@ -467,3 +469,149 @@ class ConsultarSicserPestanasImportadasTest(TestCase):
                     self.assertIn('Órdenes importadas a SIGMA hoy', html)
                 else:
                     self.assertIn('Histórico de órdenes importadas a SIGMA', html)
+
+    @patch('servicio_tecnico.sicser_client.fetch_listado_garantias')
+    @patch('servicio_tecnico.sicser_client.fetch_listado_oow')
+    def test_tab_oow_muestra_contacto_y_razon_social(
+        self,
+        mock_oow,
+        mock_garantia,
+    ):
+        """
+        En el listado OOW, Cliente es el contacto y la razón social va aparte.
+        """
+        mock_oow.return_value = ([_orden_oow_sicser()], 1)
+        mock_garantia.return_value = ([], 0)
+
+        request = self.factory.get(self.listado, {'tab': 'oow'})
+        request.user = self.user
+        response = views_sicser.consultar_sicser(request)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('Juan Perez', html)
+        self.assertIn('EMPRESA SA DE CV', html)
+        self.assertIn('Razón social', html)
+
+
+def _orden_oow_sicser(**overrides):
+    """
+    Arma un OrdenOOWSicser de prueba con todos los campos requeridos.
+
+    Args:
+        **overrides: Campos a sustituir (nombre_cliente, contacto, etc.).
+
+    Returns:
+        OrdenOOWSicser: Registro listo para importar o mapear.
+    """
+    from servicio_tecnico.sicser_client import OrdenOOWSicser
+
+    datos = {
+        'id_orden': 11954,
+        'folio': 'MX_CIS_MX_DROPOFF_11954',
+        'service_tag': 'ABC1234',
+        'nombre_cliente': 'EMPRESA SA DE CV',
+        'contacto': 'Juan Perez',
+        'marca': 'HP',
+        'tipo_equipo': 'LAPTOP',
+        'modelo': 'Pavilion',
+        'email': 'juan@test.local',
+        'telefono': '5512345678',
+        'rfc': 'EMP010101XXX',
+        'descripcion_falla': 'No enciende',
+        'cis': '',
+        'fecha': '2026-09-01 10:00:00',
+        'codigo_pais': 'MX',
+        'codigo_cis_url': 'DROP',
+        'cis_etiqueta': 'Drop Off',
+        'preview_orden_sigma': 'OOW-11954',
+        'url_formato_digital': 'http://ejemplo.test/oow',
+    }
+    datos.update(overrides)
+    return OrdenOOWSicser(**datos)
+
+
+class MapearNombresClienteOowTest(SimpleTestCase):
+    """Regla de negocio: contacto → persona, nombre_cliente SICSER → razón social."""
+
+    def test_contacto_y_razon_distintos(self):
+        """Feliz: se guardan en los campos correctos de SIGMA."""
+        nombre, razon = mapear_nombres_cliente_oow(_orden_oow_sicser())
+        self.assertEqual(nombre, 'Juan Perez')
+        self.assertEqual(razon, 'EMPRESA SA DE CV')
+
+    def test_sin_contacto_copia_la_razon_social(self):
+        """Borde: si SICSER no mandó persona, el nombre copia la empresa."""
+        nombre, razon = mapear_nombres_cliente_oow(
+            _orden_oow_sicser(contacto='')
+        )
+        self.assertEqual(razon, 'EMPRESA SA DE CV')
+        self.assertEqual(nombre, 'EMPRESA SA DE CV')
+
+
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class ImportarOrdenOowNombresTest(TestCase):
+    """Al importar OOW, SIGMA persiste persona y razón social por separado."""
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        """Sucursal + técnico mínimos para crear la orden importada."""
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal OOW Nombres',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='oow_nombres',
+            password='testpass123',
+        )
+        Empleado.objects.create(
+            nombre_completo='Importador OOW Nombres',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='oow.nombres@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+
+    def test_importar_guarda_contacto_y_razon_social(self):
+        """
+        Feliz: contacto → nombre_cliente, nombre SICSER → razon_social_cliente.
+        """
+        resultado = importar_orden_oow_desde_sicser(
+            _orden_oow_sicser(),
+            self.user,
+        )
+        detalle = resultado.orden.detalle_equipo
+        self.assertEqual(detalle.nombre_cliente, 'Juan Perez')
+        self.assertEqual(detalle.razon_social_cliente, 'EMPRESA SA DE CV')
+
+    def test_importar_sin_contacto_copia_razon_a_nombre(self):
+        """Borde: sin contacto, ambos campos de SIGMA llevan la empresa."""
+        resultado = importar_orden_oow_desde_sicser(
+            _orden_oow_sicser(id_orden=11955, folio='MX_CIS_MX_DROPOFF_11955',
+                              preview_orden_sigma='OOW-11955', contacto=''),
+            self.user,
+        )
+        detalle = resultado.orden.detalle_equipo
+        self.assertEqual(detalle.nombre_cliente, 'EMPRESA SA DE CV')
+        self.assertEqual(detalle.razon_social_cliente, 'EMPRESA SA DE CV')
+
+    def test_buscar_importadas_por_razon_social(self):
+        """El histórico importadas encuentra órdenes por razón social."""
+        from servicio_tecnico.sicser_import import listar_ordenes_importadas_sicser
+
+        importar_orden_oow_desde_sicser(_orden_oow_sicser(), self.user)
+        filas = listar_ordenes_importadas_sicser(texto_busqueda='EMPRESA SA DE CV')
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(filas[0]['razon_social_cliente'], 'EMPRESA SA DE CV')
+        self.assertEqual(filas[0]['nombre_cliente'], 'Juan Perez')
+

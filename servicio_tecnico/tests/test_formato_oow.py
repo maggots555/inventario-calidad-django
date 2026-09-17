@@ -103,6 +103,36 @@ def _flowable_tiene_imagen(flowables) -> bool:
     return False
 
 
+def _textos_flowables(flowables) -> list:
+    """
+    Extrae el texto plano de Paragraphs dentro de tablas/KeepTogether.
+
+    Args:
+        flowables: Lista de bloques ReportLab (como los del PDF OOW).
+
+    Returns:
+        list: Cadenas visibles (labels y valores).
+    """
+    from reportlab.platypus import KeepTogether, Paragraph, Table
+
+    textos = []
+    pila = list(flowables)
+    while pila:
+        item = pila.pop()
+        if isinstance(item, Paragraph):
+            textos.append(item.getPlainText())
+        elif isinstance(item, KeepTogether):
+            pila.extend(list(item._content or []))
+        elif isinstance(item, Table):
+            for fila in item._cellvalues:
+                for celda in fila:
+                    if isinstance(celda, list):
+                        pila.extend(celda)
+                    elif celda is not None:
+                        pila.append(celda)
+    return textos
+
+
 class FormatoOowReexportsTest(SimpleTestCase):
     """Humo: views.py reexporta y las URLs resuelven al módulo nuevo."""
 
@@ -319,6 +349,28 @@ class FormatoOowServiceTest(TestCase):
         detalle.save(update_fields=['numero_serie_cargador'])
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
         self.assertEqual(formato.numero_cargador, 'CN01OOWTEST001')
+
+    def test_pdf_separa_nombre_y_razon_social(self):
+        """
+        El PDF OOW lista Nombre (persona) y Razón social (empresa) por separado.
+        """
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        detalle = self.orden.detalle_equipo
+        detalle.nombre_cliente = 'Ana Perez'
+        detalle.razon_social_cliente = 'Empresa Demo SA de CV'
+        detalle.save(update_fields=['nombre_cliente', 'razon_social_cliente'])
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        textos = _textos_flowables(
+            PDFFormatoServicioOOW(formato)._construir_datos_cliente()
+        )
+        bloque = ' | '.join(textos)
+        self.assertNotIn('Nombre / Razón social', bloque)
+        self.assertIn('Nombre', textos)
+        self.assertIn('Razón social', textos)
+        self.assertIn('Ana Perez', textos)
+        self.assertIn('Empresa Demo SA de CV', textos)
 
     def test_guardar_numero_cargador_sincroniza_detalle(self):
         """
@@ -861,6 +913,7 @@ class FormatoOowVistaTest(TestCase):
         self.assertRegex(html, r'id="numeroCargador"[^>]*\bdisabled\b')
         self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
         self.assertIn('id="checkItemDanos"', html)
+        self.assertIn('Razón social', html)
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )

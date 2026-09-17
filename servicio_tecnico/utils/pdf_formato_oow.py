@@ -560,7 +560,8 @@ class PDFFormatoServicioOOW:
         # Import diferido para evitar ciclo con services.formato_oow → este PDF
         from servicio_tecnico.services.formato_oow import lista_emails_envio
         pares = [
-            ('Nombre / Razón social', d.nombre_cliente),
+            ('Nombre', d.nombre_cliente),
+            ('Razón social', d.razon_social_cliente),
             ('RFC', d.rfc_cliente),
             ('Email de contacto', d.email_cliente),
             ('Teléfono(s)', d.telefono_cliente),

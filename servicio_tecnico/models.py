@@ -962,7 +962,22 @@ class DetalleEquipo(models.Model):
     nombre_cliente = models.CharField(
         max_length=200,
         blank=True,
-        help_text="Nombre completo del cliente (opcional, para facturación)"
+        help_text=(
+            "Nombre de la persona de contacto (opcional). "
+            "En import OOW viene de SICSER contacto."
+        ),
+    )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # En SICSER OOW hay DOS textos: nombre_cliente (empresa / razón social)
+    # y contacto (persona). SIGMA los guarda por separado para el PDF y
+    # la facturación. Si no hay empresa, este campo queda vacío.
+    razon_social_cliente = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=(
+            "Razón social / empresa (opcional). "
+            "En import OOW viene de SICSER nombre_cliente."
+        ),
     )
     rfc_cliente = models.CharField(
         max_length=13,

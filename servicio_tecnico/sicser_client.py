@@ -107,7 +107,8 @@ class OrdenOOWSicser:
         id_orden: ID interno en SICSER.
         folio: Folio completo (ej. MX_CIS_MX_DROPOFF_11954).
         service_tag: Número de serie / Service Tag del equipo.
-        nombre_cliente: Nombre del cliente.
+        nombre_cliente: Razón social / nombre fiscal que manda SICSER.
+        contacto: Persona de contacto (puede venir vacío).
         marca: Marca reportada por SICSER.
         tipo_equipo: Tipo reportado (ej. LAPTOP).
         modelo: Modelo del equipo.
@@ -127,6 +128,7 @@ class OrdenOOWSicser:
     folio: str
     service_tag: str
     nombre_cliente: str
+    contacto: str
     marca: str
     tipo_equipo: str
     modelo: str
@@ -141,6 +143,34 @@ class OrdenOOWSicser:
     cis_etiqueta: str
     preview_orden_sigma: str
     url_formato_digital: str
+
+    def nombre_para_listado(self) -> str:
+        """
+        Texto de “Cliente” en Consultar SICSER.
+
+        Args:
+            Ninguno (usa self.contacto y self.nombre_cliente).
+
+        Returns:
+            str: Persona de contacto; si SICSER no la mandó, la razón social.
+        """
+        return (self.contacto or self.nombre_cliente or '').strip()
+
+    def mostrar_razon_social_en_listado(self) -> bool:
+        """
+        True si conviene mostrar la razón social además del contacto.
+
+        Returns:
+            bool: Hay persona de contacto y la empresa es un texto distinto.
+        """
+        razon = (self.nombre_cliente or '').strip()
+        contacto = (self.contacto or '').strip()
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si no hay contacto, el listado ya muestra la razón social como
+        # “Cliente”. No repetimos el mismo texto en otra fila.
+        if not razon or not contacto:
+            return False
+        return razon.lower() != contacto.lower()
 
 
 @dataclass(frozen=True)
@@ -481,7 +511,11 @@ def _normalizar_registro_oow(item: dict[str, Any]) -> OrdenOOWSicser:
         id_orden=int(item.get('id_orden') or 0),
         folio=folio,
         service_tag=str(item.get('service_tag') or '').strip().upper(),
-        nombre_cliente=str(item.get('nombre_cliente') or item.get('contacto') or '').strip(),
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # SICSER manda DOS nombres. No los juntamos aquí: el import
+        # decide qué va a SIGMA (contacto → persona, nombre_cliente → empresa).
+        nombre_cliente=str(item.get('nombre_cliente') or '').strip(),
+        contacto=str(item.get('contacto') or '').strip(),
         marca=str(item.get('marca') or '').strip(),
         tipo_equipo=str(item.get('tipo_equipo') or '').strip(),
         modelo=str(item.get('modelo') or '').strip(),
@@ -594,6 +628,7 @@ def fetch_listado_oow(
                 orden.folio,
                 orden.service_tag,
                 orden.nombre_cliente,
+                orden.contacto,
                 orden.marca,
                 orden.preview_orden_sigma,
             )

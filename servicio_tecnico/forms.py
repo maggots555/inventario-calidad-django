@@ -1350,6 +1350,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'orden_cliente',
             'email_cliente',  # ✅ NUEVO CAMPO (Noviembre 2025)
             'nombre_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
+            'razon_social_cliente',  # Razón social (import OOW / facturación)
             'rfc_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'telefono_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'direccion_cliente',  # Dirección (garantía Dell / facturación)
@@ -1397,8 +1398,13 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             # ✅ NUEVOS WIDGETS: Datos adicionales del cliente (Junio 2026)
             'nombre_cliente': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Nombre completo del cliente (opcional)',
+                'placeholder': 'Nombre de la persona de contacto (opcional)',
                 'autocomplete': 'name',
+            }),
+            'razon_social_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Razón social o empresa (opcional)',
+                'autocomplete': 'organization',
             }),
             'rfc_cliente': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -1444,7 +1450,8 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo': 'Modelo',
             'numero_serie': 'Número de Serie',
             'orden_cliente': 'Orden del Cliente',
-            'nombre_cliente': 'Nombre Completo del Cliente',  # ✅ NUEVO (Junio 2026)
+            'nombre_cliente': 'Nombre del Cliente',  # Persona de contacto
+            'razon_social_cliente': 'Razón Social',
             'rfc_cliente': 'RFC del Cliente',  # ✅ NUEVO (Junio 2026)
             'telefono_cliente': 'Teléfono del Cliente',  # ✅ NUEVO (Junio 2026)
             'direccion_cliente': 'Dirección del Cliente',
@@ -1463,7 +1470,8 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'numero_serie': 'Número de serie o Service Tag del equipo',
             'orden_cliente': 'Número de orden del cliente',
             'email_cliente': 'Email para enviar fotos del ingreso y notificaciones (obligatorio)',  # ✅ NUEVO
-            'nombre_cliente': 'Nombre completo del cliente para facturación (opcional)',  # ✅ NUEVO (Junio 2026)
+            'nombre_cliente': 'Persona de contacto (opcional). En import OOW viene de SICSER contacto.',
+            'razon_social_cliente': 'Empresa / razón social (opcional). En import OOW viene de SICSER nombre_cliente.',
             'rfc_cliente': 'RFC del cliente — Genérico: XAXX010101000 (opcional, 13 caracteres)',  # ✅ NUEVO (Junio 2026)
             'telefono_cliente': 'Teléfono de contacto del cliente (opcional)',  # ✅ NUEVO (Junio 2026)
             'direccion_cliente': 'Calle, número, colonia y C.P. (opcional; se usa en el Formato Garantía Dell)',

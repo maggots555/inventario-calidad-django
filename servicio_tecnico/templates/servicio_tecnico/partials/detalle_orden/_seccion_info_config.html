@@ -152,6 +152,12 @@
                                 <span class="info-field__value">{{ detalle.nombre_cliente }}</span>
                             </div>
                             {% endif %}
+                            {% if detalle.razon_social_cliente %}
+                            <div class="info-field">
+                                <span class="info-field__label">Razón social</span>
+                                <span class="info-field__value">{{ detalle.razon_social_cliente }}</span>
+                            </div>
+                            {% endif %}
                             <div class="info-field">
                                 <span class="info-field__label">Email</span>
                                 <span class="info-field__value">

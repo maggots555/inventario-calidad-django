@@ -318,6 +318,7 @@ def datos_orden_para_wizard(orden: OrdenServicio) -> dict[str, Any]:
         'folio_sicser': detalle.folio_sicser or '',
         'fecha_ingreso': orden.fecha_ingreso.strftime('%Y-%m-%d') if orden.fecha_ingreso else '',
         'nombre_cliente': detalle.nombre_cliente or '',
+        'razon_social_cliente': detalle.razon_social_cliente or '',
         'rfc_cliente': detalle.rfc_cliente or '',
         'email_cliente': detalle.email_cliente or '',
         'telefono_cliente': detalle.telefono_cliente or '',

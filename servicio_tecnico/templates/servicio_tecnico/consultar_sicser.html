@@ -168,8 +168,14 @@
                     <div class="sicser-item-card__meta">
                         <div class="sicser-meta-item">
                             <span class="sicser-item-card__label">Cliente</span>
-                            <span>{{ orden.nombre_cliente|truncatechars:40|default:"—" }}</span>
+                            <span>{{ orden.nombre_para_listado|truncatechars:40|default:"—" }}</span>
                         </div>
+                        {% if orden.mostrar_razon_social_en_listado %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Razón social</span>
+                            <span>{{ orden.nombre_cliente|truncatechars:40 }}</span>
+                        </div>
+                        {% endif %}
                         {% if sigma %}
                         <div class="sicser-meta-item">
                             <span class="sicser-item-card__label">Orden SIGMA</span>
@@ -240,7 +246,12 @@
                                     {% endif %}
                                 </td>
                                 <td><strong>{{ orden.service_tag }}</strong></td>
-                                <td>{{ orden.nombre_cliente|truncatechars:35 }}</td>
+                                <td>
+                                    {{ orden.nombre_para_listado|truncatechars:35|default:"—" }}
+                                    {% if orden.mostrar_razon_social_en_listado %}
+                                    <span class="small d-block text-muted">{{ orden.nombre_cliente|truncatechars:30 }}</span>
+                                    {% endif %}
+                                </td>
                                 <td class="d-none d-xxl-table-cell">{{ orden.marca }}</td>
                                 <td>
                                     {% if orden.cis_etiqueta %}
@@ -462,6 +473,12 @@
                             <span class="sicser-item-card__label">Cliente</span>
                             <span>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</span>
                         </div>
+                        {% if fila.razon_social_cliente and fila.razon_social_cliente != fila.nombre_cliente %}
+                        <div class="sicser-meta-item">
+                            <span class="sicser-item-card__label">Razón social</span>
+                            <span>{{ fila.razon_social_cliente|truncatechars:35 }}</span>
+                        </div>
+                        {% endif %}
                         <div class="sicser-meta-item">
                             <span class="sicser-item-card__label">Ciudad</span>
                             {% if fila.ciudad %}
@@ -538,7 +555,12 @@
                                     <span class="small d-block text-muted">{{ fila.numero_orden_interno }}</span>
                                 </td>
                                 <td><strong>{{ fila.service_tag }}</strong></td>
-                                <td>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</td>
+                                <td>
+                                    {{ fila.nombre_cliente|truncatechars:35|default:"—" }}
+                                    {% if fila.razon_social_cliente and fila.razon_social_cliente != fila.nombre_cliente %}
+                                    <span class="small d-block text-muted">{{ fila.razon_social_cliente|truncatechars:30 }}</span>
+                                    {% endif %}
+                                </td>
                                 <td class="d-none d-xxl-table-cell">
                                     {% if fila.ciudad %}
                                     <span>{{ fila.ciudad|truncatechars:22 }}</span>

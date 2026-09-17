@@ -204,6 +204,33 @@ def extraer_falla_garantia(instrucciones_dell: str) -> str:
     return texto[:4000]
 
 
+def mapear_nombres_cliente_oow(registro: OrdenOOWSicser) -> tuple[str, str]:
+    """
+    Separa persona de contacto y razón social al importar una orden OOW.
+
+    Objetivo de negocio:
+        En SICSER, `nombre_cliente` es la empresa/razón social y `contacto`
+        es la persona. En SIGMA esos roles se invierten de nombre:
+        nombre_cliente = persona, razon_social_cliente = empresa.
+
+    Args:
+        registro: Datos normalizados de la API OOW.
+
+    Returns:
+        tuple[str, str]: (nombre_cliente SIGMA, razon_social_cliente SIGMA).
+
+    Efectos secundarios:
+        Ninguno (solo arma dos cadenas; no toca la base de datos).
+    """
+    # Paso 1: la razón social es el `nombre_cliente` que mandó SICSER.
+    razon = (registro.nombre_cliente or '').strip()[:200]
+    # Paso 2: la persona es `contacto`. Si no vino, copiamos la razón
+    # para que el campo de cliente en SIGMA no quede vacío.
+    contacto = (registro.contacto or '').strip()[:200]
+    nombre = contacto or razon
+    return nombre, razon
+
+
 def es_mis_desde_grupo(nombre_grupo: str) -> bool:
     """
     Indica si la orden de garantía corresponde a Mail-In Service.
@@ -341,6 +368,7 @@ def _queryset_ordenes_importadas_sicser(
             | Q(sicser_id_externo__icontains=filtro)
             | Q(numero_serie__icontains=filtro)
             | Q(nombre_cliente__icontains=filtro)
+            | Q(razon_social_cliente__icontains=filtro)
             | Q(orden__numero_orden_interno__icontains=filtro)
             | Q(sicser_ciudad__icontains=filtro)
             | Q(sicser_estado__icontains=filtro)
@@ -414,6 +442,7 @@ def listar_ordenes_importadas_sicser(
             'sicser_id_externo': detalle.sicser_id_externo,
             'service_tag': detalle.numero_serie,
             'nombre_cliente': detalle.nombre_cliente,
+            'razon_social_cliente': detalle.razon_social_cliente,
             'fecha_ingreso': detalle.orden.fecha_ingreso,
             'fecha_importacion_sicser': detalle.fecha_importacion_sicser,
             'sucursal': detalle.orden.sucursal.nombre if detalle.orden.sucursal else '',
@@ -501,6 +530,8 @@ def importar_orden_oow_desde_sicser(
     tipo_equipo = normalizar_tipo_equipo(registro.tipo_equipo)
     modelo = (registro.modelo or '')[:100]
     email = registro.email or 'cliente@ejemplo.com'
+    # Paso: persona vs empresa (SICSER los nombra al revés que SIGMA).
+    nombre_cliente, razon_social_cliente = mapear_nombres_cliente_oow(registro)
 
     orden = OrdenServicio(
         sucursal=sucursal,
@@ -528,7 +559,8 @@ def importar_orden_oow_desde_sicser(
         # Momento real del click «Importar» en SIGMA (no la fecha SICSER).
         fecha_importacion_sicser=timezone.now(),
         email_cliente=email,
-        nombre_cliente=registro.nombre_cliente[:200],
+        nombre_cliente=nombre_cliente,
+        razon_social_cliente=razon_social_cliente,
         rfc_cliente=registro.rfc[:13],
         telefono_cliente=registro.telefono[:20],
         falla_principal=(registro.descripcion_falla or 'Importada desde SICSER OOW')[:4000],
