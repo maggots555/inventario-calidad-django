@@ -741,7 +741,11 @@ class FormatoOowServiceTest(TestCase):
         textos = _textos_flowables(
             PDFFormatoServicioOOW(formato)._construir_firmas_manuscritas_portada()
         )
-        self.assertIn('Técnico que repara y diagnostica', textos)
+        self.assertIn(
+            'ACEPTO LAS CONDICIONES EN LAS QUE RECIBO EL EQUIPO.',
+            textos,
+        )
+        self.assertIn('Técnico que diagnostica y repara', textos)
         self.assertIn('Firma del cliente', textos)
         # En blanco: no se pinta la firma digital de la tablet
         self.assertFalse(

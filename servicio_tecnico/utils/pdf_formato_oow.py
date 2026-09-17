@@ -632,23 +632,35 @@ class PDFFormatoServicioOOW:
 
     def _construir_firmas_manuscritas_portada(self) -> List:
         """
-        Dos recuadros en blanco en la hoja de datos (se firman a mano).
+        Leyenda de entrega + dos recuadros en blanco (se firman a mano).
 
         Objetivo de negocio:
-            El técnico y el cliente firman en papel al entregar/recibir.
-            No se pinta la firma digital aquí: van vacíos a propósito.
+            Al entregar el equipo ya reparado, técnico y cliente firman
+            en papel. No se pinta la firma digital aquí: van vacíos.
 
         Returns:
-            Lista de flowables (una tabla de 2 columnas).
+            Lista de flowables (leyenda + tabla de 2 columnas).
         """
+        # Misma jerarquía visual que “ACEPTO… ENTREGO” de la hoja de daños
+        estilo_acepta = ParagraphStyle(
+            'AceptaRecepcionOow',
+            parent=self._estilos['CeldaLabel'],
+            alignment=TA_CENTER,
+            fontSize=8,
+            leading=10,
+        )
+        leyenda = Paragraph(
+            'ACEPTO LAS CONDICIONES EN LAS QUE RECIBO EL EQUIPO.',
+            estilo_acepta,
+        )
+
         # Paso 1: el ancho útil se parte en dos columnas iguales
         ancho_util = letter[0] - (2 * MARGEN)
-        # 4 mm de separación visual entre recuadros (padding de celdas)
         ancho_col = (ancho_util - 4 * mm) / 2
         alto_linea = 16 * mm
 
         izq = self._bloque_columna_firma(
-            'Técnico que repara y diagnostica',
+            'Técnico que diagnostica y repara',
             imagen=None,
             ancho=ancho_col,
             alto_espacio=alto_linea,
@@ -659,7 +671,7 @@ class PDFFormatoServicioOOW:
             ancho=ancho_col,
             alto_espacio=alto_linea,
         )
-        # Paso 2: ambas firmas viajan juntas (KeepTogether lo aplica el caller)
+        # Paso 2: leyenda + ambas firmas viajan juntas (KeepTogether lo aplica el caller)
         tabla = Table(
             [[izq, der]],
             colWidths=[ancho_util / 2, ancho_util / 2],
@@ -674,7 +686,7 @@ class PDFFormatoServicioOOW:
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
-        return [tabla]
+        return [leyenda, Spacer(1, 3 * mm), tabla]
 
     def _texto_aviso_pc_audit(self) -> str:
         """Texto del aviso cuando no se pudo usar / no hay escaneo PC Audit."""
