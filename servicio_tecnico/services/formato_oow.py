@@ -29,6 +29,7 @@ from inventario.models import Empleado
 from servicio_tecnico.models import (
     DanoEsteticoVista,
     FormatoServicioOOW,
+    ImagenOrden,
     OrdenServicio,
 )
 from servicio_tecnico.services.sync_cargador_detalle import (
@@ -119,11 +120,98 @@ CAMPOS_ACCESORIOS = (
     'accesorio_otros',
 )
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Cada accesorio “con nombre” tiene su propio campo de serie.
+# La tupla es (checkbox, campo_serie, etiqueta_para_PDF_y_mensajes).
+# “Otros” no va aquí: usa accesorios_otros_detalle.
+ACCESORIOS_CON_SERIE = (
+    ('accesorio_cargador', 'numero_cargador', 'Cargador'),
+    ('accesorio_maletin', 'numero_maletin', 'Maletín'),
+    ('accesorio_mouse', 'numero_mouse', 'Mouse'),
+    ('accesorio_teclado', 'numero_teclado', 'Teclado'),
+    ('accesorio_monitor', 'numero_monitor', 'Monitor'),
+)
+
+CAMPOS_NUMERO_ACCESORIO = tuple(campo for _flag, campo, _eti in ACCESORIOS_CON_SERIE)
+
 COMO_ENTERASTE_VALIDOS = {valor for valor, _ in COMO_ENTERASTE_OOW_CHOICES}
 
 
 class FormatoOOWError(Exception):
     """Error de negocio al guardar o finalizar el formato OOW."""
+
+
+def tiene_foto_identificacion_oow(orden: OrdenServicio) -> bool:
+    """
+    True si la orden ya tiene al menos una foto de INE/IFE (tipo identificacion_oow).
+
+    Args:
+        orden: OrdenServicio del formato
+
+    Returns:
+        bool: hay evidencia de identificación oficial
+    """
+    return ImagenOrden.objects.filter(
+        orden=orden,
+        tipo='identificacion_oow',
+    ).exists()
+
+
+def validar_requisitos_finalizar_oow(formato: FormatoServicioOOW) -> None:
+    """
+    Exige INE y número/detalle de cada accesorio marcado antes de generar el PDF.
+
+    Args:
+        formato: FormatoServicioOOW ya persistido
+
+    Raises:
+        FormatoOOWError: si falta la foto de identificación o una serie/detalle
+    """
+    # Paso 1: la foto de INE/IFE se guarda como ImagenOrden, no en el formato
+    if not tiene_foto_identificacion_oow(formato.orden):
+        raise FormatoOOWError(
+            'La foto de identificación oficial del cliente (INE / IFE u otra) '
+            'es obligatoria.'
+        )
+    # Paso 2: cada accesorio marcado necesita su número de serie
+    for flag, campo_serie, etiqueta in ACCESORIOS_CON_SERIE:
+        if not getattr(formato, flag):
+            continue
+        serie = (getattr(formato, campo_serie) or '').strip()
+        if not serie:
+            raise FormatoOOWError(
+                f'Debes capturar el número de serie del {etiqueta.lower()}.'
+            )
+    # Paso 3: “Otros” pide el detalle (qué accesorio es), no una serie extra
+    if formato.accesorio_otros:
+        detalle = (formato.accesorios_otros_detalle or '').strip()
+        if not detalle:
+            raise FormatoOOWError(
+                'Debes capturar el detalle del accesorio “Otros”.'
+            )
+
+
+def filas_accesorios_pdf(formato: FormatoServicioOOW) -> list[tuple[str, str]]:
+    """
+    Filas del PDF de accesorios: solo los marcados, con su serie/detalle.
+
+    Args:
+        formato: FormatoServicioOOW
+
+    Returns:
+        Lista de (etiqueta, '123ABC'). Vacía si no hay accesorios marcados.
+    """
+    filas: list[tuple[str, str]] = []
+    for flag, campo_serie, etiqueta in ACCESORIOS_CON_SERIE:
+        if not getattr(formato, flag):
+            continue
+        # Solo el número: el accesorio ya está en la columna izquierda
+        serie = (getattr(formato, campo_serie) or '').strip()
+        filas.append((etiqueta, serie))
+    if formato.accesorio_otros:
+        detalle = (formato.accesorios_otros_detalle or '').strip()
+        filas.append(('Otros', detalle))
+    return filas
 
 
 def _empleado_desde_usuario(usuario) -> Empleado | None:
@@ -284,6 +372,10 @@ def serializar_formato(formato: FormatoServicioOOW) -> dict[str, Any]:
         'accesorio_otros': formato.accesorio_otros,
         'accesorios_otros_detalle': formato.accesorios_otros_detalle,
         'numero_cargador': formato.numero_cargador,
+        'numero_maletin': formato.numero_maletin,
+        'numero_mouse': formato.numero_mouse,
+        'numero_teclado': formato.numero_teclado,
+        'numero_monitor': formato.numero_monitor,
         'contrasena_equipo': formato.contrasena_equipo,
         'observaciones_tecnicas': formato.observaciones_tecnicas,
         'disclaimer_pc_audit': formato.disclaimer_pc_audit,
@@ -415,15 +507,15 @@ def aplicar_payload_borrador(
             'accesorios_otros_detalle',
             'contrasena_equipo',
             'observaciones_tecnicas',
-            'numero_cargador',
+            *CAMPOS_NUMERO_ACCESORIO,
         ):
             if campo in payload and payload[campo] is not None:
                 # EXPLICACIÓN PARA PRINCIPIANTES:
-                # Cada campo tiene un tope distinto (el S/N del cargador
-                # comparte max_length=100 con DetalleEquipo).
+                # Cada campo tiene un tope distinto (los S/N de accesorios
+                # usan max_length=100, igual que DetalleEquipo.numero_serie_cargador).
                 if campo == 'observaciones_tecnicas':
                     limite = 5000
-                elif campo == 'numero_cargador':
+                elif campo in CAMPOS_NUMERO_ACCESORIO:
                     limite = 100
                 else:
                     limite = 500
@@ -564,6 +656,8 @@ def finalizar_formato(
             + ', '.join(faltantes)
             + '.'
         )
+    # INE + series de accesorios: mismo momento que firma/daños (no en el borrador)
+    validar_requisitos_finalizar_oow(formato)
 
     version, _texto = texto_aviso_privacidad_actual()
     formato.version_aviso_privacidad = version

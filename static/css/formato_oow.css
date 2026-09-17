@@ -203,6 +203,26 @@
   flex-shrink: 0;
 }
 
+/* Campo de serie que aparece al marcar un accesorio */
+.formato-oow-accesorio-bloque {
+  padding-bottom: 0.25rem;
+}
+
+.formato-oow-serie-wrap {
+  margin-top: 0.15rem;
+  padding-left: 0.15rem;
+}
+
+.formato-oow-serie-wrap[hidden] {
+  display: none !important;
+}
+
+[data-bs-theme="dark"] .formato-oow-serie-wrap .form-control {
+  background-color: var(--card-bg, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+  border-color: var(--border-color, #334155);
+}
+
 .formato-oow-radios {
   display: flex;
   flex-wrap: wrap;

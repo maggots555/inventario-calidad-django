@@ -57,7 +57,7 @@
         <a class="formato-oow-nav-chip" href="#seccion-danos" id="chipDanos" data-req="danos"><span class="formato-oow-nav-num">3</span> Daños</a>
         <a class="formato-oow-nav-chip" href="#seccion-observaciones"><span class="formato-oow-nav-num">4</span> Observaciones</a>
         <a class="formato-oow-nav-chip" href="#seccion-firma" id="chipFirma" data-req="firma"><span class="formato-oow-nav-num">5</span> Firma</a>
-        <a class="formato-oow-nav-chip" href="#seccion-fotos"><span class="formato-oow-nav-num">6</span> Fotos</a>
+        <a class="formato-oow-nav-chip" href="#seccion-fotos" id="chipFotos" data-req="fotos"><span class="formato-oow-nav-num">6</span> Fotos</a>
         <a class="formato-oow-nav-chip" href="#seccion-envio" id="chipEnvio" data-req="envio"><span class="formato-oow-nav-num">7</span> Envío</a>
     </nav>
 
@@ -107,83 +107,179 @@
     <section class="card formato-oow-card mb-3" id="seccion-accesorios">
         <div class="card-header formato-oow-section-header">2 · Accesorios entregados</div>
         <div class="card-body">
-            <div class="row g-2 formato-oow-checks">
-                <div class="col-6 col-md-4 col-lg-2">
+            <p class="form-text small mt-0 mb-3">
+                Marca solo lo que el cliente entregó. Cada casilla exige el número de serie
+                (o el detalle, en “Otros”). Lo no marcado no sale en el PDF.
+            </p>
+            <!--
+              EXPLICACIÓN PARA PRINCIPIANTES:
+              Cada accesorio es un bloque: casilla + campo de serie que se muestra
+              al marcar. El botón de cámara reutiliza scanner_codigo.js.
+            -->
+            <div class="row g-3 formato-oow-accesorios-grid">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accCargador" {% if formato.accesorio_cargador %}checked{% endif %}>
                         <span>Cargador</span>
                     </label>
+                    <div class="formato-oow-serie-wrap" id="wrapSerieCargador"
+                         {% if not formato.accesorio_cargador %}hidden{% endif %}>
+                        <label class="form-label" for="numeroCargador">Número de serie del cargador <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroCargador"
+                                   value="{{ formato.numero_cargador }}"
+                                   placeholder="No. serie / descripción del cargador…"
+                                   autocomplete="off"
+                                   {% if not formato.accesorio_cargador %}disabled{% endif %}>
+                            <button type="button"
+                                    class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                    id="btnEscanearCargador"
+                                    title="Escanear QR o código de barras"
+                                    aria-label="Escanear número del cargador con la cámara"
+                                    data-serie-input="numeroCargador"
+                                    data-serie-checkbox="accCargador"
+                                    data-serie-etiqueta="cargador"
+                                    {% if not formato.accesorio_cargador %}disabled{% endif %}>
+                                <i class="bi bi-camera" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="form-text" id="ayudaNumeroCargador">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    </div>
                 </div>
-                <div class="col-6 col-md-4 col-lg-2">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accMaletin" {% if formato.accesorio_maletin %}checked{% endif %}>
                         <span>Maletín</span>
                     </label>
+                    <div class="formato-oow-serie-wrap" id="wrapSerieMaletin"
+                         {% if not formato.accesorio_maletin %}hidden{% endif %}>
+                        <label class="form-label" for="numeroMaletin">Número de serie del maletín <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroMaletin"
+                                   value="{{ formato.numero_maletin }}"
+                                   placeholder="No. serie del maletín…"
+                                   autocomplete="off"
+                                   {% if not formato.accesorio_maletin %}disabled{% endif %}>
+                            <button type="button"
+                                    class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                    id="btnEscanearMaletin"
+                                    title="Escanear QR o código de barras"
+                                    aria-label="Escanear número del maletín con la cámara"
+                                    data-serie-input="numeroMaletin"
+                                    data-serie-checkbox="accMaletin"
+                                    data-serie-etiqueta="maletín"
+                                    {% if not formato.accesorio_maletin %}disabled{% endif %}>
+                                <i class="bi bi-camera" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    </div>
                 </div>
-                <div class="col-6 col-md-4 col-lg-2">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accMouse" {% if formato.accesorio_mouse %}checked{% endif %}>
                         <span>Mouse</span>
                     </label>
+                    <div class="formato-oow-serie-wrap" id="wrapSerieMouse"
+                         {% if not formato.accesorio_mouse %}hidden{% endif %}>
+                        <label class="form-label" for="numeroMouse">Número de serie del mouse <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroMouse"
+                                   value="{{ formato.numero_mouse }}"
+                                   placeholder="No. serie del mouse…"
+                                   autocomplete="off"
+                                   {% if not formato.accesorio_mouse %}disabled{% endif %}>
+                            <button type="button"
+                                    class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                    id="btnEscanearMouse"
+                                    title="Escanear QR o código de barras"
+                                    aria-label="Escanear número del mouse con la cámara"
+                                    data-serie-input="numeroMouse"
+                                    data-serie-checkbox="accMouse"
+                                    data-serie-etiqueta="mouse"
+                                    {% if not formato.accesorio_mouse %}disabled{% endif %}>
+                                <i class="bi bi-camera" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    </div>
                 </div>
-                <div class="col-6 col-md-4 col-lg-2">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accTeclado" {% if formato.accesorio_teclado %}checked{% endif %}>
                         <span>Teclado</span>
                     </label>
+                    <div class="formato-oow-serie-wrap" id="wrapSerieTeclado"
+                         {% if not formato.accesorio_teclado %}hidden{% endif %}>
+                        <label class="form-label" for="numeroTeclado">Número de serie del teclado <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroTeclado"
+                                   value="{{ formato.numero_teclado }}"
+                                   placeholder="No. serie del teclado…"
+                                   autocomplete="off"
+                                   {% if not formato.accesorio_teclado %}disabled{% endif %}>
+                            <button type="button"
+                                    class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                    id="btnEscanearTeclado"
+                                    title="Escanear QR o código de barras"
+                                    aria-label="Escanear número del teclado con la cámara"
+                                    data-serie-input="numeroTeclado"
+                                    data-serie-checkbox="accTeclado"
+                                    data-serie-etiqueta="teclado"
+                                    {% if not formato.accesorio_teclado %}disabled{% endif %}>
+                                <i class="bi bi-camera" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    </div>
                 </div>
-                <div class="col-6 col-md-4 col-lg-2">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accMonitor" {% if formato.accesorio_monitor %}checked{% endif %}>
                         <span>Monitor</span>
                     </label>
+                    <div class="formato-oow-serie-wrap" id="wrapSerieMonitor"
+                         {% if not formato.accesorio_monitor %}hidden{% endif %}>
+                        <label class="form-label" for="numeroMonitor">Número de serie del monitor <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="numeroMonitor"
+                                   value="{{ formato.numero_monitor }}"
+                                   placeholder="No. serie del monitor…"
+                                   autocomplete="off"
+                                   {% if not formato.accesorio_monitor %}disabled{% endif %}>
+                            <button type="button"
+                                    class="btn btn-outline-secondary formato-garantia-btn-scanner"
+                                    id="btnEscanearMonitor"
+                                    title="Escanear QR o código de barras"
+                                    aria-label="Escanear número del monitor con la cámara"
+                                    data-serie-input="numeroMonitor"
+                                    data-serie-checkbox="accMonitor"
+                                    data-serie-etiqueta="monitor"
+                                    {% if not formato.accesorio_monitor %}disabled{% endif %}>
+                                <i class="bi bi-camera" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Puedes escribirlo a mano o escanearlo con la cámara.</div>
+                    </div>
                 </div>
-                <div class="col-6 col-md-4 col-lg-2">
+                <div class="col-md-6 formato-oow-accesorio-bloque">
                     <label class="formato-oow-check">
                         <input type="checkbox" id="accOtros" {% if formato.accesorio_otros %}checked{% endif %}>
                         <span>Otros</span>
                     </label>
-                </div>
-            </div>
-            <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                    <!--
-                      EXPLICACIÓN PARA PRINCIPIANTES:
-                      input-group = textbox + botón cámara al lado.
-                      El botón abre scanner_codigo.js (zxing-wasm) y llena este campo.
-                      Al guardar, el número también se copia a DetalleEquipo.
-                    -->
-                    <label class="form-label" for="numeroCargador">Número del cargador</label>
-                    <div class="input-group" id="wrapNumeroCargador">
-                        <input type="text" class="form-control" id="numeroCargador"
-                               value="{{ formato.numero_cargador }}"
-                               placeholder="No. serie / descripción del cargador…"
+                    <div class="formato-oow-serie-wrap" id="wrapSerieOtros"
+                         {% if not formato.accesorio_otros %}hidden{% endif %}>
+                        <label class="form-label" for="accOtrosDetalle">Detalle de “Otros” <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="accOtrosDetalle"
+                               value="{{ formato.accesorios_otros_detalle }}"
+                               placeholder="Ej. Bolsa térmica, dock…"
                                autocomplete="off"
-                               {% if not formato.accesorio_cargador %}disabled{% endif %}>
-                        <button type="button"
-                                class="btn btn-outline-secondary formato-garantia-btn-scanner"
-                                id="btnEscanearCargador"
-                                title="Escanear QR o código de barras"
-                                aria-label="Escanear número del cargador con la cámara"
-                                {% if not formato.accesorio_cargador %}disabled{% endif %}>
-                            <i class="bi bi-camera" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                    <div class="form-text" id="ayudaNumeroCargador">
-                        {% if formato.accesorio_cargador %}
-                        Puedes escribirlo a mano o escanearlo con la cámara.
-                        {% else %}
-                        Marca la casilla “Cargador” para escribir o escanear el número.
-                        {% endif %}
+                               {% if not formato.accesorio_otros %}disabled{% endif %}>
+                        <div class="form-text">Describe el accesorio extra. Este texto sale en el PDF junto al nombre.</div>
                     </div>
                 </div>
             </div>
             <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                    <label class="form-label" for="accOtrosDetalle">Detalle de “Otros”</label>
-                    <input type="text" class="form-control" id="accOtrosDetalle"
-                           value="{{ formato.accesorios_otros_detalle }}">
-                </div>
                 <div class="col-md-6">
                     <label class="form-label" for="contrasenaEquipo">Contraseña del equipo</label>
                     <input type="text" class="form-control" id="contrasenaEquipo"
@@ -303,10 +399,10 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label" for="fotoIdentificacion">Identificación oficial del cliente (INE / IFE u otra)</label>
+                    <label class="form-label" for="fotoIdentificacion">Identificación oficial del cliente (INE / IFE u otra) <span class="text-danger">*</span></label>
                     <input type="file" class="form-control" id="fotoIdentificacion"
                            accept="image/*" capture="environment">
-                    <p class="form-text small mb-0">Foto legible del frente de la identificación.</p>
+                    <p class="form-text small mb-0">Foto legible del frente de la identificación. Obligatoria para finalizar.</p>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" for="fotoEscaneo">Resultado del escaneo</label>
@@ -331,7 +427,7 @@
             </div>
             <div class="formato-oow-evidencias mt-3 d-flex flex-wrap gap-2" id="listaEvidencias">
                 {% for img in evidencias %}
-                <div class="formato-oow-evidencia-item" data-imagen-id="{{ img.pk }}">
+                <div class="formato-oow-evidencia-item" data-imagen-id="{{ img.pk }}" data-tipo="{{ img.tipo }}">
                     <button type="button"
                             class="formato-oow-evidencia-eliminar"
                             title="Eliminar esta foto"
@@ -405,6 +501,7 @@
         <div class="formato-oow-checklist" id="formatoOowChecklist" aria-live="polite">
             <span class="formato-oow-check-item" id="checkItemDanos" data-req="danos">Daños</span>
             <span class="formato-oow-check-item" id="checkItemFirma" data-req="firma">Firma</span>
+            <span class="formato-oow-check-item" id="checkItemIdentificacion" data-req="identificacion">INE</span>
             <span class="formato-oow-check-item" id="checkItemCondiciones" data-req="condiciones">Condiciones</span>
             <span class="formato-oow-check-item" id="checkItemPrivacidad" data-req="privacidad">Privacidad</span>
         </div>

@@ -4116,6 +4116,30 @@ class FormatoServicioOOW(models.Model):
         blank=True,
         help_text='Número de serie / descripción del cargador',
     )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Si el cliente entrega maletín/mouse/teclado/monitor, el wizard
+    # exige su número de serie (igual que el cargador). blank=True
+    # permite guardar borrador vacío; la validación ocurre al finalizar.
+    numero_maletin = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie del maletín (si se entregó)',
+    )
+    numero_mouse = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie del mouse (si se entregó)',
+    )
+    numero_teclado = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie del teclado (si se entregó)',
+    )
+    numero_monitor = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text='Número de serie del monitor (si se entregó)',
+    )
     detalle_equipo = models.CharField(
         max_length=300,
         blank=True,

@@ -23,6 +23,10 @@ interface FormatoOowPayload {
   accesorio_otros: boolean;
   accesorios_otros_detalle: string;
   numero_cargador: string;
+  numero_maletin: string;
+  numero_mouse: string;
+  numero_teclado: string;
+  numero_monitor: string;
   contrasena_equipo: string;
   observaciones_tecnicas: string;
   disclaimer_pc_audit: boolean;
@@ -41,6 +45,48 @@ interface FormatoOowPayload {
 
 /** Máximo de correos para compartir el PDF del formato OOW */
 const MAX_EMAILS_ENVIO = 3;
+
+/**
+ * Accesorios con número de serie propio (el wizard muestra input + cámara).
+ * “Otros” usa el detalle, no va en esta lista.
+ */
+interface AccesorioSerieUi {
+  checkboxId: string;
+  inputId: string;
+  wrapId: string;
+  etiqueta: string;
+}
+
+const ACCESORIOS_CON_SERIE_UI: AccesorioSerieUi[] = [
+  { checkboxId: 'accCargador', inputId: 'numeroCargador', wrapId: 'wrapSerieCargador', etiqueta: 'cargador' },
+  { checkboxId: 'accMaletin', inputId: 'numeroMaletin', wrapId: 'wrapSerieMaletin', etiqueta: 'maletín' },
+  { checkboxId: 'accMouse', inputId: 'numeroMouse', wrapId: 'wrapSerieMouse', etiqueta: 'mouse' },
+  { checkboxId: 'accTeclado', inputId: 'numeroTeclado', wrapId: 'wrapSerieTeclado', etiqueta: 'teclado' },
+  { checkboxId: 'accMonitor', inputId: 'numeroMonitor', wrapId: 'wrapSerieMonitor', etiqueta: 'monitor' },
+];
+
+function tieneFotoIdentificacion(): boolean {
+  const lista = byId('listaEvidencias');
+  if (!lista) {
+    return false;
+  }
+  return lista.querySelectorAll('.formato-oow-evidencia-item[data-tipo="identificacion_oow"]').length > 0;
+}
+
+/**
+ * Si un accesorio está marcado sin serie (o Otros sin detalle), mensaje de error.
+ */
+function mensajeSerieAccesorioFaltante(): string {
+  for (const acc of ACCESORIOS_CON_SERIE_UI) {
+    if (checked(acc.checkboxId) && valorInput(acc.inputId).trim().length === 0) {
+      return `Debes capturar el número de serie del ${acc.etiqueta}.`;
+    }
+  }
+  if (checked('accOtros') && valorInput('accOtrosDetalle').trim().length === 0) {
+    return 'Debes capturar el detalle del accesorio “Otros”.';
+  }
+  return '';
+}
 
 interface PadState {
   canvas: HTMLCanvasElement;
@@ -880,6 +926,7 @@ function inicializarFormatoOow(): void {
     const items: Array<{ id: string; listo: boolean; chipId?: string }> = [
       { id: 'checkItemDanos', listo: faltantesDanos.length === 0 && totalDanos > 0, chipId: 'chipDanos' },
       { id: 'checkItemFirma', listo: tieneFirma, chipId: 'chipFirma' },
+      { id: 'checkItemIdentificacion', listo: tieneFotoIdentificacion(), chipId: 'chipFotos' },
       { id: 'checkItemCondiciones', listo: checked('aceptaCondiciones') },
       { id: 'checkItemPrivacidad', listo: checked('aceptaPrivacidad'), chipId: 'chipEnvio' },
     ];
@@ -1129,6 +1176,10 @@ function inicializarFormatoOow(): void {
       accesorio_otros: checked('accOtros'),
       accesorios_otros_detalle: valorInput('accOtrosDetalle'),
       numero_cargador: valorInput('numeroCargador'),
+      numero_maletin: valorInput('numeroMaletin'),
+      numero_mouse: valorInput('numeroMouse'),
+      numero_teclado: valorInput('numeroTeclado'),
+      numero_monitor: valorInput('numeroMonitor'),
       contrasena_equipo: valorInput('contrasenaEquipo'),
       observaciones_tecnicas: valorInput('observacionesTecnicas'),
       disclaimer_pc_audit: checked('disclaimerPcAudit'),
@@ -1186,6 +1237,23 @@ function inicializarFormatoOow(): void {
     if (!padFirmaCli.tieneTrazos && !(formatoInicial.firma_cliente_url)) {
       setStatus('La firma del cliente es obligatoria.', true, false);
       enfocarSeccion('seccion-firma');
+      actualizarChecklistRequeridos();
+      return;
+    }
+    const serieFaltante = mensajeSerieAccesorioFaltante();
+    if (serieFaltante) {
+      setStatus(serieFaltante, true, false);
+      enfocarSeccion('seccion-accesorios');
+      actualizarChecklistRequeridos();
+      return;
+    }
+    if (!tieneFotoIdentificacion()) {
+      setStatus(
+        'La foto de identificación oficial del cliente (INE / IFE u otra) es obligatoria.',
+        true,
+        false,
+      );
+      enfocarSeccion('seccion-fotos');
       actualizarChecklistRequeridos();
       return;
     }
@@ -1393,10 +1461,12 @@ function inicializarFormatoOow(): void {
           id: data.imagen.id,
           url: data.imagen.url,
           etiqueta,
+          tipo,
         });
         lista.prepend(item);
       }
       setStatus('Foto guardada.', false, false);
+      actualizarChecklistRequeridos();
       input.value = '';
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Error al subir foto', true, false);
@@ -1414,10 +1484,12 @@ function inicializarFormatoOow(): void {
     id: number;
     url: string;
     etiqueta: string;
+    tipo: string;
   }): HTMLDivElement => {
     const wrap = document.createElement('div');
     wrap.className = 'formato-oow-evidencia-item';
     wrap.dataset.imagenId = String(opts.id);
+    wrap.dataset.tipo = opts.tipo;
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1493,6 +1565,7 @@ function inicializarFormatoOow(): void {
       }
       item.remove();
       mostrarListaVaciaSiHaceFalta();
+      actualizarChecklistRequeridos();
       setStatus(data.mensaje || 'Foto eliminada.', false, false);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Error al eliminar foto', true, false);
@@ -1524,55 +1597,78 @@ function inicializarFormatoOow(): void {
   });
 
   // EXPLICACIÓN PARA PRINCIPIANTES:
-  // El número y la cámara solo sirven si el cliente SÍ entregó cargador.
-  // Mientras la casilla esté apagada, el textbox y el botón quedan disabled.
-  const actualizarEstadoCargador = (): void => {
-    const activo = checked('accCargador');
-    const inputNumero = byId('numeroCargador') as HTMLInputElement | null;
-    const btnScan = byId('btnEscanearCargador') as HTMLButtonElement | null;
-    const ayuda = byId('ayudaNumeroCargador');
+  // Cada casilla de accesorio muestra su campo de serie (o el detalle de Otros).
+  // Mientras esté apagada, el input y el botón de cámara quedan hidden+disabled.
+  const actualizarEstadoAccesorioSerie = (acc: AccesorioSerieUi): void => {
+    const activo = checked(acc.checkboxId);
+    const wrap = byId(acc.wrapId);
+    const inputNumero = byId(acc.inputId) as HTMLInputElement | null;
+    const btnScan = wrap?.querySelector('.formato-garantia-btn-scanner') as HTMLButtonElement | null;
+    if (wrap) {
+      wrap.hidden = !activo;
+    }
     if (inputNumero) {
       inputNumero.disabled = !activo;
     }
     if (btnScan) {
       btnScan.disabled = !activo;
     }
-    if (ayuda) {
-      ayuda.textContent = activo
-        ? 'Puedes escribirlo a mano o escanearlo con la cámara.'
-        : 'Marca la casilla “Cargador” para escribir o escanear el número.';
+  };
+
+  const actualizarEstadoOtros = (): void => {
+    const activo = checked('accOtros');
+    const wrap = byId('wrapSerieOtros');
+    const inputDetalle = byId('accOtrosDetalle') as HTMLInputElement | null;
+    if (wrap) {
+      wrap.hidden = !activo;
+    }
+    if (inputDetalle) {
+      inputDetalle.disabled = !activo;
     }
   };
-  byId('accCargador')?.addEventListener('change', actualizarEstadoCargador);
-  actualizarEstadoCargador();
 
-  // Botón de cámara junto a "Número del cargador": reutiliza scanner_codigo.ts
-  const btnEscanearCargador = byId('btnEscanearCargador') as HTMLButtonElement | null;
-  const inputNumeroCargador = byId('numeroCargador') as HTMLInputElement | null;
-  btnEscanearCargador?.addEventListener('click', () => {
-    if (!checked('accCargador') || btnEscanearCargador.disabled) {
-      setStatus('Marca la casilla “Cargador” para poder escanear el número.', true, false);
-      return;
-    }
-    if (!inputNumeroCargador) {
-      setStatus('No se encontró el campo del número de cargador.', true, false);
-      return;
-    }
-    if (typeof window.abrirScannerCodigo !== 'function') {
-      setStatus(
-        'El scanner no está disponible. Recarga la página o escribe el número a mano.',
-        true,
-        false,
-      );
-      return;
-    }
-    window.abrirScannerCodigo({
-      targetInput: inputNumeroCargador,
-      tituloModal: 'Escanear número del cargador',
-      modoInicial: 'barras',
-      onDetect: () => {
-        setStatus('Número del cargador capturado con el scanner.', false, false);
-      },
+  ACCESORIOS_CON_SERIE_UI.forEach((acc) => {
+    actualizarEstadoAccesorioSerie(acc);
+    byId(acc.checkboxId)?.addEventListener('change', () => {
+      actualizarEstadoAccesorioSerie(acc);
+    });
+  });
+  byId('accOtros')?.addEventListener('change', actualizarEstadoOtros);
+  actualizarEstadoOtros();
+
+  // Botones de cámara junto a cada número de serie: reutilizan scanner_codigo.ts
+  document.querySelectorAll<HTMLButtonElement>('.formato-garantia-btn-scanner[data-serie-input]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      // data-serie-* enlaza el botón con su casilla, input y nombre para el mensaje
+      const checkboxId = btn.dataset.serieCheckbox || '';
+      const inputId = btn.dataset.serieInput || '';
+      const etiqueta = btn.dataset.serieEtiqueta || 'accesorio';
+      if (!checked(checkboxId) || btn.disabled) {
+        setStatus(`Marca la casilla del ${etiqueta} para poder escanear el número.`, true, false);
+        return;
+      }
+      const inputNumero = byId(inputId) as HTMLInputElement | null;
+      if (!inputNumero) {
+        setStatus(`No se encontró el campo del número de ${etiqueta}.`, true, false);
+        return;
+      }
+      if (typeof window.abrirScannerCodigo !== 'function') {
+        setStatus(
+          'El scanner no está disponible. Recarga la página o escribe el número a mano.',
+          true,
+          false,
+        );
+        return;
+      }
+      // Abre el modal de scanner_codigo.js y escribe el código en el input
+      window.abrirScannerCodigo({
+        targetInput: inputNumero,
+        tituloModal: `Escanear número del ${etiqueta}`,
+        modoInicial: 'barras',
+        onDetect: () => {
+          setStatus(`Número del ${etiqueta} capturado con el scanner.`, false, false);
+        },
+      });
     });
   });
 }

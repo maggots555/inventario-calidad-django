@@ -26,6 +26,7 @@ from servicio_tecnico.models import (
     DanoEsteticoVista,
     EnlaceSeguimientoCliente,
     FormatoServicioOOW,
+    ImagenOrden,
     OrdenServicio,
     _resolver_ref_carpeta_orden,
     dano_estetico_upload_path,
@@ -35,6 +36,7 @@ from servicio_tecnico.models import (
 from servicio_tecnico.services.formato_oow import (
     FormatoOOWError,
     aplicar_payload_borrador,
+    filas_accesorios_pdf,
     finalizar_formato,
     lista_emails_envio,
     normalizar_emails_envio,
@@ -74,6 +76,38 @@ def _adjuntar_vistas_completas(formato) -> None:
             ContentFile(_png_bytes()),
             save=True,
         )
+
+
+def _adjuntar_identificacion_oow(orden, empleado=None):
+    """
+    Sube una foto dummy de INE/IFE (tipo identificacion_oow).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Finalizar el formato ahora exige esa foto. Los tests de PDF no
+    abren la cámara; esta función simula que el técnico ya la tomó.
+    """
+    img = ImagenOrden(
+        orden=orden,
+        tipo='identificacion_oow',
+        descripcion='INE test',
+        subido_por=empleado,
+    )
+    img.imagen.save('ident_oow_test.png', ContentFile(_png_bytes()), save=True)
+    return img
+
+
+def _preparar_requisitos_finalizar(formato, empleado=None):
+    """
+    Completa INE + serie del cargador si el prefill lo dejó marcado.
+
+    Efectos secundarios:
+        Crea ImagenOrden identificacion_oow; puede UPDATE numero_cargador.
+    """
+    _adjuntar_identificacion_oow(formato.orden, empleado)
+    # El prefill copia tiene_cargador del detalle; sin serie no deja finalizar
+    if formato.accesorio_cargador and not (formato.numero_cargador or '').strip():
+        formato.numero_cargador = 'CN-TEST-OOW'
+        formato.save(update_fields=['numero_cargador'])
 
 
 def _flowable_tiene_imagen(flowables) -> bool:
@@ -469,6 +503,138 @@ class FormatoOowServiceTest(TestCase):
         self.assertIn('vistas de daños', str(ctx.exception).lower())
         self.assertIn('Top Cover', str(ctx.exception))
 
+    def test_finalizar_exige_identificacion(self):
+        """Sin foto de INE/IFE no se puede generar el PDF."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': False,
+            },
+            usuario=self.user,
+        )
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        _adjuntar_vistas_completas(formato)
+        with self.assertRaises(FormatoOOWError) as ctx:
+            finalizar_formato(formato, usuario=self.user)
+        self.assertIn('identificación', str(ctx.exception).lower())
+
+    def test_finalizar_exige_serie_cargador(self):
+        """Cargador marcado sin número de serie no deja finalizar."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': True,
+                'numero_cargador': '',
+            },
+            usuario=self.user,
+        )
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        _adjuntar_vistas_completas(formato)
+        _adjuntar_identificacion_oow(self.orden, self.empleado)
+        with self.assertRaises(FormatoOOWError) as ctx:
+            finalizar_formato(formato, usuario=self.user)
+        self.assertIn('cargador', str(ctx.exception).lower())
+
+    def test_finalizar_exige_detalle_otros(self):
+        """Otros marcado sin detalle no deja finalizar."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'acepta_condiciones': True,
+                'acepta_privacidad': True,
+                'accesorio_cargador': False,
+                'accesorio_otros': True,
+                'accesorios_otros_detalle': '',
+            },
+            usuario=self.user,
+        )
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        _adjuntar_vistas_completas(formato)
+        _adjuntar_identificacion_oow(self.orden, self.empleado)
+        with self.assertRaises(FormatoOOWError) as ctx:
+            finalizar_formato(formato, usuario=self.user)
+        self.assertIn('otros', str(ctx.exception).lower())
+
+    def test_filas_accesorios_pdf_omite_no_marcados(self):
+        """El helper del PDF solo lista accesorios marcados con su serie."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_cargador': True,
+                'numero_cargador': 'CN-SOLO',
+                'accesorio_maletin': False,
+                'accesorio_mouse': False,
+                'accesorio_teclado': False,
+                'accesorio_monitor': False,
+                'accesorio_otros': False,
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertEqual(
+            filas_accesorios_pdf(formato),
+            [('Cargador', 'CN-SOLO')],
+        )
+
+    def test_filas_accesorios_pdf_vacio(self):
+        """Sin accesorios marcados, el PDF muestra el texto de vacío."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_cargador': False,
+                'accesorio_maletin': False,
+                'accesorio_mouse': False,
+                'accesorio_teclado': False,
+                'accesorio_monitor': False,
+                'accesorio_otros': False,
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertEqual(filas_accesorios_pdf(formato), [])
+        textos = _textos_flowables(
+            PDFFormatoServicioOOW(formato)._construir_accesorios()
+        )
+        self.assertIn('Sin accesorios entregados', textos)
+
+    def test_guardar_numero_mouse_en_borrador(self):
+        """El wizard puede guardar la serie del mouse sin finalizar."""
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        aplicar_payload_borrador(
+            formato,
+            {
+                'accesorio_mouse': True,
+                'numero_mouse': 'MS-ABC-99',
+            },
+            usuario=self.user,
+        )
+        formato.refresh_from_db()
+        self.assertTrue(formato.accesorio_mouse)
+        self.assertEqual(formato.numero_mouse, 'MS-ABC-99')
+
     def test_pdf_omite_vistas_de_otro_tipo(self):
         """
         Si se guardó un Top Cover de laptop y luego el tipo es escritorio,
@@ -557,6 +723,7 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
 
         final = finalizar_formato(formato, usuario=self.user)
         self.assertEqual(final.estado, 'finalizado')
@@ -585,6 +752,7 @@ class FormatoOowServiceTest(TestCase):
                 'accesorio_otros': True,
                 'accesorios_otros_detalle': 'Bolsa térmica',
                 'numero_cargador': 'CN-0OOWPDF',
+                'numero_mouse': 'SN-MOUSE-1',
             },
             usuario=self.user,
         )
@@ -602,30 +770,31 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
         final = finalizar_formato(formato, usuario=self.user, forzar_regenerar=True)
         resultado = PDFFormatoServicioOOW(final).generar_pdf()
         self.assertTrue(resultado['success'])
         self.assertGreater(len(resultado['buffer'].getvalue()), 100)
 
-        # La sección construye pares SI/NO a partir de los booleans del modelo
-        pares_esperados = {
-            'Cargador': 'SI',
-            'Maletín': 'NO',
-            'Mouse': 'SI',
-            'Teclado': 'NO',
-            'Monitor': 'NO',
-            'Otros': 'SI',
-        }
-        f = final
-        pares_reales = {
-            'Cargador': 'SI' if f.accesorio_cargador else 'NO',
-            'Maletín': 'SI' if f.accesorio_maletin else 'NO',
-            'Mouse': 'SI' if f.accesorio_mouse else 'NO',
-            'Teclado': 'SI' if f.accesorio_teclado else 'NO',
-            'Monitor': 'SI' if f.accesorio_monitor else 'NO',
-            'Otros': 'SI' if f.accesorio_otros else 'NO',
-        }
-        self.assertEqual(pares_reales, pares_esperados)
+        # Solo accesorios marcados; el número/detalle va en la misma celda
+        filas = filas_accesorios_pdf(final)
+        self.assertEqual(
+            filas,
+            [
+                ('Cargador', 'CN-0OOWPDF'),
+                ('Mouse', 'SN-MOUSE-1'),
+                ('Otros', 'Bolsa térmica'),
+            ],
+        )
+        textos = _textos_flowables(PDFFormatoServicioOOW(final)._construir_accesorios())
+        self.assertIn('Cargador', textos)
+        self.assertIn('CN-0OOWPDF', textos)
+        self.assertNotIn('SI CN-0OOWPDF', textos)
+        self.assertIn('Mouse', textos)
+        self.assertNotIn('Maletín', textos)
+        self.assertNotIn('Teclado', textos)
+        self.assertFalse(any('No. serie cargador' in t for t in textos))
+        self.assertFalse(any('Detalle otros' in t for t in textos))
 
     def test_finalizar_crea_enlace_sin_email_y_pdf_con_qr(self):
         """
@@ -653,6 +822,7 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
 
         final = finalizar_formato(formato, usuario=self.user)
         self.assertTrue(
@@ -688,6 +858,7 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
         final = finalizar_formato(formato, usuario=self.user)
 
         with patch(
@@ -723,6 +894,7 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
         final = finalizar_formato(formato, usuario=self.user)
         self.assertEqual(final.estado, 'finalizado')
 
@@ -741,6 +913,7 @@ class FormatoOowServiceTest(TestCase):
                 'acepta_condiciones': True,
                 'acepta_privacidad': True,
                 'accesorio_cargador': True,
+                'numero_cargador': 'CN-REGEN-OOW',
                 'observaciones_tecnicas': 'Segunda versión con cargador',
             },
             usuario=self.user,
@@ -802,6 +975,7 @@ class FormatoOowServiceTest(TestCase):
             save=True,
         )
         _adjuntar_vistas_completas(formato)
+        _preparar_requisitos_finalizar(formato, self.empleado)
         finalizar_formato(formato, usuario=self.user)
         formato.refresh_from_db()
 
@@ -913,6 +1087,8 @@ class FormatoOowVistaTest(TestCase):
         # Scanner QR/barras junto al número de cargador (igual que Dell)
         self.assertIn(b'id="numeroCargador"', resp.content)
         self.assertIn(b'id="btnEscanearCargador"', resp.content)
+        self.assertIn(b'id="numeroMaletin"', resp.content)
+        self.assertIn(b'id="btnEscanearMaletin"', resp.content)
         self.assertIn(b'scanner_codigo.js', resp.content)
         self.assertIn(b'zxing-wasm', resp.content)
         # Sin casilla Cargador: el número y la cámara nacen deshabilitados
@@ -920,6 +1096,8 @@ class FormatoOowVistaTest(TestCase):
         self.assertRegex(html, r'id="numeroCargador"[^>]*\bdisabled\b')
         self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
         self.assertIn('id="checkItemDanos"', html)
+        self.assertIn('id="checkItemIdentificacion"', html)
+        self.assertIn('INE / IFE u otra', html)
         self.assertIn('Razón social', html)
         self.assertIn('Dirección', html)
         self.assertTrue(

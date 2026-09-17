@@ -591,44 +591,33 @@ class PDFFormatoServicioOOW:
 
     def _construir_accesorios(self) -> List:
         """
-        Accesorios entregados: tabla label|SI/NO (compatible con Helvetica).
+        Accesorios entregados: solo los marcados, con el número de serie en la celda.
 
         EXPLICACIÓN PARA PRINCIPIANTES:
-        ReportLab con fuente Helvetica NO dibuja bien los símbolos ☑ / ☐
-        (Unicode). Por eso usamos "SI" / "NO" en texto ASCII, visibles en el PDF.
-        SI va en navy negrita y NO en gris para escanear más rápido en recepción.
+        Ya no listamos Maletín/Mouse/etc. en NO. Si el cliente no lo trajo,
+        esa fila no existe. El número de serie (o el detalle de “Otros”)
+        va en la columna derecha, no abajo de la tabla.
         """
-        elementos = [self._crear_header_seccion('Accesorios entregados'), Spacer(1, 2 * mm)]
-        f = self.formato
+        # Import diferido: el servicio también importa este PDF al finalizar
+        from servicio_tecnico.services.formato_oow import filas_accesorios_pdf
 
-        def _celda_si_no(activo: bool) -> Paragraph:
-            if activo:
-                return Paragraph('SI', self._estilos['AccesorioSi'])
-            return Paragraph('NO', self._estilos['AccesorioNo'])
+        elementos = [self._crear_header_seccion('Accesorios entregados'), Spacer(1, 2 * mm)]
+        filas = filas_accesorios_pdf(self.formato)
+        if not filas:
+            elementos.append(Paragraph(
+                'Sin accesorios entregados',
+                self._estilos['CeldaValor'],
+            ))
+            return elementos
 
         pares = [
-            ('Cargador', _celda_si_no(f.accesorio_cargador)),
-            ('Maletín', _celda_si_no(f.accesorio_maletin)),
-            ('Mouse', _celda_si_no(f.accesorio_mouse)),
-            ('Teclado', _celda_si_no(f.accesorio_teclado)),
-            ('Monitor', _celda_si_no(f.accesorio_monitor)),
-            ('Otros', _celda_si_no(f.accesorio_otros)),
+            (
+                etiqueta,
+                Paragraph(self._esc(valor), self._estilos['AccesorioSi']),
+            )
+            for etiqueta, valor in filas
         ]
         elementos.append(self._tabla_pares(pares, valores_flowables=True))
-        if f.accesorios_otros_detalle:
-            elementos.append(Spacer(1, 2 * mm))
-            elementos.append(Paragraph(
-                f'<b>Detalle otros:</b> {self._esc(f.accesorios_otros_detalle)}',
-                self._estilos['CeldaValor'],
-            ))
-        # Número de serie del cargador (mismo dato que va a DetalleEquipo)
-        num_cargador = (f.numero_cargador or '').strip()
-        if num_cargador:
-            elementos.append(Spacer(1, 2 * mm))
-            elementos.append(Paragraph(
-                f'<b>No. serie cargador:</b> {self._esc(num_cargador)}',
-                self._estilos['CeldaValor'],
-            ))
         return elementos
 
     def _texto_aviso_pc_audit(self) -> str:
