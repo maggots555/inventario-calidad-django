@@ -1147,12 +1147,59 @@ class PDFFormatoServicioOOW:
         # Las campañas se leen AHORA (al generar/regenerar). Si marketing
         # pausó una, el PDF nuevo ya no la trae; el PDF viejo no se reescribe
         # solo: hay que pulsar regenerar.
-        for campania in obtener_campanias_vigentes():
-            bloque = self._construir_bloque_campania(campania)
-            if bloque:
-                elementos.append(KeepTogether(bloque))
-                elementos.append(Spacer(1, 4 * mm))
+        elementos += self._construir_rejilla_campanias(obtener_campanias_vigentes())
         return elementos
+
+    def _construir_rejilla_campanias(self, campanias) -> List:
+        """
+        Acomoda los flyers a lo ancho (2 por fila), no uno debajo del otro.
+
+        Args:
+            campanias: iterable de CampaniaPdfOow vigentes.
+
+        Returns:
+            Lista con la tabla (vacía si ninguna imagen se pudo leer).
+        """
+        bloques = []
+        for campania in campanias:
+            bloques.append(campania)
+        if not bloques:
+            return []
+
+        ancho_util = letter[0] - (2 * MARGEN)
+        # 1 flyer: usa todo el ancho. 2 o más: dos columnas para llenar la hoja.
+        columnas = 1 if len(bloques) == 1 else 2
+        ancho_col = ancho_util / columnas
+        # Retrato (ficha de laptop) cabe más alto cuando comparte la fila.
+        alto_img = 140 * mm if columnas == 1 else 125 * mm
+
+        celdas = []
+        for campania in bloques:
+            pieza = self._construir_bloque_campania(
+                campania,
+                ancho=ancho_col - 3 * mm,
+                alto=alto_img,
+            )
+            celdas.append(pieza if pieza else '')
+
+        filas = []
+        # De 2 en 2: si queda una suelta, la última fila lleva celda vacía.
+        for i in range(0, len(celdas), columnas):
+            fila = celdas[i:i + columnas]
+            while len(fila) < columnas:
+                fila.append('')
+            filas.append(fila)
+
+        tabla = Table(filas, colWidths=[ancho_col] * columnas)
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        return [tabla]
 
     def _construir_qrs_promo_fijos(self) -> Table:
         """
@@ -1249,12 +1296,19 @@ class PDFFormatoServicioOOW:
         ]))
         return fila
 
-    def _construir_bloque_campania(self, campania) -> List:
+    def _construir_bloque_campania(
+        self,
+        campania,
+        ancho: Optional[float] = None,
+        alto: Optional[float] = None,
+    ) -> List:
         """
         Flyer de una campaña vigente (imagen + leyenda).
 
         Args:
             campania: CampaniaPdfOow vigente.
+            ancho: Tope de ancho del flyer (por defecto, toda la hoja útil).
+            alto: Tope de alto (por defecto 90 mm).
 
         Returns:
             Lista de flowables, o vacía si no se pudo leer la imagen.
@@ -1263,24 +1317,67 @@ class PDFFormatoServicioOOW:
             Ninguno sobre BD. Si hay url_destino, la imagen queda clicable
             en el PDF digital (sin imprimir QR ni la dirección).
         """
-        ancho_util = letter[0] - (2 * MARGEN)
-        # 90 mm de alto máximo: deja aire para el título y los QR fijos
-        # en la misma hoja; si no cabe, KeepTogether manda el flyer abajo.
+        if ancho is None:
+            ancho = letter[0] - (2 * MARGEN)
+        if alto is None:
+            alto = 90 * mm
         imagen = self._imagen_campania_pdf(
             campania,
-            ancho=ancho_util,
-            alto=90 * mm,
+            ancho=ancho,
+            alto=alto,
         )
         if imagen is None:
             return []
 
-        piezas: List = [imagen]
+        # Marco del tamaño REAL de la foto (no del tope 125 mm).
+        piezas: List = [self._marco_alrededor_imagen(imagen)]
         # Leyenda visible; si está vacía, caemos al texto alt (no al título interno).
         pie = (campania.leyenda or campania.texto_alt or '').strip()
         if pie:
             piezas.append(Spacer(1, 2 * mm))
             piezas.append(Paragraph(self._esc(pie), self._estilos['PromoLeyenda']))
         return piezas
+
+    def _marco_alrededor_imagen(self, imagen: RLImage) -> Table:
+        """
+        Recuadro navy ajustado al flyer (respeta el ratio de la imagen).
+
+        Args:
+            imagen: RLImage ya escalada con kind=proportional.
+
+        Returns:
+            Table de 1 celda con BOX; el ancho/alto coinciden con la foto.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Si pusiéramos el borde en la columna entera, saldría un rectángulo
+        enorme con la foto chica adentro. Aquí leemos drawWidth/drawHeight
+        (el tamaño real que ReportLab va a pintar) y el marco es de eso.
+        """
+        # lazy=1: la imagen aún no abrió el archivo; forzamos el cálculo.
+        if getattr(imagen, '_lazy', 0):
+            try:
+                imagen._setup_inner()
+            except Exception:
+                logger.warning('[PDF_FORMATO_OOW] No se midió el flyer para el marco')
+        pad = 1.5 * mm
+        ancho_real = float(getattr(imagen, 'drawWidth', 0) or 0)
+        alto_real = float(getattr(imagen, 'drawHeight', 0) or 0)
+        kwargs = {}
+        if ancho_real > 8 and alto_real > 8:
+            kwargs['colWidths'] = [ancho_real + pad]
+            kwargs['rowHeights'] = [alto_real + pad]
+        marco = Table([[imagen]], **kwargs)
+        marco.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.8, COLOR_NAVY),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), pad / 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), pad / 2),
+            ('TOPPADDING', (0, 0), (-1, -1), pad / 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), pad / 2),
+        ]))
+        marco.hAlign = 'CENTER'
+        return marco
 
     def _imagen_campania_pdf(
         self,

@@ -899,6 +899,65 @@ class FormatoOowServiceTest(TestCase):
         self.assertIn(url_campania, _urls_en_imagenes_clicables(elementos))
         self.assertTrue(_flowable_tiene_imagen(elementos))
 
+    def test_pdf_promociones_flyer_tiene_marco_ajustado(self):
+        """
+        El marco del flyer mide casi lo mismo que la imagen (no la columna entera).
+        """
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Image as RLImage, Table
+
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        # 80×160: retrato, más angosto que la columna de 90 mm.
+        campania = _crear_campania_pdf(
+            titulo='Marco test',
+            leyenda='Pie marco',
+            size=(80, 160),
+        )
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        tope_ancho = 90 * mm
+        tope_alto = 125 * mm
+        bloque = PDFFormatoServicioOOW(formato)._construir_bloque_campania(
+            campania,
+            ancho=tope_ancho,
+            alto=tope_alto,
+        )
+        self.assertTrue(bloque)
+        self.assertIsInstance(bloque[0], Table)
+        marco = bloque[0]
+        img = marco._cellvalues[0][0]
+        self.assertIsInstance(img, RLImage)
+        # El marco no debe ser el tope de la columna (90 mm), sino la foto + padding.
+        self.assertLess(marco._colWidths[0], tope_ancho)
+        self.assertAlmostEqual(
+            marco._colWidths[0],
+            img.drawWidth + 1.5 * mm,
+            delta=1.0,
+        )
+
+    def test_pdf_promociones_campanias_lado_a_lado(self):
+        """Dos flyers vigentes van en la misma fila (no uno debajo del otro)."""
+        from reportlab.platypus import Table
+
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        _crear_campania_pdf(titulo='Flyer A', leyenda='LEYENDA COLUMNA A', orden=1)
+        _crear_campania_pdf(titulo='Flyer B', leyenda='LEYENDA COLUMNA B', orden=2)
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        elementos = PDFFormatoServicioOOW(formato)._construir_promociones()
+        unidos = ' | '.join(_textos_flowables(elementos))
+        self.assertIn('LEYENDA COLUMNA A', unidos)
+        self.assertIn('LEYENDA COLUMNA B', unidos)
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # La primera Table es la de los 2 QR. La segunda es la rejilla
+        # de flyers: una sola fila con 2 celdas.
+        tablas = [e for e in elementos if isinstance(e, Table)]
+        self.assertGreaterEqual(len(tablas), 2)
+        rejilla = tablas[1]
+        self.assertEqual(len(rejilla._cellvalues), 1)
+        self.assertEqual(len(rejilla._cellvalues[0]), 2)
+
     def test_pdf_promociones_omite_campania_vencida_y_pausada(self):
         """Caducada o pausada: no sale la leyenda en el PDF."""
         from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
