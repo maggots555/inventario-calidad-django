@@ -359,7 +359,12 @@ class FormatoOowServiceTest(TestCase):
         detalle = self.orden.detalle_equipo
         detalle.nombre_cliente = 'Ana Perez'
         detalle.razon_social_cliente = 'Empresa Demo SA de CV'
-        detalle.save(update_fields=['nombre_cliente', 'razon_social_cliente'])
+        detalle.direccion_cliente = 'Calle 10 Colonia Centro'
+        detalle.save(update_fields=[
+            'nombre_cliente',
+            'razon_social_cliente',
+            'direccion_cliente',
+        ])
 
         formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
         textos = _textos_flowables(
@@ -371,6 +376,8 @@ class FormatoOowServiceTest(TestCase):
         self.assertIn('Razón social', textos)
         self.assertIn('Ana Perez', textos)
         self.assertIn('Empresa Demo SA de CV', textos)
+        self.assertIn('Dirección', textos)
+        self.assertIn('Calle 10 Colonia Centro', textos)
 
     def test_guardar_numero_cargador_sincroniza_detalle(self):
         """
@@ -914,6 +921,7 @@ class FormatoOowVistaTest(TestCase):
         self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
         self.assertIn('id="checkItemDanos"', html)
         self.assertIn('Razón social', html)
+        self.assertIn('Dirección', html)
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )

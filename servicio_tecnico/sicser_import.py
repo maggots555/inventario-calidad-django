@@ -563,6 +563,7 @@ def importar_orden_oow_desde_sicser(
         razon_social_cliente=razon_social_cliente,
         rfc_cliente=registro.rfc[:13],
         telefono_cliente=registro.telefono[:20],
+        direccion_cliente=(registro.direccion or '')[:300],
         falla_principal=(registro.descripcion_falla or 'Importada desde SICSER OOW')[:4000],
         gama=_calcular_gama(marca, modelo),
         equipo_enciende=True,

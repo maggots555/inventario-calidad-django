@@ -1474,7 +1474,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'razon_social_cliente': 'Empresa / razón social (opcional). En import OOW viene de SICSER nombre_cliente.',
             'rfc_cliente': 'RFC del cliente — Genérico: XAXX010101000 (opcional, 13 caracteres)',  # ✅ NUEVO (Junio 2026)
             'telefono_cliente': 'Teléfono de contacto del cliente (opcional)',  # ✅ NUEVO (Junio 2026)
-            'direccion_cliente': 'Calle, número, colonia y C.P. (opcional; se usa en el Formato Garantía Dell)',
+            'direccion_cliente': 'Calle, número, colonia y C.P. (opcional; se usa en Formato OOW y Garantía Dell)',
             'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
             'es_mis': 'Marca si el equipo llegó por paquetería (Mail-In Service)',
             'tiene_cargador': 'Marca si el equipo incluye cargador',

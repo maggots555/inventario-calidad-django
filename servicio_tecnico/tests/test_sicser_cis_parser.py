@@ -91,6 +91,7 @@ class NormalizarRegistroOowNombresTest(SimpleTestCase):
             'email': 'juan@test.local',
             'telefono': '5512345678',
             'rfc': 'EMP010101XXX',
+            'direccion_cliente': 'Calle 10 Colonia Centro',
             'descripcion_falla': 'No enciende',
             'cis': '',
             'fecha': '2026-09-01 10:00:00',
@@ -107,6 +108,7 @@ class NormalizarRegistroOowNombresTest(SimpleTestCase):
         self.assertEqual(reg.contacto, 'Juan Perez')
         self.assertEqual(reg.nombre_para_listado(), 'Juan Perez')
         self.assertTrue(reg.mostrar_razon_social_en_listado())
+        self.assertEqual(reg.direccion, 'Calle 10 Colonia Centro')
 
     def test_sin_contacto_no_descarta_la_razon_social(self):
         """

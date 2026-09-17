@@ -517,6 +517,7 @@ def _orden_oow_sicser(**overrides):
         'email': 'juan@test.local',
         'telefono': '5512345678',
         'rfc': 'EMP010101XXX',
+        'direccion': 'Calle 10 Colonia Centro',
         'descripcion_falla': 'No enciende',
         'cis': '',
         'fecha': '2026-09-01 10:00:00',
@@ -593,6 +594,7 @@ class ImportarOrdenOowNombresTest(TestCase):
         detalle = resultado.orden.detalle_equipo
         self.assertEqual(detalle.nombre_cliente, 'Juan Perez')
         self.assertEqual(detalle.razon_social_cliente, 'EMPRESA SA DE CV')
+        self.assertEqual(detalle.direccion_cliente, 'Calle 10 Colonia Centro')
 
     def test_importar_sin_contacto_copia_razon_a_nombre(self):
         """Borde: sin contacto, ambos campos de SIGMA llevan la empresa."""

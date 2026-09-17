@@ -115,6 +115,7 @@ class OrdenOOWSicser:
         email: Correo del cliente.
         telefono: Teléfono de contacto.
         rfc: RFC del cliente (si aplica).
+        direccion: Dirección del cliente (calle, colonia; puede venir vacía).
         descripcion_falla: Texto de la falla reportada.
         cis: Código CIS en SICSER (puede ser null).
         fecha: Fecha de ingreso en SICSER.
@@ -135,6 +136,7 @@ class OrdenOOWSicser:
     email: str
     telefono: str
     rfc: str
+    direccion: str
     descripcion_falla: str
     cis: str
     fecha: str
@@ -522,6 +524,10 @@ def _normalizar_registro_oow(item: dict[str, Any]) -> OrdenOOWSicser:
         email=str(item.get('email') or '').strip().lower(),
         telefono=str(item.get('telefono') or '').strip(),
         rfc=str(item.get('rfc') or '').strip().upper(),
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # En OOW la API manda la dirección con la clave direccion_cliente
+        # (en garantías a veces llega con otros nombres).
+        direccion=str(item.get('direccion_cliente') or '').strip(),
         descripcion_falla=str(item.get('descripcion_falla') or '').strip(),
         cis=cis_raw,
         fecha=str(item.get('fecha') or '').strip(),

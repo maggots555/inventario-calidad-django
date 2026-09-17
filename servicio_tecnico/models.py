@@ -990,9 +990,9 @@ class DetalleEquipo(models.Model):
         help_text="Teléfono de contacto del cliente (opcional)"
     )
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Dirección de contacto del cliente. En órdenes garantía Dell suele venir
-    # de SICSER; también se puede capturar/editar en “Datos adicionales”.
-    # Se usa en el PDF Formato Garantía (INFORMACIÓN DEL CLIENTE).
+    # Dirección de contacto del cliente. En import OOW y garantía Dell suele
+    # venir de SICSER; también se puede capturar/editar en “Datos adicionales”.
+    # Se usa en el PDF Formato OOW y en el Formato Garantía.
     direccion_cliente = models.CharField(
         max_length=300,
         blank=True,

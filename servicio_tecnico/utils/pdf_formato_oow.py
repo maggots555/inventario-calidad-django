@@ -565,6 +565,7 @@ class PDFFormatoServicioOOW:
             ('RFC', d.rfc_cliente),
             ('Email de contacto', d.email_cliente),
             ('Teléfono(s)', d.telefono_cliente),
+            ('Dirección', d.direccion_cliente),
             ('Email envío formato', ', '.join(lista_emails_envio(self.formato)) or '—'),
         ]
         elementos.append(self._tabla_pares(pares))
