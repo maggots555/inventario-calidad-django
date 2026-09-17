@@ -731,6 +731,47 @@ class FormatoOowServiceTest(TestCase):
         self.assertTrue(final.pdf.size > 100)
         self.assertTrue(final.version_aviso_privacidad)
 
+    def test_portada_pdf_tiene_firmas_en_blanco(self):
+        """
+        La hoja de datos trae dos recuadros vacíos: técnico y cliente.
+        """
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        textos = _textos_flowables(
+            PDFFormatoServicioOOW(formato)._construir_firmas_manuscritas_portada()
+        )
+        self.assertIn('Técnico que repara y diagnostica', textos)
+        self.assertIn('Firma del cliente', textos)
+        # En blanco: no se pinta la firma digital de la tablet
+        self.assertFalse(
+            _flowable_tiene_imagen(
+                PDFFormatoServicioOOW(formato)._construir_firmas_manuscritas_portada()
+            )
+        )
+
+    def test_aviso_privacidad_incluye_firma_digital(self):
+        """
+        Al final del aviso, después de la frase de aceptación, va la firma.
+        """
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.firma_cliente.save(
+            'firma_cli.png',
+            ContentFile(_png_bytes()),
+            save=True,
+        )
+        elementos = PDFFormatoServicioOOW(formato)._construir_aviso_privacidad()
+        textos = _textos_flowables(elementos)
+        unidos = ' | '.join(textos)
+        self.assertIn(
+            'El cliente aceptó este aviso digitalmente al finalizar el Formato OOW en SIGMA.',
+            unidos,
+        )
+        self.assertIn('Firma del cliente', textos)
+        self.assertTrue(_flowable_tiene_imagen(elementos))
+
     def test_pdf_muestra_accesorios_marcados(self):
         """
         Los checkboxes se guardan y el PDF se regenera sin fallar.

@@ -11,10 +11,11 @@ como PDFCotizacionCliente.
 
 Estructura (páginas bien separadas, sin encimar):
 1. Página 1 — Header + título + orden + cliente + equipo + accesorios
-2. Página siguiente — Daños estéticos + observaciones técnicas + firma cliente
+   + firmas en blanco (técnico y cliente, se llenan a mano)
+2. Página siguiente — Daños estéticos + observaciones técnicas + firma digital
    (si no hay foto de escaneo, muestra aviso PC Audit en observaciones)
 3. Página siguiente — Resultado del escaneo (solo si hay fotos)
-4. Página(s) finales — Aviso de Privacidad México
+4. Página(s) finales — Aviso de Privacidad + firma digital del cliente
 """
 
 from __future__ import annotations
@@ -127,21 +128,28 @@ class PDFFormatoServicioOOW:
             elementos: List = []
             # --- Página 1: datos generales ---
             elementos += self._construir_header()
-            elementos.append(Spacer(1, 4 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_titulo()
-            elementos.append(Spacer(1, 4 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             # QR de seguimiento: página 1, visible, sin pelear con el logo.
             tarjeta_qr = self._construir_tarjeta_seguimiento()
             if tarjeta_qr:
                 elementos += tarjeta_qr
-                elementos.append(Spacer(1, 5 * mm))
+                elementos.append(Spacer(1, 3 * mm))
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Spacers de 3 mm (antes 5) para que quepan accesorios + firmas
+            # en blanco en la misma hoja, sin dejar un recuadro huérfano.
             elementos += self._envolver_seccion(self._construir_orden_servicio())
-            elementos.append(Spacer(1, 5 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._envolver_seccion(self._construir_datos_cliente())
-            elementos.append(Spacer(1, 5 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._envolver_seccion(self._construir_datos_equipo())
-            elementos.append(Spacer(1, 5 * mm))
+            elementos.append(Spacer(1, 3 * mm))
             elementos += self._envolver_seccion(self._construir_accesorios())
+            elementos.append(Spacer(1, 4 * mm))
+            elementos += self._envolver_seccion(
+                self._construir_firmas_manuscritas_portada()
+            )
 
             # --- Página de daños + observaciones + firma (como el formato papel) ---
             elementos.append(PageBreak())
@@ -440,8 +448,10 @@ class PDFFormatoServicioOOW:
         if not url:
             return []
 
-        # 28 mm: tamaño seguro para escanear impreso; clicable en PDF digital.
-        qr_img = imagen_qr_para_pdf(url, lado_mm=28)
+        # 22 mm: mismo tamaño que el QR de venta mostrador / garantía.
+        # Sigue siendo fácil de escanear en papel (ERROR_CORRECT_M) y
+        # ocupa menos la tarjeta de la portada.
+        qr_img = imagen_qr_para_pdf(url, lado_mm=22)
         titulo = Paragraph(
             'Consulta el estatus de tu servicio',
             self._estilos['QrTitulo'],
@@ -451,7 +461,7 @@ class PDFFormatoServicioOOW:
             self._estilos['QrLeyenda'],
         )
         ancho_util = letter[0] - (2 * MARGEN)
-        ancho_qr = 32 * mm
+        ancho_qr = 26 * mm
         ancho_texto = ancho_util - ancho_qr
         bloque_texto = Table(
             [[titulo], [leyenda]],
@@ -619,6 +629,52 @@ class PDFFormatoServicioOOW:
         ]
         elementos.append(self._tabla_pares(pares, valores_flowables=True))
         return elementos
+
+    def _construir_firmas_manuscritas_portada(self) -> List:
+        """
+        Dos recuadros en blanco en la hoja de datos (se firman a mano).
+
+        Objetivo de negocio:
+            El técnico y el cliente firman en papel al entregar/recibir.
+            No se pinta la firma digital aquí: van vacíos a propósito.
+
+        Returns:
+            Lista de flowables (una tabla de 2 columnas).
+        """
+        # Paso 1: el ancho útil se parte en dos columnas iguales
+        ancho_util = letter[0] - (2 * MARGEN)
+        # 4 mm de separación visual entre recuadros (padding de celdas)
+        ancho_col = (ancho_util - 4 * mm) / 2
+        alto_linea = 16 * mm
+
+        izq = self._bloque_columna_firma(
+            'Técnico que repara y diagnostica',
+            imagen=None,
+            ancho=ancho_col,
+            alto_espacio=alto_linea,
+        )
+        der = self._bloque_columna_firma(
+            'Firma del cliente',
+            imagen=None,
+            ancho=ancho_col,
+            alto_espacio=alto_linea,
+        )
+        # Paso 2: ambas firmas viajan juntas (KeepTogether lo aplica el caller)
+        tabla = Table(
+            [[izq, der]],
+            colWidths=[ancho_util / 2, ancho_util / 2],
+        )
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('BOX', (0, 0), (0, 0), 0.5, COLOR_GRIS_BORDE),
+            ('BOX', (1, 0), (1, 0), 0.5, COLOR_GRIS_BORDE),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        return [tabla]
 
     def _texto_aviso_pc_audit(self) -> str:
         """Texto del aviso cuando no se pudo usar / no hay escaneo PC Audit."""
@@ -843,42 +899,21 @@ class PDFFormatoServicioOOW:
         elementos.append(Spacer(1, 4 * mm if compacto else 8 * mm))
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Ancho fijo de la firma para que imagen, línea y texto "FIRMA CLIENTE"
-        # compartan la misma columna centrada dentro del recuadro (antes la
-        # celda era muy ancha y la imagen quedaba a la izquierda).
+        # Ancho fijo de la firma para que imagen, línea y texto
+        # compartan la misma columna centrada dentro del recuadro.
         ancho_firma = 45 * mm if compacto else 50 * mm
         alto_firma = 18 * mm if compacto else 22 * mm
-        firma_cli = None
-        if self.formato.firma_cliente:
-            try:
-                firma_cli = RLImage(
-                    self.formato.firma_cliente.path,
-                    width=ancho_firma,
-                    height=alto_firma,
-                    kind='proportional',
-                    hAlign='CENTER',
-                )
-            except Exception:
-                firma_cli = self._imagen_firma(self.formato.firma_cliente)
-
-        # Columna estrecha: firma + línea + etiqueta, todo centrado
-        col_cli = [
-            [firma_cli or Paragraph(' ', self._estilos['CeldaValor'])],
-            [HRFlowable(
-                width=ancho_firma,
-                thickness=0.6,
-                color=COLOR_NEGRO,
-                hAlign='CENTER',
-            )],
-            [Paragraph('<b>FIRMA CLIENTE</b>', self._estilos['FirmaLabel'])],
-        ]
-        tabla_firma = Table(col_cli, colWidths=[ancho_firma])
-        tabla_firma.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 1),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-        ]))
+        firma_cli = self._imagen_firma(
+            self.formato.firma_cliente,
+            ancho=ancho_firma,
+            alto=alto_firma,
+        )
+        tabla_firma = self._bloque_columna_firma(
+            'FIRMA CLIENTE',
+            imagen=firma_cli,
+            ancho=ancho_firma,
+            alto_espacio=alto_firma,
+        )
 
         pad = 6 if compacto else 10
         # Recuadro a todo el ancho; la firma queda centrada dentro
@@ -897,12 +932,61 @@ class PDFFormatoServicioOOW:
         # "¿Cómo se enteró?" ya no se imprime en el PDF (sigue en pantalla/BD).
         return elementos
 
-    def _imagen_firma(self, campo) -> Optional[RLImage]:
+    def _bloque_columna_firma(
+        self,
+        etiqueta: str,
+        imagen: Optional[RLImage],
+        ancho: float,
+        alto_espacio: float,
+    ) -> Table:
         """
-        Carga la imagen de firma desde disco con tamaño estándar.
+        Una columna de firma: imagen o hueco + línea + etiqueta.
+
+        Args:
+            etiqueta: Texto debajo de la línea (ej. Firma del cliente)
+            imagen: Firma digital, o None para dejar el espacio en blanco
+            ancho: Ancho de la columna
+            alto_espacio: Alto del hueco si no hay imagen (firma a mano)
+
+        Returns:
+            Table de una columna, lista para meter en otra tabla.
+        """
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si no hay PNG, Spacer reserva el mismo alto para que se pueda
+        # firmar a lápiz. La línea y la etiqueta quedan centradas.
+        celda_superior = imagen if imagen is not None else Spacer(1, alto_espacio)
+        col = [
+            [celda_superior],
+            [HRFlowable(
+                width=max(ancho - 8 * mm, 30 * mm),
+                thickness=0.6,
+                color=COLOR_NEGRO,
+                hAlign='CENTER',
+            )],
+            [Paragraph(f'<b>{self._esc(etiqueta)}</b>', self._estilos['FirmaLabel'])],
+        ]
+        tabla = Table(col, colWidths=[ancho])
+        tabla.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        return tabla
+
+    def _imagen_firma(
+        self,
+        campo,
+        ancho: float = 50 * mm,
+        alto: float = 22 * mm,
+    ) -> Optional[RLImage]:
+        """
+        Carga la imagen de firma desde disco.
 
         Args:
             campo: FileField/ImageField de Django con la firma.
+            ancho: Ancho máximo de la imagen.
+            alto: Alto máximo (kind=proportional respeta la proporción).
 
         Returns:
             RLImage centrada, o None si no se puede leer el archivo.
@@ -913,8 +997,8 @@ class PDFFormatoServicioOOW:
             # hAlign CENTER: alinea la imagen dentro de su celda padre
             return RLImage(
                 campo.path,
-                width=50 * mm,
-                height=22 * mm,
+                width=ancho,
+                height=alto,
                 kind='proportional',
                 hAlign='CENTER',
             )
@@ -959,9 +1043,40 @@ class PDFFormatoServicioOOW:
             elementos.append(Paragraph(self._esc(limpio), self._estilos['CuerpoChico']))
             elementos.append(Spacer(1, 1.5 * mm))
 
-        elementos.append(Spacer(1, 3 * mm))
-        elementos.append(Paragraph(
-            'El cliente aceptó este aviso digitalmente al finalizar el Formato OOW en SIGMA.',
-            self._estilos['CeldaValor'],
-        ))
+        # KeepTogether: la frase de aceptación y la firma no se parten
+        # (evita una hoja final solo con la imagen).
+        ancho_firma = 50 * mm
+        alto_firma = 18 * mm
+        firma_img = self._imagen_firma(
+            self.formato.firma_cliente,
+            ancho=ancho_firma,
+            alto=alto_firma,
+        )
+        bloque_firma = self._bloque_columna_firma(
+            'Firma del cliente',
+            imagen=firma_img,
+            ancho=ancho_firma,
+            alto_espacio=alto_firma,
+        )
+        ancho_util = letter[0] - (2 * MARGEN)
+        firma_centrada = Table(
+            [[bloque_firma]],
+            colWidths=[ancho_util],
+        )
+        firma_centrada.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        elementos.append(KeepTogether([
+            Spacer(1, 3 * mm),
+            Paragraph(
+                'El cliente aceptó este aviso digitalmente al finalizar '
+                'el Formato OOW en SIGMA.',
+                self._estilos['CeldaValor'],
+            ),
+            Spacer(1, 3 * mm),
+            firma_centrada,
+        ]))
         return elementos
