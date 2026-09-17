@@ -33,6 +33,8 @@ from .models import (
     EventoSeguimientoCliente,
     # NUEVO - BANNERS PROMOCIONALES (Abril 2026)
     BannerPromocional,
+    # Campañas de publicidad en el PDF OOW (hermano de banners, no es el seguimiento)
+    CampaniaPdfOow,
     # NUEVO - ANÁLISIS DE SENTIMIENTO IA (Abril 2026)
     AnalisisSentimientoEncuesta,
     # Formato Digital OOW
@@ -2189,6 +2191,146 @@ class BannerPromocionalAdmin(admin.ModelAdmin):
                 '<span style="background:#ef4444;color:#fff;padding:2px 10px;'
                 'border-radius:12px;font-size:11px;font-weight:600;">EXPIRADO</span>'
             )
+
+
+# ============================================================================
+# CAMPAÑAS PDF OOW (hoja de promociones del formato de servicio)
+# ============================================================================
+
+@admin.register(CampaniaPdfOow)
+class CampaniaPdfOowAdmin(admin.ModelAdmin):
+    """
+    Admin para flyers que se adjuntan al PDF OOW (no a la página de seguimiento).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Marketing sube la imagen, pone fechas y listo. SIGMA las pega al generar
+    el formato. Pausar = desmarcar "Activo"; no hace falta borrar nada.
+    """
+
+    list_display = (
+        'titulo',
+        'preview_imagen',
+        'vigencia_badge',
+        'fecha_inicio',
+        'fecha_fin',
+        'orden_display',
+        'activo',
+        'tiene_url',
+    )
+    list_filter = ('activo',)
+    search_fields = ('titulo', 'texto_alt', 'leyenda', 'url_destino')
+    ordering = ('orden_display', '-fecha_creacion')
+    list_editable = ('orden_display', 'activo')
+    fieldsets = (
+        ('Contenido de la campaña', {
+            'fields': (
+                'titulo',
+                'imagen',
+                'preview_imagen_admin',
+                'leyenda',
+                'texto_alt',
+                'url_destino',
+            ),
+        }),
+        ('Aparición en el PDF', {
+            'fields': ('orden_display',),
+            'description': (
+                'El número menor se imprime primero en la hoja de promociones '
+                'del Formato OOW. No aparece en el seguimiento del cliente.'
+            ),
+        }),
+        ('Vigencia', {
+            'fields': ('activo', 'fecha_inicio', 'fecha_fin'),
+            'description': (
+                'La campaña entra al PDF solo si está activa y la fecha de '
+                'generación cae entre inicio y fin.'
+            ),
+        }),
+        ('Metadatos (automáticos)', {
+            'fields': ('fecha_creacion', 'fecha_actualizacion'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = (
+        'preview_imagen_admin',
+        'fecha_creacion',
+        'fecha_actualizacion',
+    )
+
+    @admin.display(description='Vista previa')
+    def preview_imagen(self, obj):
+        """Miniatura en la lista del admin."""
+        if obj.pk and obj.imagen and obj.imagen.name:
+            try:
+                return format_html(
+                    '<img src="{}" style="height:48px; width:auto; border-radius:6px; '
+                    'object-fit:cover; box-shadow:0 2px 6px rgba(0,0,0,0.15);">',
+                    obj.imagen.url,
+                )
+            except Exception:
+                return '(error al cargar)'
+        return '—'
+
+    @admin.display(description='Vista previa actual')
+    def preview_imagen_admin(self, obj):
+        """Miniatura grande en el formulario de edición."""
+        if obj.pk and obj.imagen and obj.imagen.name:
+            try:
+                return format_html(
+                    '<div style="margin:8px 0;">'
+                    '<img src="{}" style="max-height:220px; max-width:100%; '
+                    'border-radius:10px; object-fit:contain; '
+                    'box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
+                    '<p style="margin:6px 0 0; font-size:12px; color:#6b7280;">'
+                    'Recomendado: flyer horizontal ~1800×1000 px. '
+                    'No se recorta; si es más grande, se escala.</p>'
+                    '</div>',
+                    obj.imagen.url,
+                )
+            except Exception:
+                return format_html(
+                    '<p style="color:#ef4444; font-style:italic;">'
+                    'No se pudo cargar la vista previa. Archivo: {}</p>',
+                    obj.imagen.name,
+                )
+        if not obj.pk:
+            return format_html(
+                '<p style="color:#6b7280; font-style:italic;">'
+                'Guarda la campaña para ver la vista previa.</p>'
+            )
+        return format_html(
+            '<p style="color:#9ca3af; font-style:italic;">Sin imagen aún.</p>'
+        )
+
+    @admin.display(description='URL', boolean=True)
+    def tiene_url(self, obj):
+        """True si hay enlace (el flyer del PDF digital será clicable)."""
+        return bool((obj.url_destino or '').strip())
+
+    @admin.display(description='Estado')
+    def vigencia_badge(self, obj):
+        """Semáforo: vigente / pausado / programado / expirado."""
+        if obj.esta_vigente:
+            return format_html(
+                '<span style="background:#10b981;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">VIGENTE</span>'
+            )
+        if not obj.activo:
+            return format_html(
+                '<span style="background:#6b7280;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">PAUSADO</span>'
+            )
+        from django.utils import timezone
+        ahora = timezone.now()
+        if obj.fecha_inicio and ahora < obj.fecha_inicio:
+            return format_html(
+                '<span style="background:#f59e0b;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">PROGRAMADO</span>'
+            )
+        return format_html(
+            '<span style="background:#ef4444;color:#fff;padding:2px 10px;'
+            'border-radius:12px;font-size:11px;font-weight:600;">EXPIRADO</span>'
+        )
 
 
 # Configuración del sitio admin

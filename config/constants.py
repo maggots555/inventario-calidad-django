@@ -1331,6 +1331,33 @@ AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS = (
     'tratamiento de sus datos personales conforme a la normativa local aplicable.'
 )
 
+# ============================================================================
+# FORMATO DIGITAL OOW — Hoja de promociones / catálogo (después del aviso)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# El PDF OOW termina con una hoja extra de publicidad. Los dos QR de abajo
+# SIEMPRE salen (son el catálogo fijo de SIC). Las imágenes de campaña
+# (modelo CampaniaPdfOow) se agregan solo si marketing las tiene vigentes.
+
+OOW_PROMO_TITULO_HOJA = 'Promociones / Catálogo de equipos certificados'
+
+# Cada ítem: titulo (visible), leyenda (ayuda a escanear) y url del QR.
+OOW_PROMO_QR_FIJOS = [
+    {
+        'titulo': 'Equipos reacondicionados',
+        'leyenda': 'Escanea para ver equipos certificados listos para compra.',
+        'url': 'https://sicfix.mx/compra-de-equipos-reacondicionados/',
+    },
+    {
+        'titulo': 'Catálogo y más promociones',
+        'leyenda': 'Escanea para ver el catálogo y las promociones vigentes.',
+        'url': (
+            'https://qrfy.io/p/zF-zJlr3WQ'
+            '?utm_source=qrcode&utm_medium=link-list&utm_campaign=22767153'
+        ),
+    },
+]
+
 # Vistas del diagrama de daños estéticos (laptop).
 VISTAS_DANO_ESTETICO_LAPTOP = [
     ('pantalla', 'Pantalla'),

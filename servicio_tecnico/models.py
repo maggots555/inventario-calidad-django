@@ -3652,9 +3652,146 @@ class BannerPromocional(models.Model):
         super().save(*args, **kwargs)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción
-# ─────────────────────────────────────────────────────────────────────────────
+# ============================================================================
+# CAMPAÑAS PDF OOW — Publicidad en la hoja extra del formato de servicio
+# ============================================================================
+
+class CampaniaPdfOow(models.Model):
+    """
+    Flyer de campaña para adjuntar al PDF del Formato OOW (no al seguimiento).
+
+    Objetivo de negocio:
+        Marketing sube una imagen + vigencia. Al generar el PDF OOW, las
+        campañas vigentes se imprimen después del aviso de privacidad,
+        junto con los QR fijos del catálogo de equipos certificados.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+        Es el hermano de BannerPromocional. Ese otro modelo recorta fotos
+        para la página WEB de seguimiento. Este no recorta: el PDF es una
+        hoja carta y necesitamos el flyer completo.
+    """
+
+    titulo = models.CharField(
+        max_length=200,
+        verbose_name='Título interno',
+        help_text='Nombre para identificar la campaña en el admin. No se imprime.',
+    )
+    imagen = models.ImageField(
+        upload_to='campanias_pdf_oow/%Y/%m/',
+        validators=[
+            FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']),
+            FileSizeValidator(10),
+        ],
+        verbose_name='Imagen de la campaña',
+        help_text=(
+            'Flyer en JPG, PNG, GIF o WebP. Máx. 10 MB. Se escala si pasa de '
+            '1800 px de lado, sin recortar. Recomendado: horizontal ~1800×1000.'
+        ),
+    )
+    url_destino = models.URLField(
+        max_length=500,
+        blank=True,
+        verbose_name='URL de destino (opcional)',
+        help_text=(
+            'Si hay enlace, en el PDF digital el cliente puede tocar la '
+            'imagen para abrir la promoción. No se imprime la URL ni un QR extra.'
+        ),
+    )
+    texto_alt = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Texto alternativo',
+        help_text='Descripción corta de la imagen (accesibilidad / pie de foto).',
+    )
+    leyenda = models.CharField(
+        max_length=240,
+        blank=True,
+        verbose_name='Leyenda en el PDF',
+        help_text='Frase visible debajo de la imagen. Si se deja vacía, se usa el texto alternativo.',
+    )
+    fecha_inicio = models.DateTimeField(
+        verbose_name='Fecha y hora de inicio',
+        help_text='La campaña entra al PDF a partir de esta fecha.',
+    )
+    fecha_fin = models.DateTimeField(
+        verbose_name='Fecha y hora de fin',
+        help_text='Después de esta fecha ya no se adjunta al PDF.',
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo',
+        help_text='Desmarcar para pausar sin borrar la campaña.',
+    )
+    orden_display = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Orden de aparición',
+        help_text='Número menor = se imprime primero. Si no caben, siguen en la hoja siguiente.',
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de creación',
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última actualización',
+    )
+
+    class Meta:
+        verbose_name = 'Campaña PDF OOW'
+        verbose_name_plural = 'Campañas PDF OOW'
+        ordering = ['orden_display', '-fecha_creacion']
+
+    def __str__(self):
+        estado = 'vigente' if self.esta_vigente else 'inactiva'
+        return f'{self.titulo} [{estado}]'
+
+    @property
+    def esta_vigente(self):
+        """True si el interruptor está on y hoy cae entre inicio y fin."""
+        ahora = timezone.now()
+        return (
+            self.activo
+            and self.fecha_inicio is not None
+            and self.fecha_fin is not None
+            and self.fecha_inicio <= ahora <= self.fecha_fin
+        )
+
+    def clean(self):
+        """
+        Evita un calendario imposible (fin antes que inicio).
+
+        Efectos secundarios:
+            Ninguno sobre BD; el admin llama esto al validar el formulario.
+        """
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if (
+            self.fecha_inicio
+            and self.fecha_fin
+            and self.fecha_fin <= self.fecha_inicio
+        ):
+            raise ValidationError(
+                'La fecha de fin debe ser posterior a la fecha de inicio.'
+            )
+
+    def save(self, *args, **kwargs):
+        """
+        Fachada: el cerebro de Pillow vive en services/campanias_pdf_oow.py.
+
+        Args:
+            *args / **kwargs: los de Model.save().
+
+        Efectos secundarios:
+            Puede reescribir el archivo de imagen (escalado) y luego INSERT/UPDATE.
+        """
+        from servicio_tecnico.services.campanias_pdf_oow import (
+            optimizar_imagen_si_cambio,
+        )
+
+        optimizar_imagen_si_cambio(self)
+        super().save(*args, **kwargs)
+
 
 class AnalisisSentimientoEncuesta(models.Model):
     """

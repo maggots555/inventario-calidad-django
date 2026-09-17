@@ -8,6 +8,7 @@ responde 200 para una orden de diagnóstico.
 """
 
 from io import BytesIO
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -16,12 +17,14 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import resolve, reverse
+from django.utils import timezone
 from PIL import Image
 
 from inventario.models import Empleado, Sucursal
 from servicio_tecnico import views as st_views
 from servicio_tecnico import views_formato_oow
 from servicio_tecnico.models import (
+    CampaniaPdfOow,
     DetalleEquipo,
     DanoEsteticoVista,
     EnlaceSeguimientoCliente,
@@ -76,6 +79,48 @@ def _adjuntar_vistas_completas(formato) -> None:
             ContentFile(_png_bytes()),
             save=True,
         )
+
+
+def _crear_campania_pdf(
+    *,
+    titulo='Promo test',
+    vigente=True,
+    activo=True,
+    leyenda='Flyer de prueba OOW',
+    url='',
+    orden=0,
+    size=(160, 80),
+):
+    """
+    Crea una CampaniaPdfOow de prueba con PNG dummy.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    vigente=True pone fechas que cubren "ahora". vigente=False las deja
+    en el pasado, como si la campaña ya hubiera caducado.
+    """
+    ahora = timezone.now()
+    if vigente:
+        inicio, fin = ahora - timedelta(days=1), ahora + timedelta(days=7)
+    else:
+        inicio, fin = ahora - timedelta(days=20), ahora - timedelta(days=1)
+    buf = BytesIO()
+    Image.new('RGB', size, (0, 51, 102)).save(buf, format='PNG')
+    campania = CampaniaPdfOow(
+        titulo=titulo,
+        url_destino=url,
+        leyenda=leyenda,
+        fecha_inicio=inicio,
+        fecha_fin=fin,
+        activo=activo,
+        orden_display=orden,
+    )
+    campania.imagen.save(
+        f'{titulo.replace(" ", "_")}.png',
+        ContentFile(buf.getvalue()),
+        save=False,
+    )
+    campania.save()
+    return campania
 
 
 def _adjuntar_identificacion_oow(orden, empleado=None):
@@ -135,6 +180,38 @@ def _flowable_tiene_imagen(flowables) -> bool:
                     elif celda is not None:
                         pila.append(celda)
     return False
+
+
+def _urls_en_imagenes_clicables(flowables) -> list:
+    """
+    URLs registradas en imágenes clicables (QR fijos o flyer con destino).
+
+    Args:
+        flowables: Lista de bloques ReportLab.
+
+    Returns:
+        list: URLs de ``ImagenQRClicable._url_enlace`` (sin imprimirse como texto).
+    """
+    from reportlab.platypus import KeepTogether, Table
+
+    from servicio_tecnico.utils.qr_pdf import ImagenQRClicable
+
+    urls = []
+    pila = list(flowables)
+    while pila:
+        item = pila.pop()
+        if isinstance(item, ImagenQRClicable) and getattr(item, '_url_enlace', ''):
+            urls.append(item._url_enlace)
+        elif isinstance(item, KeepTogether):
+            pila.extend(list(item._content or []))
+        elif isinstance(item, Table):
+            for fila in item._cellvalues:
+                for celda in fila:
+                    if isinstance(celda, list):
+                        pila.extend(celda)
+                    elif celda is not None:
+                        pila.append(celda)
+    return urls
 
 
 def _textos_flowables(flowables) -> list:
@@ -775,6 +852,94 @@ class FormatoOowServiceTest(TestCase):
         )
         self.assertIn('Firma del cliente', textos)
         self.assertTrue(_flowable_tiene_imagen(elementos))
+
+    def test_pdf_promociones_despues_del_aviso_con_qr_fijos(self):
+        """
+        La hoja de promociones empieza en página nueva. Los 2 QR van
+        con título, pero la URL no se imprime (solo se escanea / se toca).
+        """
+        from reportlab.platypus import PageBreak
+
+        from config.constants import OOW_PROMO_QR_FIJOS, OOW_PROMO_TITULO_HOJA
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        elementos = PDFFormatoServicioOOW(formato)._construir_promociones()
+        self.assertTrue(elementos)
+        self.assertIsInstance(elementos[0], PageBreak)
+        textos = _textos_flowables(elementos)
+        unidos = ' | '.join(textos)
+        self.assertIn(OOW_PROMO_TITULO_HOJA, unidos)
+        urls_qr = _urls_en_imagenes_clicables(elementos)
+        for item in OOW_PROMO_QR_FIJOS:
+            self.assertIn(item['titulo'], unidos)
+            self.assertNotIn(item['url'], unidos)
+            self.assertIn(item['url'], urls_qr)
+        self.assertTrue(_flowable_tiene_imagen(elementos))
+
+    def test_pdf_promociones_incluye_campania_vigente(self):
+        """Flyer vigente: leyenda sí, URL impresa no; la imagen sí es clicable."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        url_campania = 'https://sicfix.mx/compra-de-equipos-reacondicionados/'
+        _crear_campania_pdf(
+            titulo='Reacondicionados verano',
+            leyenda='Hasta 12 meses de garantía en equipos certificados',
+            url=url_campania,
+        )
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        elementos = PDFFormatoServicioOOW(formato)._construir_promociones()
+        textos = _textos_flowables(elementos)
+        unidos = ' | '.join(textos)
+        self.assertIn(
+            'Hasta 12 meses de garantía en equipos certificados',
+            textos,
+        )
+        self.assertNotIn(url_campania, unidos)
+        self.assertIn(url_campania, _urls_en_imagenes_clicables(elementos))
+        self.assertTrue(_flowable_tiene_imagen(elementos))
+
+    def test_pdf_promociones_omite_campania_vencida_y_pausada(self):
+        """Caducada o pausada: no sale la leyenda en el PDF."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        _crear_campania_pdf(
+            titulo='Ya caducó',
+            vigente=False,
+            leyenda='NO DEBE SALIR VENCIDA',
+        )
+        _crear_campania_pdf(
+            titulo='Pausada a mano',
+            vigente=True,
+            activo=False,
+            leyenda='NO DEBE SALIR PAUSADA',
+        )
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        textos = _textos_flowables(
+            PDFFormatoServicioOOW(formato)._construir_promociones()
+        )
+        unidos = ' | '.join(textos)
+        self.assertNotIn('NO DEBE SALIR VENCIDA', unidos)
+        self.assertNotIn('NO DEBE SALIR PAUSADA', unidos)
+
+    def test_pdf_promociones_sin_qrcode_sigue_con_titulos(self):
+        """Si falta qrcode, la hoja extra se arma igual (títulos, sin URL impresa)."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        from config.constants import OOW_PROMO_QR_FIJOS
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        with patch(
+            'servicio_tecnico.utils.qr_pdf._importar_qrcode',
+            side_effect=ImportError,
+        ):
+            elementos = PDFFormatoServicioOOW(formato)._construir_promociones()
+        unidos = ' | '.join(_textos_flowables(elementos))
+        for item in OOW_PROMO_QR_FIJOS:
+            self.assertIn(item['titulo'], unidos)
+            self.assertNotIn(item['url'], unidos)
+        # Sin campañas y sin librería QR: no hay Image que pintar.
+        self.assertFalse(_flowable_tiene_imagen(elementos))
 
     def test_pdf_muestra_accesorios_marcados(self):
         """
@@ -1541,3 +1706,39 @@ class FormatoOowUploadPathTest(TestCase):
             formato_oow_firma_upload_path(self.formato, 'firma.png'),
             f'servicio_tecnico/formato_oow/{interno}/firmas/firma.png',
         )
+
+
+class CampaniaPdfOowServiceTest(TestCase):
+    """Reglas del modelo hermano: vigencia e imagen sin recortar."""
+
+    databases = {'default', 'mexico'}
+
+    def test_obtener_campanias_vigentes_filtra(self):
+        """
+        Solo las activas cuyo calendario cubre ahora entran al PDF.
+        """
+        from servicio_tecnico.services.campanias_pdf_oow import (
+            obtener_campanias_vigentes,
+        )
+
+        _crear_campania_pdf(titulo='Viva', orden=1)
+        _crear_campania_pdf(titulo='Muerta', vigente=False, orden=2)
+        _crear_campania_pdf(titulo='Pausa', activo=False, orden=0)
+        titulos = [c.titulo for c in obtener_campanias_vigentes()]
+        self.assertEqual(titulos, ['Viva'])
+
+    def test_optimiza_imagen_grande_mantiene_ratio(self):
+        """
+        Un flyer de 2400×1200 baja a 1800×900 (mismo 2:1), sin recorte.
+        """
+        campania = _crear_campania_pdf(titulo='Grande', size=(2400, 1200))
+        campania.imagen.open()
+        img = Image.open(campania.imagen)
+        self.assertEqual(img.size, (1800, 900))
+
+    def test_imagen_chica_no_se_reescala(self):
+        """Si ya cabe en 1800 px, se deja tal cual."""
+        campania = _crear_campania_pdf(titulo='Chica', size=(160, 80))
+        campania.imagen.open()
+        img = Image.open(campania.imagen)
+        self.assertEqual(img.size, (160, 80))

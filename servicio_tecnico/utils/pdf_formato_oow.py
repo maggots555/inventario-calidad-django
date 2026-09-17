@@ -15,7 +15,8 @@ Estructura (páginas bien separadas, sin encimar):
 2. Página siguiente — Daños estéticos + observaciones técnicas + firma digital
    (si no hay foto de escaneo, muestra aviso PC Audit en observaciones)
 3. Página siguiente — Resultado del escaneo (solo si hay fotos)
-4. Página(s) finales — Aviso de Privacidad + firma digital del cliente
+4. Página(s) — Aviso de Privacidad + firma digital del cliente
+5. Página(s) extra — Promociones / catálogo (QR fijos + campañas vigentes)
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ from reportlab.platypus import (
 from config.constants import (
     AVISO_PRIVACIDAD_OOW_MX,
     AVISO_PRIVACIDAD_OOW_PLACEHOLDER_OTROS,
+    OOW_PROMO_QR_FIJOS,
+    OOW_PROMO_TITULO_HOJA,
     catalogo_vistas_dano_estetico,
 )
 from config.paises_config import get_pais_actual
@@ -165,6 +168,9 @@ class PDFFormatoServicioOOW:
 
             # --- Aviso de privacidad ---
             elementos += self._construir_aviso_privacidad()
+
+            # --- Promociones / catálogo (siempre, después del aviso) ---
+            elementos += self._construir_promociones()
 
             # EXPLICACIÓN PARA PRINCIPIANTES:
             # onFirstPage/onLaterPages dibujan el pie en CADA hoja con canvas
@@ -316,6 +322,23 @@ class PDFFormatoServicioOOW:
             textColor=COLOR_NEGRO,
             alignment=TA_LEFT,
             leading=10,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'PromoTitulo',
+            fontName='Helvetica-Bold',
+            fontSize=11,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            leading=14,
+            spaceAfter=4,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'PromoLeyenda',
+            fontName='Helvetica',
+            fontSize=8,
+            textColor=COLOR_NEGRO,
+            alignment=TA_CENTER,
+            leading=11,
         ))
 
     def _tiene_fotos_escaneo(self) -> bool:
@@ -1092,3 +1115,213 @@ class PDFFormatoServicioOOW:
             firma_centrada,
         ]))
         return elementos
+
+    def _construir_promociones(self) -> List:
+        """
+        Hoja extra: QR fijos del catálogo + flyers vigentes de marketing.
+
+        Objetivo de negocio:
+            El cliente se lleva el papel y puede escanear reacondicionados
+            o el catálogo. Si hay campaña vigente, también ve el flyer.
+
+        Returns:
+            Lista de flowables que empieza con PageBreak.
+        """
+        from servicio_tecnico.services.campanias_pdf_oow import (
+            obtener_campanias_vigentes,
+        )
+
+        elementos: List = [PageBreak()]
+        elementos.append(Paragraph(
+            self._esc(OOW_PROMO_TITULO_HOJA),
+            self._estilos['PromoTitulo'],
+        ))
+        elementos.append(self._crear_header_seccion(
+            'Promociones / Catálogo de equipos certificados',
+        ))
+        elementos.append(Spacer(1, 3 * mm))
+        elementos.append(self._construir_qrs_promo_fijos())
+        elementos.append(Spacer(1, 4 * mm))
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Las campañas se leen AHORA (al generar/regenerar). Si marketing
+        # pausó una, el PDF nuevo ya no la trae; el PDF viejo no se reescribe
+        # solo: hay que pulsar regenerar.
+        for campania in obtener_campanias_vigentes():
+            bloque = self._construir_bloque_campania(campania)
+            if bloque:
+                elementos.append(KeepTogether(bloque))
+                elementos.append(Spacer(1, 4 * mm))
+        return elementos
+
+    def _construir_qrs_promo_fijos(self) -> Table:
+        """
+        Dos tarjetas lado a lado con los QR del catálogo (siempre visibles).
+
+        Returns:
+            Table de 2 columnas con el mismo look navy de la portada.
+        """
+        from servicio_tecnico.utils.qr_pdf import imagen_qr_para_pdf
+
+        ancho_util = letter[0] - (2 * MARGEN)
+        ancho_col = ancho_util / 2
+        celdas = []
+        for item in OOW_PROMO_QR_FIJOS:
+            url = item['url']
+            qr_img = imagen_qr_para_pdf(url, lado_mm=22)
+            celdas.append(self._tarjeta_qr_promo(
+                titulo=item['titulo'],
+                leyenda=item['leyenda'],
+                url=url,
+                qr_img=qr_img,
+                ancho=ancho_col - 2 * mm,
+            ))
+        tabla = Table([celdas], colWidths=[ancho_col, ancho_col])
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 1),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        return tabla
+
+    def _tarjeta_qr_promo(
+        self,
+        titulo: str,
+        leyenda: str,
+        url: str,
+        qr_img,
+        ancho: float,
+    ) -> Table:
+        """
+        Una tarjeta navy: QR a la izquierda, título + leyenda a la derecha.
+
+        Args:
+            titulo: Texto corto visible (ej. Equipos reacondicionados).
+            leyenda: Ayuda para escanear.
+            url: Destino del QR (no se imprime; el código ya es clicable).
+            qr_img: Image de ReportLab o None si no se pudo generar.
+            ancho: Ancho total de esta tarjeta.
+
+        Returns:
+            Table lista para meter en la fila de 2 columnas.
+        """
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # La URL no se escribe en el papel (se veía larga y fea). El cliente
+        # escanea el QR. Si qrcode no está, el título queda como enlace
+        # invisible en el PDF digital, sin mostrar la dirección.
+        if qr_img is None and url:
+            titulo_p = Paragraph(
+                f'<link href="{self._esc(url)}">{self._esc(titulo)}</link>',
+                self._estilos['QrTitulo'],
+            )
+        else:
+            titulo_p = Paragraph(self._esc(titulo), self._estilos['QrTitulo'])
+        leyenda_p = Paragraph(self._esc(leyenda), self._estilos['QrLeyenda'])
+        ancho_qr = 26 * mm
+        ancho_texto = max(ancho - ancho_qr, 20 * mm)
+        bloque_texto = Table(
+            [[titulo_p], [leyenda_p]],
+            colWidths=[ancho_texto],
+        )
+        bloque_texto.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        celda_qr = qr_img if qr_img is not None else ''
+        fila = Table(
+            [[celda_qr, bloque_texto]],
+            colWidths=[ancho_qr, ancho_texto],
+        )
+        fila.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), COLOR_NAVY_SUAVE),
+            ('BOX', (0, 0), (-1, -1), 0.7, COLOR_NAVY),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (0, 0), 2),
+            ('RIGHTPADDING', (0, 0), (0, 0), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return fila
+
+    def _construir_bloque_campania(self, campania) -> List:
+        """
+        Flyer de una campaña vigente (imagen + leyenda).
+
+        Args:
+            campania: CampaniaPdfOow vigente.
+
+        Returns:
+            Lista de flowables, o vacía si no se pudo leer la imagen.
+
+        Efectos secundarios:
+            Ninguno sobre BD. Si hay url_destino, la imagen queda clicable
+            en el PDF digital (sin imprimir QR ni la dirección).
+        """
+        ancho_util = letter[0] - (2 * MARGEN)
+        # 90 mm de alto máximo: deja aire para el título y los QR fijos
+        # en la misma hoja; si no cabe, KeepTogether manda el flyer abajo.
+        imagen = self._imagen_campania_pdf(
+            campania,
+            ancho=ancho_util,
+            alto=90 * mm,
+        )
+        if imagen is None:
+            return []
+
+        piezas: List = [imagen]
+        # Leyenda visible; si está vacía, caemos al texto alt (no al título interno).
+        pie = (campania.leyenda or campania.texto_alt or '').strip()
+        if pie:
+            piezas.append(Spacer(1, 2 * mm))
+            piezas.append(Paragraph(self._esc(pie), self._estilos['PromoLeyenda']))
+        return piezas
+
+    def _imagen_campania_pdf(
+        self,
+        campania,
+        ancho: float,
+        alto: float,
+    ) -> Optional[RLImage]:
+        """
+        Carga el flyer y, si hay URL, lo hace clicable en el PDF digital.
+
+        Args:
+            campania: CampaniaPdfOow con ImageField.
+            ancho / alto: tope en puntos (kind=proportional respeta el ratio).
+
+        Returns:
+            RLImage o None si el archivo no se puede leer.
+        """
+        campo = getattr(campania, 'imagen', None)
+        if not campo:
+            return None
+        try:
+            ruta = campo.path
+        except Exception:
+            return None
+
+        url = (getattr(campania, 'url_destino', None) or '').strip()
+        kwargs = {
+            'width': ancho,
+            'height': alto,
+            'kind': 'proportional',
+            'hAlign': 'CENTER',
+        }
+        try:
+            if url:
+                from servicio_tecnico.utils.qr_pdf import ImagenQRClicable
+                return ImagenQRClicable(ruta, url=url, **kwargs)
+            return RLImage(ruta, **kwargs)
+        except Exception as exc:
+            logger.warning(
+                '[PDF_FORMATO_OOW] No se pudo pegar campaña "%s": %s',
+                getattr(campania, 'titulo', '?'),
+                exc,
+            )
+            return None
