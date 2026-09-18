@@ -13,8 +13,8 @@ Cuando subes una imagen, Django necesita dos cosas:
 2. SERVIR/MOSTRAR la imagen cuando el navegador la solicita (esto lo resuelve este archivo)
 
 El problema:
-- Imágenes antiguas están en C:\...\media\
-- Imágenes nuevas están en D:\Media_Django\...\media\
+- Imágenes antiguas están en C:/.../media/
+- Imágenes nuevas están en D:/Media_Django/.../media/
 - Django solo busca en UNA ubicación por defecto
 
 La solución:
@@ -29,7 +29,6 @@ En producción, configura tu servidor web (nginx/apache) para servir ambas rutas
 
 from pathlib import Path
 
-from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponseNotModified
 from django.utils.http import http_date
 from django.views.static import was_modified_since
@@ -82,8 +81,8 @@ def serve_media_from_multiple_locations(request, path):
     cuando lo encuentra. Es similar a como Django busca archivos estáticos.
     
     Orden de búsqueda:
-    1. Disco alterno (D:\Media_Django\...) - Archivos nuevos
-    2. Disco principal (C:\...\media\) - Archivos antiguos
+    1. Disco alterno (D:/Media_Django/...) - Archivos nuevos
+    2. Disco principal (C:/.../media/) - Archivos antiguos
     
     Args:
         request: La petición HTTP del navegador
@@ -98,8 +97,8 @@ def serve_media_from_multiple_locations(request, path):
         path = 'scorecard/evidencias/2025/11/imagen.jpg'
         
         Busca en:
-        1. D:\Media_Django\...\media\scorecard\evidencias\2025\11\imagen.jpg
-        2. C:\...\media\scorecard\evidencias\2025\11\imagen.jpg
+        1. D:/Media_Django/.../media/scorecard/evidencias/2025/11/imagen.jpg
+        2. C:/.../media/scorecard/evidencias/2025/11/imagen.jpg
     """
     # Importar configuración de storage_utils
     from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
