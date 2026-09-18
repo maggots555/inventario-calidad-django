@@ -114,10 +114,18 @@ def generar_compras_desde_solicitud(
 
         # PASO 1: lock de las líneas pendientes (mismo orden siempre:
         # solicitud primero, luego líneas, para no deadlock).
+        #
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # PostgreSQL NO permite FOR UPDATE si el SELECT trae un LEFT JOIN
+        # (lado nullable). ``pieza_cotizada_origen`` y ``proveedor`` pueden
+        # ir vacíos, así que select_related arma un outer join. En SQLite
+        # el candado se ignora y el test pasa; en producción revienta:
+        # "FOR UPDATE cannot be applied to the nullable side of an outer join".
+        # of=('self',) bloquea SOLO la fila de LineaCotizacion, no las unidas.
         lineas_pendientes = list(
             LineaCotizacion.objects
             .using(db_alias)
-            .select_for_update()
+            .select_for_update(of=('self',))
             .filter(
                 solicitud=solicitud,
                 estado_cliente='aprobada',

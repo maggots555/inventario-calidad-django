@@ -138,3 +138,13 @@ class GenerarComprasAtomicoTest(BaseIntegracionCotizacionMixin, TestCase):
         """
         self.solicitud._state.db = 'mexico'
         self.assertEqual(resolver_db_alias(self.solicitud), 'mexico')
+
+    def test_lock_de_lineas_no_bloquea_el_join_nullable(self) -> None:
+        """
+        PostgreSQL revienta si FOR UPDATE cae en el LEFT JOIN de
+        pieza_cotizada_origen / proveedor. El candado debe ser of=('self',).
+        """
+        import inspect
+
+        fuente = inspect.getsource(generar_compras_desde_solicitud)
+        self.assertIn("select_for_update(of=('self',))", fuente)
