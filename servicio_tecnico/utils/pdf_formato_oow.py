@@ -10,8 +10,8 @@ NO usa el layout “papel” de RHITSO (canvas manual). Usa tablas y párrafos
 como PDFCotizacionCliente.
 
 Estructura (páginas bien separadas, sin encimar):
-1. Página 1 — Header + título + orden + cliente + equipo + accesorios
-   + firmas en blanco (técnico y cliente, se llenan a mano)
+1. Página 1 — Header + título + QR|orden (dos columnas) + cliente
+   + equipo + accesorios + firmas en blanco (técnico y cliente, a mano)
 2. Página siguiente — Daños estéticos + observaciones técnicas + firma digital
    (si no hay foto de escaneo, muestra aviso PC Audit en observaciones)
 3. Página siguiente — Resultado del escaneo (solo si hay fotos)
@@ -134,15 +134,11 @@ class PDFFormatoServicioOOW:
             elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_titulo()
             elementos.append(Spacer(1, 3 * mm))
-            # QR de seguimiento: página 1, visible, sin pelear con el logo.
-            tarjeta_qr = self._construir_tarjeta_seguimiento()
-            if tarjeta_qr:
-                elementos += tarjeta_qr
-                elementos.append(Spacer(1, 3 * mm))
             # EXPLICACIÓN PARA PRINCIPIANTES:
-            # Spacers de 3 mm (antes 5) para que quepan accesorios + firmas
-            # en blanco en la misma hoja, sin dejar un recuadro huérfano.
-            elementos += self._envolver_seccion(self._construir_orden_servicio())
+            # QR a la izquierda y Fecha/Número a la derecha: el folio no
+            # necesita una barra navy a todo el ancho. Si no hay enlace,
+            # la orden vuelve a ir full-width (sin hueco vacío).
+            elementos += self._construir_portada_qr_y_orden()
             elementos.append(Spacer(1, 3 * mm))
             elementos += self._envolver_seccion(self._construir_datos_cliente())
             elementos.append(Spacer(1, 3 * mm))
@@ -363,17 +359,26 @@ class PDFFormatoServicioOOW:
             return []
         return [KeepTogether(partes)]
 
-    def _crear_header_seccion(self, titulo: str) -> Table:
+    def _crear_header_seccion(
+        self,
+        titulo: str,
+        ancho: Optional[float] = None,
+    ) -> Table:
         """
         Barra navy de sección (igual que cotizaciones).
 
         Args:
             titulo: Texto del encabezado
+            ancho: Ancho de la barra en puntos. Si es None, usa toda la hoja.
+                Obligatorio cuando la barra va DENTRO de una columna más
+                estrecha: ReportLab no recorta, se sale y tapa lo de al lado
+                (mismo cuidado que el PDF de venta mostrador).
 
         Returns:
             Table de una celda con fondo navy
         """
-        ancho = letter[0] - (2 * MARGEN)
+        if ancho is None:
+            ancho = letter[0] - (2 * MARGEN)
         tabla = Table(
             [[Paragraph(titulo, self._estilos['TituloFormato'])]],
             colWidths=[ancho],
@@ -452,13 +457,21 @@ class PDFFormatoServicioOOW:
             'FORMATO DE SERVICIO FUERA DE GARANTÍA CON COSTO'
         )]
 
-    def _construir_tarjeta_seguimiento(self) -> List:
+    def _construir_tarjeta_seguimiento(
+        self,
+        ancho: Optional[float] = None,
+    ) -> List:
         """
         Tarjeta de página 1: QR + texto para consultar el estatus.
 
         Objetivo de negocio:
             El cliente se lleva esta hoja. Escanea (papel) o toca el QR
             (PDF en el celular) y abre el portal de seguimiento.
+
+        Args:
+            ancho: Ancho de la tarjeta en puntos. None = toda la hoja.
+                En la portada de dos columnas se pasa el ancho de la
+                columna izquierda para que el fondo navy no se desborde.
 
         Returns:
             Lista de flowables, o vacía si la orden aún no tiene enlace.
@@ -484,19 +497,27 @@ class PDFFormatoServicioOOW:
             'Escanea este código con tu celular para ver el avance de tu equipo.',
             self._estilos['QrLeyenda'],
         )
-        ancho_util = letter[0] - (2 * MARGEN)
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # ReportLab suma el padding DENTRO de la celda. Si la tabla de
+        # texto mide lo mismo que la columna Y además tiene padding (o
+        # el default de 6 pt), el párrafo se sale del recuadro azul.
+        # Por eso restamos el padding al ancho del bloque de texto.
+        ancho_util = ancho if ancho is not None else (letter[0] - (2 * MARGEN))
         ancho_qr = 26 * mm
         ancho_texto = ancho_util - ancho_qr
+        pad_texto_izq = 3
+        pad_texto_der = 6
         bloque_texto = Table(
             [[titulo], [leyenda]],
-            colWidths=[ancho_texto],
+            colWidths=[ancho_texto - pad_texto_izq - pad_texto_der],
         )
         bloque_texto.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 3),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
         # Columna QR + texto: fondo navy suave, mismo lenguaje visual que el resto.
         celda_qr = qr_img if qr_img is not None else ''
@@ -509,23 +530,39 @@ class PDFFormatoServicioOOW:
             ('BOX', (0, 0), (-1, -1), 0.7, COLOR_NAVY),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            # Padding en TODAS las celdas (si no, la de texto usa 6 pt
+            # de default y el párrafo se sale ~2 mm del borde).
             ('LEFTPADDING', (0, 0), (0, 0), 2),
             ('RIGHTPADDING', (0, 0), (0, 0), 2),
+            ('LEFTPADDING', (1, 0), (1, 0), pad_texto_izq),
+            ('RIGHTPADDING', (1, 0), (1, 0), pad_texto_der),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
         return [KeepTogether([fila])]
 
-    def _construir_orden_servicio(self) -> List:
+    def _construir_orden_servicio(
+        self,
+        ancho: Optional[float] = None,
+        anchos_pares: Optional[List[float]] = None,
+    ) -> List:
         """
-        Sección Orden de servicio (mismo layout que Datos del cliente).
+        Sección Orden de servicio (barra navy + Fecha / Número).
 
         EXPLICACIÓN PARA PRINCIPIANTES:
-        Barra navy + tabla label|valor a todo el ancho, igual que el resto
-        de secciones de la página 1. La fecha sale de finalizado_en (fecha
-        real de cierre), no de "hoy", para que regenerar no la cambie.
+        La fecha sale de finalizado_en (fecha real de cierre), no de
+        "hoy", para que regenerar no la cambie. Cuando va a la derecha
+        del QR hay que pasar `ancho` de ESA columna: si no, la barra
+        navy se dibuja a todo el ancho de la hoja y tapa el QR.
+
+        Args:
+            ancho: Ancho de la barra navy. None = hoja completa.
+            anchos_pares: [label, valor] en puntos. None = 45 mm + resto.
         """
-        elementos = [self._crear_header_seccion('Orden de servicio'), Spacer(1, 2 * mm)]
+        elementos = [
+            self._crear_header_seccion('Orden de servicio', ancho=ancho),
+            Spacer(1, 2 * mm),
+        ]
         momento = self.formato.finalizado_en or timezone.now()
         # localtime: muestra la fecha en zona horaria del servidor/Django
         fecha_txt = timezone.localtime(momento).strftime('%Y-%m-%d')
@@ -538,8 +575,80 @@ class PDFFormatoServicioOOW:
             ('Fecha', fecha_txt),
             ('Número de orden', folio),
         ]
-        elementos.append(self._tabla_pares(pares))
+        elementos.append(self._tabla_pares(pares, col_widths=anchos_pares))
         return elementos
+
+    def _construir_portada_qr_y_orden(self) -> List:
+        """
+        Fila de portada: QR de seguimiento a la izquierda, orden a la derecha.
+
+        Objetivo de negocio:
+            El cliente ve el QR y el folio en el mismo renglón, en dos
+            columnas del mismo ancho. Fecha y número no llevan barra
+            navy a toda la hoja.
+
+        Returns:
+            Lista de flowables (KeepTogether). Sin enlace de seguimiento,
+            la orden vuelve a ir a todo el ancho para no dejar un hueco.
+        """
+        ancho_util = letter[0] - (2 * MARGEN)
+        hueco = 2 * mm
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Mitad y mitad (menos el hueco de 2 mm). Así QR y «Orden de
+        # servicio» miden lo mismo: ni la tarjeta azul se come la hoja,
+        # ni el folio se ve más ancho que el código.
+        ancho_izq = (ancho_util - hueco) / 2
+        ancho_der = ancho_util - hueco - ancho_izq
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si no hay URL de seguimiento, no hay QR. En ese caso no armamos
+        # dos columnas: la sección Orden de servicio llena la hoja, igual
+        # que antes de este layout.
+        tarjeta_qr = self._construir_tarjeta_seguimiento(ancho=ancho_izq)
+        if not tarjeta_qr:
+            return self._envolver_seccion(self._construir_orden_servicio())
+
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # KeepTogether DENTRO de una celda de Table hace que ReportLab
+        # calcule una altura absurda (~16 millones de puntos) y el PDF
+        # truena. Por eso sacamos la tabla interna del QR y metemos la
+        # orden en una tabla de 1 columna (no una lista suelta).
+        celda_qr = tarjeta_qr[0]
+        if isinstance(celda_qr, KeepTogether):
+            contenido_qr = list(celda_qr._content or [])
+            celda_qr = contenido_qr[0] if contenido_qr else ''
+
+        # Labels más estrechos (~28 mm) para que el folio largo haga wrap
+        # dentro de la columna, no se salga encima del QR.
+        seccion_orden = self._construir_orden_servicio(
+            ancho=ancho_der,
+            anchos_pares=[28 * mm, ancho_der - 28 * mm],
+        )
+        celda_orden = Table(
+            [[parte] for parte in seccion_orden],
+            colWidths=[ancho_der],
+        )
+        celda_orden.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        fila = Table(
+            [[celda_qr, '', celda_orden]],
+            colWidths=[ancho_izq, hueco, ancho_der],
+        )
+        fila.setStyle(TableStyle([
+            # MIDDLE: si la orden es más alta, el QR queda centrado en vertical
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        return [KeepTogether([fila])]
 
     def _fila_dato(self, label: str, valor: str) -> list:
         return [
@@ -547,7 +656,12 @@ class PDFFormatoServicioOOW:
             Paragraph(self._esc(valor or '—'), self._estilos['CeldaValor']),
         ]
 
-    def _tabla_pares(self, pares: List[tuple], valores_flowables: bool = False) -> Table:
+    def _tabla_pares(
+        self,
+        pares: List[tuple],
+        valores_flowables: bool = False,
+        col_widths: Optional[List[float]] = None,
+    ) -> Table:
         """
         Tabla 2 columnas label|valor con jerarquía visual.
 
@@ -555,6 +669,9 @@ class PDFFormatoServicioOOW:
             pares: lista de (label, valor). Si valores_flowables=False, valor es str.
             valores_flowables: si True, el segundo elemento ya es un flowable
                 (p. ej. Paragraph SI/NO estilizado).
+            col_widths: [label, valor] en puntos. None = 45 mm + resto.
+                En la columna derecha de la portada se pasan anchos
+                explícitos para que el folio no desborde.
 
         Returns:
             Table ReportLab lista para insertar en el documento.
@@ -570,7 +687,12 @@ class PDFFormatoServicioOOW:
         else:
             data = [self._fila_dato(l, v) for l, v in pares]
 
-        tabla = Table(data, colWidths=[45 * mm, None])
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # `None` en colWidths de ReportLab significa "el espacio que sobre".
+        # Fuera de una celda estrecha está bien; dentro, mejor pasar mm fijos.
+        if col_widths is None:
+            col_widths = [45 * mm, None]
+        tabla = Table(data, colWidths=col_widths)
         estilos = [
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('GRID', (0, 0), (-1, -1), 0.4, COLOR_GRIS_BORDE),

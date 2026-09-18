@@ -1170,6 +1170,73 @@ class FormatoOowServiceTest(TestCase):
             self.assertTrue(tarjeta)
             self.assertFalse(_flowable_tiene_imagen(tarjeta))
 
+    def test_portada_qr_y_orden_dos_columnas(self):
+        """
+        Con enlace de seguimiento, QR y Orden de servicio van en la misma fila.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        La tabla exterior tiene 3 columnas: QR | hueco | fecha/folio.
+        Así comprobamos que no quedaron apilados uno debajo del otro.
+        """
+        from reportlab.platypus import KeepTogether, Table
+
+        from servicio_tecnico.services.enlace_seguimiento import (
+            obtener_o_crear_enlace_seguimiento,
+        )
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        obtener_o_crear_enlace_seguimiento(self.orden)
+        # Recargamos para que el OneToOne enlace_seguimiento no quede
+        # cacheado como "no existe" (se creó después de cargar la orden).
+        formato = FormatoServicioOOW.objects.select_related(
+            'orden__detalle_equipo',
+            'orden__enlace_seguimiento',
+        ).get(pk=formato.pk)
+
+        bloque = PDFFormatoServicioOOW(formato)._construir_portada_qr_y_orden()
+        self.assertTrue(_flowable_tiene_imagen(bloque))
+        unidos = ' | '.join(_textos_flowables(bloque))
+        self.assertIn('Consulta el estatus de tu servicio', unidos)
+        self.assertIn('Orden de servicio', unidos)
+        self.assertIn('Fecha', unidos)
+        self.assertIn('Número de orden', unidos)
+        self.assertIn('OOW-99999', unidos)
+
+        self.assertEqual(len(bloque), 1)
+        self.assertIsInstance(bloque[0], KeepTogether)
+        fila = bloque[0]._content[0]
+        self.assertIsInstance(fila, Table)
+        # QR | hueco | orden — mismas columnas (mitad y mitad)
+        self.assertEqual(len(fila._colWidths), 3)
+        self.assertAlmostEqual(fila._colWidths[0], fila._colWidths[2], delta=1.0)
+
+        # El bloque de texto debe ser más angosto que su celda: si mide
+        # lo mismo + padding, el párrafo se sale del recuadro azul.
+        tarjeta = fila._cellvalues[0][0]
+        self.assertIsInstance(tarjeta, Table)
+        self.assertEqual(len(tarjeta._colWidths), 2)
+        bloque_txt = tarjeta._cellvalues[0][1]
+        self.assertIsInstance(bloque_txt, Table)
+        self.assertLess(bloque_txt._colWidths[0], tarjeta._colWidths[1])
+
+    def test_portada_orden_full_width_sin_enlace(self):
+        """Sin URL de seguimiento, Orden de servicio sigue saliendo a todo el ancho."""
+        from servicio_tecnico.utils.pdf_formato_oow import PDFFormatoServicioOOW
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        with patch(
+            'servicio_tecnico.services.enlace_seguimiento.url_seguimiento_de_orden',
+            return_value=None,
+        ):
+            bloque = PDFFormatoServicioOOW(formato)._construir_portada_qr_y_orden()
+
+        unidos = ' | '.join(_textos_flowables(bloque))
+        self.assertIn('Orden de servicio', unidos)
+        self.assertIn('OOW-99999', unidos)
+        self.assertNotIn('Consulta el estatus de tu servicio', unidos)
+        self.assertFalse(_flowable_tiene_imagen(bloque))
+
     def test_regenerar_pdf_ya_finalizado(self):
         """
         Tras finalizar, se pueden actualizar datos y regenerar el PDF
