@@ -320,10 +320,29 @@ def lista_componentes(request):
 
 
 # APIs para JavaScript
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Estas URLs las llama el formulario de incidencias (fetch). Antes solo
+# pedían login: un técnico autenticado podía leer email/área de cualquier
+# empleado o el historial de un número de serie. Ahora exigen el mismo
+# permiso que las pantallas HTML de Scorecard.
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_empleado_data(request, empleado_id):
     """
-    API para obtener datos de un empleado (para autocompletar)
+    API JSON: datos de un empleado para el formulario de incidencias.
+
+    Objetivo de negocio:
+        Autocompletar área/cargo/sucursal al elegir técnico en Scorecard.
+
+    Args:
+        request: GET autenticado.
+        empleado_id (int): PK de inventario.Empleado.
+
+    Returns:
+        JsonResponse con email, área, cargo y sucursal.
+
+    Efectos secundarios:
+        Ninguno (solo lectura). Requiere scorecard.view_incidencia.
     """
     try:
         empleado = Empleado.objects.get(id=empleado_id)
@@ -346,9 +365,22 @@ def api_empleado_data(request, empleado_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_buscar_reincidencias(request):
     """
-    API para buscar incidencias previas por número de serie
+    API JSON: incidencias previas del mismo número de serie.
+
+    Objetivo de negocio:
+        Avisar al inspector si el equipo ya tuvo fallas (reincidencia).
+
+    Args:
+        request: GET con ``?numero_serie=``.
+
+    Returns:
+        JsonResponse con hasta 5 incidencias (folio, técnico, severidad).
+
+    Efectos secundarios:
+        Ninguno (solo lectura). Requiere scorecard.view_incidencia.
     """
     numero_serie = request.GET.get('numero_serie', '').strip().upper()
     

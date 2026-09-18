@@ -4067,104 +4067,23 @@ class SolicitudCotizacion(models.Model):
     def generar_compras(self, usuario=None):
         """
         Genera CompraProducto para cada línea aprobada.
-        
-        Este método:
-        1. Itera sobre las líneas aprobadas sin compra
-        2. Crea un CompraProducto para cada una
-        3. Vincula la compra con la línea
-        4. Actualiza el estado de la solicitud a 'completada' cuando termina
-        5. En órdenes OOW de reparación: crea SeguimientoPieza en ST y pasa
-           la orden a «Esperando Llegada de Piezas»
-        
+
+        Fachada: el cerebro (transacción + candado de fila) vive en
+        ``almacen.utils.generar_compras``. El HTML y las vistas siguen
+        llamando ``solicitud.generar_compras()``.
+
         Args:
             usuario: Usuario que genera las compras (para registrado_por)
-        
+
         Returns:
             list: Lista de CompraProducto creados
-        
+
         Nota:
             El resultado del sync ST queda en ``self._resultado_sync_seguimiento_st``
             (dict) para que la vista pueda mostrar un mensaje al usuario.
         """
-        if not self.puede_generar_compras():
-            self._resultado_sync_seguimiento_st = {
-                'seguimientos_creados': 0,
-                'estado_actualizado': False,
-                'motivo_omitido': 'no_puede_generar',
-            }
-            return []
-        
-        compras_creadas = []
-        lineas_procesadas = []
-        lineas_pendientes = self.lineas.filter(
-            estado_cliente='aprobada',
-            compra_generada__isnull=True
-        ).select_related(
-            'producto',
-            'proveedor',
-            'pieza_cotizada_origen',
-            'pieza_cotizada_origen__componente',
-        )
-        
-        for linea in lineas_pendientes:
-            compra = CompraProducto.objects.create(
-                tipo='cotizacion',  # Es cotización porque viene del sistema de cotizaciones
-                estado='pendiente_llegada',
-                producto=linea.producto,
-                proveedor=linea.proveedor,
-                cantidad=linea.cantidad,
-                costo_unitario=linea.costo_unitario,
-                costo_total=linea.cantidad * linea.costo_unitario,
-                fecha_pedido=timezone.now().date(),
-                orden_servicio=self.orden_servicio,
-                orden_cliente=self.numero_orden_cliente,
-                observaciones=f"Generada desde solicitud {self.numero_solicitud}",
-                registrado_por=usuario,
-            )
-            
-            # CREAR UnidadCompra para que al recibir se generen las UnidadInventario
-            # Esto permite tracking individual de cada pieza
-            # marca: Nombre del producto genérico (ej: "Memoria RAM DDR4")
-            # modelo: Descripción específica de la pieza (ej: "RAM DDR4 16GB 3200MHz Kingston Fury")
-            UnidadCompra.objects.create(
-                compra=compra,
-                numero_linea=1,
-                marca=linea.producto.nombre,  # Nombre del producto genérico
-                modelo=linea.descripcion_pieza,  # Descripción específica de la pieza
-                cantidad=linea.cantidad,
-                costo_unitario=linea.costo_unitario,
-                estado='pendiente'
-            )
-            
-            # Vincular la compra con la línea
-            linea.compra_generada = compra
-            linea.estado_cliente = 'compra_generada'
-            linea.save()
-            
-            compras_creadas.append(compra)
-            lineas_procesadas.append(linea)
-        
-        # Actualizar estado de la solicitud
-        if not self.lineas.filter(estado_cliente='aprobada', compra_generada__isnull=True).exists():
-            self.estado = 'completada'
-            self.fecha_completada = timezone.now()
-            self.save()
-        else:
-            self.estado = 'en_proceso'
-            self.save()
-
-        # Sync ST: SeguimientoPieza + estado esperando_piezas (solo reparación OOW)
-        from almacen.utils.sincronizar_seguimiento_piezas import (
-            sincronizar_seguimiento_piezas_al_generar_compras,
-        )
-        self._resultado_sync_seguimiento_st = (
-            sincronizar_seguimiento_piezas_al_generar_compras(
-                self,
-                lineas=lineas_procesadas,
-            )
-        )
-        
-        return compras_creadas
+        from almacen.utils.generar_compras import generar_compras_desde_solicitud
+        return generar_compras_desde_solicitud(self, usuario=usuario)
     
     def puede_generar_venta_mostrador(self):
         """

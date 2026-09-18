@@ -11,8 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config
+from decouple import UndefinedValueError, config
 from celery.schedules import crontab
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,11 +26,69 @@ LOGS_DIR.mkdir(exist_ok=True)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-c^$$m7)o4(**%esnl3ao&z^n&pn3*r=^qxu-!cmczpe#wdi372')
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Si un worker o Gunicorn arranca SIN .env, Django antes usaba una
+# SECRET_KEY de tutorial (pública en git) y DEBUG=True. Eso firma
+# sesiones con un secreto conocido. Ahora el proceso NO ARRANCA:
+# hay que copiar .env.example a .env y llenar SECRET_KEY y DEBUG.
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+
+def exigir_variable_entorno(nombre, *, cast=None, fuente=None):
+    """
+    Lee una variable de .env y falla cerrado si no existe.
+
+    Args:
+        nombre (str): Nombre de la variable (ej. ``SECRET_KEY``).
+        cast: Conversor de decouple (ej. ``bool``). None = texto crudo.
+        fuente: Callable estilo ``config()``; inyectable en tests.
+
+    Returns:
+        El valor ya convertido.
+
+    Efectos secundarios:
+        Ninguno. Si falta la variable, lanza ImproperlyConfigured
+        (Django ni siquiera termina de cargar settings).
+    """
+    leer = fuente if fuente is not None else config
+    kwargs = {}
+    if cast is not None:
+        kwargs['cast'] = cast
+    try:
+        return leer(nombre, **kwargs)
+    except UndefinedValueError as exc:
+        raise ImproperlyConfigured(
+            f'{nombre} debe estar definido en el archivo .env. '
+            'Copia .env.example a .env y llena los valores. '
+            'SIGMA no arranca con defaults de tutorial.'
+        ) from exc
+
+
+def validar_secret_key_produccion(secret_key, debug):
+    """
+    En producción (DEBUG=False) rechaza la clave insegura de tutorial.
+
+    Args:
+        secret_key (str): Valor de SECRET_KEY ya leído.
+        debug (bool): Valor de DEBUG ya leído.
+
+    Returns:
+        str: La misma clave si es aceptable.
+
+    Efectos secundarios:
+        Lanza ImproperlyConfigured si DEBUG=False y la clave empieza
+        con ``django-insecure-``.
+    """
+    if not debug and str(secret_key).startswith('django-insecure-'):
+        raise ImproperlyConfigured(
+            'SECRET_KEY de producción no puede ser la clave insegura de '
+            'tutorial. Genera una nueva (djecrety.ir) y ponla en .env.'
+        )
+    return secret_key
+
+
+SECRET_KEY = exigir_variable_entorno('SECRET_KEY')
+DEBUG = exigir_variable_entorno('DEBUG', cast=bool)
+SECRET_KEY = validar_secret_key_produccion(SECRET_KEY, DEBUG)
 
 # Autofacturador VO → SIGMA (Facturación en demanda SICSER 4).
 # EXPLICACIÓN PARA PRINCIPIANTES: el portal en http://201.149.21.30/facturador

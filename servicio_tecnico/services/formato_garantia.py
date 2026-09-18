@@ -557,8 +557,10 @@ def finalizar_formato(
         f"FormatoGarantia_{formato.orden.numero_orden_interno}.pdf"
     )
     pdf_bytes = resultado['buffer'].getvalue()
+    # AGENTS §11: atomic() sin using= abre default, no mexico/argentina.
+    db_alias = db_alias_de(formato)
 
-    with transaction.atomic():
+    with transaction.atomic(using=db_alias):
         formato.pdf.save(nombre_archivo, ContentFile(pdf_bytes), save=False)
         formato.estado = 'finalizado'
         formato.finalizado_en = timezone.now()

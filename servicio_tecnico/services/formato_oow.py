@@ -665,7 +665,7 @@ def finalizar_formato(
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # Fijamos la fecha en memoria ANTES de generar el PDF, para que el
     # documento imprima la fecha real de finalización (no "hoy" al regenerar).
-    # El save a BD sigue abajo, dentro de transaction.atomic().
+    # El save a BD sigue abajo, dentro de transaction.atomic(using=alias).
     ahora = timezone.now()
     if not formato.finalizado_en:
         formato.finalizado_en = ahora
@@ -692,8 +692,10 @@ def finalizar_formato(
         f"FormatoOOW_{formato.orden.numero_orden_interno}.pdf"
     )
     pdf_bytes = resultado['buffer'].getvalue()
+    # AGENTS §11: atomic() sin using= abre default, no mexico/argentina.
+    db_alias = db_alias_de(formato)
 
-    with transaction.atomic():
+    with transaction.atomic(using=db_alias):
         formato.pdf.save(nombre_archivo, ContentFile(pdf_bytes), save=False)
         formato.estado = 'finalizado'
         # Conservamos finalizado_en ya fijado arriba (primera finalización)

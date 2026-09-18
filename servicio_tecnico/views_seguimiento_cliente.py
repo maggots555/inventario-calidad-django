@@ -36,8 +36,11 @@ logger = logging.getLogger(__name__)
 # de seguimiento y ve la información de su equipo, timeline de estados y
 # datos de contacto de su responsable de seguimiento.
 # ============================================================================
+# block=True: sin esto django-ratelimit 4.x solo MARCA request.limited y
+# la vista sigue ejecutándose. Con block=True lanza Ratelimited (403).
+# Mismo patrón que facturación en demanda.
 
-@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'], block=True)
 def seguimiento_orden_cliente(request, token):
     """
     Vista pública de seguimiento de orden para el cliente.
@@ -321,7 +324,7 @@ def seguimiento_orden_cliente(request, token):
 
 
 
-@ratelimit(key='ip', rate='30/m', method=['GET'])
+@ratelimit(key='ip', rate='30/m', method=['GET'], block=True)
 def diagnostico_pdf_seguimiento(request, token):
     """
     Sirve el PDF de diagnóstico del cliente de forma pública (protegida por token).
@@ -394,7 +397,7 @@ def diagnostico_pdf_seguimiento(request, token):
 # ícono que instale en su celular abre directo el estado de SU equipo.
 # ============================================================================
 
-@ratelimit(key='ip', rate='30/m', method=['GET'])
+@ratelimit(key='ip', rate='30/m', method=['GET'], block=True)
 def manifest_seguimiento(request, token):
     """
     Genera el manifest.json de la PWA para la página pública de seguimiento.
@@ -458,7 +461,7 @@ def manifest_seguimiento(request, token):
 # ============================================================================
 
 @csrf_exempt
-@ratelimit(key='ip', rate='10/m', method=['GET'])
+@ratelimit(key='ip', rate='10/m', method=['GET'], block=True)
 def vapid_key_seguimiento(request, token):
     """
     Entrega la llave pública VAPID al navegador del cliente.
@@ -484,7 +487,7 @@ def vapid_key_seguimiento(request, token):
 
 
 @csrf_exempt
-@ratelimit(key='ip', rate='10/m', method=['POST'])
+@ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def suscribir_push_seguimiento(request, token):
     """
     Guarda o reactiva la suscripción push de un cliente para su orden.
@@ -559,7 +562,7 @@ def suscribir_push_seguimiento(request, token):
 
 
 @csrf_exempt
-@ratelimit(key='ip', rate='10/m', method=['POST'])
+@ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def cancelar_push_seguimiento(request, token):
     """
     Desactiva la suscripción push del cliente para su enlace de seguimiento.
@@ -610,7 +613,7 @@ def cancelar_push_seguimiento(request, token):
 
 
 @csrf_exempt
-@ratelimit(key='ip', rate='30/m', method=['POST'])
+@ratelimit(key='ip', rate='30/m', method=['POST'], block=True)
 def registrar_evento_seguimiento_cliente(request, token):
     """
     Endpoint público para que el navegador registre eventos de producto del cliente.
@@ -674,7 +677,7 @@ def registrar_evento_seguimiento_cliente(request, token):
 # ve la información de su equipo y piezas, y puede escribir su comentario.
 # ============================================================================
 
-@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'], block=True)
 def feedback_rechazo_view(request, token):
     """
     Vista pública para que el cliente deje su comentario de rechazo.
@@ -886,7 +889,7 @@ def _estrellas_preseleccionadas_desde_query(request):
     return None
 
 
-@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'], block=True)
 def feedback_satisfaccion_cliente(request, token):
     """
     Vista pública para la encuesta de satisfacción post-entrega.
@@ -1077,7 +1080,7 @@ def feedback_satisfaccion_cliente(request, token):
 # ============================================================================
 
 @csrf_exempt
-@ratelimit(key='ip', rate='10/m', method=['POST'])
+@ratelimit(key='ip', rate='10/m', method=['POST'], block=True)
 def chat_seguimiento_cliente(request, token):
     """
     API AJAX del chatbot de IA en la vista pública de seguimiento del cliente.

@@ -8,6 +8,7 @@ accesorios Dell + número de cargador, finalizar+PDF con falla_principal.
 """
 
 from io import BytesIO
+import inspect
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -146,6 +147,17 @@ class FormatoGarantiaReexportsTest(SimpleTestCase):
         self.assertNotIn('top_cover', escritorio)
         aio = [c for c, _ in catalogo_vistas_dano_estetico('aio')]
         self.assertIn('aio_base', aio)
+
+    def test_finalizar_abre_transaccion_en_alias_del_formato(self):
+        """
+        AGENTS §11: atomic() sin using= no cubre mexico/argentina.
+        """
+        from servicio_tecnico.services.formato_garantia import finalizar_formato
+
+        fuente = inspect.getsource(finalizar_formato)
+        self.assertIn('db_alias = db_alias_de(formato)', fuente)
+        self.assertIn('transaction.atomic(using=db_alias)', fuente)
+        self.assertNotIn('with transaction.atomic():', fuente)
 
 
 class FormatoGarantiaServiceTest(TestCase):

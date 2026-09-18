@@ -7,6 +7,7 @@ Cubren: reexports/URLs, crear borrador, finalizar+PDF, y que el wizard
 responde 200 para una orden de diagnóstico.
 """
 
+import inspect
 from io import BytesIO
 from datetime import timedelta
 from unittest.mock import patch
@@ -283,6 +284,21 @@ class FormatoOowReexportsTest(SimpleTestCase):
             match_elim.func,
             views_formato_oow.formato_oow_eliminar_evidencia,
         )
+
+    def test_finalizar_abre_transaccion_en_alias_del_formato(self):
+        """
+        AGENTS §11: atomic() sin using= no cubre mexico/argentina.
+
+        EXPLICACIÓN: el borrador ya usa db_alias_de(); finalizar PDF+estado
+        tiene que usar el mismo alias. Si alguien vuelve a poner atomic()
+        a secas, este test falla antes de producción.
+        """
+        from servicio_tecnico.services.formato_oow import finalizar_formato
+
+        fuente = inspect.getsource(finalizar_formato)
+        self.assertIn('db_alias = db_alias_de(formato)', fuente)
+        self.assertIn('transaction.atomic(using=db_alias)', fuente)
+        self.assertNotIn('with transaction.atomic():', fuente)
 
 
 class FormatoOowServiceTest(TestCase):

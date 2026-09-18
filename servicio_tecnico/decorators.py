@@ -7,7 +7,8 @@ poder modularizar vistas sin romper permisos ni el cache de dashboards.
 
 Efectos secundarios:
 - permission_required_with_message redirige a la página de acceso denegado.
-- cache_page_dashboard guarda HTML de dashboards en Redis (TTL de settings).
+- cache_page_dashboard guarda HTML de dashboards en Redis (TTL de settings)
+  y lo separa por cookie de sesión (Vary: Cookie) para no mezclar nombres.
 """
 
 from functools import wraps
@@ -16,6 +17,7 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_cookie
 
 
 # ===== CACHE DE DASHBOARDS (Redis) =====
@@ -28,11 +30,29 @@ from django.views.decorators.cache import cache_page
 #   /dashboard/?fecha_inicio=2025-01-01  → cache separado
 #   /dashboard/?fecha_inicio=2025-06-01  → otro cache separado
 #
-# IMPORTANTE: cache_page debe ir DESPUÉS de @login_required para que
-# cada usuario autenticado tenga su propio cache (no mezclar datos).
+# IMPORTANTE: cache_page NO es por usuario. Solo mira la URL. El dashboard
+# extiende base.html, que pinta el nombre de quien está logueado. Sin
+# Vary: Cookie, el staff B vería el nombre (y el HTML) del staff A durante
+# 10 minutos. vary_on_cookie mete la cookie de sesión en la clave de cache.
 #
+# login_required sigue yendo ANTES: así no cacheamos el redirect a login.
 # CACHE_TTL_DASHBOARD viene de settings.py (10 minutos por defecto).
-cache_page_dashboard = cache_page(getattr(settings, 'CACHE_TTL_DASHBOARD', 600))
+def cache_page_dashboard(view_func):
+    """
+    Cachea el HTML del dashboard y lo separa por cookie de sesión.
+
+    Args:
+        view_func: Vista GET del dashboard (ya protegida con login/permiso).
+
+    Returns:
+        Vista envuelta: primero Vary: Cookie, luego cache_page(TTL).
+
+    Efectos secundarios:
+        Escribe/lee Redis (o el backend de CACHES) con TTL de settings.
+    """
+    ttl = getattr(settings, 'CACHE_TTL_DASHBOARD', 600)
+    # vary_on_cookie va adentro: cache_page usa el header Vary para la clave.
+    return cache_page(ttl)(vary_on_cookie(view_func))
 
 
 def permission_required_with_message(perm, message=None):
