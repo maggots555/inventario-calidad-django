@@ -30,11 +30,11 @@ from servicio_tecnico.models import (
     OrdenServicio,
 )
 from servicio_tecnico.services.diagnostico_catalogo import (
-    PERFILES_SIN_CARGO,
     PERFILES_VALIDOS,
     TarifarioNoDisponible,
     aplicar_perfil_diagnostico,
     opciones_diagnostico,
+    perfil_es_cobrable,
     tarifa_perfil,
     tarifa_perfil_estricta,
 )
@@ -72,11 +72,6 @@ class ParidadDeClavesTest(SimpleTestCase):
             with self.subTest(perfil=perfil):
                 self.assertIn(perfil, PERFIL_DIAGNOSTICO_GAMA)
 
-    def test_perfiles_sin_cargo_existen_en_el_catalogo(self):
-        """La lista de exentos no puede referirse a perfiles inventados."""
-        for perfil in PERFILES_SIN_CARGO:
-            with self.subTest(perfil=perfil):
-                self.assertIn(perfil, PERFILES_VALIDOS)
 
 
 class BaseCatalogoTest(TestCase):
@@ -139,12 +134,12 @@ class TarifarioCaidoTest(BaseCatalogoTest):
         self.assertEqual(self.orden.costo_mano_obra, Decimal('0.00'))
         self.assertEqual(self.orden.perfil_diagnostico, '')
 
-    def test_perfil_con_tarifa_cero_es_error_si_deberia_cobrar(self):
+    def test_perfil_con_tarifa_cero_no_se_puede_cobrar(self):
         """
-        Estándar en $0 significa panel mal configurado, no diagnóstico gratis.
+        Un diagnóstico en $0 no es cobrable, venga de donde venga ese cero.
 
-        Cobrar $0 por un diagnóstico que sí se hizo es una pérdida silenciosa,
-        así que preferimos bloquear la captura y que alguien revise el panel.
+        Da igual si el perfil no se cobra en este negocio o si Gerencia aún no
+        lo configuró: guardar el cero registraría un cobro que no existe.
         """
         with patch(
             'almacen.utils.parametros_cotizador.obtener_profit_config',
@@ -153,17 +148,18 @@ class TarifarioCaidoTest(BaseCatalogoTest):
             with self.assertRaises(TarifarioNoDisponible):
                 tarifa_perfil_estricta('estandar')
 
-    def test_perfil_sin_cargo_si_acepta_cero(self):
+    def test_mostrador_sin_precio_no_se_guarda(self):
         """
-        Mostrador vale $0 de verdad: ese cero sí es un precio válido.
+        Mostrador está en $0 en el tarifario, así que tampoco se puede cobrar.
 
-        Es la contraparte del test anterior: distinguir los dos ceros era
-        justamente el punto.
+        Antes este perfil era una excepción permitida; ahora la regla es
+        uniforme y la orden queda intacta.
         """
-        resultado = aplicar_perfil_diagnostico(self.orden, 'mostrador')
+        with self.assertRaises(TarifarioNoDisponible):
+            aplicar_perfil_diagnostico(self.orden, 'mostrador')
+
         self.orden.refresh_from_db()
-        self.assertEqual(resultado.monto_nuevo, Decimal('0.00'))
-        self.assertEqual(self.orden.perfil_diagnostico, 'mostrador')
+        self.assertEqual(self.orden.perfil_diagnostico, '')
         self.assertEqual(self.orden.costo_mano_obra, Decimal('0.00'))
 
     def test_lectura_tolerante_no_rompe_la_pantalla(self):
@@ -171,7 +167,8 @@ class TarifarioCaidoTest(BaseCatalogoTest):
         Para mostrar precios preferimos un $0 a una pantalla caída.
 
         tarifa_perfil() y opciones_diagnostico() se usan al pintar el selector;
-        si el tarifario falla, la página debe seguir abriendo.
+        si el tarifario falla, la página debe seguir abriendo, aunque sea con
+        el selector vacío.
         """
         with patch(
             'almacen.utils.parametros_cotizador.obtener_profit_config',
@@ -180,7 +177,135 @@ class TarifarioCaidoTest(BaseCatalogoTest):
             self.assertEqual(tarifa_perfil('estandar'), Decimal('0.00'))
             opciones = opciones_diagnostico()
 
-        self.assertEqual(len(opciones), len(PERFILES_VALIDOS))
+        self.assertEqual(opciones, [])
+
+
+class SoloPerfilesConPrecioTest(BaseCatalogoTest):
+    """
+    El selector solo ofrece diagnósticos que hoy tienen precio configurado.
+
+    La regla mira el tarifario, no una lista escrita en el código: si Gerencia
+    cambia un precio, el selector se ajusta solo.
+    """
+
+    def test_oculta_los_perfiles_en_cero(self):
+        """Mostrador y Rep. nivel componente están en $0 → no aparecen."""
+        claves = [opcion.clave for opcion in opciones_diagnostico()]
+
+        self.assertNotIn('mostrador', claves)
+        self.assertNotIn('rep_nivel_componente', claves)
+        self.assertEqual(claves, ['estandar', 'express', 'alta_gama', 'server'])
+
+    def test_todas_las_opciones_ofrecidas_tienen_precio(self):
+        """Ninguna opción visible puede venir en $0."""
+        for opcion in opciones_diagnostico():
+            with self.subTest(perfil=opcion.clave):
+                self.assertGreater(opcion.tarifa, Decimal('0.00'))
+                self.assertTrue(opcion.disponible)
+
+    def test_si_gerencia_le_pone_precio_a_mostrador_reaparece(self):
+        """
+        La lista sigue al tarifario, no a una lista fija.
+
+        Es la prueba de que no quedó nada hardcodeado: basta configurar el
+        precio para que el perfil vuelva a ofrecerse, sin tocar código.
+        """
+        with patch(
+            'almacen.utils.parametros_cotizador.obtener_profit_config',
+            return_value={
+                'mostrador': {'diagnostico': 350.0},
+                'estandar': {'diagnostico': 570.0},
+            },
+        ):
+            claves = [opcion.clave for opcion in opciones_diagnostico()]
+
+        self.assertIn('mostrador', claves)
+
+    def test_si_estandar_queda_en_cero_desaparece(self):
+        """Y al revés: un perfil sin precio se cae de la lista."""
+        with patch(
+            'almacen.utils.parametros_cotizador.obtener_profit_config',
+            return_value={
+                'estandar': {'diagnostico': 0},
+                'server': {'diagnostico': 1000.0},
+            },
+        ):
+            claves = [opcion.clave for opcion in opciones_diagnostico()]
+
+        self.assertNotIn('estandar', claves)
+        self.assertEqual(claves, ['server'])
+
+    def test_conserva_el_perfil_ya_guardado_aunque_pierda_precio(self):
+        """
+        Si la orden ya tiene un perfil que hoy vale $0, el selector lo muestra.
+
+        Si no lo hiciera, la pantalla diría algo distinto a lo que la orden
+        realmente tiene guardado, y el técnico podría sobrescribirlo sin
+        enterarse de que lo estaba cambiando.
+        """
+        with patch(
+            'almacen.utils.parametros_cotizador.obtener_profit_config',
+            return_value={
+                'estandar': {'diagnostico': 0},
+                'server': {'diagnostico': 1000.0},
+            },
+        ):
+            opciones = opciones_diagnostico(perfil_actual='estandar')
+
+        por_clave = {opcion.clave: opcion for opcion in opciones}
+        self.assertIn('estandar', por_clave)
+        self.assertFalse(por_clave['estandar'].disponible)
+        self.assertTrue(por_clave['server'].disponible)
+
+    def test_perfil_es_cobrable_refleja_el_tarifario(self):
+        """El helper que decide la visibilidad responde según el precio."""
+        self.assertTrue(perfil_es_cobrable('estandar'))
+        self.assertFalse(perfil_es_cobrable('mostrador'))
+        self.assertFalse(perfil_es_cobrable('no_existe'))
+
+
+class SelectorDelFormularioTest(BaseCatalogoTest):
+    """Lo que el técnico ve en el desplegable."""
+
+    def test_formulario_solo_ofrece_perfiles_con_precio(self):
+        """El form arma sus choices desde el tarifario, no desde el modelo."""
+        from servicio_tecnico.forms import GuardarManoObraForm
+
+        form = GuardarManoObraForm(instance=self.orden)
+        claves = [clave for clave, _ in form.fields['perfil_diagnostico'].choices]
+
+        self.assertNotIn('mostrador', claves)
+        self.assertNotIn('rep_nivel_componente', claves)
+        self.assertIn('estandar', claves)
+
+    def test_formulario_rechaza_un_perfil_sin_precio(self):
+        """Aunque alguien lo mande por POST, no es una opción válida."""
+        from servicio_tecnico.forms import GuardarManoObraForm
+
+        form = GuardarManoObraForm(
+            {'perfil_diagnostico': 'mostrador'},
+            instance=self.orden,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('perfil_diagnostico', form.errors)
+
+    def test_sin_tarifario_el_selector_lo_dice(self):
+        """
+        Un desplegable vacío sin explicación deja al técnico adivinando.
+
+        Preferimos un texto que nombre el problema real.
+        """
+        from servicio_tecnico.forms import GuardarManoObraForm
+
+        with patch(
+            'almacen.utils.parametros_cotizador.obtener_profit_config',
+            side_effect=RuntimeError('BD no disponible'),
+        ):
+            form = GuardarManoObraForm(instance=self.orden)
+            choices = list(form.fields['perfil_diagnostico'].choices)
+
+        self.assertEqual(len(choices), 1)
+        self.assertIn('Sin diagnósticos configurados', choices[0][1])
 
 
 class AtomicidadTest(BaseCatalogoTest):

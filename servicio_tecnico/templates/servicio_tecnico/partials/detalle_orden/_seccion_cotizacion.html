@@ -77,7 +77,7 @@
                                                 {% for opcion in opciones_diagnostico %}
                                                     <option value="{{ opcion.clave }}"
                                                             {% if opcion.clave == orden.perfil_diagnostico %}selected{% endif %}>
-                                                        {{ opcion.etiqueta }}{% if opcion.tarifa %} — ${{ opcion.tarifa|floatformat:2 }} sin IVA{% else %} — sin cargo{% endif %}
+                                                        {{ opcion.etiqueta }}{% if opcion.disponible %} — ${{ opcion.tarifa|floatformat:2 }} sin IVA{% else %} — sin precio vigente{% endif %}
                                                     </option>
                                                 {% endfor %}
                                             </select>
@@ -209,11 +209,15 @@
                                                             id="id_perfil_diagnostico_editar"
                                                             class="form-select"
                                                             required>
-                                                        <option value="">— Selecciona el diagnóstico —</option>
+                                                        {% if opciones_diagnostico %}
+                                                            <option value="">— Selecciona el diagnóstico —</option>
+                                                        {% else %}
+                                                            <option value="">— Sin diagnósticos configurados en el tarifario —</option>
+                                                        {% endif %}
                                                         {% for opcion in opciones_diagnostico %}
                                                             <option value="{{ opcion.clave }}"
                                                                     {% if opcion.clave == orden.perfil_diagnostico %}selected{% endif %}>
-                                                                {{ opcion.etiqueta }}{% if opcion.tarifa %} — ${{ opcion.tarifa|floatformat:2 }}{% else %} — sin cargo{% endif %}
+                                                                {{ opcion.etiqueta }}{% if opcion.disponible %} — ${{ opcion.tarifa|floatformat:2 }}{% else %} — sin precio vigente{% endif %}
                                                             </option>
                                                         {% endfor %}
                                                     </select>

@@ -408,7 +408,9 @@ Cascada de gama vigente: Estándar respeta `baja`/`media` (no puede distinguirla
 | `tarifa_perfil_estricta()` | Al **cobrar** (`aplicar_perfil_diagnostico`) | Lanza `TarifarioNoDisponible` |
 | `tarifa_perfil()` / `opciones_diagnostico()` | Al **mostrar** o comparar | Devuelve `$0.00` y la pantalla sigue viva |
 
-El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se entere. `PERFILES_SIN_CARGO` (Mostrador, Rep. nivel componente) distingue el cero legítimo del cero por fallo.
+El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se entere.
+
+**Cobrable = tiene precio > $0 en el tarifario.** El selector (`opciones_diagnostico()`) solo ofrece esos, y `tarifa_perfil_estricta()` rechaza cualquier `$0`. No hay lista de exentos hardcodeada: si Gerencia le pone precio a Mostrador, aparece solo; si deja Express en `$0`, desaparece solo. Un perfil ya guardado en una orden se sigue mostrando aunque pierda precio (`disponible=False`), para no mentir sobre lo que esa orden tiene.
 
 ```
 ❌ NUNCA volver a exponer costo_mano_obra como input editable (form, template o API)
@@ -416,7 +418,9 @@ El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se
 ❌ NUNCA sumar IVA al monto guardado creyendo que ya lo trae — está sin IVA
 ❌ NUNCA hardcodear 570/774/864/1000: el precio vive en el tarifario (BD + .env)
 ❌ NUNCA usar tarifa_perfil() para guardar un cobro — esa versión se traga los fallos
+❌ NUNCA reintroducir una lista fija de perfiles "sin cargo": la regla es el precio del tarifario
 ✅ Perfil nuevo = agregarlo a PERFIL_DIAGNOSTICO_CHOICES, PERFIL_DIAGNOSTICO_GAMA y PERFILES_PROFIT (las claves deben coincidir; hay test de paridad)
+✅ Perfil que no se cobra = dejarlo en $0 en el tarifario; se cae del selector solo
 ✅ aplicar_perfil_diagnostico() escribe 4 tablas dentro de transaction.atomic(using=alias) — ver §11
 ✅ En vistas: atrapar TarifarioNoDisponible y avisar con messages, no romper con 500
 ✅ En tests que toquen mano de obra: sembrar_tarifario() en setUp

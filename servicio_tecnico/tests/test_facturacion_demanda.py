@@ -753,7 +753,7 @@ class DiagnosticoCatalogoTest(BaseFacturacionTest):
         self.orden = self._crear_orden('OOW-13700', 'SN-CAT-13700', gama='baja')
 
     def test_tarifa_perfil_lee_el_tarifario_vigente(self):
-        """Cada perfil devuelve su precio sin IVA; los sin cargo devuelven $0."""
+        """Cada perfil devuelve su precio sin IVA; sin precio configurado, $0."""
         self.assertEqual(tarifa_perfil('estandar'), Decimal('570.00'))
         self.assertEqual(tarifa_perfil('express'), Decimal('774.00'))
         self.assertEqual(tarifa_perfil('alta_gama'), Decimal('864.00'))

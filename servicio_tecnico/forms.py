@@ -1655,10 +1655,15 @@ class GuardarManoObraForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         """
-        Arma el selector con el precio vigente de cada perfil.
+        Arma el selector solo con los diagnósticos que hoy tienen precio.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Las opciones NO salen de los choices del modelo, sino del tarifario
+        vivo. Un diagnóstico configurado en $0 no se cobra, así que no tiene
+        sentido ofrecerlo: elegirlo no registraría ningún cobro.
 
         Efectos secundarios:
-            Lee el tarifario del cotizador una vez para etiquetar las opciones.
+            Lee el tarifario del cotizador una vez para armar las opciones.
         """
         super().__init__(*args, **kwargs)
 
@@ -1669,17 +1674,31 @@ class GuardarManoObraForm(forms.ModelForm):
         campo = self.fields['perfil_diagnostico']
         campo.required = True
 
+        # El perfil ya guardado se conserva aunque hoy valga $0, para que el
+        # selector no muestre algo distinto a lo que la orden realmente tiene.
+        perfil_actual = getattr(self.instance, 'perfil_diagnostico', '') or ''
+        catalogo = opciones_diagnostico(perfil_actual=perfil_actual)
+
         # EXPLICACIÓN: mostramos el precio dentro de la propia opción
         # ("Estándar — $570.00 sin IVA") para que el técnico vea qué está
         # cobrando sin tener que abrir el tarifario en otra pestaña.
-        opciones = [('', '— Selecciona el diagnóstico cobrado —')]
-        for opcion in opciones_diagnostico():
-            if opcion.tarifa > 0:
+        opciones = []
+        for opcion in catalogo:
+            if opcion.disponible:
                 texto = f'{opcion.etiqueta} — ${opcion.tarifa:,.2f} sin IVA'
             else:
-                texto = f'{opcion.etiqueta} — sin cargo'
+                # Solo puede llegar aquí el perfil histórico de esta orden.
+                texto = f'{opcion.etiqueta} — sin precio vigente'
             opciones.append((opcion.clave, texto))
-        campo.choices = opciones
+
+        if opciones:
+            placeholder = '— Selecciona el diagnóstico cobrado —'
+        else:
+            # Sin tarifario no hay nada que cobrar. Es mejor decirlo en el
+            # propio selector que mostrar una lista vacía sin explicación.
+            placeholder = '— Sin diagnósticos configurados en el tarifario —'
+
+        campo.choices = [('', placeholder)] + opciones
 
         # EXPLICACIÓN: Bootstrap usa is-validatable para estilos de validación
         for field_name, field in self.fields.items():

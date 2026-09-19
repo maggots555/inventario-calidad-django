@@ -190,7 +190,13 @@ def build_detalle_orden_context(request, orden):
     # El catálogo de diagnósticos se necesita en los DOS caminos: al capturar
     # por primera vez (sin cotización) y al corregirlo después (con cotización
     # ya creada). Por eso se arma aquí afuera, no dentro del if.
-    opciones_diagnostico_orden = opciones_diagnostico()
+    #
+    # Solo trae los que tienen precio configurado. Se pasa el perfil que ya
+    # tiene la orden para que, si quedó sin precio vigente, el selector siga
+    # mostrando lo que realmente está guardado en lugar de otra cosa.
+    opciones_diagnostico_orden = opciones_diagnostico(
+        perfil_actual=orden.perfil_diagnostico,
+    )
 
     # Seguimientos: siempre por ORDEN (OOW con cotización y FL sin ella)
     seguimientos_piezas = orden.seguimientos_piezas.all().order_by('-fecha_pedido')

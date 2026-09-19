@@ -42,23 +42,32 @@ CENTAVO = Decimal('0.01')
 # Mapa clave → etiqueta legible ('estandar' → 'Estándar')
 _PERFIL_LABELS = dict(PERFIL_DIAGNOSTICO_CHOICES)
 
-# Claves válidas, en el orden en que deben aparecer en el selector.
+# Claves válidas del catálogo, en el orden en que deben aparecer.
 PERFILES_VALIDOS = tuple(clave for clave, _ in PERFIL_DIAGNOSTICO_CHOICES)
 
-# Perfiles que legítimamente cobran $0 de diagnóstico.
+# ============================================================================
+# REGLA CENTRAL: cobrable = tiene precio configurado (> $0)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Un diagnóstico que vale $0 no es un cobro de cero pesos: es un servicio que
+# este negocio no cobra (Mostrador, Reparación nivel componente) o un precio
+# que Gerencia todavía no configuró. En los dos casos no hay nada que
+# registrar, así que ese perfil no se ofrece en el selector ni se puede
+# guardar.
 #
-# EXPLICACIÓN PARA PRINCIPIANTES — por qué esta lista importa:
-# Necesitamos distinguir dos ceros que se ven idénticos en el código:
-#   - "Mostrador no cobra diagnóstico"  → $0 correcto, se guarda tal cual.
-#   - "No pude leer el tarifario"       → $0 falso, borraría el cobro.
-# Sin esta lista, un fallo de base de datos dejaría la orden en $0.00 y el
-# técnico vería un mensaje de éxito. Eso es peor que un error visible.
-PERFILES_SIN_CARGO = ('mostrador', 'rep_nivel_componente')
+# Lo importante es que la regla mira el TARIFARIO, no una lista escrita aquí.
+# Si mañana Gerencia decide cobrar el diagnóstico de Mostrador, aparece solo;
+# si pone Express en $0, desaparece solo. Ningún programador tiene que enterarse.
 
 
 class TarifarioNoDisponible(Exception):
     """
-    El tarifario del cotizador no pudo leerse o no tiene precio para el perfil.
+    No hay un precio válido para cobrar este diagnóstico.
+
+    Cubre dos situaciones que para quien captura significan lo mismo
+    ("ahora no puedo cobrar esto"), con mensajes distintos:
+      - El tarifario no se pudo leer (base caída, tabla sin migrar).
+      - El perfil existe pero está configurado en $0.
 
     Se lanza SOLO al escribir (aplicar_perfil_diagnostico). Las lecturas
     informativas prefieren devolver $0.00 antes que romper una pantalla.
@@ -80,12 +89,15 @@ class OpcionDiagnostico:
         etiqueta: nombre visible ('Estándar').
         tarifa: precio SIN IVA que cobra ese perfil, según el tarifario vigente.
         gama: gama que aplicará al equipo, o None si ese perfil no la define.
+        disponible: False cuando el perfil ya no tiene precio configurado y
+            solo aparece porque la orden lo tenía guardado de antes.
     """
 
     clave: str
     etiqueta: str
     tarifa: Decimal
     gama: Optional[str]
+    disponible: bool = True
 
 
 def etiqueta_perfil(perfil: Optional[str]) -> str:
@@ -156,13 +168,12 @@ def tarifa_perfil_estricta(perfil: str) -> Decimal:
         perfil: clave del perfil ('estandar', 'alta_gama', …).
 
     Returns:
-        Decimal con 2 decimales. Solo puede ser $0.00 para los perfiles que
-        legítimamente no cobran diagnóstico (ver PERFILES_SIN_CARGO).
+        Decimal con 2 decimales, siempre mayor a cero.
 
     Raises:
         ValueError: si el perfil no existe en el catálogo.
-        TarifarioNoDisponible: si no hay tarifario, o si un perfil que SÍ debe
-            cobrar tiene precio 0 (señal de configuración incompleta).
+        TarifarioNoDisponible: si no hay tarifario, o si el perfil está
+            configurado en $0 (no es cobrable).
 
     Efectos secundarios:
         Lee el tarifario del tenant activo.
@@ -173,17 +184,36 @@ def tarifa_perfil_estricta(perfil: str) -> Decimal:
     config = _leer_tarifario()
     monto = _dinero(config.get(perfil, {}).get('diagnostico', 0))
 
-    # Paso: un cero solo es aceptable en los perfiles que no cobran. En los
-    # demás significa que el panel de parámetros está a medio configurar, y
-    # cobrar $0 por un diagnóstico Estándar sería un error silencioso.
-    if monto <= 0 and perfil not in PERFILES_SIN_CARGO:
+    # Paso: $0 no es un cobro válido. O el perfil no se cobra en este negocio,
+    # o el panel de parámetros está a medio configurar. En ambos casos guardar
+    # el cero sería registrar un cobro que no existe.
+    if monto <= 0:
         raise TarifarioNoDisponible(
-            f'El tarifario no tiene precio para el diagnóstico '
-            f'"{etiqueta_perfil(perfil)}". Revisa el panel de parámetros '
-            f'del cotizador antes de cobrarlo.'
+            f'El diagnóstico "{etiqueta_perfil(perfil)}" no tiene precio '
+            f'configurado en el tarifario del cotizador, así que no se puede '
+            f'cobrar. Revisa el panel de parámetros.'
         )
 
     return monto
+
+
+def perfil_es_cobrable(perfil: Optional[str]) -> bool:
+    """
+    True si este diagnóstico tiene un precio configurado mayor a cero.
+
+    Es lo que decide si el perfil aparece en el selector. Se consulta contra
+    el tarifario vivo, no contra una lista fija.
+
+    Args:
+        perfil: clave del perfil.
+
+    Returns:
+        bool: False si no existe, vale $0 o el tarifario no responde.
+
+    Efectos secundarios:
+        Lee el tarifario del tenant activo.
+    """
+    return tarifa_perfil(perfil) > 0
 
 
 def tarifa_perfil(perfil: Optional[str]) -> Decimal:
@@ -258,15 +288,27 @@ def gama_por_perfil(perfil: Optional[str], gama_actual: Optional[str]) -> Option
     return gama_destino
 
 
-def opciones_diagnostico() -> List[OpcionDiagnostico]:
+def opciones_diagnostico(perfil_actual: Optional[str] = None) -> List[OpcionDiagnostico]:
     """
-    Catálogo completo con el precio vigente de cada perfil.
+    Diagnósticos que hoy se pueden cobrar, con su precio vigente.
 
-    Lo usa el formulario para armar el selector y mostrar el monto al técnico
-    antes de guardar, para que vea exactamente qué va a cobrar.
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Solo devuelve los perfiles con precio mayor a cero. Un diagnóstico en $0
+    no se cobra, así que ofrecerlo en el selector solo daría lugar a capturas
+    que no significan nada.
+
+    El argumento `perfil_actual` cubre un caso incómodo: una orden que ya tiene
+    guardado un perfil que después quedó en $0. Si lo dejáramos fuera, el
+    selector mostraría otra cosa distinta a la que la orden realmente tiene, y
+    al guardar se perdería el dato sin que nadie lo pidiera. Por eso ese perfil
+    se incluye igual, marcado como no disponible.
+
+    Args:
+        perfil_actual: perfil ya guardado en la orden (o None / '').
 
     Returns:
-        Lista de OpcionDiagnostico en el orden del catálogo.
+        Lista de OpcionDiagnostico en el orden del catálogo. Puede venir vacía
+        si el tarifario no responde o no hay ningún precio configurado.
 
     Efectos secundarios:
         Una lectura del tarifario (se reutiliza para todos los perfiles).
@@ -280,6 +322,12 @@ def opciones_diagnostico() -> List[OpcionDiagnostico]:
     opciones: List[OpcionDiagnostico] = []
     for clave, etiqueta in PERFIL_DIAGNOSTICO_CHOICES:
         tarifa = _dinero(config.get(clave, {}).get('diagnostico', 0))
+        es_cobrable = tarifa > 0
+
+        # Paso: sin precio no se ofrece, salvo que la orden ya lo tenga guardado.
+        if not es_cobrable and clave != (perfil_actual or ''):
+            continue
+
         regla = PERFIL_DIAGNOSTICO_GAMA.get(clave, {})
         opciones.append(
             OpcionDiagnostico(
@@ -287,6 +335,7 @@ def opciones_diagnostico() -> List[OpcionDiagnostico]:
                 etiqueta=etiqueta,
                 tarifa=tarifa,
                 gama=regla.get('gama'),
+                disponible=es_cobrable,
             )
         )
     return opciones
