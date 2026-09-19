@@ -39,6 +39,54 @@
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-7">
+
+                            {% comment %}
+                              Diagnóstico: bolsillo aparte del de piezas. Se muestra
+                              desglosado porque el cliente paga servicio + IVA, y quien
+                              cobra necesita ver el total exacto que debe pedir en caja.
+                            {% endcomment %}
+                            {% if resumen_diagnostico.monto > 0 %}
+                            <table class="table table-sm seccion-pagos__desglose seccion-pagos__diagnostico mb-3">
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            Diagnóstico / mano de obra
+                                            <div class="small text-muted">
+                                                Se cobra completo aunque el cliente no autorice la reparación.
+                                            </div>
+                                        </td>
+                                        <td class="text-end">${{ resumen_diagnostico.monto|floatformat:2 }}</td>
+                                    </tr>
+                                    {% if resumen_diagnostico.iva > 0 %}
+                                    <tr>
+                                        <td>IVA (16%)</td>
+                                        <td class="text-end">${{ resumen_diagnostico.iva|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr class="seccion-pagos__total">
+                                        <th>
+                                            Total a cubrir
+                                            <div class="small fw-normal text-muted">Esto es lo que se cobra en caja</div>
+                                        </th>
+                                        <th class="text-end">${{ resumen_diagnostico.monto_con_iva|floatformat:2 }}</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Pagado</td>
+                                        <td class="text-end text-success">${{ resumen_diagnostico.pagado|floatformat:2 }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Saldo del diagnóstico</th>
+                                        <th class="text-end {% if resumen_diagnostico.saldo > 0 %}text-danger{% else %}text-success{% endif %}">
+                                            ${{ resumen_diagnostico.saldo|floatformat:2 }}
+                                            {% if resumen_diagnostico.saldo <= 0 %}
+                                                <span class="badge bg-success ms-1">Cubierto</span>
+                                            {% endif %}
+                                        </th>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            {% endif %}
+
                             <table class="table table-sm seccion-pagos__desglose mb-0">
                                 <tbody>
                                     <tr>
@@ -86,7 +134,15 @@
                         </div>
                         <div class="col-md-5">
                             {% if puede_registrar_pago %}
-                            <form method="post" enctype="multipart/form-data" id="formRegistrarPago">
+                            {% comment %}
+                              Los importes del diagnóstico viajan resueltos desde el
+                              service (con IVA ya aplicado según el país). El JS solo
+                              los copia al campo; no calcula impuestos.
+                            {% endcomment %}
+                            <form method="post" enctype="multipart/form-data" id="formRegistrarPago"
+                                  data-saldo-diagnostico="{{ resumen_diagnostico.saldo|stringformat:'.2f' }}"
+                                  data-diagnostico-sin-iva="{{ resumen_diagnostico.monto|stringformat:'.2f' }}"
+                                  data-diagnostico-iva="{{ resumen_diagnostico.iva|stringformat:'.2f' }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="form_type" value="registrar_pago">
                                 <div class="mb-2">

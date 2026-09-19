@@ -68,16 +68,28 @@ class ResumenDiagnostico:
     """
     Foto del diagnóstico de una orden: cuánto vale, cuánto pagaron y si cuadra.
 
+    EXPLICACIÓN PARA PRINCIPIANTES — los dos montos y por qué son distintos:
+        `monto` es el precio del servicio SIN IVA ($570). Es el que va al CFDI,
+        porque el SAT pide el valor antes de impuestos.
+        `monto_con_iva` es lo que el cliente entrega en caja ($661.20). Es el
+        que se compara contra los pagos, porque un comprobante de transferencia
+        dice 661.20, no 570.
+        Confundirlos es justo lo que provocaba que no se pudiera cobrar el
+        diagnóstico: el sistema pedía 570 cuando en la práctica entraban 661.20.
+
     Args/campos:
-        monto: lo que realmente se cobra por el diagnóstico (mano de obra ya
-            con el descuento aplicado si el cliente aceptó la cotización).
-        pagado: suma de abonos tipo 'diagnostico' ya capturados.
+        monto: precio del diagnóstico SIN IVA (mano de obra ya con el descuento
+            aplicado si el cliente aceptó la cotización).
+        iva: impuesto sobre ese monto ($0.00 fuera de México).
+        monto_con_iva: total que el cliente debe cubrir en caja.
+        pagado: suma de abonos tipo 'diagnostico' ya capturados (con IVA).
         pagado_confirmado: de esos abonos, los que Facturación ya dio por
             buenos (validado o no_aplica).
-        saldo: monto − pagado (nunca negativo).
+        saldo: monto_con_iva − pagado (nunca negativo), en pesos reales.
         cubierto_100: True si ya no debe nada de diagnóstico.
         confirmado_100: True y además el dinero está verificado → se factura.
-        tarifa_referencia: lo que dice el tarifario para este diagnóstico.
+        tarifa_referencia: lo que dice el tarifario para este diagnóstico
+            (sin IVA, para comparar contra `monto`).
         gama: gama del equipo ('baja', 'media', 'alta') o ''.
         perfil: tipo de diagnóstico elegido ('estandar', 'alta_gama'…) o ''
             en órdenes viejas con monto capturado a mano.
@@ -85,6 +97,8 @@ class ResumenDiagnostico:
     """
 
     monto: Decimal
+    iva: Decimal
+    monto_con_iva: Decimal
     pagado: Decimal
     pagado_confirmado: Decimal
     saldo: Decimal
@@ -200,12 +214,42 @@ def _pagos_diagnostico(orden):
     return orden.pagos.filter(tipo=TIPO_PAGO_DIAGNOSTICO)
 
 
-def resumen_diagnostico(orden) -> ResumenDiagnostico:
+def iva_diagnostico(monto_sin_iva: Decimal, codigo_pais: Optional[str] = None) -> Decimal:
+    """
+    IVA que le toca al diagnóstico según el país de la orden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El 16% es de México. Las demás operaciones del grupo no lo cobran, así que
+    preguntamos por el país igual que lo hace el resumen de cobro de piezas
+    (`calcular_resumen_cobro`), para no inventar una regla distinta.
+
+    Args:
+        monto_sin_iva: precio del servicio antes de impuestos.
+        codigo_pais: override del país (útil en tests).
+
+    Returns:
+        Decimal con el impuesto; $0.00 fuera de México.
+
+    Efectos secundarios:
+        Lee el país activo del request/thread-local.
+    """
+    from servicio_tecnico.services.pagos_orden import (
+        IVA_TASA_MX,
+        _codigo_pais_activo,
+    )
+
+    if _codigo_pais_activo(codigo_pais) != 'MX':
+        return Decimal('0.00')
+    return _dinero(_dinero(monto_sin_iva) * IVA_TASA_MX)
+
+
+def resumen_diagnostico(orden, codigo_pais: Optional[str] = None) -> ResumenDiagnostico:
     """
     Calcula todo lo que hay que saber del diagnóstico de una orden.
 
     Args:
         orden: OrdenServicio (idealmente con cotizacion y pagos precargados).
+        codigo_pais: override del país para el IVA (útil en tests).
 
     Returns:
         ResumenDiagnostico listo para la UI y para decidir si hay factura PUE.
@@ -215,7 +259,12 @@ def resumen_diagnostico(orden) -> ResumenDiagnostico:
     """
     monto = monto_diagnostico(orden)
 
-    # Paso 1: cuánto ha entrado por diagnóstico, en total y ya verificado.
+    # Paso 1: el cliente paga el servicio MÁS su IVA. Este es el número que
+    # debe aparecer en el recibo y contra el que se comparan los abonos.
+    iva = iva_diagnostico(monto, codigo_pais=codigo_pais)
+    monto_con_iva = _dinero(monto + iva)
+
+    # Paso 2: cuánto ha entrado por diagnóstico, en total y ya verificado.
     pagos = _pagos_diagnostico(orden)
     pagado = _dinero(pagos.aggregate(total=Sum('monto'))['total'])
     pagado_confirmado = _dinero(
@@ -223,16 +272,17 @@ def resumen_diagnostico(orden) -> ResumenDiagnostico:
         .aggregate(total=Sum('monto'))['total']
     )
 
-    # Paso 2: saldo nunca negativo (si cobraron de más, es cero, no crédito).
-    saldo = _dinero(monto - pagado)
+    # Paso 3: saldo nunca negativo (si cobraron de más, es cero, no crédito).
+    # Se mide contra el total CON IVA porque los pagos son dinero real de caja.
+    saldo = _dinero(monto_con_iva - pagado)
     if saldo < 0:
         saldo = Decimal('0.00')
 
-    # Paso 3: para facturar PUE exigimos las dos cosas: que esté cubierto
+    # Paso 4: para facturar PUE exigimos las dos cosas: que esté cubierto
     # al 100% y que el dinero ya esté verificado por Facturación.
     hay_cobro = monto > Decimal('0.00')
-    cubierto = hay_cobro and pagado >= monto
-    confirmado = hay_cobro and pagado_confirmado >= monto
+    cubierto = hay_cobro and pagado >= monto_con_iva
+    confirmado = hay_cobro and pagado_confirmado >= monto_con_iva
 
     # Paso 4: comparación contra el tarifario (solo informativa). Con perfil
     # capturado esto debería coincidir siempre, porque el monto se calculó
@@ -245,6 +295,8 @@ def resumen_diagnostico(orden) -> ResumenDiagnostico:
 
     return ResumenDiagnostico(
         monto=monto,
+        iva=iva,
+        monto_con_iva=monto_con_iva,
         pagado=pagado,
         pagado_confirmado=pagado_confirmado,
         saldo=saldo,
@@ -281,10 +333,16 @@ def validar_monto_pago_diagnostico(orden, monto: Decimal) -> None:
             'del diagnóstico antes de cobrarlo.'
         )
 
+    # Paso: el techo es el total CON IVA, que es lo que el cliente entrega.
+    # Si el mensaje solo dijera "supera el saldo", quien cobra pensaría que
+    # el monto correcto es el del servicio sin impuesto, que es precisamente
+    # el error que hacía imposible registrar este cobro.
     if monto > resumen.saldo:
         raise ValidationError(
             f'El pago de diagnóstico (${monto}) supera lo que falta por '
-            f'cubrir (${resumen.saldo}).'
+            f'cubrir (${resumen.saldo}). El diagnóstico cuesta '
+            f'${resumen.monto} + ${resumen.iva} de IVA = '
+            f'${resumen.monto_con_iva}.'
         )
 
 

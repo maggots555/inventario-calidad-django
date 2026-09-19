@@ -289,7 +289,15 @@ def build_detalle_orden_context(request, orden):
         usuario_puede_validar_pago,
     )
 
+    # EXPLICACIÓN PARA PRINCIPIANTES — por qué son DOS resúmenes y no uno:
+    # `calcular_resumen_cobro` deja fuera el diagnóstico a propósito: son dos
+    # bolsillos distintos (el diagnóstico se cobra aunque el cliente rechace
+    # la reparación). Por eso el diagnóstico trae su propio resumen, con su
+    # IVA desglosado, para que quien cobra vea el total exacto a pedir.
+    from servicio_tecnico.services.pagos_diagnostico import resumen_diagnostico
+
     resumen_cobro = calcular_resumen_cobro(orden)
+    resumen_diagnostico_orden = resumen_diagnostico(orden)
     pagos_orden = orden.pagos.select_related(
         'registrado_por',
         'validado_por',
@@ -433,6 +441,8 @@ def build_detalle_orden_context(request, orden):
 
         # Cobros / facturación (pagos + saldo + flags de factura)
         'resumen_cobro': resumen_cobro,
+        # Diagnóstico: bolsillo aparte, con IVA desglosado para el cobro.
+        'resumen_diagnostico': resumen_diagnostico_orden,
         'pagos_orden': pagos_orden,
         'puede_registrar_pago': puede_registrar_pago,
         'puede_validar_pago': puede_validar_pago,

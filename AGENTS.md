@@ -412,10 +412,21 @@ El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se
 
 **Cobrable = tiene precio > $0 en el tarifario.** El selector (`opciones_diagnostico()`) solo ofrece esos, y `tarifa_perfil_estricta()` rechaza cualquier `$0`. No hay lista de exentos hardcodeada: si Gerencia le pone precio a Mostrador, aparece solo; si deja Express en `$0`, desaparece solo. Un perfil ya guardado en una orden se sigue mostrando aunque pierda precio (`disponible=False`), para no mentir sobre lo que esa orden tiene.
 
+**El diagnóstico se guarda sin IVA pero se cobra con IVA.** Son dos lecturas de la misma cifra y confundirlas rompe la caja o el CFDI:
+
+| Cifra | Cuánto | Dónde vive | Para qué |
+|---|---|---|---|
+| `resumen.monto` | $570.00 | `costo_mano_obra` | Línea del CFDI (el SAT pide el neto) |
+| `resumen.monto_con_iva` | $661.20 | calculado en `pagos_diagnostico.py` | Lo que entra a caja y el techo del pago |
+
+`PagoOrden.monto` siempre es **dinero real con IVA**, igual que los pagos de piezas (por eso `facturacion_documentos._sin_iva()` se lo quita al facturar). Capturar el neto ($570) para "que deje guardar" descuadra SIGMA contra el banco y deja el diagnóstico sin cubrir. El selector de tipo de pago autollena el monto correcto (`detalle_orden_pago_diagnostico.ts`); el JS **no** calcula impuestos, solo copia lo que resolvió el service.
+
 ```
 ❌ NUNCA volver a exponer costo_mano_obra como input editable (form, template o API)
 ❌ NUNCA escribir costo_mano_obra a mano: usar aplicar_perfil_diagnostico()
 ❌ NUNCA sumar IVA al monto guardado creyendo que ya lo trae — está sin IVA
+❌ NUNCA validar un pago de diagnóstico contra resumen.monto (neto): el techo es monto_con_iva
+❌ NUNCA calcular el IVA en TypeScript — fuera de MX es $0 y quedarían dos fuentes de verdad
 ❌ NUNCA hardcodear 570/774/864/1000: el precio vive en el tarifario (BD + .env)
 ❌ NUNCA usar tarifa_perfil() para guardar un cobro — esa versión se traga los fallos
 ❌ NUNCA reintroducir una lista fija de perfiles "sin cargo": la regla es el precio del tarifario

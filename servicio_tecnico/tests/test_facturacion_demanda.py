@@ -211,8 +211,15 @@ class FacturacionApiTest(BaseFacturacionTest):
 
     # ── Helpers HTTP ────────────────────────────────────────────────────
 
-    def _pagar_diagnostico(self, monto='500.00'):
-        """Efectivo = nace en no_aplica, o sea dinero ya verificado."""
+    def _pagar_diagnostico(self, monto='580.00'):
+        """
+        Efectivo = nace en no_aplica, o sea dinero ya verificado.
+
+        EXPLICACIÓN PARA PRINCIPIANTES — por qué $580 y no $500:
+        La mano de obra de esta orden es $500 SIN IVA, pero el cliente entrega
+        en caja $500 + $80 de IVA. Los pagos guardan dinero real, así que para
+        que el diagnóstico quede cubierto hay que abonar el total con impuesto.
+        """
         return PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal(monto),
@@ -801,13 +808,16 @@ class DiagnosticoCatalogoTest(BaseFacturacionTest):
         """
         End to end: Estándar cobrado en efectivo → CFDI de $570 + $91.20.
 
-        El total ($661.20) es exactamente lo que el cliente pagó en caja. Con
-        el esquema anterior el mismo servicio habría facturado $766.99.
+        EXPLICACIÓN PARA PRINCIPIANTES — las dos caras del mismo servicio:
+        En caja entran $661.20 (es lo que el cliente entrega y lo que dirá su
+        comprobante). En el CFDI ese mismo cobro se parte en $570 de servicio
+        más $91.20 de IVA, porque el SAT pide el valor antes de impuestos.
+        Registrar el pago por $570 "para que cuadre" descuadraría la caja.
         """
         aplicar_perfil_diagnostico(self.orden, 'estandar')
         PagoOrden.objects.create(
             orden=self.orden,
-            monto=Decimal('570.00'),
+            monto=Decimal('661.20'),
             tipo='diagnostico',
             metodo='efectivo',
             estado_validacion='no_aplica',
@@ -895,9 +905,10 @@ class AutofacturaSeguimientoTest(BaseFacturacionTest):
             precio_unitario_cliente=Decimal('200.00'),
             aceptada_por_cliente=True,
         )
+        # $500 de mano de obra + $80 de IVA: lo que el cliente paga en caja.
         self.pago = PagoOrden.objects.create(
             orden=self.orden,
-            monto=Decimal('500.00'),
+            monto=Decimal('580.00'),
             tipo='diagnostico',
             metodo='efectivo',
             estado_validacion='no_aplica',

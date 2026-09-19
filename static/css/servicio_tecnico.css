@@ -6830,6 +6830,13 @@ thead.sticky-top {
     font-size: 1.05rem;
 }
 
+/* El diagnóstico es un cobro aparte del de piezas: se separa visualmente
+   para que nadie sume los dos totales creyendo que es uno solo. */
+.seccion-pagos__diagnostico {
+    border-left: 3px solid var(--primary-color, #1f6391);
+    padding-left: 0.75rem;
+}
+
 .seccion-pagos__barra {
     height: 1.1rem;
 }
@@ -6865,6 +6872,10 @@ thead.sticky-top {
 
 [data-bs-theme="dark"] .seccion-pagos__desglose {
     color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .seccion-pagos__diagnostico {
+    border-left-color: #60a5fa;
 }
 
 .seccion-pagos__badge-validacion {
