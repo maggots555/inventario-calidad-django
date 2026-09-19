@@ -13,6 +13,12 @@ from django.shortcuts import redirect
 
 from .forms import GuardarManoObraForm, GestionarCotizacionForm
 from .models import Cotizacion, HistorialOrden
+from .services.diagnostico_catalogo import (
+    TarifarioNoDisponible,
+    aplicar_perfil_diagnostico,
+    etiqueta_perfil,
+)
+from .utils_gama import etiqueta_gama
 
 
 def handle_guardar_mano_obra(request, orden, empleado_actual):
@@ -30,54 +36,40 @@ def handle_guardar_mano_obra(request, orden, empleado_actual):
     """
     form_guardar_mo = GuardarManoObraForm(request.POST, instance=orden)
     if form_guardar_mo.is_valid():
-        from servicio_tecnico.utils_gama import (
-            aplicar_gama_por_mano_obra,
-            etiqueta_gama,
-        )
-
-        costo_anterior = orden.costo_mano_obra
-        # Gama previa (estimado por modelo) para el mensaje al usuario
-        gama_antes = getattr(
-            getattr(orden, 'detalle_equipo', None), 'gama', None
-        )
-        orden_actualizada = form_guardar_mo.save()
-        nuevo_costo = orden_actualizada.costo_mano_obra
-
-        # Si ya hay cotización, mantener ambos valores alineados
-        if hasattr(orden_actualizada, 'cotizacion'):
-            cotizacion_mo = orden_actualizada.cotizacion
-            cotizacion_mo.costo_mano_obra = nuevo_costo
-            cotizacion_mo.save(update_fields=['costo_mano_obra'])
-
-        # Cascada: MO > 0 redefine la gama del equipo (fuente de verdad)
-        gama_aplicada = aplicar_gama_por_mano_obra(
-            orden_actualizada,
-            nuevo_costo,
-            usuario=empleado_actual,
-        )
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # No usamos form.save(). El formulario solo nos dice QUÉ diagnóstico
+        # eligió el técnico; el servicio es quien sabe cuánto cuesta, qué gama
+        # implica y qué escribir en el historial. Guardar por los dos lados
+        # dejaría la orden a medias.
+        perfil = form_guardar_mo.cleaned_data['perfil_diagnostico']
+        try:
+            resultado = aplicar_perfil_diagnostico(
+                orden,
+                perfil,
+                usuario=empleado_actual,
+            )
+        except TarifarioNoDisponible as exc:
+            # No guardamos nada: mejor que el técnico reintente a que la orden
+            # quede cobrando $0 por un diagnóstico que sí se hizo.
+            messages.error(request, f'❌ {exc}')
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
         msg_mo = (
-            f'✅ Mano de obra guardada: ${costo_anterior} → ${nuevo_costo}. '
+            f'✅ Diagnóstico registrado: {etiqueta_perfil(resultado.perfil)} — '
+            f'${resultado.monto_nuevo} sin IVA. '
             f'La cotización no se crea automáticamente.'
         )
-        if gama_aplicada:
+        if resultado.gama_nueva:
             msg_mo += (
-                f' Gama actualizada: {etiqueta_gama(gama_antes)} → '
-                f'{etiqueta_gama(gama_aplicada)} (según costo).'
+                f' Gama actualizada: {etiqueta_gama(resultado.gama_anterior)} → '
+                f'{etiqueta_gama(resultado.gama_nueva)}.'
             )
         messages.success(request, msg_mo)
-        HistorialOrden.objects.create(
-            orden=orden_actualizada,
-            tipo_evento='cotizacion',
-            comentario=(
-                f'Mano de obra guardada en la orden: '
-                f'${costo_anterior} → ${nuevo_costo} (sin crear cotización)'
-            ),
-            usuario=empleado_actual,
-            es_sistema=False,
-        )
     else:
-        messages.error(request, '❌ Error al guardar la mano de obra. Revisa el valor ingresado.')
+        messages.error(
+            request,
+            '❌ Selecciona un tipo de diagnóstico válido del catálogo.',
+        )
 
     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
@@ -101,31 +93,33 @@ def handle_crear_cotizacion(request, orden, empleado_actual):
         )
         return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
-    # Si el usuario envió un valor de MO en el mismo POST, lo guardamos
-    # en la orden antes de crear la cotización (opcional, por comodidad).
-    from servicio_tecnico.utils_gama import (
-        aplicar_gama_por_mano_obra,
-        etiqueta_gama,
-    )
-
-    costo_mo_post = request.POST.get('costo_mano_obra', '').strip()
-    if costo_mo_post:
-        form_mo_previo = GuardarManoObraForm(request.POST, instance=orden)
-        if form_mo_previo.is_valid():
-            orden = form_mo_previo.save()
-        else:
-            messages.error(request, '❌ Valor de mano de obra inválido. No se generó la cotización.')
-            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-
-    # Cascada: si hay MO > 0 (recién enviada o ya en la orden), actualizar gama
+    # Si el técnico eligió el diagnóstico en el mismo POST, lo aplicamos antes
+    # de crear la cotización (por comodidad: un solo clic en vez de dos).
+    perfil_post = request.POST.get('perfil_diagnostico', '').strip()
+    gama_aplicada = None
     gama_antes = getattr(
         getattr(orden, 'detalle_equipo', None), 'gama', None
     )
-    gama_aplicada = aplicar_gama_por_mano_obra(
-        orden,
-        orden.costo_mano_obra,
-        usuario=empleado_actual,
-    )
+    if perfil_post:
+        form_mo_previo = GuardarManoObraForm(request.POST, instance=orden)
+        if not form_mo_previo.is_valid():
+            messages.error(
+                request,
+                '❌ Tipo de diagnóstico inválido. No se generó la cotización.',
+            )
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+        try:
+            resultado = aplicar_perfil_diagnostico(
+                orden,
+                form_mo_previo.cleaned_data['perfil_diagnostico'],
+                usuario=empleado_actual,
+            )
+        except TarifarioNoDisponible as exc:
+            # Sin precio no se genera la cotización: nacería con $0 de mano de
+            # obra y ese error se arrastraría hasta la factura.
+            messages.error(request, f'❌ {exc} No se generó la cotización.')
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+        gama_aplicada = resultado.gama_nueva
 
     # Crear Cotizacion copiando la MO ya registrada en la orden
     cotizacion = Cotizacion.objects.create(
@@ -134,13 +128,13 @@ def handle_crear_cotizacion(request, orden, empleado_actual):
     )
 
     msg_cot = (
-        f'✅ Cotización generada con mano de obra: ${cotizacion.costo_mano_obra}. '
+        f'✅ Cotización generada con mano de obra: ${cotizacion.costo_mano_obra} sin IVA. '
         f'Ahora puedes agregar piezas. El estado de la orden no se cambió automáticamente.'
     )
     if gama_aplicada:
         msg_cot += (
             f' Gama actualizada: {etiqueta_gama(gama_antes)} → '
-            f'{etiqueta_gama(gama_aplicada)} (según costo).'
+            f'{etiqueta_gama(gama_aplicada)} (según el diagnóstico).'
         )
     messages.success(request, msg_cot)
     HistorialOrden.objects.create(
@@ -220,58 +214,41 @@ def handle_editar_mano_obra(request, orden, empleado_actual):
         messages.error(request, '❌ No existe una cotización para esta orden.')
         return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
-    costo_mano_obra_str = request.POST.get('costo_mano_obra', '').strip()
-    if costo_mano_obra_str:
-        try:
-            from decimal import Decimal, InvalidOperation
-            nuevo_costo = Decimal(costo_mano_obra_str)
-            if nuevo_costo < 0:
-                messages.error(request, '❌ El costo de mano de obra no puede ser negativo.')
-                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Corregir el diagnóstico es elegir otro tipo, no teclear otro número. El
+    # servicio recalcula el monto desde el tarifario y reajusta la gama, igual
+    # que en la captura inicial, así que aquí solo validamos y delegamos.
+    perfil_post = request.POST.get('perfil_diagnostico', '').strip()
+    if not perfil_post:
+        messages.error(request, '❌ No se seleccionó un tipo de diagnóstico.')
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
-            cotizacion = orden.cotizacion
-            costo_anterior = cotizacion.costo_mano_obra
-            gama_antes = getattr(
-                getattr(orden, 'detalle_equipo', None), 'gama', None
-            )
-            # Sincronizar ambos: cotización y orden (fuente de verdad de la MO)
-            cotizacion.costo_mano_obra = nuevo_costo
-            cotizacion.save(update_fields=['costo_mano_obra'])
-            orden.costo_mano_obra = nuevo_costo
-            orden.save(update_fields=['costo_mano_obra'])
+    try:
+        resultado = aplicar_perfil_diagnostico(
+            orden,
+            perfil_post,
+            usuario=empleado_actual,
+        )
+    except ValueError:
+        messages.error(
+            request,
+            '❌ Tipo de diagnóstico inválido. Elige una opción del catálogo.',
+        )
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+    except TarifarioNoDisponible as exc:
+        messages.error(request, f'❌ {exc}')
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 
-            # Cascada: MO redefine la gama del equipo
-            from servicio_tecnico.utils_gama import (
-                aplicar_gama_por_mano_obra,
-                etiqueta_gama,
-            )
-            gama_aplicada = aplicar_gama_por_mano_obra(
-                orden,
-                nuevo_costo,
-                usuario=empleado_actual,
-            )
-
-            msg_edit = (
-                f'✅ Mano de obra actualizada: ${costo_anterior} → ${nuevo_costo}'
-            )
-            if gama_aplicada:
-                msg_edit += (
-                    f'. Gama actualizada: {etiqueta_gama(gama_antes)} → '
-                    f'{etiqueta_gama(gama_aplicada)} (según costo).'
-                )
-            messages.success(request, msg_edit)
-
-            HistorialOrden.objects.create(
-                orden=orden,
-                tipo_evento='cotizacion',
-                comentario=f'Costo de mano de obra editado: ${costo_anterior} → ${nuevo_costo}',
-                usuario=empleado_actual,
-                es_sistema=False
-            )
-        except (InvalidOperation, ValueError, TypeError) as e:
-            messages.error(request, f'❌ Valor de mano de obra inválido: {str(e)}')
-    else:
-        messages.error(request, '❌ No se proporcionó un valor válido para mano de obra.')
+    msg_edit = (
+        f'✅ Diagnóstico actualizado a {etiqueta_perfil(resultado.perfil)}: '
+        f'${resultado.monto_anterior} → ${resultado.monto_nuevo} sin IVA'
+    )
+    if resultado.gama_nueva:
+        msg_edit += (
+            f'. Gama actualizada: {etiqueta_gama(resultado.gama_anterior)} → '
+            f'{etiqueta_gama(resultado.gama_nueva)}.'
+        )
+    messages.success(request, msg_edit)
 
     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
 

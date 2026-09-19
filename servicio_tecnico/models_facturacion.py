@@ -1,14 +1,30 @@
 """
-Comprobante fiscal (CFDI) recibido del autofacturador VO.
+Documentos fiscales (CFDI) del autofacturador VO.
 
 Objetivo de negocio:
-    Cuando el portal timbra una venta, manda XML y PDF a SIGMA (PUT).
-    Esta tabla guarda esos archivos y el UUID del SAT, sin inflar OrdenServicio.
+    El cliente entra al portal del facturador, teclea un "webId" y pide su
+    factura. SIGMA es quien decide QUÉ se puede facturar, con qué descripción
+    y por cuánto. Esta tabla guarda esa decisión y, cuando VO timbra, el XML,
+    el PDF y el UUID del SAT.
 
-EXPLICACIÓN PARA PRINCIPIANTES:
-    El GET del API “reserva” la venta (solicitado_en). El PUT solo se acepta
-    si esa reserva existe; si no, 404 como en el PDF de SICSER 4.
+EXPLICACIÓN PARA PRINCIPIANTES — los dos tipos de documento:
+    * PUE (Pago en Una sola Exhibición): el cliente ya pagó el 100% de un
+      servicio (Diagnóstico, Limpieza y Mantenimiento). Se factura el servicio
+      completo, con IVA desglosado.
+    * PPD (Pago en Parcialidades o Diferido): el cliente dio un anticipo de una
+      reparación que todavía no termina. Se factura como "Anticipo del bien o
+      servicio", sin describir piezas.
+
+    Una orden puede tener los dos (pagó su diagnóstico y además dio anticipo),
+    por eso esto es una tabla hija y no un campo dentro de OrdenServicio.
+
+CRITICAL — este archivo es TABLA, no cerebro:
+    Aquí solo van campos, choices y __str__. Los cálculos de dinero, el armado
+    de conceptos y la generación del webId viven en services/ (ver
+    facturacion_documentos.py y facturacion_web_id.py).
 """
+
+from decimal import Decimal
 
 from django.db import models
 
@@ -18,7 +34,7 @@ def cfdi_xml_upload_path(instance, filename):
     Ruta del XML del CFDI dentro de MEDIA_ROOT.
 
     Args:
-        instance: ComprobanteFiscalOrden dueño del archivo.
+        instance: DocumentoFiscalOrden dueño del archivo.
         filename: Nombre sugerido (uuid.xml).
 
     Returns:
@@ -32,41 +48,124 @@ def cfdi_pdf_upload_path(instance, filename):
     Ruta del PDF de la factura dentro de MEDIA_ROOT.
 
     Args:
-        instance: ComprobanteFiscalOrden dueño del archivo.
+        instance: DocumentoFiscalOrden dueño del archivo.
         filename: Nombre sugerido (uuid.pdf).
+
+    Returns:
+        str: facturacion/<orden_id>/pdf/<filename>
     """
     return f'facturacion/{instance.orden_id}/pdf/{filename}'
 
 
-class ComprobanteFiscalOrden(models.Model):
+class DocumentoFiscalOrden(models.Model):
     """
-    Un CFDI timbrado (o la solicitud previa al timbrado) por orden.
+    Un documento facturable (PUE o PPD) de una orden de servicio.
 
     Args/campos:
-        orden: orden de servicio (1 a 1).
-        web_id: dígitos de orden_cliente usados en el API.
-        solicitado_en: cuándo el portal hizo GET (requisito del PUT).
-        uuid / archivos: se llenan en el PUT.
+        orden: orden de servicio dueña del documento (varios por orden).
+        web_id: texto público que el cliente teclea en el portal (SAT9596-1).
+        tipo: 'pue' o 'ppd' (el API los expone como 1 y 2).
+        descripcion: texto del concepto principal, ya resuelto por el servicio.
+        subtotal / iva / total / tasa_iva: montos congelados al momento de
+            quedar disponible; una vez timbrado ya no se recalculan.
+        disponible_desde: cuándo el pago quedó validado y el cliente pudo ver
+            el webId. Vacío = todavía no se le muestra a nadie.
+        solicitado_en: cuándo el portal hizo el GET (requisito del PUT).
+        uuid y archivos: se llenan en el PUT, cuando VO ya timbró.
 
     Efectos secundarios:
-        Ninguno en save(). El servicio escribe historial/flags.
+        Ninguno en save(). Historial y avisos los escriben los servicios.
     """
 
-    orden = models.OneToOneField(
+    # ── Tipos de comprobante ────────────────────────────────────────────────
+    TIPO_PUE = 'pue'
+    TIPO_PPD = 'ppd'
+    TIPO_CHOICES = [
+        (TIPO_PUE, 'PUE — Pago en una sola exhibición'),
+        (TIPO_PPD, 'PPD — Pago en parcialidades o diferido'),
+    ]
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # VO pidió identificar el tipo con un número corto y escalable. Guardamos
+    # el texto (legible en el admin) y traducimos a número solo en el API.
+    # Si mañana entra un tercer tipo (ej. nota de crédito) se agrega aquí.
+    CODIGO_TIPO = {
+        TIPO_PUE: 1,
+        TIPO_PPD: 2,
+    }
+    # Sufijo del webId por tipo: SAT9596-1 (PUE), SAT9596-2 (PPD).
+    SUFIJO_TIPO = CODIGO_TIPO
+
+    orden = models.ForeignKey(
         'servicio_tecnico.OrdenServicio',
         on_delete=models.CASCADE,
-        related_name='comprobante_fiscal',
-        help_text='Orden cuya venta se facturó o se está facturando',
+        related_name='documentos_fiscales',
+        help_text='Orden cuya venta se factura',
     )
-    web_id = models.PositiveBigIntegerField(
+    web_id = models.CharField(
+        max_length=32,
+        unique=True,
         db_index=True,
-        help_text='Número público del API (dígitos de orden_cliente)',
+        help_text='Identificador público del portal (ej. SAT9596-1)',
+    )
+    tipo = models.CharField(
+        max_length=3,
+        choices=TIPO_CHOICES,
+        help_text='PUE (servicio pagado al 100%) o PPD (anticipo)',
+    )
+    descripcion = models.CharField(
+        max_length=200,
+        help_text='Texto del concepto: Diagnóstico, Limpieza y Mantenimiento, Anticipo…',
+    )
+
+    # ── Montos congelados ───────────────────────────────────────────────────
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Guardamos los tres números por separado (antes de IVA, IVA y total) para
+    # que el portal no tenga que calcular nada y para que quede evidencia de
+    # cuánto se facturó, aunque después alguien edite precios en la orden.
+    subtotal = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Importe antes de IVA',
+    )
+    tasa_iva = models.DecimalField(
+        max_digits=6,
+        decimal_places=4,
+        default=Decimal('0.1600'),
+        help_text='Tasa de IVA aplicada (0.1600 = 16%)',
+    )
+    iva = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Importe del IVA trasladado',
+    )
+    total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Subtotal + IVA (lo que se factura)',
+    )
+    moneda = models.CharField(
+        max_length=3,
+        default='MXN',
+        help_text='Moneda del comprobante (hoy siempre MXN)',
+    )
+
+    # ── Ciclo de vida ───────────────────────────────────────────────────────
+    disponible_desde = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Cuándo se validó el pago y el cliente pudo ver el webId',
     )
     solicitado_en = models.DateTimeField(
         null=True,
         blank=True,
-        help_text='Momento del GET previo. Sin esto el PUT responde 404.',
+        help_text='Momento del GET del portal. Sin esto el PUT responde 404.',
     )
+
+    # ── Timbrado (lo llena el PUT de VO) ────────────────────────────────────
     uuid = models.CharField(
         max_length=36,
         blank=True,
@@ -105,10 +204,19 @@ class ComprobanteFiscalOrden(models.Model):
         help_text='Cuándo SIGMA aceptó el PUT timbrado',
     )
 
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
     class Meta:
-        verbose_name = 'Comprobante fiscal de orden'
-        verbose_name_plural = 'Comprobantes fiscales de órdenes'
+        verbose_name = 'Documento fiscal de orden'
+        verbose_name_plural = 'Documentos fiscales de órdenes'
+        ordering = ['orden_id', 'tipo']
         constraints = [
+            # Una orden factura como máximo un PUE y un PPD.
+            models.UniqueConstraint(
+                fields=['orden', 'tipo'],
+                name='unico_documento_fiscal_por_tipo',
+            ),
             models.UniqueConstraint(
                 fields=['uuid'],
                 condition=models.Q(uuid__gt=''),
@@ -118,9 +226,80 @@ class ComprobanteFiscalOrden(models.Model):
 
     def __str__(self):
         estado = self.uuid or 'pendiente de timbrar'
-        return f'CFDI web_id={self.web_id} ({estado})'
+        return f'{self.get_tipo_display()} {self.web_id} ({estado})'
 
     @property
     def esta_timbrado(self) -> bool:
-        """True si ya llegó un UUID del SAT."""
+        """True si ya llegó un UUID del SAT (el documento ya no se recalcula)."""
         return bool((self.uuid or '').strip())
+
+    @property
+    def codigo_tipo(self) -> int:
+        """Número que el API expone a VO: 1 = PUE, 2 = PPD."""
+        return self.CODIGO_TIPO.get(self.tipo, 0)
+
+
+class ConceptoDocumentoFiscal(models.Model):
+    """
+    Una línea del documento fiscal (un servicio facturado).
+
+    Objetivo: un PUE puede llevar varios servicios (Diagnóstico + Limpieza y
+    Mantenimiento). El PPD lleva una sola línea de anticipo.
+
+    Args/campos:
+        documento: documento fiscal dueño de la línea.
+        descripcion: texto que ve el cliente en la factura.
+        clave_sat / clave_unidad: catálogos del SAT que exige el CFDI.
+        cantidad / precio_unitario / importe: montos antes de IVA.
+
+    Efectos secundarios:
+        Ninguno. Las líneas las arma facturacion_documentos.py.
+    """
+
+    documento = models.ForeignKey(
+        DocumentoFiscalOrden,
+        on_delete=models.CASCADE,
+        related_name='conceptos',
+        help_text='Documento fiscal al que pertenece la línea',
+    )
+    descripcion = models.CharField(
+        max_length=200,
+        help_text='Texto del concepto tal como aparece en la factura',
+    )
+    clave_sat = models.CharField(
+        max_length=12,
+        help_text='ClaveProdServ del SAT (ej. 81111812 servicios técnicos)',
+    )
+    clave_unidad = models.CharField(
+        max_length=6,
+        help_text='ClaveUnidad del SAT (ej. E48 unidad de servicio)',
+    )
+    cantidad = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('1.00'),
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='Precio antes de IVA',
+    )
+    importe = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        help_text='cantidad × precio_unitario (antes de IVA)',
+    )
+    orden_linea = models.PositiveSmallIntegerField(
+        default=1,
+        help_text='Posición de la línea dentro del documento',
+    )
+
+    class Meta:
+        verbose_name = 'Concepto de documento fiscal'
+        verbose_name_plural = 'Conceptos de documentos fiscales'
+        ordering = ['documento_id', 'orden_linea', 'id']
+
+    def __str__(self):
+        return f'{self.descripcion} — ${self.importe}'

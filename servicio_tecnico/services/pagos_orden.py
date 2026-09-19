@@ -41,6 +41,10 @@ PERMISO_REGISTRAR_PAGO = 'servicio_tecnico.add_pagoorden'
 # Efectivo/otro se cobraron en caja: no piden validación de Facturación.
 METODOS_REQUIEREN_VALIDACION = ('transferencia', 'tarjeta')
 
+# El diagnóstico se cobra aparte de las piezas (ver PagoOrden.TIPO_PAGO_CHOICES).
+# Todo lo que tenga este tipo se excluye del saldo de la reparación.
+TIPO_PAGO_DIAGNOSTICO = 'diagnostico'
+
 # Quién puede marcar "ya aparece / no aparece". Recepción cobra, no concilia.
 ROLES_PUEDEN_VALIDAR_PAGO = (
     'facturacion',
@@ -310,8 +314,13 @@ def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenC
 
     total = _dinero(total_cotizacion_con_iva + total_vm)
 
-    # Paso: suma de abonos ya capturados (si no hay, 0).
-    agregado = orden.pagos.aggregate(total=Sum('monto'))['total']
+    # Paso: suma de abonos ya capturados (si no hay, 0). Excluimos el
+    # diagnóstico porque tampoco está sumado en `total`: si lo contáramos
+    # aquí, el saldo de piezas se vería pagado de más.
+    agregado = (
+        orden.pagos.exclude(tipo=TIPO_PAGO_DIAGNOSTICO)
+        .aggregate(total=Sum('monto'))['total']
+    )
     pagado = _dinero(agregado or Decimal('0.00'))
 
     saldo = _dinero(total - pagado)
@@ -599,20 +608,29 @@ def registrar_pago(
             .select_for_update()
             .get(pk=orden.pk)
         )
-        resumen = calcular_resumen_cobro(orden_bloqueada, codigo_pais=codigo_pais)
-
-        # Paso: sin cotización ni venta no hay cifra contra la cual abonar.
-        if resumen.total_a_cobrar <= Decimal('0.00'):
-            raise ValidationError(
-                'No hay un total a cobrar todavía. Genera la cotización '
-                'o una venta mostrador antes de registrar un pago.'
+        # Paso: el diagnóstico tiene su propio techo (la mano de obra), no el
+        # total de piezas. Su validación vive en pagos_diagnostico.py.
+        if tipo == TIPO_PAGO_DIAGNOSTICO:
+            from servicio_tecnico.services.pagos_diagnostico import (
+                validar_monto_pago_diagnostico,
             )
 
-        if monto_dec > resumen.saldo:
-            raise ValidationError(
-                f'El pago (${monto_dec}) supera el saldo pendiente '
-                f'(${resumen.saldo}).'
-            )
+            validar_monto_pago_diagnostico(orden_bloqueada, monto_dec)
+        else:
+            resumen = calcular_resumen_cobro(orden_bloqueada, codigo_pais=codigo_pais)
+
+            # Paso: sin cotización ni venta no hay cifra contra la cual abonar.
+            if resumen.total_a_cobrar <= Decimal('0.00'):
+                raise ValidationError(
+                    'No hay un total a cobrar todavía. Genera la cotización '
+                    'o una venta mostrador antes de registrar un pago.'
+                )
+
+            if monto_dec > resumen.saldo:
+                raise ValidationError(
+                    f'El pago (${monto_dec}) supera el saldo pendiente '
+                    f'(${resumen.saldo}).'
+                )
 
         # Paso: transferencia/tarjeta nacen pendientes; efectivo no se concilia.
         pago = PagoOrden(

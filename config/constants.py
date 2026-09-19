@@ -48,7 +48,7 @@ GAMA_EQUIPO_CHOICES = [
 ]
 
 # ============================================================================
-# UMBRALES DE GAMA POR MANO DE OBRA (cascada)
+# UMBRALES DE GAMA POR MANO DE OBRA (cascada legada)
 # ============================================================================
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Al crear la orden, la gama se estima por marca/modelo (catálogo ReferenciaGamaEquipo).
@@ -57,9 +57,61 @@ GAMA_EQUIPO_CHOICES = [
 #
 # Ejemplos: $661 → media; $1002 → alta.
 # Si el costo es 0 (aún no registrado), no se cambia la gama del modelo.
+#
+# ⚠️ LEGADO (Septiembre 2026): adivinar la gama a partir del dinero dejó de ser
+# confiable. Los montos históricos se tecleaban a mano y no había criterio fijo
+# sobre si incluían IVA, así que $661 y $570 podían significar el mismo servicio.
+# Hoy la gama se deriva del PERFIL de diagnóstico elegido (ver bloque siguiente).
+# Estos umbrales se conservan solo para órdenes viejas sin perfil capturado.
 GAMA_POR_MANO_OBRA_UMBRAL_MEDIA = 400   # >= 400 y < 800 → media
 GAMA_POR_MANO_OBRA_UMBRAL_ALTA = 800    # >= 800 → alta
 # < 400 → baja
+
+# ============================================================================
+# PERFILES DE DIAGNÓSTICO (catálogo cerrado - Septiembre 2026)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# La "mano de obra" de una orden es en realidad el diagnóstico, y su precio no
+# es libre: sale del tarifario que Gerencia administra en el panel de parámetros
+# del cotizador (almacen.utils.parametros_cotizador.obtener_profit_config).
+#
+# Antes el técnico escribía el monto a mano. Eso traía dos problemas:
+#   1. El mismo servicio se capturaba con montos distintos según la persona.
+#   2. Nadie sabía si el número incluía IVA, y al facturar el desglose salía mal.
+#
+# Ahora el técnico elige QUÉ diagnóstico cobró y SIGMA pone el precio. El monto
+# guardado siempre es SIN IVA, que es como lo necesita el CFDI para desglosar.
+#
+# Las claves son las mismas de PERFILES_PROFIT en el cotizador: si aquí y allá
+# no coinciden, el tarifario no encuentra el precio.
+PERFIL_DIAGNOSTICO_CHOICES = [
+    ('mostrador', 'Mostrador (sin cargo de diagnóstico)'),
+    ('estandar', 'Estándar'),
+    ('express', 'Express'),
+    ('alta_gama', 'Alta Gama'),
+    ('server', 'Server'),
+    ('rep_nivel_componente', 'Reparación nivel componente (sin cargo)'),
+]
+
+# Perfil elegido → gama que le corresponde al equipo.
+#
+# Cómo leer cada entrada:
+#   'gama'        → gama que se aplica. None significa "no tocar la gama".
+#   'compatibles' → gamas que ya son válidas para este perfil; si el equipo ya
+#                   está en una de ellas, se respeta y no se sobrescribe.
+#
+# Estándar es el único perfil que cubre dos gamas: un equipo de gama baja y uno
+# de gama media pagan el mismo diagnóstico. Por eso, si el catálogo marca/modelo
+# ya dijo 'baja', el perfil Estándar no lo sube a 'media' — no tiene con qué
+# distinguirlos, y el catálogo sí.
+PERFIL_DIAGNOSTICO_GAMA = {
+    'mostrador': {'gama': None, 'compatibles': ()},
+    'estandar': {'gama': 'media', 'compatibles': ('baja', 'media')},
+    'express': {'gama': 'alta', 'compatibles': ()},
+    'alta_gama': {'gama': 'alta', 'compatibles': ()},
+    'server': {'gama': 'alta', 'compatibles': ()},
+    'rep_nivel_componente': {'gama': None, 'compatibles': ()},
+}
 
 # ============================================================================
 # ESTADOS DE ORDEN DE SERVICIO - Workflow completo

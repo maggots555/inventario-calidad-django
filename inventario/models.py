@@ -31,6 +31,19 @@ class Sucursal(models.Model):
         help_text="Horario público para clientes. Ej: Lunes a viernes 9:00 - 18:00, Sábados 9:00 - 14:00",
     )
     
+    # Facturación (autofacturador)
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El cliente teclea un "webId" en el portal del facturador para pedir su
+    # factura. Ese webId se arma como PREFIJO + dígitos del folio, por ejemplo
+    # SAT9596. Antes el prefijo se adivinaba leyendo el nombre de la sucursal;
+    # aquí queda explícito para que una sucursal nueva no rompa la facturación.
+    prefijo_facturacion = models.CharField(
+        max_length=6,
+        blank=True,
+        verbose_name="Prefijo de facturación",
+        help_text="Prefijo del webId del autofacturador (SAT, DROP, MTY, GDL). Vacío = no factura.",
+    )
+
     # Estado y observaciones
     activa = models.BooleanField(default=True, help_text="Sucursal activa")
     observaciones = models.TextField(blank=True, help_text="Observaciones adicionales")

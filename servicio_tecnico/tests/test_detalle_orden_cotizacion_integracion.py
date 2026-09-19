@@ -35,6 +35,7 @@ from servicio_tecnico.models import (
     PiezaCotizada,
     SeguimientoPieza,
 )
+from servicio_tecnico.tests.helpers_tarifario import sembrar_tarifario
 from servicio_tecnico.views import detalle_orden
 
 
@@ -51,6 +52,8 @@ class DetalleOrdenCotizacionIntegracionTest(TestCase):
     databases = {'default', 'mexico'}
 
     def setUp(self):
+        # El diagnóstico se cobra por tarifario: lo fijamos para no depender del .env
+        sembrar_tarifario()
         self.factory = RequestFactory()
         self.sucursal = Sucursal.objects.create(
             nombre='Sucursal Cotiz Integración',
@@ -128,19 +131,23 @@ class DetalleOrdenCotizacionIntegracionTest(TestCase):
 
     def test_generar_cotizacion_copia_mo_y_no_cambia_estado(self):
         """
-        Feliz: form_type=generar_cotizacion crea Cotizacion con la MO enviada.
+        Feliz: form_type=generar_cotizacion crea Cotizacion con la MO del tarifario.
+
+        El POST manda el TIPO de diagnóstico, no el monto: el precio lo
+        resuelve SIGMA. Por eso la cotización nace con $570 (Estándar).
         """
         response = self._post({
             'form_type': 'generar_cotizacion',
-            'costo_mano_obra': '500.00',
+            'perfil_diagnostico': 'estandar',
         })
         self.assertEqual(response.status_code, 302)
 
         self.orden.refresh_from_db()
         self.assertTrue(hasattr(self.orden, 'cotizacion'))
         cotizacion = self.orden.cotizacion
-        self.assertEqual(cotizacion.costo_mano_obra, Decimal('500.00'))
-        self.assertEqual(self.orden.costo_mano_obra, Decimal('500.00'))
+        self.assertEqual(cotizacion.costo_mano_obra, Decimal('570.00'))
+        self.assertEqual(self.orden.costo_mano_obra, Decimal('570.00'))
+        self.assertEqual(self.orden.perfil_diagnostico, 'estandar')
         # El handler documenta que NO cambia estado automáticamente.
         self.assertEqual(self.orden.estado, 'diagnostico')
         self.assertTrue(
@@ -161,7 +168,7 @@ class DetalleOrdenCotizacionIntegracionTest(TestCase):
         )
         response = self._post({
             'form_type': 'generar_cotizacion',
-            'costo_mano_obra': '999.00',
+            'perfil_diagnostico': 'server',
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Cotizacion.objects.filter(orden=self.orden).count(), 1)

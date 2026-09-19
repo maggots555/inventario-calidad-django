@@ -1,20 +1,23 @@
 """
-Cerebro de la facturación en demanda (autofacturador VO → SIGMA).
+Cerebro del autofacturador (portal VO → SIGMA).
 
 Objetivo de negocio:
-    El portal http://201.149.21.30/facturador pide a SIGMA los datos de una
-    venta (GET) para timbrar el CFDI. SIGMA NO timbra: solo arma el JSON
-    con encabezado + conceptos SAT a partir de cotización y pagos.
+    El cliente entra al portal de facturación, teclea su `webId` y el portal
+    le pregunta a SIGMA qué debe timbrar (GET). SIGMA NO timbra: arma el JSON
+    con encabezado + conceptos SAT. Cuando VO termina, devuelve el CFDI
+    timbrado (PUT) y aquí guardamos XML, PDF y UUID.
 
-EXPLICACIÓN PARA PRINCIPIANTES:
-    El `webId` del API es un número. En SIGMA el folio que ve el cliente
-    es `orden_cliente` (ej. OOW-11902). Extraemos solo los dígitos:
-    OOW-11902 → 11902. Si dos órdenes caen al mismo número, no adivinamos.
+EXPLICACIÓN PARA PRINCIPIANTES — el webId manda:
+    `SAT9596-1` significa "sucursal Satélite, folio 9596, documento tipo 1
+    (PUE)". De ahí sacamos la orden y el documento exacto. Cómo se arma y se
+    lee ese texto está en facturacion_web_id.py; qué se puede facturar y por
+    cuánto, en facturacion_documentos.py. Este archivo solo traduce eso al
+    contrato HTTP que espera VO.
 
 Efectos secundarios:
-    El GET deja constancia en ComprobanteFiscalOrden (solicitado_en) para
-    que el PUT posterior pueda guardar XML y PDF. El PUT escribe archivos
-    en media y marca factura_emitida en la orden.
+    El GET deja constancia en DocumentoFiscalOrden (solicitado_en), requisito
+    para aceptar el PUT. El PUT escribe archivos en media y marca
+    factura_emitida en la orden.
 """
 
 from __future__ import annotations
@@ -37,23 +40,27 @@ from django.utils.dateparse import parse_datetime
 
 from config.paises_config import get_pais_actual
 from servicio_tecnico.models import DetalleEquipo, OrdenServicio
-from servicio_tecnico.models_facturacion import ComprobanteFiscalOrden
-from servicio_tecnico.services.pagos_orden import IVA_TASA_MX, _db_de, calcular_resumen_cobro
+from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
+from servicio_tecnico.services.facturacion_documentos import (
+    aplica_autofacturacion,
+    sincronizar_documentos_orden,
+)
+from servicio_tecnico.services.facturacion_web_id import (  # noqa: F401
+    PartesWebId,
+    construir_web_id,
+    desglosar_web_id,
+    extraer_digitos,
+    filtrar_ordenes_por_prefijo,
+)
+from servicio_tecnico.services.pagos_orden import _db_de
 
 CENTAVO = Decimal('0.01')
 
-# Catálogo interno que esperaba el portal VO (PDF SICSER 4).
+# Catálogo interno que espera el portal VO (PDF SICSER 4).
 EMPRESA_EMISORA = '2'
 OBJETO_IMPUESTO = 2
 IMPUESTOS_IVA = '[4]'
-
-# Claves SAT genéricas (fase 1: defaults; un catálogo fino puede llegar después).
-CLAVE_SAT_PIEZA = '43211600'
-CLAVE_UNIDAD_PIEZA = 'H87'
-UNIDAD_PIEZA = 'PIEZA'
-CLAVE_SAT_SERVICIO = '81111812'
-CLAVE_UNIDAD_SERVICIO = 'E48'
-UNIDAD_SERVICIO = 'UNIDAD DE SERVICIO'
+MONEDA_DEFAULT = 'MXN'
 
 # forma_pago SAT c_FormaPago a partir de PagoOrden.metodo.
 MAPEO_FORMA_PAGO = {
@@ -63,14 +70,24 @@ MAPEO_FORMA_PAGO = {
     'otro': '99',
 }
 
+# Cómo se llama cada tipo en el catálogo c_MetodoPago del SAT.
+METODO_PAGO_SAT = {
+    DocumentoFiscalOrden.TIPO_PUE: 'PUE',
+    DocumentoFiscalOrden.TIPO_PPD: 'PPD',
+}
+
 MENSAJE_BAD_REQUEST = 'Bad Request'
 MENSAJE_NO_ENCONTRADO = 'No se encontró el folio'
-RAZON_NO_NUMERICO = 'Información de folio no numérico'
-RAZON_SIN_ACU = 'la venta no tiene estatus ACU'
-RAZON_SIN_PAGOS = 'la venta no tiene pagos para facturar'
+RAZON_WEB_ID_INVALIDO = 'El webId no tiene un formato válido'
+RAZON_SIN_PAGOS = 'la venta no tiene pagos validados para facturar'
 RAZON_PAGO_INVALIDO = 'forma de pago no válida, método de pago no válido'
-RAZON_COLISION = 'hay más de una orden con el mismo folio numérico'
+RAZON_COLISION = 'hay más de una orden con el mismo folio'
+RAZON_TIPO_AMBIGUO = (
+    'el folio tiene más de un documento facturable; '
+    'indique el tipo en el webId (-1 PUE, -2 PPD)'
+)
 RAZON_SOLO_MEXICO = 'la facturación en demanda solo aplica en México'
+RAZON_NO_FACTURABLE = 'la venta no está disponible para autofacturación'
 RAZON_SIN_GET_PREVIO = (
     'Solo se recibirán datos de facturas timbradas que se hayan '
     'solicitado previamente por el método GET'
@@ -96,95 +113,14 @@ class FacturacionDemandaError(Exception):
         self.razon = razon
 
 
-def extraer_digitos(texto: str) -> str:
-    """
-    Deja solo los números de un folio de cliente.
-
-    Args:
-        texto: ej. 'OOW-11902' o 'FL-2026-0001'.
-
-    Returns:
-        str: '11902' o '20260001'. Cadena vacía si no hay dígitos.
-    """
-    return ''.join(caracter for caracter in (texto or '') if caracter.isdigit())
-
-
-def web_id_a_entero(web_id: str) -> int:
-    """
-    Convierte el path {webId} a entero. Si no es numérico, lanza 400.
-
-    Args:
-        web_id: fragmento de URL (puede traer ceros a la izquierda).
-
-    Returns:
-        int: el número (0123 → 123).
-    """
-    bruto = str(web_id or '').strip()
-    # Paso: el PDF exige folio numérico; letras → 400, no 404 de Django.
-    if not bruto.isdigit():
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_NO_NUMERICO)
-    return int(bruto)
-
-
 def _a_centavos(valor: Decimal) -> Decimal:
     """Redondea dinero a 2 decimales (0.005 sube)."""
-    return Decimal(valor).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+    return Decimal(valor or 0).quantize(CENTAVO, rounding=ROUND_HALF_UP)
 
 
 def _a_float(valor: Decimal) -> float:
     """JSON numérico como el ejemplo del PDF (no string)."""
     return float(_a_centavos(valor))
-
-
-def _precio_sin_iva_si_incluye(monto: Decimal, incluye_iva: bool) -> Decimal:
-    """
-    El API pide precio de concepto SIN IVA.
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Las piezas cotizadas ya están sin IVA. La venta mostrador en SIGMA
-    suele ir con IVA incluido: aquí lo quitamos para no duplicar el 16%.
-    """
-    monto = _a_centavos(monto)
-    if not incluye_iva or monto <= 0:
-        return monto
-    return _a_centavos(monto / (Decimal('1') + IVA_TASA_MX))
-
-
-def _concepto(
-    *,
-    descripcion: str,
-    precio: Decimal,
-    cantidad: int,
-    es_servicio: bool,
-    clave_cliente: str,
-) -> dict[str, Any]:
-    """Arma un renglón del array `conceptos` del PDF."""
-    if es_servicio:
-        clave_sat, clave_unidad, unidad = (
-            CLAVE_SAT_SERVICIO,
-            CLAVE_UNIDAD_SERVICIO,
-            UNIDAD_SERVICIO,
-        )
-    else:
-        clave_sat, clave_unidad, unidad = (
-            CLAVE_SAT_PIEZA,
-            CLAVE_UNIDAD_PIEZA,
-            UNIDAD_PIEZA,
-        )
-    return {
-        'clave_producto_servicio': clave_sat,
-        'descripcion': descripcion,
-        'clave_unidad': clave_unidad,
-        'precio': _a_float(precio),
-        'numero_identificacion': 'None',
-        'unidad': unidad,
-        'objeto_impuesto': OBJETO_IMPUESTO,
-        'impuestos': IMPUESTOS_IVA,
-        'empresa': EMPRESA_EMISORA,
-        'clave_producto_cliente': clave_cliente or 'P0000',
-        'cantidad': cantidad,
-        'descuento': 0,
-    }
 
 
 def _codigo_pais() -> str:
@@ -195,12 +131,28 @@ def _codigo_pais() -> str:
         return 'MX'
 
 
+def partes_web_id(web_id: str) -> PartesWebId:
+    """
+    Lee el webId del path o lanza 400 si no se entiende.
+
+    Args:
+        web_id: fragmento de URL ('SAT9596-1', 'SAT9596', '9596').
+
+    Returns:
+        PartesWebId con prefijo, dígitos y tipo.
+    """
+    partes = desglosar_web_id(web_id)
+    if partes is None:
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_WEB_ID_INVALIDO)
+    return partes
+
+
 def buscar_ordenes_por_web_id(numero: int) -> list[OrdenServicio]:
     """
     Órdenes cuyo `orden_cliente` se reduce al mismo entero que `numero`.
 
     Args:
-        numero: webId ya validado (ej. 11902).
+        numero: dígitos del webId ya validados (ej. 9596).
 
     Returns:
         list: 0, 1 o varias (colisión OOW-1234 vs FL-1234).
@@ -228,6 +180,7 @@ def buscar_ordenes_por_web_id(numero: int) -> list[OrdenServicio]:
             'cotizacion',
             'venta_mostrador',
             'detalle_equipo',
+            'sucursal',
         )
         .prefetch_related(
             'pagos',
@@ -238,160 +191,166 @@ def buscar_ordenes_por_web_id(numero: int) -> list[OrdenServicio]:
     )
 
 
-def _exige_acu(orden: OrdenServicio) -> None:
+def resolver_documento(web_id: str) -> DocumentoFiscalOrden:
     """
-    ACU en SICSER = Cliente Autoriza Cotización.
+    Del texto que tecleó el cliente al documento fiscal exacto.
 
-    En SIGMA el estado `cliente_acepta_cotizacion` es un PASO: la orden
-    sigue a reparación/entrega. El dato que sí se queda es
-    `cotizacion.usuario_acepto is True`.
-    """
-    if orden.estado in ('cancelado', 'rechazada'):
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_ACU)
-    cotizacion = getattr(orden, 'cotizacion', None)
-    if cotizacion is None or cotizacion.usuario_acepto is not True:
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_ACU)
+    Objetivo de negocio:
+        Es el corazón del GET y del PUT. Encuentra la orden, recalcula qué
+        se puede facturar hoy y devuelve el documento que corresponde al
+        webId recibido.
 
-
-def _forma_y_metodo_pago(orden: OrdenServicio, cubierto_100: bool) -> tuple[str, str]:
-    """
-    Mapea abonos SIGMA → catálogos SAT.
+    Args:
+        web_id: fragmento de URL ('SAT9596-1').
 
     Returns:
-        tuple: (metodo_pago PUE/PPD, forma_pago '01'/'03'/…).
+        DocumentoFiscalOrden listo para armar el payload.
+
+    Raises:
+        FacturacionDemandaError: 400 si el webId es inválido o ambiguo,
+        404 si no existe folio o todavía no hay nada facturable.
+
+    Efectos secundarios:
+        Recalcula y guarda los documentos de la orden (ver
+        facturacion_documentos.sincronizar_documentos_orden).
+    """
+    if _codigo_pais() != 'MX':
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SOLO_MEXICO)
+
+    partes = partes_web_id(web_id)
+
+    # Paso 1: buscar por los dígitos del folio (OOW-9596 → 9596).
+    ordenes = buscar_ordenes_por_web_id(partes.numero)
+    if not ordenes:
+        raise FacturacionDemandaError(404, MENSAJE_NO_ENCONTRADO, MENSAJE_NO_ENCONTRADO)
+
+    # Paso 2: si hay varias, el prefijo de sucursal desempata (SAT vs DROP).
+    ordenes = filtrar_ordenes_por_prefijo(ordenes, partes.prefijo)
+    if len(ordenes) > 1:
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_COLISION)
+
+    orden = ordenes[0]
+    if not aplica_autofacturacion(orden):
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_NO_FACTURABLE)
+
+    # Paso 3: recalcular. Si el cliente acaba de pagar, su documento nace aquí.
+    documentos = sincronizar_documentos_orden(orden)
+    if not documentos:
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_PAGOS)
+
+    # Paso 4: el sufijo del webId elige el documento. Sin sufijo solo
+    # funciona si hay uno nada más (si no, no adivinamos: pedimos el tipo).
+    if partes.tipo is not None:
+        for documento in documentos:
+            if documento.tipo == partes.tipo:
+                return documento
+        raise FacturacionDemandaError(404, MENSAJE_NO_ENCONTRADO, MENSAJE_NO_ENCONTRADO)
+
+    if len(documentos) > 1:
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_TIPO_AMBIGUO)
+    return documentos[0]
+
+
+def _forma_pago(orden) -> str:
+    """
+    Clave c_FormaPago del SAT a partir de cómo pagó el cliente.
+
+    Args:
+        orden: OrdenServicio con sus pagos.
+
+    Returns:
+        str: '01' efectivo, '03' transferencia, '04' tarjeta, '99' mixto.
     """
     metodos = {pago.metodo for pago in orden.pagos.all()}
     if not metodos:
         raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_PAGOS)
-    # Paso: un solo método → su clave SAT; mixtos → 99 (por definir).
-    if len(metodos) == 1:
-        metodo = next(iter(metodos))
-        forma = MAPEO_FORMA_PAGO.get(metodo)
-        if not forma:
-            raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_PAGO_INVALIDO)
-    else:
-        forma = '99'
-    metodo_cfdi = 'PUE' if cubierto_100 else 'PPD'
-    return metodo_cfdi, forma
+    # Paso: un solo método → su clave SAT; mezclados → 99 (por definir).
+    if len(metodos) > 1:
+        return '99'
+    forma = MAPEO_FORMA_PAGO.get(next(iter(metodos)))
+    if not forma:
+        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_PAGO_INVALIDO)
+    return forma
 
 
-def _conceptos_piezas(orden: OrdenServicio) -> list[dict[str, Any]]:
-    """Líneas de piezas aceptadas (precio al cliente, sin IVA)."""
-    cotizacion = getattr(orden, 'cotizacion', None)
-    if cotizacion is None:
-        return []
-    conceptos: list[dict[str, Any]] = []
-    piezas = cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=True)
-    for pieza in piezas:
-        if pieza.precio_unitario_cliente is not None:
-            precio = pieza.precio_unitario_cliente
-        else:
-            precio = pieza.costo_unitario
-        nombre = pieza.componente.nombre if pieza.componente_id else 'Pieza'
-        extra = (pieza.descripcion_adicional or '').strip()
-        descripcion = f'{nombre} / {extra}' if extra else nombre
-        clave = f'P{pieza.componente_id:04d}' if pieza.componente_id else 'P0000'
-        conceptos.append(
-            _concepto(
-                descripcion=descripcion.upper(),
-                precio=precio,
-                cantidad=pieza.cantidad,
-                es_servicio=False,
-                clave_cliente=clave,
-            )
-        )
-    return conceptos
-
-
-def _conceptos_venta_mostrador(orden: OrdenServicio) -> list[dict[str, Any]]:
-    """Servicios y piezas de VM (en SIGMA el monto suele incluir IVA)."""
-    venta = getattr(orden, 'venta_mostrador', None)
-    if venta is None:
-        return []
-    conceptos: list[dict[str, Any]] = []
-
-    def agregar_servicio(descripcion: str, monto: Decimal, clave: str) -> None:
-        if monto <= 0:
-            return
-        conceptos.append(
-            _concepto(
-                descripcion=descripcion,
-                precio=_precio_sin_iva_si_incluye(monto, incluye_iva=True),
-                cantidad=1,
-                es_servicio=True,
-                clave_cliente=clave,
-            )
-        )
-
-    # Paso: cada bandera de VM es un concepto aparte (limpieza, kit, etc.).
-    if venta.paquete and venta.paquete != 'ninguno':
-        agregar_servicio(
-            f'PAQUETE {venta.get_paquete_display()}'.upper(),
-            venta.costo_paquete,
-            'S-PAQ',
-        )
-    if venta.incluye_cambio_pieza:
-        agregar_servicio('CAMBIO DE PIEZA', venta.costo_cambio_pieza, 'S-CAM')
-    if venta.incluye_limpieza:
-        agregar_servicio('LIMPIEZA Y MANTENIMIENTO', venta.costo_limpieza, 'S-LIM')
-    if venta.incluye_kit_limpieza:
-        agregar_servicio('KIT DE LIMPIEZA', venta.costo_kit, 'S-KIT')
-    if venta.incluye_reinstalacion_so:
-        agregar_servicio('REINSTALACION DE SO', venta.costo_reinstalacion, 'S-SO')
-    if venta.incluye_respaldo:
-        agregar_servicio('RESPALDO DE INFORMACION', venta.costo_respaldo, 'S-RES')
-
-    for pieza_vm in venta.piezas_vendidas.all():
-        precio_neto = _precio_sin_iva_si_incluye(
-            pieza_vm.precio_unitario,
-            incluye_iva=True,
-        )
-        conceptos.append(
-            _concepto(
-                descripcion=(pieza_vm.descripcion_pieza or 'PIEZA VM').upper(),
-                precio=precio_neto,
-                cantidad=pieza_vm.cantidad,
-                es_servicio=False,
-                clave_cliente=f'VM{pieza_vm.pk}',
-            )
-        )
-    return conceptos
-
-
-def armar_payload_venta(orden: OrdenServicio, web_id: int) -> dict[str, Any]:
+def _concepto_json(concepto, indice: int) -> dict[str, Any]:
     """
-    JSON de venta listo para el GET (encabezado + conceptos).
+    Traduce un ConceptoDocumentoFiscal al renglón que espera VO.
 
     Args:
-        orden: ya validada (ACU + pagos).
-        web_id: número público del path.
+        concepto: ConceptoDocumentoFiscal guardado.
+        indice: posición (para la clave interna del cliente).
 
     Returns:
-        dict: exactamente las llaves del PDF SICSER 4.
+        dict con las llaves exactas del contrato SICSER 4.
     """
-    resumen = calcular_resumen_cobro(orden, codigo_pais='MX')
-    metodo_pago, forma_pago = _forma_y_metodo_pago(orden, resumen.cubierto_100)
+    return {
+        'clave_producto_servicio': concepto.clave_sat,
+        'descripcion': concepto.descripcion,
+        'clave_unidad': concepto.clave_unidad,
+        'precio': _a_float(concepto.precio_unitario),
+        'numero_identificacion': 'None',
+        'unidad': concepto.clave_unidad,
+        'objeto_impuesto': OBJETO_IMPUESTO,
+        'impuestos': IMPUESTOS_IVA,
+        'empresa': EMPRESA_EMISORA,
+        'clave_producto_cliente': f'S{indice:04d}',
+        'cantidad': _a_float(concepto.cantidad),
+        'descuento': 0,
+    }
+
+
+def armar_payload_documento(documento: DocumentoFiscalOrden) -> dict[str, Any]:
+    """
+    JSON de la venta listo para el GET (encabezado + conceptos).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El encabezado trae el IVA desglosado (subtotal, iva, total) para que el
+    portal no tenga que calcular nada y para que Contabilidad pueda cuadrar
+    contra SIGMA sin abrir el XML.
+
+    Args:
+        documento: DocumentoFiscalOrden ya resuelto.
+
+    Returns:
+        dict con 'encabezado' y 'conceptos'.
+
+    Efectos secundarios:
+        Lee la orden y sus pagos. No escribe.
+    """
+    orden = documento.orden
 
     ultimo_pago = orden.pagos.order_by('-fecha_pago').first()
     fecha_ticket = ultimo_pago.fecha_pago if ultimo_pago else timezone.now()
-    folio_visible = ''
+
     try:
         folio_visible = (orden.detalle_equipo.orden_cliente or '').strip()
     except Exception:
+        folio_visible = ''
+    if not folio_visible:
         folio_visible = orden.numero_orden_interno
 
-    conceptos = _conceptos_piezas(orden) + _conceptos_venta_mostrador(orden)
+    conceptos = [
+        _concepto_json(concepto, indice)
+        for indice, concepto in enumerate(documento.conceptos.all(), start=1)
+    ]
     if not conceptos:
         raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_PAGOS)
 
     return {
         'encabezado': {
             'fecha_ticket': fecha_ticket.isoformat(),
-            'folio': folio_visible or str(web_id),
-            'web_id': str(web_id),
-            'total': _a_float(resumen.total_a_cobrar),
-            'metodo_pago': metodo_pago,
-            'forma_pago': forma_pago,
+            'folio': folio_visible,
+            'web_id': documento.web_id,
+            # 1 = PUE, 2 = PPD (estructura escalable pedida por VO).
+            'tipo_factura': documento.codigo_tipo,
+            'metodo_pago': METODO_PAGO_SAT[documento.tipo],
+            'forma_pago': _forma_pago(orden),
+            'moneda': documento.moneda or MONEDA_DEFAULT,
+            'subtotal': _a_float(documento.subtotal),
+            'tasa_iva': float(documento.tasa_iva),
+            'iva': _a_float(documento.iva),
+            'total': _a_float(documento.total),
         },
         'conceptos': conceptos,
     }
@@ -399,59 +358,39 @@ def armar_payload_venta(orden: OrdenServicio, web_id: int) -> dict[str, Any]:
 
 def obtener_venta_para_facturar(web_id: str) -> dict[str, Any]:
     """
-    Punto de entrada del GET: valida país, ACU, pagos y arma el JSON.
+    Punto de entrada del GET: resuelve el documento y arma el JSON.
 
     Args:
-        web_id: fragmento de URL (debe ser numérico).
+        web_id: fragmento de URL ('SAT9596-1').
 
     Returns:
-        dict: payload del PDF.
+        dict: payload para el portal VO.
 
     Efectos secundarios:
-        Escribe ComprobanteFiscalOrden.solicitado_en (reserva para el PUT).
+        Sincroniza documentos y marca `solicitado_en` (reserva para el PUT).
     """
-    if _codigo_pais() != 'MX':
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SOLO_MEXICO)
-
-    numero = web_id_a_entero(web_id)
-    ordenes = buscar_ordenes_por_web_id(numero)
-    if not ordenes:
-        raise FacturacionDemandaError(404, MENSAJE_NO_ENCONTRADO, MENSAJE_NO_ENCONTRADO)
-    if len(ordenes) > 1:
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_COLISION)
-
-    orden = ordenes[0]
-    _exige_acu(orden)
-    if not orden.pagos.exists():
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_PAGOS)
-    payload = armar_payload_venta(orden, numero)
-    # Paso: el PDF exige GET antes del PUT. Guardamos la “reserva”.
-    marcar_solicitud_facturacion(orden, numero)
+    documento = resolver_documento(web_id)
+    payload = armar_payload_documento(documento)
+    # Paso: el contrato exige GET antes del PUT. Guardamos la "reserva".
+    marcar_solicitud_facturacion(documento)
     return payload
 
 
-def marcar_solicitud_facturacion(orden: OrdenServicio, web_id: int) -> None:
+def marcar_solicitud_facturacion(documento: DocumentoFiscalOrden) -> None:
     """
-    Anota que el portal ya consultó esta venta (requisito del PUT).
+    Anota que el portal ya consultó este documento (requisito del PUT).
 
     Args:
-        orden: orden facturable.
-        web_id: número del path.
+        documento: DocumentoFiscalOrden consultado.
 
     Efectos secundarios:
-        Crea o actualiza ComprobanteFiscalOrden.solicitado_en.
+        Escribe `solicitado_en` la primera vez.
     """
-    db_alias = _db_de(orden)
-    ahora = timezone.now()
-    with transaction.atomic(using=db_alias):
-        comprobante, creado = ComprobanteFiscalOrden.objects.get_or_create(
-            orden=orden,
-            defaults={'web_id': web_id, 'solicitado_en': ahora},
-        )
-        if not creado and not comprobante.solicitado_en:
-            comprobante.solicitado_en = ahora
-            comprobante.web_id = web_id
-            comprobante.save(update_fields=['solicitado_en', 'web_id'])
+    if documento.solicitado_en:
+        return
+    db_alias = _db_de(documento.orden)
+    documento.solicitado_en = timezone.now()
+    documento.save(using=db_alias, update_fields=['solicitado_en', 'actualizado_en'])
 
 
 def _bytes_campo_base64(valor: Any, *, permitir_xml: bool = False) -> bytes:
@@ -500,25 +439,18 @@ def persistir_cfdi_timbrado(web_id: str, payload: dict[str, Any]) -> None:
     PUT: guarda XML, PDF y sellos. 204 si ok; 404 si no hubo GET.
 
     Args:
-        web_id: path numérico.
+        web_id: webId del path ('SAT9596-1').
         payload: JSON del portal VO (uuid, cfdi, pdf64, …).
 
     Efectos secundarios:
-        Escribe archivos en media, UUID en ComprobanteFiscalOrden,
+        Escribe archivos en media, UUID en DocumentoFiscalOrden y
         factura_emitida=True en la orden.
     """
-    if _codigo_pais() != 'MX':
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SOLO_MEXICO)
     if not isinstance(payload, dict):
         raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_PAYLOAD_CFDI)
 
-    numero = web_id_a_entero(web_id)
-    ordenes = buscar_ordenes_por_web_id(numero)
-    if not ordenes:
-        raise FacturacionDemandaError(404, MENSAJE_NO_ENCONTRADO, MENSAJE_NO_ENCONTRADO)
-    if len(ordenes) > 1:
-        raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_COLISION)
-    orden = ordenes[0]
+    documento = resolver_documento(web_id)
+    orden = documento.orden
 
     uuid_sat = str(payload.get('uuid') or '').strip()
     if not uuid_sat or len(uuid_sat) > 36:
@@ -531,54 +463,56 @@ def persistir_cfdi_timbrado(web_id: str, payload: dict[str, Any]) -> None:
 
     db_alias = _db_de(orden)
     with transaction.atomic(using=db_alias):
-        try:
-            comprobante = (
-                ComprobanteFiscalOrden.objects.using(db_alias)
-                .select_for_update()
-                .get(orden=orden)
-            )
-        except ComprobanteFiscalOrden.DoesNotExist as exc:
-            raise FacturacionDemandaError(
-                404, MENSAJE_NO_ENCONTRADO, RAZON_SIN_GET_PREVIO
-            ) from exc
+        bloqueado = (
+            DocumentoFiscalOrden.objects.using(db_alias)
+            .select_for_update()
+            .get(pk=documento.pk)
+        )
 
-        if not comprobante.solicitado_en:
+        if not bloqueado.solicitado_en:
             raise FacturacionDemandaError(
                 404, MENSAJE_NO_ENCONTRADO, RAZON_SIN_GET_PREVIO
             )
 
         # Paso: mismo UUID otra vez = el portal reintentó; no duplicamos.
-        if comprobante.esta_timbrado:
-            if comprobante.uuid == uuid_sat:
+        if bloqueado.esta_timbrado:
+            if bloqueado.uuid == uuid_sat:
                 return
-            raise FacturacionDemandaError(
-                400, MENSAJE_BAD_REQUEST, RAZON_YA_TIMBRADA
-            )
+            raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_YA_TIMBRADA)
 
-        comprobante.web_id = numero
-        comprobante.uuid = uuid_sat
-        comprobante.fecha_timbrado = fecha_timbrado
-        comprobante.cadena_original_sat = str(payload.get('cadenaOriginalSAT') or '')
-        comprobante.no_certificado_sat = str(payload.get('noCertificadoSAT') or '')[:40]
-        comprobante.no_certificado_cfdi = str(payload.get('noCertificadoCFDI') or '')[:40]
-        comprobante.sello_sat = str(payload.get('selloSAT') or '')
-        comprobante.sello_cfdi = str(payload.get('selloCFDI') or '')
-        comprobante.qr_code = str(payload.get('qrCode') or '')
-        comprobante.recibido_en = timezone.now()
-        comprobante.cfdi_xml.save(
+        bloqueado.uuid = uuid_sat
+        bloqueado.fecha_timbrado = fecha_timbrado
+        bloqueado.cadena_original_sat = str(payload.get('cadenaOriginalSAT') or '')
+        bloqueado.no_certificado_sat = str(payload.get('noCertificadoSAT') or '')[:40]
+        bloqueado.no_certificado_cfdi = str(payload.get('noCertificadoCFDI') or '')[:40]
+        bloqueado.sello_sat = str(payload.get('selloSAT') or '')
+        bloqueado.sello_cfdi = str(payload.get('selloCFDI') or '')
+        bloqueado.qr_code = str(payload.get('qrCode') or '')
+        bloqueado.recibido_en = timezone.now()
+        bloqueado.cfdi_xml.save(
             f'{nombre_base}.xml',
             ContentFile(xml_bytes),
             save=False,
         )
-        comprobante.pdf.save(
+        bloqueado.pdf.save(
             f'{nombre_base}.pdf',
             ContentFile(pdf_bytes),
             save=False,
         )
-        comprobante.save()
-        OrdenServicio.objects.using(db_alias).filter(pk=orden.pk).update(
-            factura_emitida=True,
+        bloqueado.save(using=db_alias)
+
+        # Paso: la orden queda "facturada" solo cuando YA NO queda ningún
+        # documento suyo sin timbrar. Si tiene PUE y PPD y apenas se timbró
+        # uno, el cliente todavía debe poder facturar el otro.
+        quedan_pendientes = (
+            DocumentoFiscalOrden.objects.using(db_alias)
+            .filter(orden=orden, uuid='')
+            .exists()
         )
+        if not quedan_pendientes:
+            OrdenServicio.objects.using(db_alias).filter(pk=orden.pk).update(
+                factura_emitida=True,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -691,64 +625,82 @@ def validar_secret_authenticate(secret_body: Optional[str]) -> None:
 
 def contexto_autofactura_seguimiento(orden: OrdenServicio) -> dict[str, Any]:
     """
-    Datos para el botón de autofactura en el enlace de seguimiento.
+    Datos del bloque de autofactura en el enlace de seguimiento del cliente.
 
     Objetivo de negocio:
-        El cliente NO ve API Key ni secret. Solo un enlace al portal VO
-        con el webId numérico (dígitos de orden_cliente).
+        Mostrarle al cliente su `webId` y el enlace al portal VO. El cliente
+        NO ve API Key ni secret: esos solo viajan servidor a servidor.
 
     Args:
         orden: OrdenServicio del enlace público.
 
     Returns:
-        dict con mostrar_autofactura, url_autofactura, factura_ya_emitida.
+        dict con:
+            mostrar_autofactura: si se pinta el bloque.
+            documentos: lista de dicts (web_id, tipo, descripcion, total).
+            url_autofactura: enlace al portal (con webId si hay uno solo).
+            factura_ya_emitida: si ya se timbró.
 
     Efectos secundarios:
-        Lecturas ORM (cotización, pagos). No escribe.
+        Recalcula los documentos de la orden (puede crear filas nuevas).
     """
     oculto = {
         'mostrar_autofactura': False,
+        'documentos': [],
         'url_autofactura': '',
         'factura_ya_emitida': False,
     }
-    # Paso: CFDI solo México; el portal VO no aplica a otros países.
+    # Paso 1: CFDI solo México; el portal VO no aplica a otros países.
     if _codigo_pais() != 'MX':
         return oculto
-    if orden.estado in ('cancelado', 'rechazada'):
+    if not aplica_autofacturacion(orden):
         return oculto
 
-    from django.core.exceptions import ObjectDoesNotExist
-
-    try:
-        folio = (orden.detalle_equipo.orden_cliente or '').strip()
-    except ObjectDoesNotExist:
+    # Paso 2: recalcular qué puede facturar hoy (aquí nacen los webId).
+    documentos = sincronizar_documentos_orden(orden)
+    if not documentos:
         return oculto
 
-    digitos = extraer_digitos(folio)
-    if not digitos:
-        return oculto
-
-    cotizacion = getattr(orden, 'cotizacion', None)
-    if cotizacion is None or cotizacion.usuario_acepto is not True:
-        return oculto
-    if not orden.pagos.exists():
-        return oculto
-
-    # Paso: ya timbrada → mensaje, no volver a abrir el facturador.
-    if orden.factura_emitida:
+    # Paso 3: solo ofrecemos los que aún no tienen UUID del SAT.
+    pendientes = [
+        documento for documento in documentos if not documento.esta_timbrado
+    ]
+    # Si Facturación ya marcó la orden como facturada (por ejemplo, la
+    # emitieron por fuera del portal) o ya no queda nada por timbrar,
+    # avisamos en lugar de mandarlo otra vez al facturador.
+    if orden.factura_emitida or not pendientes:
         return {
             'mostrar_autofactura': True,
+            'documentos': [],
             'url_autofactura': '',
             'factura_ya_emitida': True,
         }
+    documentos = pendientes
 
     portal = (getattr(settings, 'FACTURACION_WEB_PORTAL_URL', '') or '').rstrip('/')
     if not portal:
         return oculto
 
-    web_id = str(int(digitos))
+    datos = [
+        {
+            'web_id': documento.web_id,
+            'tipo': documento.get_tipo_display(),
+            'descripcion': documento.descripcion,
+            'total': documento.total,
+        }
+        for documento in documentos
+    ]
+
+    # Paso 4: con un solo documento precargamos el webId en la URL; con dos
+    # el cliente elige en el portal cuál quiere facturar.
+    if len(documentos) == 1:
+        url = f'{portal}?{urlencode({"webId": documentos[0].web_id})}'
+    else:
+        url = portal
+
     return {
         'mostrar_autofactura': True,
-        'url_autofactura': f'{portal}?{urlencode({"webId": web_id})}',
+        'documentos': datos,
+        'url_autofactura': url,
         'factura_ya_emitida': False,
     }

@@ -15,6 +15,7 @@ from config.constants import (
     TIPO_EQUIPO_CHOICES,
     MARCAS_EQUIPOS_CHOICES,  # Agregar constante de marcas
     GAMA_EQUIPO_CHOICES,
+    PERFIL_DIAGNOSTICO_CHOICES,
     ESTADO_ORDEN_CHOICES,
     PAQUETES_CHOICES,
     TIPO_IMAGEN_CHOICES,
@@ -267,11 +268,34 @@ class OrdenServicio(models.Model):
         decimal_places=2,
         default=Decimal('0.00'),
         help_text=(
-            "Costo de mano de obra del servicio (independiente de si ya hay cotización). "
-            "Al generar la cotización se copia a Cotizacion.costo_mano_obra."
+            "Costo de mano de obra del servicio, SIN IVA (independiente de si ya "
+            "hay cotización). Lo calcula SIGMA a partir de perfil_diagnostico; no "
+            "se teclea. Al generar la cotización se copia a Cotizacion.costo_mano_obra."
         ),
     )
-    
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Aquí queda QUÉ diagnóstico se cobró, no cuánto. El precio lo pone el
+    # tarifario del cotizador, así que si Gerencia sube la tarifa, las órdenes
+    # nuevas cobran el precio nuevo sin que nadie toque código.
+    #
+    # Guardar el perfil (y no solo el monto) sirve para dos cosas:
+    #   - Contabilidad puede verificar el importe contra el catálogo.
+    #   - La factura sabe que el monto es SIN IVA y lo desglosa bien.
+    #
+    # Vacío = orden anterior a este catálogo, cuando el monto se tecleaba libre.
+    perfil_diagnostico = models.CharField(
+        max_length=30,
+        choices=PERFIL_DIAGNOSTICO_CHOICES,
+        blank=True,
+        default='',
+        verbose_name="Tipo de diagnóstico",
+        help_text=(
+            "Tipo de diagnóstico cobrado. Define el monto de mano de obra (sin IVA) "
+            "según el tarifario del cotizador. Vacío = orden con monto capturado a mano."
+        ),
+    )
+
     # TIPO DE SERVICIO (Sistema Venta Mostrador)
     # =========================================================================
     # Indica el flujo PRINCIPAL de la orden, pero no restringe complementos
@@ -4769,10 +4793,16 @@ class PagoOrden(models.Model):
         Ninguno en save(). El historial y los avisos los escribe el servicio.
     """
 
+    # EXPLICACIÓN PARA PRINCIPIANTES — por qué 'diagnostico' es aparte:
+    # El diagnóstico (mano de obra de ingreso) NO entra en el total de piezas
+    # que calcula pagos_orden.py. Si lo mezcláramos con los demás abonos, el
+    # saldo de la reparación saldría mal. Al tenerlo como tipo propio podemos
+    # cobrarlo, facturarlo PUE y seguir sin ensuciar el saldo de piezas.
     TIPO_PAGO_CHOICES = [
         ('anticipo', 'Anticipo (50% para iniciar)'),
         ('saldo', 'Saldo (resto a la entrega)'),
         ('pago_completo', 'Pago en una sola exhibición'),
+        ('diagnostico', 'Diagnóstico / mano de obra'),
         ('otro', 'Otro abono'),
     ]
     METODO_PAGO_CHOICES = [
@@ -4886,8 +4916,11 @@ class PagoOrden(models.Model):
         ]
 
 
-# Comprobante CFDI del autofacturador (tabla propia; no hinchar OrdenServicio).
-from servicio_tecnico.models_facturacion import ComprobanteFiscalOrden  # noqa: E402, F401
+# Documentos fiscales PUE/PPD del autofacturador (tabla propia; no hinchar OrdenServicio).
+from servicio_tecnico.models_facturacion import (  # noqa: E402, F401
+    ConceptoDocumentoFiscal,
+    DocumentoFiscalOrden,
+)
 
 # Formato digital Nota de Venta Directa (venta mostrador / FL).
 from servicio_tecnico.models_formato_venta_mostrador import (  # noqa: E402, F401

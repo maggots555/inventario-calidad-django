@@ -44,7 +44,8 @@ from .models import (
     FormatoServicioGarantia,
     DanoEsteticoVistaGarantia,
     PagoOrden,
-    ComprobanteFiscalOrden,
+    ConceptoDocumentoFiscal,
+    DocumentoFiscalOrden,
     FormatoServicioVentaMostrador,
     DanoEsteticoVistaVentaMostrador,
 )
@@ -238,6 +239,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'tipo_servicio',  # NUEVO - FASE 2: Permite filtrar por tipo de servicio
+        'perfil_diagnostico',  # Contabilidad: qué diagnóstico se cobró
         'estado',
         'sucursal',
         'es_reingreso',
@@ -269,8 +271,16 @@ class OrdenServicioAdmin(admin.ModelAdmin):
                 'tipo_servicio',
                 'control_calidad_requerido',
                 'es_fuera_garantia',
+                'perfil_diagnostico',
+                'costo_mano_obra',
             ),
-            'description': 'Define si esta orden es una venta mostrador (sin diagnóstico) o requiere diagnóstico técnico completo. El campo "Fuera de garantía" se calcula automáticamente según el prefijo OOW-/FL- de la orden del cliente.'
+            'description': (
+                'Define si esta orden es una venta mostrador (sin diagnóstico) o requiere '
+                'diagnóstico técnico completo. El campo "Fuera de garantía" se calcula '
+                'automáticamente según el prefijo OOW-/FL- de la orden del cliente. '
+                'El costo de mano de obra lo fija el tarifario según el tipo de diagnóstico '
+                'y se guarda SIN IVA; editarlo aquí a mano rompe la verificación contable.'
+            )
         }),
         ('Ubicación y Responsables', {
             'fields': (
@@ -2641,33 +2651,62 @@ class PagoOrdenAdmin(admin.ModelAdmin):
     tiene_comprobante.short_description = 'Comprobante'
 
 
-@admin.register(ComprobanteFiscalOrden)
-class ComprobanteFiscalOrdenAdmin(admin.ModelAdmin):
-    """
-    Admin del CFDI recibido del autofacturador.
+class ConceptoDocumentoFiscalInline(admin.TabularInline):
+    """Líneas del documento fiscal, en solo lectura (las arma el servicio)."""
 
-    Objetivo: ver UUID, si ya se pidió el GET y si hay XML/PDF.
+    model = ConceptoDocumentoFiscal
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        'descripcion',
+        'clave_sat',
+        'clave_unidad',
+        'cantidad',
+        'precio_unitario',
+        'importe',
+        'orden_linea',
+    )
+
+    def has_add_permission(self, request, obj=None):
+        """Los conceptos nacen del servicio de facturación, no se capturan a mano."""
+        return False
+
+
+@admin.register(DocumentoFiscalOrden)
+class DocumentoFiscalOrdenAdmin(admin.ModelAdmin):
+    """
+    Admin de los documentos PUE/PPD del autofacturador.
+
+    Objetivo: que Facturación vea qué webId tiene cada orden, de qué tipo,
+    por cuánto y si VO ya lo timbró (UUID + XML/PDF).
     """
 
     list_display = (
-        'orden',
         'web_id',
+        'orden',
+        'tipo',
+        'descripcion',
+        'total',
+        'disponible_desde',
         'uuid',
-        'solicitado_en',
-        'fecha_timbrado',
         'tiene_xml',
         'tiene_pdf',
     )
+    list_filter = ('tipo',)
     search_fields = (
+        'web_id',
         'uuid',
         'orden__numero_orden_interno',
         'orden__detalle_equipo__orden_cliente',
     )
     raw_id_fields = ('orden',)
+    inlines = [ConceptoDocumentoFiscalInline]
     readonly_fields = (
         'solicitado_en',
         'recibido_en',
         'fecha_timbrado',
+        'creado_en',
+        'actualizado_en',
     )
 
     def tiene_xml(self, obj):

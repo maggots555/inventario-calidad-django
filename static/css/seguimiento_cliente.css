@@ -2129,6 +2129,43 @@
   border-left-color: var(--st-accent, #10b981);
 }
 
+/* Identificadores (webId) que el cliente teclea en el portal de facturación */
+.st-factura-ids {
+  list-style: none;
+  margin: 0.6rem 0 0.4rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.st-factura-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background-color: var(--gray-50, #f8fafc);
+  border: 1px solid var(--gray-200, #e2e8f0);
+}
+
+.st-factura-id__meta {
+  font-size: 0.74rem;
+  color: var(--gray-600, #64748b);
+  line-height: 1.3;
+}
+
+.st-factura-id__valor {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--gray-900, #0f172a);
+  letter-spacing: 0.04em;
+  /* El cliente lo copia a mano: que se pueda seleccionar de un toque */
+  user-select: all;
+  white-space: nowrap;
+}
+
 /* ============================================================
    MODO OSCURO — Tarjeta de push + banner de instalación PWA
    ============================================================ */
@@ -2165,6 +2202,19 @@
 
 [data-bs-theme="dark"] .st-diagnostico-card--factura {
   border-left-color: #34d399;
+}
+
+[data-bs-theme="dark"] .st-factura-id {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .st-factura-id__meta {
+  color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .st-factura-id__valor {
+  color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .st-push-label {

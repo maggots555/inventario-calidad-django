@@ -215,6 +215,7 @@ inventario-calidad-django/
 | `views_multimedia.py`, `views_seguimiento_cliente.py`, `views_encuestas.py`, … | Multimedia, portal, APIs |
 | `services/` | historial, multimedia, notificaciones_piezas, ventas_mostrador_analytics |
 | `views_detalle_orden.py` | Shell `detalle_orden` (POST `form_type` + context GET) |
+| `views_facturacion_demanda.py` | API del autofacturador VO (authenticate / folio) |
 | `views.py` | solo reexports (`urls.py` → `views.foo`) |
 
 **Almacén — mapa breve (post-modularización):**
@@ -357,6 +358,69 @@ Failover disco primario/alterno (`.env`: `PRIMARY_MEDIA_ROOT`, `ALTERNATE_MEDIA_
 - Campos: `folio_sicser` (y relacionados) en `DetalleEquipo`
 - Env: `SICSER_BASE_URL`, `SICSER_TOKEN_*`, `SICSER_CACHE_TTL`
 - ❌ NUNCA inventar writes a SICSER; no hardcodear URLs/tokens
+
+### Autofacturación PUE / PPD (portal VO)
+
+El cliente teclea un `webId` en el portal VO y SIGMA responde qué timbrar. SIGMA **no** timbra.
+
+| Pieza | Archivo |
+|---|---|
+| webId (`SAT9596-1` = prefijo + folio + tipo) | `services/facturacion_web_id.py` |
+| Qué se puede facturar y por cuánto | `services/facturacion_documentos.py` |
+| Contrato HTTP (GET/PUT/JWT) | `services/facturacion_demanda.py` + `views_facturacion_demanda.py` |
+| Diagnóstico como servicio cobrable | `services/pagos_diagnostico.py` |
+| Catálogo de diagnósticos (precio + gama) | `services/diagnostico_catalogo.py` |
+| Tablas | `models_facturacion.py` (`DocumentoFiscalOrden`, `ConceptoDocumentoFiscal`) |
+| Contrato para el proveedor | `docs/integraciones/API_AUTOFACTURACION_VO.md` |
+
+- **PUE** (`tipo_factura: 1`) = servicios pagados al 100% (Diagnóstico, Limpieza y Mantenimiento).
+- **PPD** (`tipo_factura: 2`) = anticipo de reparación, concepto único sin detallar piezas.
+- Prefijo del webId: `Sucursal.prefijo_facturacion` (SAT, DROP, GDL, MTY). Vacío = no factura.
+
+```
+❌ NUNCA facturar órdenes dentro de garantía (es_fuera_garantia=False)
+❌ NUNCA publicar el webId con pagos en 'pendiente' (solo validado / no_aplica)
+❌ NUNCA recalcular ni borrar un documento ya timbrado (tiene UUID del SAT)
+❌ NUNCA mezclar el pago tipo 'diagnostico' con el saldo de piezas
+✅ Documentos lazy: se sincronizan en el GET del API y en el seguimiento del cliente
+✅ Al tocar esta zona: python manage.py test servicio_tecnico.tests.test_facturacion_demanda
+```
+
+### Mano de obra = catálogo cerrado, nunca monto libre (Septiembre 2026)
+
+`OrdenServicio.costo_mano_obra` **es el diagnóstico y siempre está SIN IVA**. Ya no se teclea: el técnico elige `perfil_diagnostico` y el precio sale del tarifario del cotizador (`obtener_profit_config()['<perfil>']['diagnostico']`).
+
+Por qué existe esta regla: antes el campo era un input libre y no había criterio fijo sobre el IVA — la misma orden estándar se capturaba como $570 o como $661.20 según la persona. Al llegar el CFDI eso se volvió imposible de desglosar. Un monto ambiguo no se puede facturar.
+
+| Pieza | Dónde |
+|---|---|
+| Choices y mapeo perfil → gama | `config/constants.py` (`PERFIL_DIAGNOSTICO_CHOICES`, `PERFIL_DIAGNOSTICO_GAMA`) |
+| Precio, gama y persistencia | `servicio_tecnico/services/diagnostico_catalogo.py` |
+| Selector (no input) | `GuardarManoObraForm` + `partials/detalle_orden/_seccion_cotizacion.html` |
+| Tarifario fijo en tests | `servicio_tecnico/tests/helpers_tarifario.py` |
+
+Cascada de gama vigente: Estándar respeta `baja`/`media` (no puede distinguirlas); Express, Alta Gama y Server fuerzan `alta`; Mostrador y Rep. nivel componente no tocan la gama. La cascada por dinero (`utils_gama.resolver_gama_por_mano_obra`) queda **solo** para órdenes viejas sin perfil.
+
+**Dos lecturas del tarifario, a propósito:**
+
+| Función | Cuándo | Si el tarifario falla |
+|---|---|---|
+| `tarifa_perfil_estricta()` | Al **cobrar** (`aplicar_perfil_diagnostico`) | Lanza `TarifarioNoDisponible` |
+| `tarifa_perfil()` / `opciones_diagnostico()` | Al **mostrar** o comparar | Devuelve `$0.00` y la pantalla sigue viva |
+
+El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se entere. `PERFILES_SIN_CARGO` (Mostrador, Rep. nivel componente) distingue el cero legítimo del cero por fallo.
+
+```
+❌ NUNCA volver a exponer costo_mano_obra como input editable (form, template o API)
+❌ NUNCA escribir costo_mano_obra a mano: usar aplicar_perfil_diagnostico()
+❌ NUNCA sumar IVA al monto guardado creyendo que ya lo trae — está sin IVA
+❌ NUNCA hardcodear 570/774/864/1000: el precio vive en el tarifario (BD + .env)
+❌ NUNCA usar tarifa_perfil() para guardar un cobro — esa versión se traga los fallos
+✅ Perfil nuevo = agregarlo a PERFIL_DIAGNOSTICO_CHOICES, PERFIL_DIAGNOSTICO_GAMA y PERFILES_PROFIT (las claves deben coincidir; hay test de paridad)
+✅ aplicar_perfil_diagnostico() escribe 4 tablas dentro de transaction.atomic(using=alias) — ver §11
+✅ En vistas: atrapar TarifarioNoDisponible y avisar con messages, no romper con 500
+✅ En tests que toquen mano de obra: sembrar_tarifario() en setUp
+```
 
 ### Portal seguimiento cliente (ecosistema dual)
 

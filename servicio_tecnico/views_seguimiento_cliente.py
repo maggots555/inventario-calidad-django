@@ -278,8 +278,9 @@ def seguimiento_orden_cliente(request, token):
             tiene_seguimientos_piezas=bool(seguimientos_piezas),
         ),
     }
-    # Autofactura: el cliente solo recibe la URL pública del portal VO
-    # (sin API Key). El helper oculta el botón si no hay ACU + pagos.
+    # Autofactura: el cliente ve su webId (SAT9596-1) y la URL pública del
+    # portal VO. Nunca la API Key. El helper oculta el bloque si la orden es
+    # de garantía o si todavía no hay un pago validado que facturar.
     from servicio_tecnico.services.facturacion_demanda import (
         contexto_autofactura_seguimiento,
     )

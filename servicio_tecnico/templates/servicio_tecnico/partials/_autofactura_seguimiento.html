@@ -1,7 +1,9 @@
 {% comment %}
-  Botón de autofactura en el seguimiento del cliente.
+  Bloque de autofactura en el seguimiento del cliente.
   EXPLICACIÓN PARA PRINCIPIANTES:
-  El cliente abre el portal VO (otra página). Aquí NO va la API Key.
+  El cliente abre el portal VO (otra página) y ahí teclea su "webId". Por eso
+  aquí se lo mostramos completo y fácil de copiar. NUNCA va la API Key: esa
+  solo viaja servidor a servidor.
   Reutilizamos las clases de la tarjeta de diagnóstico para verse igual.
 {% endcomment %}
 {% if mostrar_autofactura %}
@@ -18,6 +20,25 @@
       {% endif %}
     </div>
   </div>
+
+  {% if documentos %}
+  <ul class="st-factura-ids">
+    {% for documento in documentos %}
+    <li class="st-factura-id">
+      <span class="st-factura-id__meta">{{ documento.descripcion }}</span>
+      <code class="st-factura-id__valor">{{ documento.web_id }}</code>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="st-diagnostico-hint">
+    {% if documentos|length > 1 %}
+    Usa el identificador del comprobante que necesites.
+    {% else %}
+    Este es el identificador que te pedirá el portal.
+    {% endif %}
+  </p>
+  {% endif %}
+
   {% if url_autofactura %}
   <a href="{{ url_autofactura }}"
      class="st-diagnostico-btn"

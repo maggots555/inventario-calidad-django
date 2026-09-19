@@ -47,9 +47,9 @@ class ProductoAdmin(admin.ModelAdmin):
 
 @admin.register(Sucursal)
 class SucursalAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'responsable', 'telefono', 'activa', 'fecha_creacion')
-    list_filter = ('activa', 'fecha_creacion')
-    search_fields = ('nombre', 'responsable', 'direccion')
+    list_display = ('nombre', 'prefijo_facturacion', 'responsable', 'telefono', 'activa', 'fecha_creacion')
+    list_filter = ('activa', 'prefijo_facturacion', 'fecha_creacion')
+    search_fields = ('nombre', 'responsable', 'direccion', 'prefijo_facturacion')
     ordering = ['nombre']
 
 @admin.register(Movimiento)

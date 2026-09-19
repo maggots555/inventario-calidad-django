@@ -1612,49 +1612,74 @@ class ReferenciaGamaEquipoForm(forms.ModelForm):
 
 class GuardarManoObraForm(forms.ModelForm):
     """
-    Guarda el costo de mano de obra en la ORDEN, sin crear Cotizacion.
+    Registra QUÉ diagnóstico se cobró en la ORDEN, sin crear Cotizacion.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Antes, al capturar la mano de obra se creaba automáticamente la cotización
-    y se cambiaba el estado de la orden. Ahora son dos pasos separados:
+    Este formulario tiene dos historias encima.
 
-    1. Guardar mano de obra → solo actualiza OrdenServicio.costo_mano_obra
-    2. Generar cotización → crea el registro Cotizacion (copia la MO de la orden)
+    Primero se separó en dos pasos lo que antes era uno solo:
+    1. Guardar mano de obra → solo actualiza la orden
+    2. Generar cotización → crea el registro Cotizacion (copia la MO)
 
-    Así puedes registrar el monto aunque todavía no haya piezas ni cotización.
+    Después (Septiembre 2026) el campo dejó de ser un cuadro de texto libre.
+    El técnico ya no escribe "661" o "570" según recuerde: elige el TIPO de
+    diagnóstico y SIGMA pone el precio del tarifario. Así el monto guardado
+    siempre es sin IVA y la factura puede desglosarlo correctamente.
+
+    Por eso el formulario expone `perfil_diagnostico` y NO `costo_mano_obra`:
+    el monto es una consecuencia, no un dato que se captura.
     """
 
     class Meta:
         model = OrdenServicio
-        fields = ['costo_mano_obra']
+        fields = ['perfil_diagnostico']
 
         widgets = {
-            'costo_mano_obra': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': '0.00',
-                'step': '0.01',
-                'min': '0',
+            'perfil_diagnostico': forms.Select(attrs={
+                'class': 'form-select',
                 'required': True,
             }),
         }
 
         labels = {
-            'costo_mano_obra': 'Costo de Mano de Obra',
+            'perfil_diagnostico': 'Tipo de Diagnóstico',
         }
 
         help_texts = {
-            'costo_mano_obra': (
-                'Costo del servicio técnico (diagnóstico + reparación). '
+            'perfil_diagnostico': (
+                'El precio sale del tarifario del cotizador (sin IVA). '
                 'Se guarda en la orden; al generar la cotización se copia automáticamente.'
             ),
         }
 
     def __init__(self, *args, **kwargs):
         """
-        Añade clases Bootstrap de validación al widget.
+        Arma el selector con el precio vigente de cada perfil.
+
+        Efectos secundarios:
+            Lee el tarifario del cotizador una vez para etiquetar las opciones.
         """
         super().__init__(*args, **kwargs)
+
+        from servicio_tecnico.services.diagnostico_catalogo import (
+            opciones_diagnostico,
+        )
+
+        campo = self.fields['perfil_diagnostico']
+        campo.required = True
+
+        # EXPLICACIÓN: mostramos el precio dentro de la propia opción
+        # ("Estándar — $570.00 sin IVA") para que el técnico vea qué está
+        # cobrando sin tener que abrir el tarifario en otra pestaña.
+        opciones = [('', '— Selecciona el diagnóstico cobrado —')]
+        for opcion in opciones_diagnostico():
+            if opcion.tarifa > 0:
+                texto = f'{opcion.etiqueta} — ${opcion.tarifa:,.2f} sin IVA'
+            else:
+                texto = f'{opcion.etiqueta} — sin cargo'
+            opciones.append((opcion.clave, texto))
+        campo.choices = opciones
 
         # EXPLICACIÓN: Bootstrap usa is-validatable para estilos de validación
         for field_name, field in self.fields.items():
@@ -1666,59 +1691,16 @@ class GuardarManoObraForm(forms.ModelForm):
 
 
 # ============================================================================
-# FORMULARIO: CREAR COTIZACIÓN (legado / compatibilidad)
+# FORMULARIO ELIMINADO: CrearCotizacionForm (Septiembre 2026)
 # ============================================================================
-
-class CrearCotizacionForm(forms.ModelForm):
-    """
-    Formulario legado para crear Cotizacion (solo costo_mano_obra).
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    --------------------------------
-    El flujo nuevo ya no depende de este formulario para capturar la MO:
-    la MO vive en OrdenServicio y “Generar cotización” copia ese valor.
-
-    Se mantiene por compatibilidad con código que aún lo importe.
-    Preferir GuardarManoObraForm + POST generar_cotizacion / crear_cotizacion.
-    """
-
-    class Meta:
-        model = Cotizacion
-        fields = ['costo_mano_obra']
-
-        widgets = {
-            'costo_mano_obra': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'placeholder': '0.00',
-                'step': '0.01',
-                'min': '0',
-                'required': True,
-            }),
-        }
-
-        labels = {
-            'costo_mano_obra': 'Costo de Mano de Obra',
-        }
-
-        help_texts = {
-            'costo_mano_obra': 'Costo del servicio técnico (diagnóstico + reparación)',
-        }
-
-    def __init__(self, *args, **kwargs):
-        """
-        EXPLICACIÓN:
-        Configuración inicial del formulario. Aquí podemos personalizar
-        cómo se ve o comporta el formulario antes de mostrarlo.
-        """
-        super().__init__(*args, **kwargs)
-
-        # Agregar clase de validación de Bootstrap
-        for field_name, field in self.fields.items():
-            if 'class' in field.widget.attrs:
-                field.widget.attrs['class'] += ' '
-            else:
-                field.widget.attrs['class'] = ''
-            field.widget.attrs['class'] += 'is-validatable'
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Aquí vivía un formulario legado que exponía Cotizacion.costo_mano_obra como
+# un campo numérico libre. Ya no lo usaba ninguna vista, pero seguía siendo una
+# puerta abierta: bastaba que alguien lo importara para volver a capturar montos
+# a mano y romper la regla de que el diagnóstico sale del tarifario.
+#
+# Se eliminó en lugar de dejarlo "por si acaso". Para capturar mano de obra usa
+# GuardarManoObraForm (selector de perfil) + services/diagnostico_catalogo.py.
 
 
 # ============================================================================

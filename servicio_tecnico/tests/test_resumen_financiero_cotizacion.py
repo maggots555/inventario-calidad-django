@@ -168,13 +168,17 @@ class ResumenFinancieroCotizacionRenderTest(TestCase):
         self.assertIn('$800.00', html)
         self.assertIn('$928.00', html)
 
-        # Mano de obra movida al panel izquierdo
+        # Mano de obra movida al panel izquierdo, ahora como selector cerrado
         self.assertIn('id="formEditarManoObra"', html)
-        self.assertIn('Mano de Obra (costo interno):', html)
+        self.assertIn('Diagnóstico cobrado (mano de obra):', html)
+        self.assertIn('name="perfil_diagnostico"', html)
         self.assertIn(
-            'Costo interno (diagnóstico/reparación). No se cobra otra vez al cliente.',
+            'El precio lo define el tarifario del cotizador. '
+            'No se cobra otra vez al cliente.',
             html,
         )
+        # El monto ya no es editable a mano: no debe haber input numérico de MO
+        self.assertNotIn('name="costo_mano_obra"', html)
 
         # Totales internos que ya no deben mostrarse en el resumen
         self.assertNotIn('Total Piezas Cotizadas (costo empresa):', html)

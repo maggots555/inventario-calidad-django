@@ -595,8 +595,10 @@ def detalle_solicitud_cotizacion(request, pk):
     if info_orden:
         gama_equipo = getattr(info_orden, 'gama', '') or ''
 
-    # Costo de mano de obra desde la Cotizacion de Servicio Técnico
-    # (el usuario puede sobreescribirlo en el modal si lo desea)
+    # Costo de mano de obra desde la Cotizacion de Servicio Técnico.
+    # SOLO LECTURA: el monto lo fija el tarifario según el tipo de diagnóstico
+    # elegido en ST (ver servicio_tecnico/services/diagnostico_catalogo.py).
+    # El modal lo muestra como referencia y no entra al cálculo de profit.
     costo_mano_obra = None
     if solicitud.orden_servicio:
         try:

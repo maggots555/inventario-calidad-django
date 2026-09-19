@@ -34,6 +34,7 @@ from servicio_tecnico.forms import (
     SubirImagenesForm,
     SubirVideoForm,
 )
+from servicio_tecnico.services.diagnostico_catalogo import opciones_diagnostico
 from servicio_tecnico.services.formato_garantia import orden_es_candidata_formato_garantia
 from servicio_tecnico.services.formato_oow import orden_es_candidata_formato_oow
 from servicio_tecnico.services.formato_venta_mostrador import (
@@ -185,6 +186,12 @@ def build_detalle_orden_context(request, orden):
         # Mantener alias legado por si algún template aún lo referencia
         form_crear_cotizacion = form_guardar_mano_obra
 
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El catálogo de diagnósticos se necesita en los DOS caminos: al capturar
+    # por primera vez (sin cotización) y al corregirlo después (con cotización
+    # ya creada). Por eso se arma aquí afuera, no dentro del if.
+    opciones_diagnostico_orden = opciones_diagnostico()
+
     # Seguimientos: siempre por ORDEN (OOW con cotización y FL sin ella)
     seguimientos_piezas = orden.seguimientos_piezas.all().order_by('-fecha_pedido')
     # ========================================================================
@@ -329,6 +336,8 @@ def build_detalle_orden_context(request, orden):
         'form_crear_cotizacion': form_crear_cotizacion,
         'form_guardar_mano_obra': form_guardar_mano_obra,
         'form_gestionar_cotizacion': form_gestionar_cotizacion,
+        # Catálogo de tipos de diagnóstico con su tarifa vigente (sin IVA)
+        'opciones_diagnostico': opciones_diagnostico_orden,
 
         # Formularios para modales (Piezas y Seguimientos)
         'form_pieza': form_pieza,

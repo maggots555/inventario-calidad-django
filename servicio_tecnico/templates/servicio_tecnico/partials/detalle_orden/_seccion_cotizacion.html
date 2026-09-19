@@ -26,9 +26,10 @@
                         <div class="alert alert-info d-flex align-items-center mb-4">
                             <i class="bi bi-info-circle-fill fs-3 me-3"></i>
                             <div>
-                                <h6 class="mb-1">Mano de obra y cotización (pasos separados)</h6>
+                                <h6 class="mb-1">Diagnóstico y cotización (pasos separados)</h6>
                                 <p class="mb-0 small">
-                                    Primero registra la <strong>mano de obra</strong> (queda en la orden).
+                                    Primero elige el <strong>tipo de diagnóstico</strong> cobrado; el precio
+                                    lo toma SIGMA del tarifario (sin IVA) y queda en la orden.
                                     Cuando quieras abrir la cotización para agregar piezas, usa
                                     <strong>Generar cotización</strong>. El estado de la orden
                                     <em>no</em> cambia automáticamente.
@@ -37,46 +38,54 @@
                         </div>
 
                         {# EXPLICACIÓN PARA PRINCIPIANTES:                                    #}
-                        {# Son DOS formularios (Guardar MO vs Generar cotización).             #}
+                        {# Son DOS formularios (Guardar diagnóstico vs Generar cotización).   #}
                         {# HTML no permite anidar <form>, así que van en columnas Bootstrap   #}
-                        {# (~1/3 textbox | ~1/3 Guardar | ~1/3 Generar) para llenar el ancho. #}
+                        {# (~1/3 selector | ~1/3 Guardar | ~1/3 Generar) para llenar el ancho.#}
                         <label
                             {% if form_guardar_mano_obra %}
-                                for="{{ form_guardar_mano_obra.costo_mano_obra.id_for_label }}"
+                                for="{{ form_guardar_mano_obra.perfil_diagnostico.id_for_label }}"
                             {% else %}
-                                for="id_costo_mano_obra"
+                                for="id_perfil_diagnostico"
                             {% endif %}
                             class="form-label">
                             <i class="bi bi-tools"></i>
                             {% if form_guardar_mano_obra %}
-                                {{ form_guardar_mano_obra.costo_mano_obra.label }}
+                                {{ form_guardar_mano_obra.perfil_diagnostico.label }}
                             {% else %}
-                                Costo de Mano de Obra
+                                Tipo de Diagnóstico
                             {% endif %}
                         </label>
 
                         {% if form_guardar_mano_obra %}
-                            {{ form_guardar_mano_obra.costo_mano_obra.errors }}
+                            {{ form_guardar_mano_obra.perfil_diagnostico.errors }}
                         {% endif %}
 
                         <div class="row g-2 align-items-center mb-1">
-                            {# Form 1 ocupa 8/12: mitad textbox + mitad botón Guardar #}
+                            {# Form 1 ocupa 8/12: mitad selector + mitad botón Guardar #}
                             <div class="col-12 col-md-8">
                                 <form method="post" id="formGuardarManoObra" class="row g-2 align-items-center">
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="guardar_mano_obra">
                                     <div class="col-sm-6">
                                         {% if form_guardar_mano_obra %}
-                                            {{ form_guardar_mano_obra.costo_mano_obra }}
+                                            {{ form_guardar_mano_obra.perfil_diagnostico }}
                                         {% else %}
-                                            <input type="number" name="costo_mano_obra" id="id_costo_mano_obra"
-                                                   class="form-control" step="0.01" min="0"
-                                                   value="{{ orden.costo_mano_obra|floatformat:2 }}" required>
+                                            {# Respaldo si el context no trajo el form (no debería pasar) #}
+                                            <select name="perfil_diagnostico" id="id_perfil_diagnostico"
+                                                    class="form-select" required>
+                                                <option value="">— Selecciona el diagnóstico cobrado —</option>
+                                                {% for opcion in opciones_diagnostico %}
+                                                    <option value="{{ opcion.clave }}"
+                                                            {% if opcion.clave == orden.perfil_diagnostico %}selected{% endif %}>
+                                                        {{ opcion.etiqueta }}{% if opcion.tarifa %} — ${{ opcion.tarifa|floatformat:2 }} sin IVA{% else %} — sin cargo{% endif %}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
                                         {% endif %}
                                     </div>
                                     <div class="col-sm-6">
                                         <button type="submit" class="btn btn-outline-primary w-100">
-                                            <i class="bi bi-save"></i> Guardar mano de obra
+                                            <i class="bi bi-save"></i> Guardar diagnóstico
                                         </button>
                                     </div>
                                 </form>
@@ -85,11 +94,11 @@
                             {# Form 2 ocupa 4/12: Generar a todo el ancho de su columna #}
                             <div class="col-12 col-md-4">
                                 <form method="post" id="formGenerarCotizacion" class="w-100"
-                                      onsubmit="return confirm('¿Generar la cotización con la mano de obra registrada? El estado de la orden no cambiará automáticamente.');">
+                                      onsubmit="return confirm('¿Generar la cotización con el diagnóstico registrado? El estado de la orden no cambiará automáticamente.');">
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="generar_cotizacion">
-                                    <input type="hidden" name="costo_mano_obra" id="hiddenCostoManoObraGenerar"
-                                           value="{{ orden.costo_mano_obra|floatformat:2 }}">
+                                    <input type="hidden" name="perfil_diagnostico" id="hiddenPerfilDiagnosticoGenerar"
+                                           value="{{ orden.perfil_diagnostico }}">
                                     <button type="submit" class="btn btn-success w-100">
                                         <i class="bi bi-plus-circle"></i> Generar cotización
                                     </button>
@@ -97,11 +106,19 @@
                             </div>
                         </div>
 
+                        {% if orden.costo_mano_obra %}
+                            <div class="alert alert-light border mt-2 mb-2 py-2 px-3">
+                                <span class="small text-muted">Diagnóstico registrado:</span>
+                                <strong>{{ orden.get_perfil_diagnostico_display|default:"Monto capturado a mano" }}</strong>
+                                <span class="badge bg-secondary ms-1">${{ orden.costo_mano_obra|floatformat:2 }} sin IVA</span>
+                            </div>
+                        {% endif %}
+
                         <small class="text-muted d-block">
                             {% if form_guardar_mano_obra %}
-                                {{ form_guardar_mano_obra.costo_mano_obra.help_text }}
+                                {{ form_guardar_mano_obra.perfil_diagnostico.help_text }}
                             {% else %}
-                                Costo del servicio técnico (diagnóstico + reparación). Se guarda en la orden; al generar la cotización se copia automáticamente.
+                                El precio sale del tarifario del cotizador (sin IVA). Se guarda en la orden; al generar la cotización se copia automáticamente.
                             {% endif %}
                         </small>
                         <small class="text-muted d-block mt-1">
@@ -110,17 +127,17 @@
                         </small>
 
                         <script>
-                        // EXPLICACIÓN: Al generar, copiamos el valor visible del input de MO
-                        // por si el técnico lo cambió sin pulsar "Guardar" antes.
+                        // EXPLICACIÓN: Al generar, copiamos el diagnóstico visible en el
+                        // selector por si el técnico lo cambió sin pulsar "Guardar" antes.
                         (function () {
                             var formGen = document.getElementById('formGenerarCotizacion');
                             var formMo = document.getElementById('formGuardarManoObra');
-                            var hidden = document.getElementById('hiddenCostoManoObraGenerar');
+                            var hidden = document.getElementById('hiddenPerfilDiagnosticoGenerar');
                             if (formGen && formMo && hidden) {
                                 formGen.addEventListener('submit', function () {
-                                    var inputMo = formMo.querySelector('[name="costo_mano_obra"]');
-                                    if (inputMo) {
-                                        hidden.value = inputMo.value;
+                                    var selectPerfil = formMo.querySelector('[name="perfil_diagnostico"]');
+                                    if (selectPerfil) {
+                                        hidden.value = selectPerfil.value;
                                     }
                                 });
                             }
@@ -179,30 +196,40 @@
                                             <small class="text-muted">Editable para ajustar métricas</small>
                                         </div>
 
-                                        {# Mano de obra: dato interno; no entra al cobro al cliente #}
+                                        {# Diagnóstico: el precio sale del tarifario, no se teclea #}
                                         <div class="mb-3">
-                                            <label class="text-muted small">Mano de Obra (costo interno):</label>
+                                            <label class="text-muted small" for="id_perfil_diagnostico_editar">
+                                                Diagnóstico cobrado (mano de obra):
+                                            </label>
                                             <form method="post" class="d-flex align-items-center gap-2 flex-wrap" id="formEditarManoObra">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="form_type" value="editar_mano_obra">
-                                                <div class="input-group input-group-sm" style="max-width: 220px;">
-                                                    <span class="input-group-text">$</span>
-                                                    <input type="number"
-                                                           name="costo_mano_obra"
-                                                           class="form-control text-end"
-                                                           step="0.01"
-                                                           min="0"
-                                                           value="{{ cotizacion.costo_mano_obra|floatformat:2 }}">
-                                                    <button type="submit" class="btn btn-outline-primary" title="Guardar mano de obra">
+                                                <div class="input-group input-group-sm" style="max-width: 340px;">
+                                                    <select name="perfil_diagnostico"
+                                                            id="id_perfil_diagnostico_editar"
+                                                            class="form-select"
+                                                            required>
+                                                        <option value="">— Selecciona el diagnóstico —</option>
+                                                        {% for opcion in opciones_diagnostico %}
+                                                            <option value="{{ opcion.clave }}"
+                                                                    {% if opcion.clave == orden.perfil_diagnostico %}selected{% endif %}>
+                                                                {{ opcion.etiqueta }}{% if opcion.tarifa %} — ${{ opcion.tarifa|floatformat:2 }}{% else %} — sin cargo{% endif %}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <button type="submit" class="btn btn-outline-primary" title="Guardar diagnóstico">
                                                         <i class="bi bi-check-lg"></i>
                                                     </button>
                                                 </div>
+                                                <span class="badge bg-secondary" title="Monto sin IVA">
+                                                    ${{ cotizacion.costo_mano_obra|floatformat:2 }} sin IVA
+                                                </span>
                                                 {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
                                                     <span class="badge bg-success" title="Descuento aplicado">🎁 GRATIS</span>
                                                 {% endif %}
                                             </form>
                                             <small class="text-muted">
-                                                Costo interno (diagnóstico/reparación). No se cobra otra vez al cliente.
+                                                El precio lo define el tarifario del cotizador. No se cobra otra vez al cliente.
                                             </small>
                                         </div>
                                         
