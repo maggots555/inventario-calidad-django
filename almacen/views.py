@@ -12,6 +12,7 @@ Organización:
 - views_dashboard_distribucion.py: distribución multi-sucursal + Excel
 - views_parametros_cotizador.py: panel de márgenes del cotizador
 - views_catalogo.py: dashboard, productos, proveedores, categorías, bajas
+- views_productos_excel.py: descarga Excel de productos activos
 - views_unidades.py: UnidadesInventario + APIs + buscar/crear orden
 - views_compras.py: CompraProducto (lista, recibir, devoluciones)
 - views_solicitudes_cotizacion.py: SolicitudCotizacion CRUD/detalle/servicios/imágenes
@@ -33,6 +34,9 @@ from .views_dashboard_distribucion import (  # noqa: F401
 )
 from .views_parametros_cotizador import (  # noqa: F401
     panel_parametros_cotizador,
+)
+from .views_productos_excel import (  # noqa: F401
+    exportar_productos_excel,
 )
 from .views_catalogo import (  # noqa: F401
     acceso_denegado,

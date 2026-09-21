@@ -45,6 +45,7 @@ from .models import (
     SolicitudBaja,
     UnidadInventario,
 )
+from .utils.consulta_productos import queryset_productos_activos
 from .utils.sincronizar_solicitud_baja_vm import (
     registrar_pieza_vm_desde_solicitud_baja,
 )
@@ -357,58 +358,18 @@ def lista_productos(request):
     Efectos secundarios:
         Ninguno. Solo lee ProductoAlmacen.
     """
-    productos = ProductoAlmacen.objects.filter(activo=True).select_related(
-        'categoria', 'proveedor_principal', 'sucursal'
-    )
-    
-    # Procesar formulario de búsqueda
+    # El filtro vive en utils: el Excel usa la misma función y no se desfasan.
     form = BusquedaProductoForm(request.GET)
-    
-    if form.is_valid():
-        # Búsqueda por texto
-        q = form.cleaned_data.get('q')
-        if q:
-            productos = productos.filter(
-                Q(codigo_producto__icontains=q) |
-                Q(nombre__icontains=q) |
-                Q(descripcion__icontains=q) |
-                Q(clave_sat__icontains=q)
-            )
-        
-        # Filtro por tipo
-        tipo = form.cleaned_data.get('tipo')
-        if tipo:
-            productos = productos.filter(tipo_producto=tipo)
-        
-        # Filtro por categoría
-        categoria = form.cleaned_data.get('categoria')
-        if categoria:
-            productos = productos.filter(categoria=categoria)
-        
-        # Filtro por stock
-        stock = form.cleaned_data.get('stock')
-        if stock == 'bajo':
-            productos = productos.filter(
-                tipo_producto='resurtible',
-                stock_actual__lte=F('stock_minimo')
-            )
-        elif stock == 'agotado':
-            productos = productos.filter(stock_actual=0)
-        elif stock == 'disponible':
-            productos = productos.filter(stock_actual__gt=0)
 
-        # Paso: los conteos de clave se calculan antes de filtrar por ella,
-        # para que los badges sigan diciendo cuántas hay de cada lado.
-        total_con_clave = productos.exclude(clave_sat='').count()
-        total_sin_clave = productos.filter(clave_sat='').count()
-        clave_sat = form.cleaned_data.get('clave_sat')
-        if clave_sat == 'con':
-            productos = productos.exclude(clave_sat='')
-        elif clave_sat == 'sin':
-            productos = productos.filter(clave_sat='')
-    else:
-        total_con_clave = productos.exclude(clave_sat='').count()
-        total_sin_clave = productos.filter(clave_sat='').count()
+    # Los badges de clave se cuentan ANTES de aplicar ese filtro, para que
+    # sigan diciendo cuántos hay de cada lado aunque la tabla ya esté recortada.
+    antes_de_clave = queryset_productos_activos(
+        request.GET,
+        aplicar_clave_sat=False,
+    )
+    total_con_clave = antes_de_clave.exclude(clave_sat='').count()
+    total_sin_clave = antes_de_clave.filter(clave_sat='').count()
+    productos = queryset_productos_activos(request.GET)
     
     # Contar por tipo
     total_resurtibles = productos.filter(tipo_producto='resurtible').count()
