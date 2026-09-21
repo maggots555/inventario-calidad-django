@@ -46,6 +46,60 @@ from servicio_tecnico.forms import RegistrarPagoOrdenForm
 from servicio_tecnico.views import detalle_orden
 
 
+class BadgeSaldoReparacionTest(SimpleTestCase):
+    """El saldo de reparación muestra Cubierto igual que el del diagnóstico."""
+
+    def _html(self, saldo: str, total: str, cubierto: bool) -> str:
+        """
+        Render del partial con un resumen mínimo.
+
+        Args:
+            saldo: lo que falta por cobrar.
+            total: total de la reparación.
+            cubierto: si el service ya marcó cubierto_100.
+
+        Returns:
+            HTML del partial.
+        """
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        from django.template.loader import render_to_string
+
+        resumen = SimpleNamespace(
+            cubierto_100=cubierto,
+            total_a_cobrar=Decimal(total),
+            cubre_anticipo_50=cubierto,
+            es_estimado=False,
+            total_cotizacion_con_iva=Decimal(total),
+            total_venta_mostrador=Decimal('0.00'),
+            pagado=Decimal(total) - Decimal(saldo),
+            saldo=Decimal(saldo),
+            anticipo_minimo=Decimal('0.00'),
+            porcentaje_pagado=Decimal('100.00') if cubierto else Decimal('10.00'),
+        )
+        return render_to_string(
+            'servicio_tecnico/partials/detalle_orden/_seccion_pagos.html',
+            {
+                'resumen_cobro': resumen,
+                'resumen_diagnostico': SimpleNamespace(monto=Decimal('0.00')),
+                'puede_registrar_pago': False,
+                'puede_validar_pago': False,
+                'pagos_orden': [],
+            },
+        )
+
+    def test_saldo_en_cero_muestra_cubierto(self):
+        """Feliz: reparación liquidada lleva el mismo badge que el diagnóstico."""
+        html = self._html('0.00', '10156.00', True)
+        self.assertIn('>Cubierto<', html)
+
+    def test_con_saldo_no_muestra_cubierto(self):
+        """Borde: si todavía falta dinero, no se marca como cubierto."""
+        html = self._html('5056.00', '10156.00', False)
+        self.assertNotIn('>Cubierto<', html)
+
+
 class FormularioPagoSinSaldoPreseleccionadoTest(SimpleTestCase):
     """El alta de un pago no puede abrir ya en diagnóstico ni en reparación."""
 

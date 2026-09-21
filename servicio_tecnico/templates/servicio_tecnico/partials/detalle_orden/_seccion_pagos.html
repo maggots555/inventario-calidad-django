@@ -114,6 +114,9 @@
                                         <th>Saldo pendiente</th>
                                         <th class="text-end {% if resumen_cobro.saldo > 0 %}text-danger{% else %}text-success{% endif %}">
                                             ${{ resumen_cobro.saldo|floatformat:2 }}
+                                            {% if resumen_cobro.cubierto_100 and resumen_cobro.total_a_cobrar > 0 %}
+                                                <span class="badge bg-success ms-1">Cubierto</span>
+                                            {% endif %}
                                         </th>
                                     </tr>
                                 </tbody>
@@ -143,7 +146,9 @@
                                   data-saldo-diagnostico="{{ resumen_diagnostico.saldo|stringformat:'.2f' }}"
                                   data-diagnostico-sin-iva="{{ resumen_diagnostico.monto|stringformat:'.2f' }}"
                                   data-diagnostico-iva="{{ resumen_diagnostico.iva|stringformat:'.2f' }}"
-                                  data-familia-reparacion="{{ familia_reparacion }}">
+                                  data-familia-reparacion="{{ familia_reparacion }}"
+                                  data-saldo-reparacion="{{ resumen_cobro.saldo|stringformat:'.2f' }}"
+                                  data-total-reparacion="{{ resumen_cobro.total_a_cobrar|stringformat:'.2f' }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="form_type" value="registrar_pago">
                                 <div class="mb-2">

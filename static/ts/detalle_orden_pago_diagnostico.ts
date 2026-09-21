@@ -22,6 +22,7 @@
 
 (function detalleOrdenPagoDiagnosticoMain(): void {
     const SALDO_DIAGNOSTICO = 'diagnostico';
+    const SALDO_REPARACION = 'reparacion';
     const TIPO_CONTADO = 'pago_completo';
     const TIPO_ANTICIPO = 'anticipo';
 
@@ -65,6 +66,8 @@
 
         // Saldo pendiente del diagnóstico, ya con IVA, calculado en el servidor.
         const saldoDiagnostico = formulario.dataset.saldoDiagnostico || '';
+        const saldoReparacion = formulario.dataset.saldoReparacion || '';
+        const totalReparacion = formulario.dataset.totalReparacion || '';
         const montoSinIva = formulario.dataset.diagnosticoSinIva || '';
         const ivaDiagnostico = formulario.dataset.diagnosticoIva || '';
 
@@ -85,6 +88,23 @@
          * la persona. Si ella escribe otra cantidad, se respeta.
          */
         let valorSugerido = '';
+
+        function reparacionYaCubierta(): boolean {
+            const total = parseFloat(totalReparacion);
+            const saldo = parseFloat(saldoReparacion);
+            // Sin total todavía no está "cubierta": simplemente no hay qué cobrar.
+            return isFinite(total) && total > 0 && isFinite(saldo) && saldo <= 0;
+        }
+
+        function avisarSaldoCubierto(texto: string): void {
+            if (valorSugerido !== '' && inputMonto.value === valorSugerido) {
+                inputMonto.value = '';
+            }
+            valorSugerido = '';
+            ayuda.textContent = texto;
+            ayuda.classList.remove('d-none', 'text-info');
+            ayuda.classList.add('text-warning');
+        }
 
         function limpiarSugerencia(): void {
             // Paso: solo borramos si el contenido sigue siendo el nuestro.
@@ -182,6 +202,12 @@
                 return;
             }
             aplicarFamiliaReparacion();
+            if (selectSaldo.value === SALDO_REPARACION && reparacionYaCubierta()) {
+                avisarSaldoCubierto(
+                    'Esta reparación ya está cubierta. Verifica antes de registrar otro cobro.',
+                );
+                return;
+            }
             limpiarSugerencia();
         }
 
