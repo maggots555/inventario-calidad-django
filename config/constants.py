@@ -286,6 +286,9 @@ PALABRAS_CLAVE_COMPONENTE = [
         [
             'USB KINGSTON',
             'MEMORIA USB',
+            # El catálogo activo escribe el espacio: «USB 32 GB» (P0048).
+            # Sin ese espacio la clave vieja «USB 32GB» no alcanza a pegar.
+            'USB 32 GB',
             'USB 32GB',
             'USB 64GB',
             'USB 128GB',
@@ -355,8 +358,21 @@ PALABRAS_CLAVE_COMPONENTE = [
     (['BOTON', 'BOTÓN', 'BUTTON'], 'Botón'),
     (['DC-IN', 'DCIN', 'DC IN', 'JACK DE CARGA', 'POWER JACK', 'CONECTOR DE CARGA'], 'DC-IN cable'),
     (['PILA CMOS', 'CMOS BATTERY', 'BIOS BATTERY', 'COIN CELL'], 'Pila CMOS'),
-    # BEZEL / BISEL solos: nombres reales del catálogo (P0026, P00261)
-    (['BISEL LCD', 'LCD BEZEL', 'BEZEL LCD', 'MARCO LCD', 'BEZEL', 'BISEL'], 'Bisel LCD'),
+    # P0026 activo: «BEZEL (DE PANTALLA)(DE TECLADO)». La frase larga tiene
+    # que ganar sobre «PANTALLA» (8) y «TECLADO» (7); si no, el bisel se
+    # sincroniza como pantalla. «BEZEL» solo sigue cubriendo el nombre viejo.
+    (
+        [
+            'BEZEL (DE PANTALLA)',
+            'BISEL LCD',
+            'LCD BEZEL',
+            'BEZEL LCD',
+            'MARCO LCD',
+            'BEZEL',
+            'BISEL',
+        ],
+        'Bisel LCD',
+    ),
     # BOTTOM BASE / BASE COVER / LOWER CASE: nombre real P0027 en Almacén
     (
         [
@@ -408,7 +424,37 @@ PALABRAS_CLAVE_COMPONENTE = [
     (['MICROFONO', 'MICRÓFONO', 'MICROPHONE'], 'Micrófono'),
     (['CAMARA', 'CÁMARA', 'WEBCAM', 'WEB CAM'], 'Webcam'),
     (['MOUSE', 'RATON', 'RATÓN'], 'Mouse'),
-    (['I/O BOARD', 'IO BOARD', 'PLACA IO'], 'I/O Board'),
+    # P0041: «DAUGTHERBOARD/TARJETA HIJA/TARJETA USB». El componente
+    # «Tarjeta USB» mide 11 y se lo quedaría en un empate. Estas dos claves
+    # son más largas (13 y 12) y lo mandan a I/O Board. Se respeta la falta
+    # de ortografía del catálogo (DAUGTHER, no DAUGHTER).
+    (
+        [
+            'DAUGTHERBOARD',
+            'TARJETA HIJA',
+            'I/O BOARD',
+            'IO BOARD',
+            'PLACA IO',
+        ],
+        'I/O Board',
+    ),
+    # P0069. El componente se llama «Protector espiral USB» y el producto
+    # trae las palabras al revés, con CABLE en medio: el nombre completo
+    # no cabe dentro del texto.
+    (['ESPIRAL PROTECTOR'], 'Protector espiral USB'),
+    # P0081. El componente dice «o» («Funda para iPad o Tableta») y el
+    # producto dice «/», así que el nombre completo no coincide solo.
+    (['FUNDA PARA IPAD'], 'Funda para iPad o Tableta'),
+    # PENDIENTE7. El componente dice «piezas»; el producto dice «partes».
+    (
+        ['INSTALACION DE PARTES', 'INSTALACIÓN DE PARTES'],
+        'Instalación de piezas',
+    ),
+    # PENDIENTE9. «por componente» no es la frase «a nivel componente».
+    (
+        ['REPARACION POR COMPONENTE', 'REPARACIÓN POR COMPONENTE'],
+        'Reparación a nivel componente',
+    ),
     # Lápiz óptico del catálogo (P0113) → Stylus (componente nuevo en Scorecard)
     (
         [

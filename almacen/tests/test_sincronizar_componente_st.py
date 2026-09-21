@@ -52,6 +52,16 @@ class ResolverComponenteDesdeProductoTest(TestCase):
             'Convertidor de video',
             'Hub USB',
             'Tapete antiestatico',
+            # Catálogo activo (sept 2026): el nombre del producto ya no
+            # coincide solo con el del componente, o hay una clave más corta
+            # que se lo quedaría (Pantalla, Tarjeta USB).
+            'Instalación de piezas',
+            'Reparación a nivel componente',
+            'Funda para iPad o Tableta',
+            'Protector espiral USB',
+            'I/O Board',
+            'Paquete regreso a clases',
+            'Tarjeta USB',
             NOMBRE_COMPONENTE_EQUIPO_REACONDICIONADO,
         ]
         for nombre in nombres:
@@ -118,6 +128,14 @@ class ResolverComponenteDesdeProductoTest(TestCase):
         self.assertIsNotNone(componente)
         self.assertEqual(componente.nombre, 'Bisel LCD')
 
+    def test_bezel_de_pantalla_no_es_pantalla(self):
+        """P0026 activo: el bisel no debe caer en Pantalla ni en Teclado."""
+        componente = resolver_componente_desde_producto(
+            'BEZEL (DE PANTALLA)(DE TECLADO)'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Bisel LCD')
+
     def test_top_cover_lcd_cover(self):
         """Producto P0025 TOP COVER / LCD COVER → Top Cover (control)."""
         componente = resolver_componente_desde_producto('TOP COVER / LCD COVER')
@@ -139,8 +157,14 @@ class ResolverComponenteDesdeProductoTest(TestCase):
         self.assertEqual(componente.nombre, 'HDD/SSD Bracket')
 
     def test_usb_32gb_a_memoria_usb(self):
-        """Producto P0048 USB 32GB → Memoria USB."""
+        """Nombre viejo USB 32GB (sin espacio) sigue en Memoria USB."""
         componente = resolver_componente_desde_producto('USB 32GB')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Memoria USB')
+
+    def test_usb_32_gb_con_espacio(self):
+        """P0048 activo escribe el espacio: «USB 32 GB»."""
+        componente = resolver_componente_desde_producto('USB 32 GB')
         self.assertIsNotNone(componente)
         self.assertEqual(componente.nombre, 'Memoria USB')
 
@@ -252,11 +276,59 @@ class ResolverComponenteDesdeProductoTest(TestCase):
         self.assertIsNotNone(componente)
         self.assertEqual(componente.nombre, 'Tapete antiestatico')
 
+    def test_daughterboard_a_io_board(self):
+        """P0041 va a I/O Board, aunque el texto también diga TARJETA USB."""
+        componente = resolver_componente_desde_producto(
+            'DAUGTHERBOARD/TARJETA HIJA/TARJETA USB'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'I/O Board')
+
+    def test_tarjeta_usb_sola_sigue_en_su_componente(self):
+        """Sin DAUGTHERBOARD ni TARJETA HIJA, «TARJETA USB» se queda en el suyo."""
+        componente = resolver_componente_desde_producto('TARJETA USB')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Tarjeta USB')
+
+    def test_espiral_protector(self):
+        """P0069: las palabras van al revés respecto al nombre del componente."""
+        componente = resolver_componente_desde_producto(
+            'ESPIRAL PROTECTOR CABLE USB COLORES'
+        )
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Protector espiral USB')
+
+    def test_funda_ipad(self):
+        """P0081: el producto usa «/» y el componente dice «o»."""
+        componente = resolver_componente_desde_producto('FUNDA PARA IPAD / TABLETA')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Funda para iPad o Tableta')
+
+    def test_instalacion_de_partes(self):
+        """PENDIENTE7 dice «partes»; el componente de ST dice «piezas»."""
+        componente = resolver_componente_desde_producto('INSTALACION DE PARTES')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Instalación de piezas')
+
+    def test_reparacion_por_componente(self):
+        """PENDIENTE9 no trae la frase «a nivel componente»."""
+        componente = resolver_componente_desde_producto('REPARACIÓN POR COMPONENTE')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Reparación a nivel componente')
+
+    def test_paquete_regreso_a_clases(self):
+        """PENDIENTE8 empata porque el nombre del componente va dentro del producto."""
+        componente = resolver_componente_desde_producto('PAQUETE REGRESO A CLASES')
+        self.assertIsNotNone(componente)
+        self.assertEqual(componente.nombre, 'Paquete regreso a clases')
+
     def test_accesorio_sin_mapear_sigue_none(self):
-        """Pendientes sin componente ST siguen sin match."""
+        """Sin componente en ST no se inventa una categoría."""
         for nombre in (
-            'FUNDA PARA IPAD / TABLETA',
-            'ESPIRAL PROTECTOR CABLE USB COLORES',
+            'DIAGNOSTICO',
+            'ENVIO',
+            'SERVICIO',
+            'ALMACENAMIENTO DE EQUIPO',
             '4H MISSION CRITICAL PROSUPPORT PLUS',
             'LAPTOP',
         ):
