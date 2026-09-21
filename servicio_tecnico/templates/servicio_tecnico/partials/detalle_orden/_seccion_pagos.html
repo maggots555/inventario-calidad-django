@@ -142,7 +142,8 @@
                             <form method="post" enctype="multipart/form-data" id="formRegistrarPago"
                                   data-saldo-diagnostico="{{ resumen_diagnostico.saldo|stringformat:'.2f' }}"
                                   data-diagnostico-sin-iva="{{ resumen_diagnostico.monto|stringformat:'.2f' }}"
-                                  data-diagnostico-iva="{{ resumen_diagnostico.iva|stringformat:'.2f' }}">
+                                  data-diagnostico-iva="{{ resumen_diagnostico.iva|stringformat:'.2f' }}"
+                                  data-familia-reparacion="{{ familia_reparacion }}">
                                 {% csrf_token %}
                                 <input type="hidden" name="form_type" value="registrar_pago">
                                 <div class="mb-2">

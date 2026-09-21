@@ -38,6 +38,7 @@ from servicio_tecnico.models import (
 from servicio_tecnico.services.pagos_orden import (
     _db_de,
     calcular_resumen_cobro,
+    familia_pago_reparacion,
     mensaje_alerta_pago_por_estado,
     registrar_pago,
 )
@@ -197,6 +198,15 @@ class CalcularResumenCobroTest(TestCase):
                 self.orden, self.empleado, Decimal('100.00'),
                 'anticipo', 'efectivo', codigo_pais='MX',
             )
+
+    def test_familia_queda_en_anticipo_tras_el_primer_abono(self):
+        """Con un anticipo ya registrado, el formulario debe ofrecer solo ese tipo."""
+        self.assertEqual(familia_pago_reparacion(self.orden), '')
+        registrar_pago(
+            self.orden, self.empleado, Decimal('100.00'),
+            'anticipo', 'transferencia', codigo_pais='MX',
+        )
+        self.assertEqual(familia_pago_reparacion(self.orden), 'anticipo')
 
     def test_no_se_mezcla_anticipo_con_pago_de_contado(self):
         """Una reparación elige una familia y el siguiente abono la respeta."""

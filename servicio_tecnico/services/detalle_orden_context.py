@@ -285,6 +285,7 @@ def build_detalle_orden_context(request, orden):
     # para no meter lógica de dinero en el modelo ni en el template.
     from servicio_tecnico.services.pagos_orden import (
         calcular_resumen_cobro,
+        familia_pago_reparacion,
         usuario_puede_registrar_pago,
         usuario_puede_validar_pago,
     )
@@ -305,6 +306,9 @@ def build_detalle_orden_context(request, orden):
     puede_registrar_pago = usuario_puede_registrar_pago(request.user)
     puede_validar_pago = usuario_puede_validar_pago(request.user)
     form_registrar_pago = RegistrarPagoOrdenForm()
+    # La familia ya elegida (anticipo o contado) viaja al formulario para
+    # apagar la otra opción. Vacío = todavía se pueden elegir las dos.
+    familia_reparacion = familia_pago_reparacion(orden)
     form_datos_factura = DatosFacturaOrdenForm(instance=orden)
 
     # ========================================================================
@@ -447,6 +451,7 @@ def build_detalle_orden_context(request, orden):
         'puede_registrar_pago': puede_registrar_pago,
         'puede_validar_pago': puede_validar_pago,
         'form_registrar_pago': form_registrar_pago,
+        'familia_reparacion': familia_reparacion,
         'form_datos_factura': form_datos_factura,
     }
     return context

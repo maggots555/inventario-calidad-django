@@ -373,6 +373,37 @@ def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenC
     )
 
 
+def familia_pago_reparacion(orden) -> str:
+    """
+    Tipo de pago que ya tiene la reparación, para no ofrecer el otro.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El primer abono de la reparación elige la familia: anticipo o pago en
+    una sola exhibición. El formulario usa este dato para apagar la opción
+    que ya no cabe. El diagnóstico no cuenta: es otro saldo.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        'anticipo', 'pago_completo', o '' si todavía no hay abonos de
+        reparación (o si quedaron mezclados de antes).
+
+    Efectos secundarios:
+        Una consulta. No escribe.
+    """
+    tipos = list(
+        orden.pagos.filter(saldo_a_cubrir=SALDO_REPARACION)
+        .order_by()
+        .values_list('tipo', flat=True)
+        .distinct()
+    )
+    # Paso: una sola familia es la que manda. Cero o dos tipos: no bloqueamos.
+    if len(tipos) == 1 and tipos[0] in (TIPO_ANTICIPO, TIPO_PAGO_COMPLETO):
+        return tipos[0]
+    return ''
+
+
 def usuario_puede_registrar_pago(user: Optional[AbstractBaseUser]) -> bool:
     """
     True si el usuario puede capturar un abono (permiso add_pagoorden).

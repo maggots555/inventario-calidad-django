@@ -14,8 +14,10 @@
  *     navegador tendríamos dos fuentes de verdad.
  *
  * Efectos secundarios:
- *     Modifica el valor del input de monto, habilita o deshabilita la opción
- *     Anticipo y muestra u oculta un texto de ayuda.
+ *     Modifica el valor del input de monto, habilita o deshabilita opciones
+ *     del tipo de pago y muestra u oculta un texto de ayuda.
+ *     Si la reparación ya tiene un anticipo, "Pago en una sola exhibición"
+ *     queda apagado. Si ya se cobró de contado, "Anticipo" queda apagado.
  */
 
 (function detalleOrdenPagoDiagnosticoMain(): void {
@@ -52,6 +54,11 @@
         const opcionAnticipo = selectTipo.querySelector(
             'option[value="' + TIPO_ANTICIPO + '"]',
         );
+        const opcionContado = selectTipo.querySelector(
+            'option[value="' + TIPO_CONTADO + '"]',
+        );
+        // Familia ya guardada en la reparación: 'anticipo', 'pago_completo' o ''.
+        const familiaReparacion = formulario.dataset.familiaReparacion || '';
 
         // Saldo pendiente del diagnóstico, ya con IVA, calculado en el servidor.
         const saldoDiagnostico = formulario.dataset.saldoDiagnostico || '';
@@ -63,6 +70,12 @@
         ayuda.className = 'form-text text-info d-none';
         ayuda.id = 'ayudaMontoDiagnostico';
         inputMonto.insertAdjacentElement('afterend', ayuda);
+
+        // Aviso junto al tipo de pago cuando la familia de la reparación ya está fija.
+        const ayudaFamilia = document.createElement('div');
+        ayudaFamilia.className = 'form-text d-none';
+        ayudaFamilia.id = 'ayudaFamiliaReparacion';
+        selectTipo.insertAdjacentElement('afterend', ayudaFamilia);
 
         /**
          * Recuerda qué valor pusimos nosotros para no pisar lo que teclee
@@ -115,19 +128,48 @@
             }
         }
 
-        function fijarTipoDiagnostico(): void {
-            // Paso: Anticipo no aplica a este saldo. Lo apagamos y dejamos
-            // el tipo en una sola exhibición aunque el servidor también lo exige.
-            if (opcionAnticipo instanceof HTMLOptionElement) {
-                opcionAnticipo.disabled = true;
+        function ponerOpcion(opcion: Element | null, apagada: boolean): void {
+            if (opcion instanceof HTMLOptionElement) {
+                opcion.disabled = apagada;
             }
-            selectTipo.value = TIPO_CONTADO;
         }
 
-        function liberarTipoReparacion(): void {
-            if (opcionAnticipo instanceof HTMLOptionElement) {
-                opcionAnticipo.disabled = false;
+        function ocultarAyudaFamilia(): void {
+            ayudaFamilia.classList.add('d-none');
+            ayudaFamilia.textContent = '';
+        }
+
+        function fijarTipoDiagnostico(): void {
+            // Paso: Anticipo no aplica a este saldo. El de contado sí, aunque
+            // la reparación ya vaya por anticipos: son bolsillos distintos.
+            ponerOpcion(opcionContado, false);
+            ponerOpcion(opcionAnticipo, true);
+            selectTipo.value = TIPO_CONTADO;
+            ocultarAyudaFamilia();
+        }
+
+        function aplicarFamiliaReparacion(): void {
+            // Paso: el primer abono ya eligió. El otro tipo se apaga para que
+            // no se pueda mezclar anticipo con pago en una sola exhibición.
+            const bloqueaContado = familiaReparacion === TIPO_ANTICIPO;
+            const bloqueaAnticipo = familiaReparacion === TIPO_CONTADO;
+            ponerOpcion(opcionContado, bloqueaContado);
+            ponerOpcion(opcionAnticipo, bloqueaAnticipo);
+            if (bloqueaContado) {
+                selectTipo.value = TIPO_ANTICIPO;
+                ayudaFamilia.textContent =
+                    'Esta reparación ya tiene un anticipo. El resto se registra igual, como Anticipo.';
+                ayudaFamilia.classList.remove('d-none');
+                return;
             }
+            if (bloqueaAnticipo) {
+                selectTipo.value = TIPO_CONTADO;
+                ayudaFamilia.textContent =
+                    'Esta reparación ya se está cobrando en una sola exhibición.';
+                ayudaFamilia.classList.remove('d-none');
+                return;
+            }
+            ocultarAyudaFamilia();
         }
 
         function alCambiarSaldo(): void {
@@ -136,7 +178,7 @@
                 aplicarSugerenciaDiagnostico();
                 return;
             }
-            liberarTipoReparacion();
+            aplicarFamiliaReparacion();
             limpiarSugerencia();
         }
 
