@@ -83,12 +83,33 @@ El método no sale del tipo de servicio. Sale del pago que registró SIGMA.
 | Sufijo | `tipo_factura` | `metodo_pago` | Cuándo lo genera SIGMA | Concepto |
 |---|---|---|---|---|
 | `-1` | `1` | `PUE` | El diagnóstico está cubierto al 100% y el abono ya está validado. | `Diagnóstico` |
-| `-3` | `1` | `PUE` | La reparación o los servicios se pagaron en una sola exhibición y ese dinero ya cubre el total. | Servicios de mostrador, o una línea `Reparación de equipo` si hay piezas |
+| `-3` | `1` | `PUE` | La reparación o los servicios se pagaron en una sola exhibición y ese dinero ya cubre el total. | Una línea por servicio y una línea por cada pieza aceptada |
 | `-2` | `2` | `PPD` | Hay un anticipo validado de la reparación. | `Anticipo del bien o servicio` (línea única, sin detallar piezas) |
 
 `-1` y `-3` son los dos PUE. `tipo_factura` sigue siendo `1` en ambos: el
 sufijo distingue el documento, no un método SAT nuevo. Una orden puede
 tener el diagnóstico y, además, el anticipo o el pago de contado.
+
+### Qué lleva cada concepto del `-3`
+
+El pago en una sola exhibición describe lo que se vendió. El anticipo no:
+sigue siendo una sola línea.
+
+| Línea | `clave_producto_servicio` | `clave_unidad` | `cantidad` | Precio |
+|---|---|---|---|---|
+| Servicio de mostrador (limpieza, kit, reinstalación, respaldo, cambio de pieza, paquete) | `81111812` | `E48` | `1` | Neto del servicio |
+| Pieza aceptada de la cotización o vendida en mostrador | La `clave_sat` del producto de almacén, si tiene 8 dígitos. Si está vacía o la pieza no viene de un producto: `01010101` | `H87` | Las unidades vendidas | Precio unitario sin IVA |
+
+`precio` es el unitario sin IVA. El importe de la línea es `cantidad × precio`.
+El `subtotal` del encabezado es la suma de esos importes.
+
+La clave no se copia a la cotización. SIGMA la lee del producto al armar el
+documento. Si la capturan después de cotizar y el `-3` todavía no está
+timbrado, el siguiente GET ya la trae. Un documento con UUID no se recalcula.
+
+Varios anticipos del mismo servicio se suman en el mismo `-2` mientras no
+esté timbrado. Después del UUID ese documento queda congelado y no nace otro
+PPD: el saldo restante es complemento de pago y SIGMA no lo genera.
 
 ### Condición para que exista un documento
 
@@ -158,7 +179,7 @@ Authorization: Bearer <access_token>
     "web_id": "SAT9596-1",
     "tipo_factura": 1,
     "metodo_pago": "PUE",
-    "forma_pago": "01",
+    "forma_pago": "04",
     "moneda": "MXN",
     "subtotal": 500.00,
     "tasa_iva": 0.16,
@@ -183,6 +204,59 @@ Authorization: Bearer <access_token>
   ]
 }
 ```
+
+**Respuesta 200 — ejemplo PUE de contado (`-3`), servicio más una pieza**
+
+```json
+{
+  "encabezado": {
+    "fecha_ticket": "2026-09-21T12:10:00-06:00",
+    "folio": "OOW-9596",
+    "web_id": "SAT9596-3",
+    "tipo_factura": 1,
+    "metodo_pago": "PUE",
+    "forma_pago": "28",
+    "moneda": "MXN",
+    "subtotal": 1000.00,
+    "tasa_iva": 0.16,
+    "iva": 160.00,
+    "total": 1160.00
+  },
+  "conceptos": [
+    {
+      "clave_producto_servicio": "81111812",
+      "descripcion": "Limpieza y Mantenimiento",
+      "clave_unidad": "E48",
+      "precio": 500.00,
+      "numero_identificacion": "None",
+      "unidad": "E48",
+      "objeto_impuesto": 2,
+      "impuestos": "[4]",
+      "empresa": "2",
+      "clave_producto_cliente": "S0001",
+      "cantidad": 1.0,
+      "descuento": 0
+    },
+    {
+      "clave_producto_servicio": "43211503",
+      "descripcion": "Bateria Dell 40 W",
+      "clave_unidad": "H87",
+      "precio": 500.00,
+      "numero_identificacion": "None",
+      "unidad": "H87",
+      "objeto_impuesto": 2,
+      "impuestos": "[4]",
+      "empresa": "2",
+      "clave_producto_cliente": "S0002",
+      "cantidad": 1.0,
+      "descuento": 0
+    }
+  ]
+}
+```
+
+En el ejemplo la pieza ya tiene clave en el producto (`43211503`). Si el
+producto no la tuviera, esa misma línea saldría con `01010101`.
 
 **Respuesta 200 — ejemplo PPD (anticipo)**
 
@@ -236,8 +310,10 @@ Authorization: Bearer <access_token>
 | `iva` | number | IVA trasladado. |
 | `total` | number | `subtotal + iva`. Es lo que se timbra. |
 
-**Todos los importes de `conceptos[].precio` son sin IVA.** El `subtotal` del
-encabezado es la suma de los importes de los conceptos.
+**Todos los importes de `conceptos[].precio` son sin IVA** y son el precio
+unitario. El importe de la línea es `cantidad × precio`. El `subtotal` del
+encabezado es la suma de esos importes. En una pieza, `cantidad` puede ser
+mayor a 1.
 
 **Errores**
 
@@ -359,9 +435,10 @@ Una respuesta `204` en el paso 3 cierra el ciclo completo.
 2. **Importe del PPD.** Hoy se factura el anticipo ya verificado. Si el SAT o
    el PAC exigen facturar el total de la operación en lugar del anticipo, hay
    que confirmarlo antes de salir a producción.
-3. **Catálogo de claves SAT.** Se usan claves genéricas (`81111812` servicios
-   técnicos, `84111506` anticipos). Si el PAC exige claves más específicas por
-   tipo de servicio, se pueden parametrizar.
+3. **Catálogo de claves SAT.** Servicios: `81111812`. Anticipo: `84111506`.
+   Piezas: la clave de 8 dígitos capturada en el producto de almacén. Si el
+   producto todavía no la tiene, la línea usa `01010101`. No hace falta que
+   el portal resuelva el catálogo: usa la clave que llega en cada concepto.
 
 ---
 
