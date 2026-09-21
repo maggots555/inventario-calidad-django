@@ -20,7 +20,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
@@ -42,7 +42,20 @@ from servicio_tecnico.services.pagos_orden import (
     mensaje_alerta_pago_por_estado,
     registrar_pago,
 )
+from servicio_tecnico.forms import RegistrarPagoOrdenForm
 from servicio_tecnico.views import detalle_orden
+
+
+class FormularioPagoSinSaldoPreseleccionadoTest(SimpleTestCase):
+    """El alta de un pago no puede abrir ya en diagnóstico ni en reparación."""
+
+    def test_el_select_empieza_en_selecciona_el_saldo(self):
+        """Feliz: la opción vacía es la que viene marcada."""
+        formulario = RegistrarPagoOrdenForm()
+        self.assertEqual(formulario['saldo_a_cubrir'].value(), '')
+        html = str(formulario['saldo_a_cubrir'])
+        self.assertIn('Selecciona el saldo', html)
+        self.assertIn('autocomplete="off"', html)
 
 
 User = get_user_model()

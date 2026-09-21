@@ -3334,6 +3334,8 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
         widgets = {
             'saldo_a_cubrir': forms.Select(attrs={
                 'class': 'form-control form-select',
+                # El navegador no debe recordar el último saldo elegido.
+                'autocomplete': 'off',
             }),
             'monto': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -3385,6 +3387,10 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
             *PagoOrden.SALDO_A_CUBRIR_CHOICES,
         ]
         self.fields['saldo_a_cubrir'].required = True
+        # Paso: el modelo trae default 'reparacion'. Si lo dejamos, el select
+        # abre ya en Reparación y quien cobra puede no darse cuenta.
+        # Cada alta empieza en "Selecciona el saldo".
+        self.initial['saldo_a_cubrir'] = ''
 
 
 class ValidarPagoOrdenForm(forms.Form):

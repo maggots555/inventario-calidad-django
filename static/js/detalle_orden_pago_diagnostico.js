@@ -46,6 +46,9 @@
         // conserva el resultado del `instanceof` dentro de las funciones de
         // más abajo (se ejecutan después, cuando ya no puede garantizarlo).
         const selectSaldo = posibleSaldo;
+        // Cada alta empieza sin saldo. El modelo trae un default y el
+        // navegador a veces restaura el último cobro (diagnóstico o reparación).
+        selectSaldo.value = '';
         const selectTipo = posibleTipo;
         const inputMonto = posibleMonto;
         const opcionAnticipo = selectTipo.querySelector('option[value="' + TIPO_ANTICIPO + '"]');

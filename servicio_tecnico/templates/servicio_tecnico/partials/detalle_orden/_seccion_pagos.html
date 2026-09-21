@@ -139,7 +139,7 @@
                               service (con IVA ya aplicado según el país). El JS solo
                               los copia al campo; no calcula impuestos.
                             {% endcomment %}
-                            <form method="post" enctype="multipart/form-data" id="formRegistrarPago"
+                            <form method="post" enctype="multipart/form-data" id="formRegistrarPago" autocomplete="off"
                                   data-saldo-diagnostico="{{ resumen_diagnostico.saldo|stringformat:'.2f' }}"
                                   data-diagnostico-sin-iva="{{ resumen_diagnostico.monto|stringformat:'.2f' }}"
                                   data-diagnostico-iva="{{ resumen_diagnostico.iva|stringformat:'.2f' }}"
