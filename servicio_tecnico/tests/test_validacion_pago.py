@@ -4,7 +4,8 @@ Tests de validación de pagos en la cuenta de la empresa.
 EXPLICACIÓN PARA PRINCIPIANTES:
 --------------------------------
 Transferencia y tarjeta deben pasar por Facturación (¿ya se ve en la
-cuenta?). Efectivo no. Estos tests cubren:
+cuenta?). El efectivo ya no se captura; si quedó un abono viejo, no
+pide validación. Estos tests cubren:
 
 1) El estado inicial según el método.
 2) A quién se avisa (Facturación / responsable / quien cobró).
@@ -67,6 +68,9 @@ class EstadoValidacionInicialTest(TestCase):
     def test_transferencia_y_tarjeta_quedan_pendientes(self):
         """Feliz: esos dos métodos nacen pendientes de Facturación."""
         self.assertEqual(estado_validacion_inicial('transferencia'), 'pendiente')
+        self.assertEqual(estado_validacion_inicial('tarjeta_credito'), 'pendiente')
+        self.assertEqual(estado_validacion_inicial('tarjeta_debito'), 'pendiente')
+        # Abono viejo, capturado cuando "tarjeta" era un solo método.
         self.assertEqual(estado_validacion_inicial('tarjeta'), 'pendiente')
 
     def test_efectivo_y_otro_no_aplican(self):
@@ -341,13 +345,15 @@ class ValidacionPagoServiceTest(TestCase):
 
     def test_tarjeta_nace_pendiente(self):
         """Feliz: tarjeta también se concilia contra la cuenta."""
-        pago = self._registrar('tarjeta')
+        pago = self._registrar('tarjeta_credito')
         self.assertEqual(pago.estado_validacion, 'pendiente')
 
-    def test_efectivo_no_aplica(self):
-        """Borde: efectivo de caja no pide validación."""
-        pago = self._registrar('efectivo')
-        self.assertEqual(pago.estado_validacion, 'no_aplica')
+    def test_efectivo_ya_no_se_registra(self):
+        """Un alta nueva no acepta efectivo ni el método 'otro'."""
+        with self.assertRaises(ValidationError):
+            self._registrar('efectivo')
+        with self.assertRaises(ValidationError):
+            self._registrar('otro')
 
     def test_registrar_transferencia_avisa_a_facturacion(self):
         """Feliz: Recepción cobra por SPEI → se avisa a Facturación."""
@@ -365,9 +371,10 @@ class ValidacionPagoServiceTest(TestCase):
             url_relativa_bandeja_pagos(),
         )
 
-    def test_efectivo_no_avisa(self):
-        """Borde: un cobro en caja no dispara el flujo de Facturación."""
-        self._registrar('efectivo')
+    def test_efectivo_rechazado_no_avisa(self):
+        """Si el método no se acepta, no llega aviso a Facturación."""
+        with self.assertRaises(ValidationError):
+            self._registrar('efectivo')
         self.mock_push.assert_not_called()
         self.mock_email.assert_not_called()
 
@@ -392,7 +399,7 @@ class ValidacionPagoServiceTest(TestCase):
         """Borde: sin responsable, avisamos a recepcionistas activos."""
         self.orden.responsable_seguimiento = None
         self.orden.save(update_fields=['responsable_seguimiento'])
-        pago = self._registrar('tarjeta')
+        pago = self._registrar('tarjeta_debito')
         destinos = destinatarios_pago_validado(pago)
         ids = {empleado.pk for empleado in destinos}
         self.assertIn(self.recepcion.pk, ids)
@@ -437,9 +444,17 @@ class ValidacionPagoServiceTest(TestCase):
         self.mock_push.assert_called()
         self.mock_email.assert_called()
 
-    def test_no_se_valida_un_efectivo(self):
-        """Borde: no se puede 'validar' un pago de caja."""
-        pago = self._registrar('efectivo')
+    def test_no_se_valida_un_efectivo_historico(self):
+        """Un efectivo ya guardado sigue en no_aplica y no se concilia."""
+        pago = PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('50.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='anticipo',
+            metodo='efectivo',
+            estado_validacion='no_aplica',
+            registrado_por=self.recepcion,
+        )
         with self.assertRaises(ValidationError) as ctx:
             validar_pago_en_cuenta(pago, self.facturacion, aparece=True)
         self.assertIn('no requiere validación', str(ctx.exception).lower())
@@ -455,7 +470,15 @@ class ValidacionPagoServiceTest(TestCase):
     def test_lista_bandeja_solo_pendientes(self):
         """Feliz: la bandeja default no mezcla efectivo ni ya validados."""
         spei = self._registrar('transferencia')
-        self._registrar('efectivo', monto='50.00')
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('50.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='anticipo',
+            metodo='efectivo',
+            estado_validacion='no_aplica',
+            registrado_por=self.recepcion,
+        )
         ids = list(
             listar_pagos_abiertos_validacion('pendiente').values_list('pk', flat=True)
         )
@@ -464,7 +487,7 @@ class ValidacionPagoServiceTest(TestCase):
     def test_lista_bandeja_filtro_no_aparece(self):
         """Borde: el filtro no_aparece no trae los que siguen pendientes."""
         pendiente = self._registrar('transferencia')
-        rechazado = self._registrar('tarjeta', monto='50.00')
+        rechazado = self._registrar('tarjeta_credito', monto='50.00')
         validar_pago_en_cuenta(rechazado, self.facturacion, aparece=False)
         ids_pend = list(
             listar_pagos_abiertos_validacion('pendiente').values_list('pk', flat=True)
@@ -677,7 +700,7 @@ class ValidacionPagoHttpTest(TestCase):
             self.user_recepcion.empleado,
             Decimal('290.00'),
             'anticipo',
-            'tarjeta',
+            'tarjeta_credito',
             codigo_pais='MX',
         )
         response = self._post(self.user_facturacion, {
@@ -906,7 +929,7 @@ class BandejaPagosValidacionHttpTest(TestCase):
     def test_filtro_no_aparece_no_mezcla_pendientes(self):
         """Borde: la pestaña No aparecen no lista los que siguen pendientes."""
         pendiente = self._registrar('transferencia')
-        rechazado = self._registrar('tarjeta', monto='50.00')
+        rechazado = self._registrar('tarjeta_debito', monto='50.00')
         validar_pago_en_cuenta(
             rechazado,
             self.user_facturacion.empleado,

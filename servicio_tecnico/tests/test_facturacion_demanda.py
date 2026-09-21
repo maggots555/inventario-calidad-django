@@ -101,6 +101,13 @@ class WebIdUnidadTest(SimpleTestCase):
             DocumentoFiscalOrden.TIPO_PPD,
         )
 
+    def test_desglosar_pue_de_reparacion(self):
+        """Feliz: el sufijo 3 es el PUE de la reparación, no un método nuevo."""
+        self.assertEqual(
+            desglosar_web_id('SAT9596-3').tipo,
+            DocumentoFiscalOrden.TIPO_PUE_REPARACION,
+        )
+
     def test_desglosar_tolera_minusculas_y_sin_sufijo(self):
         """Borde: el cliente teclea en minúsculas y sin el guion."""
         partes = desglosar_web_id(' sat9596 ')
@@ -223,9 +230,10 @@ class FacturacionApiTest(BaseFacturacionTest):
         return PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal(monto),
-            tipo='diagnostico',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
 
@@ -233,6 +241,7 @@ class FacturacionApiTest(BaseFacturacionTest):
         return PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal(monto),
+            saldo_a_cubrir='reparacion',
             tipo='anticipo',
             metodo='transferencia',
             estado_validacion=estado,
@@ -305,7 +314,7 @@ class FacturacionApiTest(BaseFacturacionTest):
 
     def test_get_pue_desglosa_iva_del_diagnostico(self):
         """
-        Feliz: diagnóstico de $500 pagado en efectivo → PUE con IVA aparte.
+        Feliz: diagnóstico de $500 con transferencia validada → PUE con IVA aparte.
         500 + 80 de IVA = 580 y un solo concepto de servicio.
         """
         self._pagar_diagnostico()
@@ -317,7 +326,7 @@ class FacturacionApiTest(BaseFacturacionTest):
         self.assertEqual(encabezado['folio'], 'OOW-11902')
         self.assertEqual(encabezado['tipo_factura'], 1)
         self.assertEqual(encabezado['metodo_pago'], 'PUE')
-        self.assertEqual(encabezado['forma_pago'], '01')
+        self.assertEqual(encabezado['forma_pago'], '03')
         self.assertEqual(encabezado['subtotal'], 500.0)
         self.assertEqual(encabezado['iva'], 80.0)
         self.assertEqual(encabezado['total'], 580.0)
@@ -347,7 +356,8 @@ class FacturacionApiTest(BaseFacturacionTest):
         PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal('500.00'),
-            tipo='diagnostico',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
             metodo='transferencia',
             estado_validacion='pendiente',
             registrado_por=self.empleado,
@@ -405,16 +415,19 @@ class FacturacionApiTest(BaseFacturacionTest):
         PagoOrden.objects.create(
             orden=orden,
             monto=Decimal('580.00'),
+            saldo_a_cubrir='reparacion',
             tipo='pago_completo',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
 
-        response = self._get('SAT11950-1')
+        response = self._get('SAT11950-3')
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
         self.assertEqual(data['encabezado']['metodo_pago'], 'PUE')
+        self.assertEqual(data['encabezado']['tipo_factura'], 1)
+        self.assertTrue(data['encabezado']['web_id'].endswith('-3'))
         # 580 con IVA incluido → 500 antes de IVA + 80 de IVA.
         self.assertEqual(data['encabezado']['subtotal'], 500.0)
         self.assertEqual(data['encabezado']['total'], 580.0)
@@ -428,7 +441,119 @@ class FacturacionApiTest(BaseFacturacionTest):
                 DocumentoFiscalOrden.objects.filter(orden=orden)
                 .values_list('tipo', flat=True)
             ),
-            [DocumentoFiscalOrden.TIPO_PUE],
+            [DocumentoFiscalOrden.TIPO_PUE_REPARACION],
+        )
+
+    def test_reparacion_con_piezas_de_contado_es_pue_3(self):
+        """
+        El tipo de pago manda: piezas liquidadas en una sola exhibición
+        salen en el webId -3, no como anticipo.
+        """
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('580.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='pago_completo',
+            metodo='tarjeta_credito',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        response = self._get('SAT11902-3')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['encabezado']['tipo_factura'], 1)
+        self.assertEqual(data['encabezado']['metodo_pago'], 'PUE')
+        self.assertEqual(data['encabezado']['forma_pago'], '04')
+        self.assertEqual(data['conceptos'][0]['descripcion'], 'Reparación de equipo')
+        self.assertNotIn('Bateria', json.dumps(data))
+        self.assertFalse(
+            DocumentoFiscalOrden.objects.filter(
+                orden=self.orden,
+                tipo=DocumentoFiscalOrden.TIPO_PPD,
+            ).exists()
+        )
+
+    def test_limpieza_capturada_como_anticipo_es_ppd(self):
+        """El mismo servicio, si el pago es anticipo, sale como PPD."""
+        orden = self._crear_orden('OOW-11951', 'SN-FAC-VM-11951')
+        VentaMostrador.objects.create(
+            orden=orden,
+            folio_venta='VM-TEST-0002',
+            incluye_limpieza=True,
+            costo_limpieza=Decimal('580.00'),
+        )
+        PagoOrden.objects.create(
+            orden=orden,
+            monto=Decimal('290.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='anticipo',
+            metodo='transferencia',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        response = self._get('SAT11951-2')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['encabezado']['metodo_pago'], 'PPD')
+        self.assertEqual(
+            data['conceptos'][0]['descripcion'],
+            'Anticipo del bien o servicio',
+        )
+        self.assertFalse(
+            DocumentoFiscalOrden.objects.filter(
+                orden=orden,
+                tipo=DocumentoFiscalOrden.TIPO_PUE_REPARACION,
+            ).exists()
+        )
+
+    def test_forma_pago_no_mezcla_bolsillos(self):
+        """Débito del diagnóstico y transferencia del anticipo no se contagian."""
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('580.00'),
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='tarjeta_debito',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        self._pagar_reparacion()
+        diagnostico = json.loads(self._get('SAT11902-1').content)
+        anticipo = json.loads(self._get('SAT11902-2').content)
+        self.assertEqual(diagnostico['encabezado']['forma_pago'], '28')
+        self.assertEqual(anticipo['encabezado']['forma_pago'], '03')
+
+    def test_contado_parcial_no_publica_el_webid_3(self):
+        """El -3 espera a que el pago de contado cubra el total."""
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('290.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        response = self._get('SAT11902-3')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)['razon'], RAZON_SIN_PAGOS)
+
+    def test_efectivo_historico_sigue_facturando(self):
+        """Un efectivo ya guardado (no_aplica) sigue habilitando el -1."""
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('580.00'),
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='efectivo',
+            estado_validacion='no_aplica',
+            registrado_por=self.empleado,
+        )
+        response = self._get('SAT11902-1')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            json.loads(response.content)['encabezado']['forma_pago'],
+            '01',
         )
 
     # ── Resolución del webId ────────────────────────────────────────────
@@ -494,9 +619,10 @@ class FacturacionApiTest(BaseFacturacionTest):
         PagoOrden.objects.create(
             orden=orden_garantia,
             monto=Decimal('100.00'),
-            tipo='diagnostico',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
         response = self._get('SAT11903-1')
@@ -617,6 +743,36 @@ class FacturacionApiTest(BaseFacturacionTest):
         self.assertFalse(self.orden.factura_emitida)
         self.assertEqual(self._get('SAT11902-2').status_code, 200)
 
+    def test_diagnostico_timbrado_no_absorbe_el_pago_de_contado(self):
+        """
+        El -1 ya timbrado se queda quieto. El contado de la reparación
+        nace en el -3.
+        """
+        self._pagar_diagnostico()
+        self._get('SAT11902-1')
+        self._put('SAT11902-1', self._payload_cfdi())
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('580.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='pago_completo',
+            metodo='tarjeta_debito',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        response = self._get('SAT11902-3')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            json.loads(response.content)['encabezado']['forma_pago'],
+            '28',
+        )
+        diagnostico = DocumentoFiscalOrden.objects.get(
+            orden=self.orden,
+            tipo=DocumentoFiscalOrden.TIPO_PUE,
+        )
+        self.assertEqual(diagnostico.subtotal, Decimal('500.00'))
+        self.assertTrue(diagnostico.esta_timbrado)
+
 
 class DiagnosticoPagosTest(BaseFacturacionTest):
     """El diagnóstico es un bolsillo aparte del saldo de la reparación."""
@@ -664,9 +820,10 @@ class DiagnosticoPagosTest(BaseFacturacionTest):
         PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal('864.00'),
-            tipo='diagnostico',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
 
@@ -818,9 +975,10 @@ class DiagnosticoCatalogoTest(BaseFacturacionTest):
         PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal('661.20'),
-            tipo='diagnostico',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
 
@@ -909,9 +1067,10 @@ class AutofacturaSeguimientoTest(BaseFacturacionTest):
         self.pago = PagoOrden.objects.create(
             orden=self.orden,
             monto=Decimal('580.00'),
-            tipo='diagnostico',
-            metodo='efectivo',
-            estado_validacion='no_aplica',
+            saldo_a_cubrir='diagnostico',
+            tipo='pago_completo',
+            metodo='transferencia',
+            estado_validacion='validado',
             registrado_por=self.empleado,
         )
         self.token = secrets.token_urlsafe(32)

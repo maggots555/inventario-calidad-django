@@ -27,7 +27,10 @@ from servicio_tecnico.services.diagnostico_catalogo import (
     aplicar_perfil_diagnostico,
 )
 from servicio_tecnico.services.pagos_diagnostico import resumen_diagnostico
-from servicio_tecnico.services.pagos_orden import registrar_pago
+from servicio_tecnico.services.pagos_orden import (
+    registrar_pago,
+    validar_pago_en_cuenta,
+)
 from servicio_tecnico.tests.helpers_tarifario import sembrar_tarifario
 
 
@@ -132,8 +135,9 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('661.20'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
 
@@ -142,24 +146,42 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
         self.assertEqual(resumen.saldo, Decimal('0.00'))
         self.assertTrue(resumen.cubierto_100)
 
-    def test_efectivo_cubierto_habilita_la_factura(self):
+    def test_transferencia_validada_habilita_la_factura(self):
         """
-        Efectivo nace verificado, así que el cobro completo habilita el PUE.
+        Una transferencia nace pendiente. El PUE espera a que Finanzas la valide.
 
         `confirmado_100` es lo que el autofacturador consulta para decidir si
         ya hay algo que timbrar.
         """
-        registrar_pago(
+        pago = registrar_pago(
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('661.20'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
+        self.assertFalse(
+            resumen_diagnostico(self.orden, codigo_pais='MX').confirmado_100
+        )
 
+        validar_pago_en_cuenta(pago, self.empleado, aparece=True)
         resumen = resumen_diagnostico(self.orden, codigo_pais='MX')
         self.assertTrue(resumen.confirmado_100)
+
+    def test_diagnostico_no_se_registra_como_anticipo(self):
+        """El diagnóstico siempre es una sola exhibición."""
+        with self.assertRaises(ValidationError):
+            registrar_pago(
+                orden=self.orden,
+                empleado=self.empleado,
+                monto=Decimal('661.20'),
+                tipo='anticipo',
+                saldo_a_cubrir='diagnostico',
+                metodo='transferencia',
+                codigo_pais='MX',
+            )
 
     def test_pagar_solo_el_neto_deja_saldo_del_iva(self):
         """
@@ -172,8 +194,9 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('570.00'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
 
@@ -189,8 +212,9 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
                 orden=self.orden,
                 empleado=self.empleado,
                 monto=Decimal('700.00'),
-                tipo='diagnostico',
-                metodo='efectivo',
+                tipo='pago_completo',
+                saldo_a_cubrir='diagnostico',
+                metodo='transferencia',
                 codigo_pais='MX',
             )
 
@@ -208,8 +232,9 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
                 orden=self.orden,
                 empleado=self.empleado,
                 monto=Decimal('700.00'),
-                tipo='diagnostico',
-                metodo='efectivo',
+                tipo='pago_completo',
+                saldo_a_cubrir='diagnostico',
+                metodo='transferencia',
                 codigo_pais='MX',
             )
 
@@ -224,16 +249,18 @@ class RegistrarCobroDiagnosticoTest(BaseCobroDiagnosticoTest):
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('400.00'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
         registrar_pago(
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('261.20'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
 
@@ -257,14 +284,16 @@ class DesgloseEnLaFacturaTest(BaseCobroDiagnosticoTest):
             calcular_lineas_pue,
         )
 
-        registrar_pago(
+        pago = registrar_pago(
             orden=self.orden,
             empleado=self.empleado,
             monto=Decimal('661.20'),
-            tipo='diagnostico',
-            metodo='efectivo',
+            tipo='pago_completo',
+            saldo_a_cubrir='diagnostico',
+            metodo='transferencia',
             codigo_pais='MX',
         )
+        validar_pago_en_cuenta(pago, self.empleado, aparece=True)
 
         lineas = calcular_lineas_pue(self.orden)
         self.assertEqual(len(lineas), 1)

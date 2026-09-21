@@ -2,13 +2,14 @@
 Construcción de los documentos facturables PUE y PPD de una orden.
 
 Objetivo de negocio:
-    Decidir qué puede facturar el cliente en el portal VO y por cuánto:
+    Decidir qué puede facturar el cliente en el portal VO y por cuánto.
+    Lo decide el pago, no el tipo de servicio:
 
-    * PUE — servicios pagados al 100%: el Diagnóstico (mano de obra) y los
-      servicios de venta mostrador como "Limpieza y Mantenimiento". Se factura
-      el servicio completo con IVA desglosado.
-    * PPD — anticipo de una reparación que todavía no se liquida. Un solo
-      concepto, "Anticipo del bien o servicio", sin describir piezas.
+    * webId -1 (pue) — el diagnóstico cubierto al 100% y ya validado.
+    * webId -3 (pue_rep) — la reparación o los servicios pagados en una
+      sola exhibición, cuando ese dinero ya cubre el total y está validado.
+    * webId -2 (ppd) — el anticipo de la reparación, desde el primer peso
+      validado. Una sola línea, "Anticipo del bien o servicio".
 
 EXPLICACIÓN PARA PRINCIPIANTES — ¿cuándo nace un documento?
     Cuando el dinero ya es de la empresa. No basta con que Recepción capture
@@ -44,13 +45,16 @@ from servicio_tecnico.models_facturacion import (
 from servicio_tecnico.services.facturacion_web_id import construir_web_id
 from servicio_tecnico.services.pagos_diagnostico import (
     ESTADOS_PAGO_CONFIRMADO,
-    TIPO_PAGO_DIAGNOSTICO,
     descripcion_servicio_diagnostico,
     orden_en_garantia,
     resumen_diagnostico,
 )
 from servicio_tecnico.services.pagos_orden import (
     IVA_TASA_MX,
+    SALDO_DIAGNOSTICO,
+    SALDO_REPARACION,
+    TIPO_ANTICIPO,
+    TIPO_PAGO_COMPLETO,
     _db_de,
     calcular_resumen_cobro,
 )
@@ -66,6 +70,7 @@ CLAVE_SAT_ANTICIPO = '84111506'
 CLAVE_UNIDAD_ANTICIPO = 'ACT'
 
 DESCRIPCION_ANTICIPO = 'Anticipo del bien o servicio'
+DESCRIPCION_REPARACION = 'Reparación de equipo'
 
 
 def _dinero(valor) -> Decimal:
@@ -135,26 +140,62 @@ def aplica_autofacturacion(orden) -> bool:
     return bool(construir_web_id(orden, DocumentoFiscalOrden.TIPO_PUE))
 
 
-def _pagado_confirmado_reparacion(orden) -> Decimal:
+def _suma_confirmada(orden, saldo: str, tipo: str) -> Decimal:
     """
-    Dinero de la REPARACIÓN que Facturación ya dio por bueno.
+    Dinero ya validado de un bolsillo y un tipo de pago.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Excluimos los abonos tipo 'diagnostico' porque ese bolsillo se factura
-    aparte (PUE) y no debe contarse dos veces.
+    El diagnóstico no se suma con la reparación, y un anticipo no se suma
+    con un pago de contado. Cada factura lee solo su cajón.
 
     Args:
         orden: OrdenServicio.
+        saldo: 'diagnostico' o 'reparacion'.
+        tipo: 'anticipo' o 'pago_completo'.
 
     Returns:
-        Decimal con 2 decimales.
+        Decimal con 2 decimales. $0.00 si todavía no hay nada validado.
     """
     agregado = (
-        orden.pagos.exclude(tipo=TIPO_PAGO_DIAGNOSTICO)
-        .filter(estado_validacion__in=ESTADOS_PAGO_CONFIRMADO)
+        orden.pagos.filter(
+            saldo_a_cubrir=saldo,
+            tipo=tipo,
+            estado_validacion__in=ESTADOS_PAGO_CONFIRMADO,
+        )
         .aggregate(total=Sum('monto'))['total']
     )
     return _dinero(agregado)
+
+
+def pagos_confirmados_del_documento(orden, tipo_documento: str):
+    """
+    Abonos validados que respaldan un documento fiscal.
+
+    Sirve para la forma de pago del CFDI: el diagnóstico en débito no debe
+    cambiar la clave del anticipo que entró por transferencia.
+
+    Args:
+        orden: OrdenServicio.
+        tipo_documento: DocumentoFiscalOrden.TIPO_PUE, TIPO_PUE_REPARACION
+            o TIPO_PPD.
+
+    Returns:
+        QuerySet de PagoOrden. Vacío si el tipo no se reconoce.
+    """
+    base = orden.pagos.filter(estado_validacion__in=ESTADOS_PAGO_CONFIRMADO)
+    if tipo_documento == DocumentoFiscalOrden.TIPO_PUE:
+        return base.filter(saldo_a_cubrir=SALDO_DIAGNOSTICO)
+    if tipo_documento == DocumentoFiscalOrden.TIPO_PUE_REPARACION:
+        return base.filter(
+            saldo_a_cubrir=SALDO_REPARACION,
+            tipo=TIPO_PAGO_COMPLETO,
+        )
+    if tipo_documento == DocumentoFiscalOrden.TIPO_PPD:
+        return base.filter(
+            saldo_a_cubrir=SALDO_REPARACION,
+            tipo=TIPO_ANTICIPO,
+        )
+    return base.none()
 
 
 def _lineas_servicios_venta_mostrador(orden) -> list[LineaFacturable]:
@@ -224,14 +265,14 @@ def _tiene_piezas_por_cobrar(orden) -> bool:
     return False
 
 
-def _servicios_mostrador_van_en_pue(orden) -> bool:
+def _reparacion_de_contado_lista(orden) -> bool:
     """
-    True si los servicios de venta mostrador se facturan como PUE.
+    True si el pago de contado de la reparación ya cubre el total y está validado.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Solo cuando la orden es de PUROS servicios (sin piezas de por medio) y el
-    cliente ya liquidó el 100% verificado. Si hubiera piezas no podríamos
-    saber qué parte del dinero pagó los servicios y qué parte la mercancía.
+    No publicamos el webId -3 con un abono parcial: si el cliente timbra
+    esa factura, después no podríamos agregarle el resto. Esperamos a que
+    los abonos "en una sola exhibición" cubran el total de la reparación.
 
     Args:
         orden: OrdenServicio.
@@ -239,66 +280,93 @@ def _servicios_mostrador_van_en_pue(orden) -> bool:
     Returns:
         bool
     """
-    if _tiene_piezas_por_cobrar(orden):
-        return False
     resumen = calcular_resumen_cobro(orden, codigo_pais='MX')
-    if resumen.total_a_cobrar <= 0 or not resumen.cubierto_100:
+    if resumen.total_a_cobrar <= 0:
         return False
-    # Paso: además del saldo en cero, el dinero debe estar verificado.
-    return _pagado_confirmado_reparacion(orden) >= resumen.total_a_cobrar
+    pagado = _suma_confirmada(orden, SALDO_REPARACION, TIPO_PAGO_COMPLETO)
+    return pagado >= resumen.total_a_cobrar
 
 
 def calcular_lineas_pue(orden) -> list[LineaFacturable]:
     """
-    Servicios pagados al 100% que se facturan en una sola exhibición.
+    Línea del diagnóstico (webId -1), solo si ya está cubierto y validado.
 
     Args:
         orden: OrdenServicio.
 
     Returns:
-        list[LineaFacturable]. Vacía significa "todavía no hay PUE".
+        list[LineaFacturable] de un elemento, o vacía si aún no se factura.
 
     Efectos secundarios:
-        Lee cotización, venta mostrador y pagos. No escribe.
+        Lee pagos y mano de obra. No escribe.
     """
-    lineas: list[LineaFacturable] = []
-
-    # Paso 1: el diagnóstico. Solo si está cubierto Y verificado en cuenta.
+    # Paso: el diagnóstico es PUE por el saldo, no por el tipo de servicio.
     diagnostico = resumen_diagnostico(orden)
-    if diagnostico.confirmado_100:
-        lineas.append(
-            LineaFacturable(
-                descripcion=descripcion_servicio_diagnostico(orden),
-                importe=diagnostico.monto,
-            )
+    if not diagnostico.confirmado_100:
+        return []
+    return [
+        LineaFacturable(
+            descripcion=descripcion_servicio_diagnostico(orden),
+            importe=diagnostico.monto,
         )
+    ]
 
-    # Paso 2: los servicios de mostrador, cuando la orden es solo servicios.
-    if _servicios_mostrador_van_en_pue(orden):
-        lineas.extend(_lineas_servicios_venta_mostrador(orden))
 
-    return lineas
+def calcular_lineas_pue_reparacion(orden) -> list[LineaFacturable]:
+    """
+    Conceptos del pago en una sola exhibición de la reparación (webId -3).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Si la orden es de puros servicios (limpieza, kit, respaldo…), cada uno
+    conserva el texto que el negocio pidió ver en la factura. Si hay piezas,
+    no las listamos: una sola línea, "Reparación de equipo", por el neto
+    de lo que ya se validó.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        list[LineaFacturable]. Vacía si el contado todavía no cubre el total.
+
+    Efectos secundarios:
+        Lee venta mostrador, cotización y pagos. No escribe.
+    """
+    if not _reparacion_de_contado_lista(orden):
+        return []
+
+    # Paso: sin piezas, el detalle de servicios de mostrador sí se puede armar.
+    if not _tiene_piezas_por_cobrar(orden):
+        return _lineas_servicios_venta_mostrador(orden)
+
+    # Paso: con piezas, el CFDI no describe refacciones. El importe es el
+    # neto de los abonos de contado ya validados (vienen con IVA).
+    pagado = _suma_confirmada(orden, SALDO_REPARACION, TIPO_PAGO_COMPLETO)
+    importe = _sin_iva(pagado)
+    if importe <= 0:
+        return []
+    return [
+        LineaFacturable(
+            descripcion=DESCRIPCION_REPARACION,
+            importe=importe,
+        )
+    ]
 
 
 def calcular_linea_ppd(orden) -> Optional[LineaFacturable]:
     """
-    Anticipo facturable de la reparación (piezas y mercancía).
+    Anticipo facturable de la reparación (webId -2).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    El CFDI de anticipo no describe piezas (cuando se cobra todavía no se sabe
-    con certeza qué se va a instalar): es una sola línea que dice "Anticipo del
-    bien o servicio". El importe es lo que el cliente ya entregó y que
-    Facturación ya verificó en la cuenta.
-
-    Lo que decide que sea PPD es la NATURALEZA del cobro (una reparación que
-    se paga en partes: anticipo del 50% y saldo a la entrega), no el monto.
-    Por eso no preguntamos si ya está liquidada.
+    El CFDI de anticipo no describe piezas: es una sola línea que dice
+    "Anticipo del bien o servicio". El importe es lo que el cliente ya
+    entregó como anticipo y que Finanzas ya vio en la cuenta. No importa
+    si con eso ya liquidó el 100%: el tipo de pago es el que manda.
 
     Args:
         orden: OrdenServicio.
 
     Returns:
-        LineaFacturable o None si no hay anticipo que facturar.
+        LineaFacturable o None si no hay anticipo validado.
 
     Efectos secundarios:
         Lee resumen de cobro y pagos. No escribe.
@@ -308,18 +376,13 @@ def calcular_linea_ppd(orden) -> Optional[LineaFacturable]:
     if resumen.total_a_cobrar <= 0:
         return None
 
-    # Paso 2: si ese mismo dinero ya se fue al PUE (orden de puros servicios
-    # liquidada), no lo volvemos a facturar aquí. Nunca dos CFDI por un peso.
-    if _servicios_mostrador_van_en_pue(orden):
-        return None
-
-    # Paso 3: solo el dinero que Facturación ya dio por bueno.
-    anticipo = _pagado_confirmado_reparacion(orden)
+    # Paso 2: solo los anticipos validados. El pago de contado va al -3
+    # y el diagnóstico al -1. Nunca dos CFDI por el mismo peso.
+    anticipo = _suma_confirmada(orden, SALDO_REPARACION, TIPO_ANTICIPO)
     if anticipo <= 0:
         return None
 
-    # Paso 3: el monto recibido viene con IVA (es lo que pagó el cliente);
-    # el CFDI pide el valor antes de impuestos.
+    # Paso 3: el monto recibido viene con IVA; el CFDI pide el valor neto.
     return LineaFacturable(
         descripcion=DESCRIPCION_ANTICIPO,
         importe=_sin_iva(anticipo),
@@ -426,7 +489,7 @@ def sincronizar_documentos_orden(orden) -> list[DocumentoFiscalOrden]:
         orden: OrdenServicio.
 
     Returns:
-        list[DocumentoFiscalOrden] vigentes (0, 1 o 2).
+        list[DocumentoFiscalOrden] vigentes (0 a 3).
 
     Efectos secundarios:
         Crea/actualiza/borra documentos y conceptos en la BD del país de la
@@ -451,6 +514,17 @@ def sincronizar_documentos_orden(orden) -> list[DocumentoFiscalOrden]:
         )
         if pue is not None:
             documentos.append(pue)
+
+        # Paso: el contado de la reparación es otro PUE. No se cuelga del
+        # diagnóstico, porque ese CFDI puede timbrarse el día del ingreso.
+        pue_reparacion = _guardar_documento(
+            orden,
+            DocumentoFiscalOrden.TIPO_PUE_REPARACION,
+            calcular_lineas_pue_reparacion(orden),
+            db_alias,
+        )
+        if pue_reparacion is not None:
+            documentos.append(pue_reparacion)
 
         linea_ppd = calcular_linea_ppd(orden)
         ppd = _guardar_documento(

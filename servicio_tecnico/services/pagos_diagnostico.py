@@ -32,11 +32,10 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import Sum
 
 CENTAVO = Decimal('0.01')
-TIPO_PAGO_DIAGNOSTICO = 'diagnostico'
 
-# Estados de validación que Facturación considera "el dinero ya es nuestro".
-# 'no_aplica' es efectivo cobrado en caja; 'validado' es transferencia vista
-# en el estado de cuenta. Los dos habilitan la factura.
+# Estados de validación que Finanzas considera "el dinero ya es nuestro".
+# 'validado' es transferencia o tarjeta vista en la cuenta. 'no_aplica' queda
+# para el efectivo histórico, que se cobró en caja. Los dos habilitan la factura.
 ESTADOS_PAGO_CONFIRMADO = ('validado', 'no_aplica')
 
 # Gama del equipo (DetalleEquipo.gama) → perfil del tarifario del cotizador.
@@ -53,9 +52,9 @@ PERFIL_TARIFARIO_POR_GAMA = {
 }
 PERFIL_TARIFARIO_DEFAULT = 'estandar'
 
-# Textos que van al CFDI. El SAT pide descripción clara del servicio.
+# Texto del concepto de diagnóstico en el CFDI. La limpieza de mostrador
+# no vive aquí: sale en el PUE de la reparación cuando el pago es de contado.
 DESCRIPCION_DIAGNOSTICO = 'Diagnóstico'
-DESCRIPCION_MANTENIMIENTO = 'Limpieza y Mantenimiento'
 
 
 def _dinero(valor) -> Decimal:
@@ -210,8 +209,19 @@ def tarifa_diagnostico(orden) -> Decimal:
 
 
 def _pagos_diagnostico(orden):
-    """QuerySet de abonos tipo 'diagnostico' de la orden."""
-    return orden.pagos.filter(tipo=TIPO_PAGO_DIAGNOSTICO)
+    """
+    QuerySet de abonos que cubren el saldo del diagnóstico.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        QuerySet de PagoOrden. No incluye la reparación ni los servicios.
+    """
+    # Import diferido: pagos_orden importa este módulo dentro de registrar_pago.
+    from servicio_tecnico.services.pagos_orden import SALDO_DIAGNOSTICO
+
+    return orden.pagos.filter(saldo_a_cubrir=SALDO_DIAGNOSTICO)
 
 
 def iva_diagnostico(monto_sin_iva: Decimal, codigo_pais: Optional[str] = None) -> Decimal:
@@ -348,23 +358,23 @@ def validar_monto_pago_diagnostico(orden, monto: Decimal) -> None:
 
 def descripcion_servicio_diagnostico(orden) -> str:
     """
-    Texto del concepto que irá en la factura PUE.
+    Texto del concepto que irá en la factura PUE del diagnóstico.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    El SAT quiere saber qué se vendió. Si la orden es una venta mostrador con
-    limpieza, el servicio real fue "Limpieza y Mantenimiento"; en cualquier
-    otro caso el cliente pagó un "Diagnóstico".
+    El SAT quiere saber qué se vendió. Este bolsillo siempre es el diagnóstico
+    cobrado al ingresar el equipo. La limpieza y los demás servicios de
+    mostrador se facturan con el saldo de la reparación, no aquí.
 
     Args:
-        orden: OrdenServicio.
+        orden: OrdenServicio (se recibe por la firma histórica del llamador).
 
     Returns:
-        str: 'Diagnóstico' o 'Limpieza y Mantenimiento'.
+        str: 'Diagnóstico'.
     """
-    venta = getattr(orden, 'venta_mostrador', None)
-    # Paso: la bandeja de limpieza de venta mostrador manda sobre el default.
-    if venta is not None and getattr(venta, 'incluye_limpieza', False):
-        return DESCRIPCION_MANTENIMIENTO
+    # El texto no sale de la orden: la limpieza de mostrador se factura
+    # aparte, con el saldo de la reparación. Se conserva el argumento
+    # para no cambiar la firma de quien ya llama esta función.
+    _ = orden
     return DESCRIPCION_DIAGNOSTICO
 
 

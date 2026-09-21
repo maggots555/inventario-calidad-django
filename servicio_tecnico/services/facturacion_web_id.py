@@ -7,15 +7,15 @@ Objetivo de negocio:
 
         SAT9596-1
         └┬┘ └┬─┘ └┬
-         │   │    └── tipo de documento: 1 = PUE, 2 = PPD
+         │   │    └── documento: 1 = PUE diagnóstico, 2 = PPD, 3 = PUE reparación
          │   └─────── dígitos del folio del cliente (OOW-9596 → 9596)
          └─────────── prefijo de la sucursal (Sucursal.prefijo_facturacion)
 
 EXPLICACIÓN PARA PRINCIPIANTES — ¿por qué tres partes?
     * El prefijo evita choques: puede existir OOW-1234 en Satélite y FL-1234
       en Drop Off. Con SAT1234 y DROP1234 ya no hay duda de cuál es cuál.
-    * El sufijo permite que una misma orden tenga dos facturas distintas:
-      el diagnóstico pagado al 100% (PUE) y el anticipo de la reparación (PPD).
+    * El sufijo permite que una misma orden tenga facturas distintas:
+      -1 diagnóstico (PUE), -2 anticipo (PPD) y -3 reparación de contado (PUE).
 
 Somos tolerantes al leer: si el portal manda `SAT9596` (sin sufijo) o incluso
 `9596` (como en las primeras pruebas), igual resolvemos siempre que no haya
@@ -41,8 +41,9 @@ from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
 PATRON_WEB_ID = re.compile(r'^([A-Z]*)(\d+)(?:-(\d+))?$')
 
 # Traducción inversa del sufijo numérico al tipo del modelo.
+# Sale de SUFIJO_TIPO y no de CODIGO_TIPO: -1 y -3 son los dos PUE (código 1).
 TIPO_POR_SUFIJO = {
-    codigo: tipo for tipo, codigo in DocumentoFiscalOrden.CODIGO_TIPO.items()
+    codigo: tipo for tipo, codigo in DocumentoFiscalOrden.SUFIJO_TIPO.items()
 }
 
 
@@ -54,7 +55,7 @@ class PartesWebId:
     Args/campos:
         prefijo: sucursal ('SAT'). Cadena vacía si el portal no lo mandó.
         digitos: folio del cliente sin ceros a la izquierda ('9596').
-        tipo: 'pue' / 'ppd'. None si el portal no mandó sufijo.
+        tipo: 'pue', 'ppd' o 'pue_rep'. None si el portal no mandó sufijo.
     """
 
     prefijo: str
@@ -126,7 +127,7 @@ def construir_web_id(orden, tipo: str) -> str:
 
     Args:
         orden: OrdenServicio dueña del documento.
-        tipo: DocumentoFiscalOrden.TIPO_PUE o TIPO_PPD.
+        tipo: TIPO_PUE, TIPO_PPD o TIPO_PUE_REPARACION.
 
     Returns:
         str: 'SAT9596-1'. Cadena vacía si falta prefijo o folio, que es la
@@ -160,7 +161,7 @@ def desglosar_web_id(web_id: str) -> Optional[PartesWebId]:
         return None
 
     prefijo, digitos, sufijo = coincidencia.groups()
-    # Paso 2: el sufijo solo vale si es un tipo que conocemos (1 o 2).
+    # Paso 2: el sufijo solo vale si es un documento que conocemos (1, 2 o 3).
     tipo = None
     if sufijo is not None:
         tipo = TIPO_POR_SUFIJO.get(int(sufijo))

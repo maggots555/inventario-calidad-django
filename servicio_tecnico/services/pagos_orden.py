@@ -37,13 +37,30 @@ IVA_TASA_MX = Decimal('0.16')
 CENTAVO = Decimal('0.01')
 PERMISO_REGISTRAR_PAGO = 'servicio_tecnico.add_pagoorden'
 
-# Transferencia y tarjeta deben verse en la cuenta de la empresa.
-# Efectivo/otro se cobraron en caja: no piden validación de Facturación.
-METODOS_REQUIEREN_VALIDACION = ('transferencia', 'tarjeta')
+# Transferencia y las dos tarjetas deben verse en la cuenta de la empresa.
+# 'tarjeta' (sin crédito/débito) es un abono viejo: también se concilia.
+# Efectivo y "otro" ya no se capturan; si existen, no piden validación.
+METODOS_REQUIEREN_VALIDACION = (
+    'transferencia',
+    'tarjeta',
+    'tarjeta_credito',
+    'tarjeta_debito',
+)
+# Lo único que el formulario puede guardar a partir de ahora.
+METODOS_CAPTURABLES = (
+    'transferencia',
+    'tarjeta_credito',
+    'tarjeta_debito',
+)
 
-# El diagnóstico se cobra aparte de las piezas (ver PagoOrden.TIPO_PAGO_CHOICES).
-# Todo lo que tenga este tipo se excluye del saldo de la reparación.
-TIPO_PAGO_DIAGNOSTICO = 'diagnostico'
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# saldo_a_cubrir dice de qué bolsillo es el dinero. El diagnóstico no entra
+# al total de piezas. tipo dice cómo se factura ese bolsillo: anticipo = PPD,
+# pago_completo = PUE.
+SALDO_DIAGNOSTICO = 'diagnostico'
+SALDO_REPARACION = 'reparacion'
+TIPO_ANTICIPO = 'anticipo'
+TIPO_PAGO_COMPLETO = 'pago_completo'
 
 # Quién puede marcar "ya aparece / no aparece". Recepción cobra, no concilia.
 ROLES_PUEDEN_VALIDAR_PAGO = (
@@ -314,11 +331,11 @@ def calcular_resumen_cobro(orden, codigo_pais: Optional[str] = None) -> ResumenC
 
     total = _dinero(total_cotizacion_con_iva + total_vm)
 
-    # Paso: suma de abonos ya capturados (si no hay, 0). Excluimos el
-    # diagnóstico porque tampoco está sumado en `total`: si lo contáramos
+    # Paso: suma de abonos de la reparación (si no hay, 0). El diagnóstico
+    # vive en otro bolsillo y no está sumado en `total`: si lo contáramos
     # aquí, el saldo de piezas se vería pagado de más.
     agregado = (
-        orden.pagos.exclude(tipo=TIPO_PAGO_DIAGNOSTICO)
+        orden.pagos.exclude(saldo_a_cubrir=SALDO_DIAGNOSTICO)
         .aggregate(total=Sum('monto'))['total']
     )
     pagado = _dinero(agregado or Decimal('0.00'))
@@ -557,6 +574,7 @@ def registrar_pago(
     monto,
     tipo: str,
     metodo: str,
+    saldo_a_cubrir: str = SALDO_REPARACION,
     notas: str = '',
     comprobante_file=None,
     codigo_pais: Optional[str] = None,
@@ -568,8 +586,9 @@ def registrar_pago(
         orden: OrdenServicio destino.
         empleado: Empleado que captura (obligatorio).
         monto: Decimal o string del abono.
-        tipo: clave de PagoOrden.TIPO_PAGO_CHOICES.
-        metodo: clave de PagoOrden.METODO_PAGO_CHOICES.
+        tipo: 'anticipo' o 'pago_completo'.
+        metodo: transferencia, tarjeta_credito o tarjeta_debito.
+        saldo_a_cubrir: 'diagnostico' o 'reparacion'.
         notas: texto corto opcional.
         comprobante_file: archivo de imagen o None.
         codigo_pais: override de país para el cálculo de saldo.
@@ -597,6 +616,27 @@ def registrar_pago(
     if monto_dec <= Decimal('0.00'):
         raise ValidationError('El monto del pago debe ser mayor a cero.')
 
+    # Paso: efectivo y "otro" ya no se capturan. Todo pago nuevo se concilia.
+    if metodo not in METODOS_CAPTURABLES:
+        raise ValidationError(
+            'El método debe ser transferencia, tarjeta de crédito '
+            'o tarjeta de débito.'
+        )
+
+    # Paso: el diagnóstico siempre es PUE. Anticipo solo cabe en la reparación.
+    if saldo_a_cubrir == SALDO_DIAGNOSTICO:
+        if tipo != TIPO_PAGO_COMPLETO:
+            raise ValidationError(
+                'El diagnóstico siempre se cubre en una sola exhibición.'
+            )
+    elif saldo_a_cubrir == SALDO_REPARACION:
+        if tipo not in (TIPO_ANTICIPO, TIPO_PAGO_COMPLETO):
+            raise ValidationError(
+                'El tipo de pago de la reparación no es válido.'
+            )
+    else:
+        raise ValidationError('Elige el saldo que vas a cubrir.')
+
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # atomic(using=la BD de ESTA orden) + select_for_update: si dos
     # personas cobran a la vez, la segunda espera y vuelve a leer el saldo.
@@ -610,13 +650,30 @@ def registrar_pago(
         )
         # Paso: el diagnóstico tiene su propio techo (la mano de obra), no el
         # total de piezas. Su validación vive en pagos_diagnostico.py.
-        if tipo == TIPO_PAGO_DIAGNOSTICO:
+        if saldo_a_cubrir == SALDO_DIAGNOSTICO:
             from servicio_tecnico.services.pagos_diagnostico import (
                 validar_monto_pago_diagnostico,
             )
 
             validar_monto_pago_diagnostico(orden_bloqueada, monto_dec)
         else:
+            # Paso: una reparación no mezcla anticipo con pago de contado.
+            # El diagnóstico no cuenta: es otro bolsillo.
+            ya_hay_otra_familia = (
+                PagoOrden.objects.using(db_alias)
+                .filter(
+                    orden=orden_bloqueada,
+                    saldo_a_cubrir=SALDO_REPARACION,
+                )
+                .exclude(tipo=tipo)
+                .exists()
+            )
+            if ya_hay_otra_familia:
+                raise ValidationError(
+                    'Esta reparación ya tiene abonos del otro tipo. '
+                    'No se mezcla un anticipo con un pago en una sola exhibición.'
+                )
+
             resumen = calcular_resumen_cobro(orden_bloqueada, codigo_pais=codigo_pais)
 
             # Paso: sin cotización ni venta no hay cifra contra la cual abonar.
@@ -632,10 +689,11 @@ def registrar_pago(
                     f'(${resumen.saldo}).'
                 )
 
-        # Paso: transferencia/tarjeta nacen pendientes; efectivo no se concilia.
+        # Paso: transferencia y tarjeta nacen pendientes de Finanzas.
         pago = PagoOrden(
             orden=orden_bloqueada,
             monto=monto_dec,
+            saldo_a_cubrir=saldo_a_cubrir,
             tipo=tipo,
             metodo=metodo,
             notas=(notas or '').strip(),
@@ -651,8 +709,9 @@ def registrar_pago(
             tipo_evento='sistema',
             usuario=empleado,
             comentario=(
-                f'Pago registrado: ${monto_dec} ({pago.get_tipo_display()}, '
-                f'{pago.get_metodo_display()}).'
+                f'Pago registrado: ${monto_dec} '
+                f'({pago.get_saldo_a_cubrir_display()}, '
+                f'{pago.get_tipo_display()}, {pago.get_metodo_display()}).'
             ),
             es_sistema=True,
         )

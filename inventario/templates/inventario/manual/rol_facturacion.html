@@ -6,9 +6,9 @@
 <p class="manual-kicker">Tu área · rol Facturación</p>
 <h1>Facturación</h1>
 <p class="manual-lead">
-    Cuando Front registra un pago por <strong>transferencia</strong> o <strong>tarjeta</strong>
-    (en una orden OOW o FL ya creada), tú confirmas si ese dinero ya aparece en la cuenta de la empresa.
-    El efectivo de caja <strong>no</strong> pasa por ti: SIGMA lo da por cobrado al instante.
+    Cuando Front registra un pago por <strong>transferencia</strong>, <strong>tarjeta de crédito</strong>
+    o <strong>tarjeta de débito</strong> (en una orden OOW o FL ya creada), tú confirmas si ese dinero
+    ya aparece en la cuenta de la empresa. Esos son los únicos métodos que se capturan.
     En cotización FL <em>sin orden</em> todavía no hay pagos que validar.
 </p>
 
@@ -21,7 +21,7 @@
 <h2>Checklist de este flujo</h2>
 <ol>
     <li>Front registra el anticipo (u otro abono) en la orden. Ver <a href="{% url 'manual:acepta' %}#paso-anticipo">anticipo 50%</a>.</li>
-    <li>Si el método fue transferencia o tarjeta, te llega aviso (campana, push y correo) y el pago entra a la bandeja.</li>
+    <li>Al registrar el pago te llega aviso (campana, push y correo) y el abono entra a la bandeja.</li>
     <li>Abre <strong>Servicio Técnico → Pagos por validar</strong> (menú de órdenes).</li>
     <li>Revisa la fila: orden, monto, comprobante y quién registró el cobro.</li>
     <li>Pulsa <span class="manual-btn-name">Ya aparece</span> si el abono ya está en la cuenta, o
@@ -54,7 +54,7 @@
         </div>
         <div>
             <dt>Qué no entra aquí</dt>
-            <dd>Pagos en <strong>efectivo</strong> u otros métodos de caja. Esos no piden validación bancaria.</dd>
+            <dd>Abonos en efectivo que se capturaron antes de quitar ese método. Esos ya quedaron cobrados.</dd>
         </div>
     </dl>
 </article>

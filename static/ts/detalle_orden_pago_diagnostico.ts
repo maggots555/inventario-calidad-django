@@ -3,23 +3,25 @@
  *
  * Objetivo de negocio:
  *     El diagnóstico se guarda SIN IVA ($570), pero el cliente entrega en caja
- *     el total CON IVA ($661.20). Quien cobra no tiene por qué hacer esa cuenta
- *     de cabeza: al elegir el tipo de pago "Diagnóstico / mano de obra", el
- *     campo de monto se llena solo con lo que falta por cubrir.
+ *     el total CON IVA ($661.20). Al elegir el saldo "Diagnóstico", el monto
+ *     se llena solo y el tipo queda en "Pago en una sola exhibición": ese
+ *     saldo siempre es PUE y no se captura como anticipo.
  *
  * EXPLICACIÓN PARA PRINCIPIANTES:
  *     Los importes NO se calculan aquí. Llegan ya resueltos desde el servidor
  *     en atributos data- del formulario, porque el dinero se calcula en un solo
  *     lugar (services/pagos_diagnostico.py). Si multiplicáramos por 1.16 en el
- *     navegador tendríamos dos fuentes de verdad, y tarde o temprano una de las
- *     dos quedaría desactualizada (por ejemplo, en un país sin IVA).
+ *     navegador tendríamos dos fuentes de verdad.
  *
  * Efectos secundarios:
- *     Modifica el valor del input de monto y muestra/oculta un texto de ayuda.
+ *     Modifica el valor del input de monto, habilita o deshabilita la opción
+ *     Anticipo y muestra u oculta un texto de ayuda.
  */
 
 (function detalleOrdenPagoDiagnosticoMain(): void {
-    const TIPO_DIAGNOSTICO = 'diagnostico';
+    const SALDO_DIAGNOSTICO = 'diagnostico';
+    const TIPO_CONTADO = 'pago_completo';
+    const TIPO_ANTICIPO = 'anticipo';
 
     document.addEventListener('DOMContentLoaded', function (): void {
         const formulario = document.getElementById('formRegistrarPago');
@@ -27,8 +29,12 @@
             return;
         }
 
+        const posibleSaldo = formulario.querySelector('[name="saldo_a_cubrir"]');
         const posibleTipo = formulario.querySelector('[name="tipo"]');
         const posibleMonto = formulario.querySelector('[name="monto"]');
+        if (!(posibleSaldo instanceof HTMLSelectElement)) {
+            return;
+        }
         if (!(posibleTipo instanceof HTMLSelectElement)) {
             return;
         }
@@ -40,8 +46,12 @@
         // Reasignamos a constantes con tipo explícito porque TypeScript no
         // conserva el resultado del `instanceof` dentro de las funciones de
         // más abajo (se ejecutan después, cuando ya no puede garantizarlo).
+        const selectSaldo: HTMLSelectElement = posibleSaldo;
         const selectTipo: HTMLSelectElement = posibleTipo;
         const inputMonto: HTMLInputElement = posibleMonto;
+        const opcionAnticipo = selectTipo.querySelector(
+            'option[value="' + TIPO_ANTICIPO + '"]',
+        );
 
         // Saldo pendiente del diagnóstico, ya con IVA, calculado en el servidor.
         const saldoDiagnostico = formulario.dataset.saldoDiagnostico || '';
@@ -99,26 +109,43 @@
             if (montoSinIva !== '' && ivaDiagnostico !== '') {
                 ayuda.textContent =
                     'Incluye IVA: $' + montoSinIva + ' + $' + ivaDiagnostico +
-                    ' = $' + saldo.toFixed(2) + '. Es lo que el cliente paga en caja.';
+                    ' = $' + saldo.toFixed(2) + '. El diagnóstico siempre es pago en una sola exhibición.';
             } else {
                 ayuda.textContent = 'Monto con IVA incluido: $' + saldo.toFixed(2) + '.';
             }
         }
 
-        function alCambiarTipo(): void {
-            if (selectTipo.value === TIPO_DIAGNOSTICO) {
-                aplicarSugerenciaDiagnostico();
-            } else {
-                limpiarSugerencia();
+        function fijarTipoDiagnostico(): void {
+            // Paso: Anticipo no aplica a este saldo. Lo apagamos y dejamos
+            // el tipo en una sola exhibición aunque el servidor también lo exige.
+            if (opcionAnticipo instanceof HTMLOptionElement) {
+                opcionAnticipo.disabled = true;
+            }
+            selectTipo.value = TIPO_CONTADO;
+        }
+
+        function liberarTipoReparacion(): void {
+            if (opcionAnticipo instanceof HTMLOptionElement) {
+                opcionAnticipo.disabled = false;
             }
         }
 
-        selectTipo.addEventListener('change', alCambiarTipo);
+        function alCambiarSaldo(): void {
+            if (selectSaldo.value === SALDO_DIAGNOSTICO) {
+                fijarTipoDiagnostico();
+                aplicarSugerenciaDiagnostico();
+                return;
+            }
+            liberarTipoReparacion();
+            limpiarSugerencia();
+        }
 
-        // Paso: si el formulario se repinta con el tipo ya seleccionado
+        selectSaldo.addEventListener('change', alCambiarSaldo);
+
+        // Paso: si el formulario se repinta con el saldo ya seleccionado
         // (por ejemplo tras un error de validación), aplicamos la ayuda.
-        if (selectTipo.value === TIPO_DIAGNOSTICO) {
-            alCambiarTipo();
+        if (selectSaldo.value === SALDO_DIAGNOSTICO) {
+            alCambiarSaldo();
         }
     });
 })();

@@ -2625,6 +2625,7 @@ class PagoOrdenAdmin(admin.ModelAdmin):
     list_display = (
         'orden',
         'monto',
+        'saldo_a_cubrir',
         'tipo',
         'metodo',
         'estado_validacion',
@@ -2632,7 +2633,7 @@ class PagoOrdenAdmin(admin.ModelAdmin):
         'registrado_por',
         'tiene_comprobante',
     )
-    list_filter = ('tipo', 'metodo', 'estado_validacion', 'fecha_pago')
+    list_filter = ('saldo_a_cubrir', 'tipo', 'metodo', 'estado_validacion', 'fecha_pago')
     search_fields = (
         'orden__numero_orden_interno',
         'orden__detalle_equipo__orden_cliente',

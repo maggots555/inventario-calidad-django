@@ -45,7 +45,7 @@ muestra al cliente en su enlace de seguimiento.
 ```
 SAT9596-1
 └┬┘ └┬─┘ └┬
- │   │    └── tipo de documento (1 = PUE, 2 = PPD)
+ │   │    └── documento: 1 = PUE diagnóstico, 2 = PPD anticipo, 3 = PUE de contado
  │   └─────── dígitos del folio del cliente (OOW-9596 → 9596)
  └─────────── prefijo de la sucursal
 ```
@@ -78,24 +78,24 @@ SIGMA acepta variantes para no castigar al cliente por un error de tecleo:
 
 ## 3. Tipos de documento
 
-| `tipo_factura` | Método SAT | Cuándo lo genera SIGMA | Descripción del concepto |
-|---|---|---|---|
-| `1` | `PUE` | El cliente pagó al **100%** un servicio: diagnóstico o limpieza y mantenimiento. | `Diagnóstico`, `Limpieza y Mantenimiento`, etc. |
-| `2` | `PPD` | El cliente entregó dinero a cuenta de una reparación con piezas. | `Anticipo del bien o servicio` (línea única, sin detallar piezas). |
+El método no sale del tipo de servicio. Sale del pago que registró SIGMA.
 
-Una orden puede tener los dos documentos a la vez (pagó su diagnóstico **y**
-dio anticipo de la reparación). Por eso existe el sufijo.
+| Sufijo | `tipo_factura` | `metodo_pago` | Cuándo lo genera SIGMA | Concepto |
+|---|---|---|---|---|
+| `-1` | `1` | `PUE` | El diagnóstico está cubierto al 100% y el abono ya está validado. | `Diagnóstico` |
+| `-3` | `1` | `PUE` | La reparación o los servicios se pagaron en una sola exhibición y ese dinero ya cubre el total. | Servicios de mostrador, o una línea `Reparación de equipo` si hay piezas |
+| `-2` | `2` | `PPD` | Hay un anticipo validado de la reparación. | `Anticipo del bien o servicio` (línea única, sin detallar piezas) |
 
-La estructura es escalable: si en el futuro se agrega un tercer tipo, será
-`tipo_factura: 3` y sufijo `-3`. No asuman que solo existen 1 y 2.
+`-1` y `-3` son los dos PUE. `tipo_factura` sigue siendo `1` en ambos: el
+sufijo distingue el documento, no un método SAT nuevo. Una orden puede
+tener el diagnóstico y, además, el anticipo o el pago de contado.
 
 ### Condición para que exista un documento
 
-SIGMA solo publica un `webId` cuando **el pago está verificado**:
-
-- Efectivo o pago en caja → disponible de inmediato.
-- Transferencia o tarjeta → disponible cuando Facturación confirma que el
-  depósito aparece en el estado de cuenta.
+SIGMA solo publica un `webId` cuando **el pago está verificado** en la
+cuenta de la empresa (transferencia, tarjeta de crédito o tarjeta de
+débito). Un abono en `pendiente` no se factura. Los cobros en efectivo
+que ya existían antes de este corte siguen contando.
 
 Órdenes **dentro de garantía** nunca se autofacturan (el cliente no paga).
 
@@ -229,7 +229,7 @@ Authorization: Bearer <access_token>
 | `web_id` | string | El identificador canónico, con prefijo y sufijo. |
 | `tipo_factura` | int | `1` PUE, `2` PPD. |
 | `metodo_pago` | string | `PUE` o `PPD` (catálogo `c_MetodoPago`). |
-| `forma_pago` | string | `c_FormaPago`: `01` efectivo, `03` transferencia, `04` tarjeta, `99` mixto. |
+| `forma_pago` | string | `c_FormaPago` de los abonos de ese documento: `03` transferencia, `04` crédito, `28` débito, `99` si en ese bolsillo se mezclaron. `01` solo en efectivo histórico. |
 | `moneda` | string | Hoy siempre `MXN`. |
 | `subtotal` | number | Importe **antes** de IVA. |
 | `tasa_iva` | number | `0.16` para México. |
@@ -245,7 +245,7 @@ encabezado es la suma de los importes de los conceptos.
 |---|---|---|
 | 400 | `El webId no tiene un formato válido` | Texto sin dígitos o sufijo desconocido. |
 | 400 | `hay más de una orden con el mismo folio` | Manden el `webId` con prefijo. |
-| 400 | `el folio tiene más de un documento facturable...` | Manden el `webId` con sufijo (`-1` o `-2`). |
+| 400 | `el folio tiene más de un documento facturable...` | Manden el `webId` con sufijo (`-1`, `-2` o `-3`). |
 | 400 | `la venta no tiene pagos validados para facturar` | Todavía no hay dinero verificado. |
 | 400 | `la venta no está disponible para autofacturación` | Orden en garantía, cancelada o de sucursal sin facturación. |
 | 400 | `la facturación en demanda solo aplica en México` | Se llamó a un host de otro país. |

@@ -43,6 +43,7 @@ from servicio_tecnico.models import DetalleEquipo, OrdenServicio
 from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
 from servicio_tecnico.services.facturacion_documentos import (
     aplica_autofacturacion,
+    pagos_confirmados_del_documento,
     sincronizar_documentos_orden,
 )
 from servicio_tecnico.services.facturacion_web_id import (  # noqa: F401
@@ -63,16 +64,21 @@ IMPUESTOS_IVA = '[4]'
 MONEDA_DEFAULT = 'MXN'
 
 # forma_pago SAT c_FormaPago a partir de PagoOrden.metodo.
+# efectivo / tarjeta / otro se conservan para abonos viejos.
 MAPEO_FORMA_PAGO = {
     'efectivo': '01',
     'transferencia': '03',
     'tarjeta': '04',
+    'tarjeta_credito': '04',
+    'tarjeta_debito': '28',
     'otro': '99',
 }
 
 # Cómo se llama cada tipo en el catálogo c_MetodoPago del SAT.
+# El -3 también es PUE: tipo_factura sigue en 1.
 METODO_PAGO_SAT = {
     DocumentoFiscalOrden.TIPO_PUE: 'PUE',
+    DocumentoFiscalOrden.TIPO_PUE_REPARACION: 'PUE',
     DocumentoFiscalOrden.TIPO_PPD: 'PPD',
 }
 
@@ -84,7 +90,7 @@ RAZON_PAGO_INVALIDO = 'forma de pago no válida, método de pago no válido'
 RAZON_COLISION = 'hay más de una orden con el mismo folio'
 RAZON_TIPO_AMBIGUO = (
     'el folio tiene más de un documento facturable; '
-    'indique el tipo en el webId (-1 PUE, -2 PPD)'
+    'indique el documento en el webId (-1 diagnóstico, -2 anticipo, -3 contado)'
 )
 RAZON_SOLO_MEXICO = 'la facturación en demanda solo aplica en México'
 RAZON_NO_FACTURABLE = 'la venta no está disponible para autofacturación'
@@ -251,17 +257,23 @@ def resolver_documento(web_id: str) -> DocumentoFiscalOrden:
     return documentos[0]
 
 
-def _forma_pago(orden) -> str:
+def _forma_pago(documento: DocumentoFiscalOrden) -> str:
     """
-    Clave c_FormaPago del SAT a partir de cómo pagó el cliente.
+    Clave c_FormaPago del SAT a partir de los abonos de ESE documento.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El diagnóstico puede entrar con débito y el anticipo por transferencia.
+    Cada factura mira solo su bolsillo, para no marcar las dos como mixtas.
 
     Args:
-        orden: OrdenServicio con sus pagos.
+        documento: DocumentoFiscalOrden ya resuelto.
 
     Returns:
-        str: '01' efectivo, '03' transferencia, '04' tarjeta, '99' mixto.
+        str: '03' transferencia, '04' crédito, '28' débito, '01' efectivo
+        histórico, '99' si en ese bolsillo se mezclaron métodos.
     """
-    metodos = {pago.metodo for pago in orden.pagos.all()}
+    pagos = pagos_confirmados_del_documento(documento.orden, documento.tipo)
+    metodos = {pago.metodo for pago in pagos}
     if not metodos:
         raise FacturacionDemandaError(400, MENSAJE_BAD_REQUEST, RAZON_SIN_PAGOS)
     # Paso: un solo método → su clave SAT; mezclados → 99 (por definir).
@@ -345,7 +357,7 @@ def armar_payload_documento(documento: DocumentoFiscalOrden) -> dict[str, Any]:
             # 1 = PUE, 2 = PPD (estructura escalable pedida por VO).
             'tipo_factura': documento.codigo_tipo,
             'metodo_pago': METODO_PAGO_SAT[documento.tipo],
-            'forma_pago': _forma_pago(orden),
+            'forma_pago': _forma_pago(documento),
             'moneda': documento.moneda or MONEDA_DEFAULT,
             'subtotal': _a_float(documento.subtotal),
             'tasa_iva': float(documento.tasa_iva),

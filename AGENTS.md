@@ -373,15 +373,22 @@ El cliente teclea un `webId` en el portal VO y SIGMA responde qué timbrar. SIGM
 | Tablas | `models_facturacion.py` (`DocumentoFiscalOrden`, `ConceptoDocumentoFiscal`) |
 | Contrato para el proveedor | `docs/integraciones/API_AUTOFACTURACION_VO.md` |
 
-- **PUE** (`tipo_factura: 1`) = servicios pagados al 100% (Diagnóstico, Limpieza y Mantenimiento).
-- **PPD** (`tipo_factura: 2`) = anticipo de reparación, concepto único sin detallar piezas.
+Lo que decide PUE o PPD es el **pago**, no el tipo de servicio:
+
+- webId `-1` (`tipo='pue'`, `tipo_factura: 1`) = diagnóstico cubierto al 100% y validado. Siempre PUE.
+- webId `-3` (`tipo='pue_rep'`, `tipo_factura: 1`, `metodo_pago: PUE`) = reparación o servicios pagados en una sola exhibición, cuando ese dinero ya cubre el total.
+- webId `-2` (`tipo='ppd'`, `tipo_factura: 2`) = anticipo de la reparación. Varios anticipos se suman mientras no esté timbrado.
+- `PagoOrden.saldo_a_cubrir` separa el bolsillo (`diagnostico` / `reparacion`). `tipo` solo es `anticipo` o `pago_completo`. El diagnóstico no se captura como anticipo.
+- Métodos nuevos: transferencia (`03`), tarjeta de crédito (`04`), tarjeta de débito (`28`). Efectivo y "otro" ya no se capturan; los abonos viejos se siguen leyendo.
 - Prefijo del webId: `Sucursal.prefijo_facturacion` (SAT, DROP, GDL, MTY). Vacío = no factura.
 
 ```
 ❌ NUNCA facturar órdenes dentro de garantía (es_fuera_garantia=False)
-❌ NUNCA publicar el webId con pagos en 'pendiente' (solo validado / no_aplica)
+❌ NUNCA publicar el webId con pagos en 'pendiente' (solo validado / no_aplica histórico)
 ❌ NUNCA recalcular ni borrar un documento ya timbrado (tiene UUID del SAT)
-❌ NUNCA mezclar el pago tipo 'diagnostico' con el saldo de piezas
+❌ NUNCA meter saldo_a_cubrir='diagnostico' en el saldo de piezas
+❌ NUNCA decidir PUE/PPD por el tipo de servicio (limpieza vs piezas)
+❌ NUNCA colgar el pago de contado de la reparación en el webId -1
 ✅ Documentos lazy: se sincronizan en el GET del API y en el seguimiento del cliente
 ✅ Al tocar esta zona: python manage.py test servicio_tecnico.tests.test_facturacion_demanda
 ```
@@ -419,7 +426,7 @@ El motivo: un `$0` guardado como si fuera precio borra el cobro sin que nadie se
 | `resumen.monto` | $570.00 | `costo_mano_obra` | Línea del CFDI (el SAT pide el neto) |
 | `resumen.monto_con_iva` | $661.20 | calculado en `pagos_diagnostico.py` | Lo que entra a caja y el techo del pago |
 
-`PagoOrden.monto` siempre es **dinero real con IVA**, igual que los pagos de piezas (por eso `facturacion_documentos._sin_iva()` se lo quita al facturar). Capturar el neto ($570) para "que deje guardar" descuadra SIGMA contra el banco y deja el diagnóstico sin cubrir. El selector de tipo de pago autollena el monto correcto (`detalle_orden_pago_diagnostico.ts`); el JS **no** calcula impuestos, solo copia lo que resolvió el service.
+`PagoOrden.monto` siempre es **dinero real con IVA**, igual que los pagos de piezas (por eso `facturacion_documentos._sin_iva()` se lo quita al facturar). Capturar el neto ($570) para "que deje guardar" descuadra SIGMA contra el banco y deja el diagnóstico sin cubrir. Al elegir el saldo "Diagnóstico", el formulario fija el tipo en una sola exhibición y autollena el monto (`detalle_orden_pago_diagnostico.ts`); el JS **no** calcula impuestos, solo copia lo que resolvió el service.
 
 ```
 ❌ NUNCA volver a exponer costo_mano_obra como input editable (form, template o API)

@@ -4778,8 +4778,11 @@ class PagoOrden(models.Model):
     Args/campos:
         orden: OrdenServicio a la que pertenece el abono.
         monto: Cantidad cobrada en esta captura (mayor a cero).
-        tipo: anticipo / saldo / pago_completo / otro.
-        metodo: efectivo / transferencia / tarjeta / otro.
+        saldo_a_cubrir: diagnóstico, o reparación / servicios aceptados.
+        tipo: anticipo (PPD) o pago en una sola exhibición (PUE).
+        metodo: transferencia, tarjeta de crédito o tarjeta de débito.
+            Los valores viejos (efectivo, tarjeta, otro) se conservan
+            solo para leer abonos ya capturados.
         comprobante: Imagen opcional del ticket o captura bancaria.
         notas: Texto corto (referencia de transferencia, etc.).
         registrado_por: Empleado que capturó el pago.
@@ -4793,28 +4796,36 @@ class PagoOrden(models.Model):
         Ninguno en save(). El historial y los avisos los escribe el servicio.
     """
 
-    # EXPLICACIÓN PARA PRINCIPIANTES — por qué 'diagnostico' es aparte:
-    # El diagnóstico (mano de obra de ingreso) NO entra en el total de piezas
-    # que calcula pagos_orden.py. Si lo mezcláramos con los demás abonos, el
-    # saldo de la reparación saldría mal. Al tenerlo como tipo propio podemos
-    # cobrarlo, facturarlo PUE y seguir sin ensuciar el saldo de piezas.
-    TIPO_PAGO_CHOICES = [
-        ('anticipo', 'Anticipo (50% para iniciar)'),
-        ('saldo', 'Saldo (resto a la entrega)'),
-        ('pago_completo', 'Pago en una sola exhibición'),
-        ('diagnostico', 'Diagnóstico / mano de obra'),
-        ('otro', 'Otro abono'),
+    # EXPLICACIÓN PARA PRINCIPIANTES — dos preguntas distintas:
+    # "¿Qué saldo cubres?" (diagnóstico o reparación) no es lo mismo que
+    # "¿cómo se factura?" (una sola exhibición = PUE, anticipo = PPD).
+    # El diagnóstico no entra al total de piezas: si se mezclara, el saldo
+    # de la reparación saldría pagado de más.
+    SALDO_A_CUBRIR_CHOICES = [
+        ('diagnostico', 'Diagnóstico'),
+        ('reparacion', 'Reparación / servicios aceptados'),
     ]
-    METODO_PAGO_CHOICES = [
-        ('efectivo', 'Efectivo'),
+    TIPO_PAGO_CHOICES = [
+        ('anticipo', 'Anticipo'),
+        ('pago_completo', 'Pago en una sola exhibición'),
+    ]
+    # Lo que el formulario ofrece hoy. Crédito y débito son claves SAT distintas.
+    METODO_PAGO_NUEVOS = [
         ('transferencia', 'Transferencia'),
+        ('tarjeta_credito', 'Tarjeta de crédito'),
+        ('tarjeta_debito', 'Tarjeta de débito'),
+    ]
+    # Abonos viejos. No se ofrecen al capturar; sí se muestran en historial.
+    METODO_PAGO_LEGADO = [
+        ('efectivo', 'Efectivo'),
         ('tarjeta', 'Tarjeta'),
         ('otro', 'Otro'),
     ]
+    METODO_PAGO_CHOICES = METODO_PAGO_NUEVOS + METODO_PAGO_LEGADO
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # Efectivo/otro no pasan por la cuenta de la empresa → no_aplica.
-    # Transferencia/tarjeta nacen en pendiente hasta que Facturación mira
-    # el estado de cuenta y marca validado o no_aparece.
+    # Transferencia y tarjeta nacen en pendiente hasta que Finanzas mira
+    # el estado de cuenta. no_aplica queda para el efectivo histórico:
+    # ese dinero ya se cobró en caja y no hay depósito que buscar.
     ESTADO_VALIDACION_CHOICES = [
         ('no_aplica', 'No requiere validación'),
         ('pendiente', 'Pendiente de validar en cuenta'),
@@ -4834,17 +4845,23 @@ class PagoOrden(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))],
         help_text='Monto cobrado en este abono (debe ser mayor a cero)',
     )
+    saldo_a_cubrir = models.CharField(
+        max_length=20,
+        choices=SALDO_A_CUBRIR_CHOICES,
+        default='reparacion',
+        help_text='Si este abono cubre el diagnóstico o la reparación / servicios',
+    )
     tipo = models.CharField(
         max_length=20,
         choices=TIPO_PAGO_CHOICES,
         default='anticipo',
-        help_text='Si es el anticipo del 50%, el saldo, un pago único u otro',
+        help_text='Anticipo (factura PPD) o pago en una sola exhibición (factura PUE)',
     )
     metodo = models.CharField(
         max_length=20,
         choices=METODO_PAGO_CHOICES,
         default='transferencia',
-        help_text='Cómo pagó el cliente',
+        help_text='Transferencia, tarjeta de crédito o tarjeta de débito',
     )
     comprobante = models.ImageField(
         upload_to=comprobante_pago_upload_path,
@@ -4875,7 +4892,7 @@ class PagoOrden(models.Model):
     estado_validacion = models.CharField(
         max_length=20,
         choices=ESTADO_VALIDACION_CHOICES,
-        default='no_aplica',
+        default='pendiente',
         db_index=True,
         help_text=(
             'Si Facturación ya confirmó que este abono aparece '

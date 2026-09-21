@@ -171,11 +171,11 @@ class CalcularResumenCobroTest(TestCase):
         """Feliz: dos pagos (50% + 50%) dejan saldo 0 y cubierto_100."""
         registrar_pago(
             self.orden, self.empleado, Decimal('290.00'),
-            'anticipo', 'efectivo', codigo_pais='MX',
+            'anticipo', 'transferencia', codigo_pais='MX',
         )
         registrar_pago(
             self.orden, self.empleado, Decimal('290.00'),
-            'saldo', 'efectivo', codigo_pais='MX',
+            'anticipo', 'tarjeta_debito', codigo_pais='MX',
         )
         resumen = calcular_resumen_cobro(self.orden, codigo_pais='MX')
         self.assertEqual(resumen.saldo, Decimal('0.00'))
@@ -186,9 +186,29 @@ class CalcularResumenCobroTest(TestCase):
         with self.assertRaises(ValidationError):
             registrar_pago(
                 self.orden, self.empleado, Decimal('9999.00'),
-                'pago_completo', 'tarjeta', codigo_pais='MX',
+                'pago_completo', 'tarjeta_credito', codigo_pais='MX',
             )
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
+
+    def test_efectivo_ya_no_se_captura(self):
+        """Los pagos nuevos solo son transferencia o tarjeta."""
+        with self.assertRaises(ValidationError):
+            registrar_pago(
+                self.orden, self.empleado, Decimal('100.00'),
+                'anticipo', 'efectivo', codigo_pais='MX',
+            )
+
+    def test_no_se_mezcla_anticipo_con_pago_de_contado(self):
+        """Una reparación elige una familia y el siguiente abono la respeta."""
+        registrar_pago(
+            self.orden, self.empleado, Decimal('100.00'),
+            'anticipo', 'transferencia', codigo_pais='MX',
+        )
+        with self.assertRaises(ValidationError):
+            registrar_pago(
+                self.orden, self.empleado, Decimal('100.00'),
+                'pago_completo', 'tarjeta_credito', codigo_pais='MX',
+            )
 
     def test_sin_total_no_permite_pago(self):
         """
@@ -199,7 +219,7 @@ class CalcularResumenCobroTest(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             registrar_pago(
                 self.orden, self.empleado, Decimal('100.00'),
-                'otro', 'efectivo', codigo_pais='MX',
+                'anticipo', 'transferencia', codigo_pais='MX',
             )
         self.assertIn('total a cobrar', str(ctx.exception).lower())
         self.assertEqual(PagoOrden.objects.filter(orden=self.orden).count(), 0)
@@ -254,7 +274,7 @@ class CalcularResumenCobroTest(TestCase):
         ):
             registrar_pago(
                 self.orden, self.empleado, Decimal('100.00'),
-                'anticipo', 'efectivo', codigo_pais='MX',
+                'anticipo', 'transferencia', codigo_pais='MX',
             )
 
         alias_esperado = _db_de(self.orden)
@@ -402,6 +422,7 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
         response = self._post(self.user_recepcion, {
             'form_type': 'registrar_pago',
             'monto': '348.00',
+            'saldo_a_cubrir': 'reparacion',
             'tipo': 'anticipo',
             'metodo': 'transferencia',
             'notas': 'SPEI prueba',
@@ -440,7 +461,7 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
             self.user_recepcion.empleado,
             Decimal('348.00'),
             'anticipo',
-            'efectivo',
+            'transferencia',
             codigo_pais='MX',
         )
         pago = PagoOrden.objects.get(orden=self.orden)

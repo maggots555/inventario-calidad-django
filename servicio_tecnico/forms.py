@@ -3310,9 +3310,11 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
     Formulario para capturar un abono del cliente en el detalle de orden.
 
     Objetivo de negocio:
-        Recibir monto, tipo (anticipo/saldo), método y foto opcional
-        del comprobante. La validación de saldo (no cobrar de más) vive
-        en services/pagos_orden.py, no aquí.
+        Tres decisiones: qué saldo se cubre (diagnóstico o reparación),
+        cómo se factura (una sola exhibición o anticipo) y con qué método
+        bancario. Efectivo y "otro" no se ofrecen. La validación de que
+        el monto quepa, y de que el diagnóstico no sea anticipo, vive en
+        services/pagos_orden.py.
 
     Args:
         ModelForm de PagoOrden. No incluye orden ni registrado_por
@@ -3321,8 +3323,18 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
 
     class Meta:
         model = PagoOrden
-        fields = ['monto', 'tipo', 'metodo', 'notas', 'comprobante']
+        fields = [
+            'saldo_a_cubrir',
+            'tipo',
+            'metodo',
+            'monto',
+            'notas',
+            'comprobante',
+        ]
         widgets = {
+            'saldo_a_cubrir': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
             'monto': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'step': '0.01',
@@ -3346,12 +3358,33 @@ class RegistrarPagoOrdenForm(forms.ModelForm):
             }),
         }
         labels = {
+            'saldo_a_cubrir': 'Saldo a cubrir',
             'monto': 'Monto cobrado',
             'tipo': 'Tipo de pago',
             'metodo': 'Método',
             'notas': 'Notas (opcional)',
             'comprobante': 'Comprobante (opcional)',
         }
+
+    def __init__(self, *args, **kwargs):
+        """
+        Deja en el select solo los métodos que se capturan hoy.
+
+        Args:
+            *args / **kwargs: los de ModelForm.
+
+        Efectos secundarios:
+            Ninguno. El modelo conserva efectivo y "otro" para el historial.
+        """
+        super().__init__(*args, **kwargs)
+        # Paso: el modelo lista también los métodos viejos, para que un abono
+        # en efectivo siga mostrando su etiqueta. Aquí no se pueden elegir.
+        self.fields['metodo'].choices = PagoOrden.METODO_PAGO_NUEVOS
+        self.fields['saldo_a_cubrir'].choices = [
+            ('', 'Selecciona el saldo'),
+            *PagoOrden.SALDO_A_CUBRIR_CHOICES,
+        ]
+        self.fields['saldo_a_cubrir'].required = True
 
 
 class ValidarPagoOrdenForm(forms.Form):

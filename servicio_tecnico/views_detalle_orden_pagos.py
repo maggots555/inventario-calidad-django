@@ -65,6 +65,7 @@ def handle_registrar_pago(request, orden, empleado_actual):
             monto=form.cleaned_data['monto'],
             tipo=form.cleaned_data['tipo'],
             metodo=form.cleaned_data['metodo'],
+            saldo_a_cubrir=form.cleaned_data['saldo_a_cubrir'],
             notas=form.cleaned_data.get('notas') or '',
             comprobante_file=form.cleaned_data.get('comprobante'),
         )

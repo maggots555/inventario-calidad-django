@@ -146,8 +146,8 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="form_type" value="registrar_pago">
                                 <div class="mb-2">
-                                    <label class="form-label" for="{{ form_registrar_pago.monto.id_for_label }}">{{ form_registrar_pago.monto.label }}</label>
-                                    {{ form_registrar_pago.monto }}
+                                    <label class="form-label" for="{{ form_registrar_pago.saldo_a_cubrir.id_for_label }}">{{ form_registrar_pago.saldo_a_cubrir.label }}</label>
+                                    {{ form_registrar_pago.saldo_a_cubrir }}
                                 </div>
                                 <div class="row g-2">
                                     <div class="col-6 mb-2">
@@ -158,6 +158,10 @@
                                         <label class="form-label" for="{{ form_registrar_pago.metodo.id_for_label }}">{{ form_registrar_pago.metodo.label }}</label>
                                         {{ form_registrar_pago.metodo }}
                                     </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label" for="{{ form_registrar_pago.monto.id_for_label }}">{{ form_registrar_pago.monto.label }}</label>
+                                    {{ form_registrar_pago.monto }}
                                 </div>
                                 <div class="mb-2">
                                     <label class="form-label" for="{{ form_registrar_pago.notas.id_for_label }}">{{ form_registrar_pago.notas.label }}</label>
@@ -189,6 +193,7 @@
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
+                                    <th>Saldo</th>
                                     <th>Tipo</th>
                                     <th>Método</th>
                                     <th class="text-end">Monto</th>
@@ -202,6 +207,7 @@
                                 {% for pago in pagos_orden %}
                                 <tr>
                                     <td>{{ pago.fecha_pago|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ pago.get_saldo_a_cubrir_display }}</td>
                                     <td>{{ pago.get_tipo_display }}</td>
                                     <td>{{ pago.get_metodo_display }}</td>
                                     <td class="text-end">${{ pago.monto|floatformat:2 }}</td>

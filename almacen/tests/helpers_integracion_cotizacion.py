@@ -199,7 +199,8 @@ class BaseIntegracionCotizacionMixin:
         Carga en la orden un abono igual al 50% del total a cobrar.
 
         EXPLICACIÓN: el candado de Generar Compras exige este anticipo.
-        Usamos efectivo para no disparar avisos a Facturación en CI.
+        El método es transferencia: el 50% cuenta aunque Finanzas aún
+        no lo valide. El aviso a Facturación, si falla, no revierte el pago.
 
         Args:
             orden: OrdenServicio con cotización/VM ya sincronizadas.
@@ -224,7 +225,8 @@ class BaseIntegracionCotizacionMixin:
             empleado=self.empleado,
             monto=resumen.anticipo_minimo,
             tipo='anticipo',
-            metodo='efectivo',
+            metodo='transferencia',
+            saldo_a_cubrir='reparacion',
             codigo_pais='MX',
         )
 

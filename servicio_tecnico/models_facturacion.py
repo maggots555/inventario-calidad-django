@@ -7,16 +7,15 @@ Objetivo de negocio:
     y por cuánto. Esta tabla guarda esa decisión y, cuando VO timbra, el XML,
     el PDF y el UUID del SAT.
 
-EXPLICACIÓN PARA PRINCIPIANTES — los dos tipos de documento:
-    * PUE (Pago en Una sola Exhibición): el cliente ya pagó el 100% de un
-      servicio (Diagnóstico, Limpieza y Mantenimiento). Se factura el servicio
-      completo, con IVA desglosado.
-    * PPD (Pago en Parcialidades o Diferido): el cliente dio un anticipo de una
-      reparación que todavía no termina. Se factura como "Anticipo del bien o
-      servicio", sin describir piezas.
+EXPLICACIÓN PARA PRINCIPIANTES — tres documentos, dos métodos SAT:
+    * pue (webId -1): el diagnóstico, siempre pago en una sola exhibición.
+    * pue_rep (webId -3): la reparación o los servicios pagados de contado.
+      También es PUE ante el SAT (tipo_factura 1). El sufijo los distingue
+      porque el diagnóstico se timbra al ingresar y la reparación, después.
+    * ppd (webId -2): el anticipo. Es el único PPD.
 
-    Una orden puede tener los dos (pagó su diagnóstico y además dio anticipo),
-    por eso esto es una tabla hija y no un campo dentro de OrdenServicio.
+    Una orden puede tener el diagnóstico y, además, el anticipo o el pago
+    de contado. Por eso esto es una tabla hija y no un campo de la orden.
 
 CRITICAL — este archivo es TABLA, no cerebro:
     Aquí solo van campos, choices y __str__. Los cálculos de dinero, el armado
@@ -64,7 +63,7 @@ class DocumentoFiscalOrden(models.Model):
     Args/campos:
         orden: orden de servicio dueña del documento (varios por orden).
         web_id: texto público que el cliente teclea en el portal (SAT9596-1).
-        tipo: 'pue' o 'ppd' (el API los expone como 1 y 2).
+        tipo: 'pue' (diagnóstico), 'pue_rep' (reparación de contado) o 'ppd'.
         descripcion: texto del concepto principal, ya resuelto por el servicio.
         subtotal / iva / total / tasa_iva: montos congelados al momento de
             quedar disponible; una vez timbrado ya no se recalculan.
@@ -79,22 +78,28 @@ class DocumentoFiscalOrden(models.Model):
 
     # ── Tipos de comprobante ────────────────────────────────────────────────
     TIPO_PUE = 'pue'
+    TIPO_PUE_REPARACION = 'pue_rep'
     TIPO_PPD = 'ppd'
     TIPO_CHOICES = [
-        (TIPO_PUE, 'PUE — Pago en una sola exhibición'),
-        (TIPO_PPD, 'PPD — Pago en parcialidades o diferido'),
+        (TIPO_PUE, 'PUE — Diagnóstico'),
+        (TIPO_PUE_REPARACION, 'PUE — Pago en una sola exhibición'),
+        (TIPO_PPD, 'PPD — Anticipo'),
     ]
 
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # VO pidió identificar el tipo con un número corto y escalable. Guardamos
-    # el texto (legible en el admin) y traducimos a número solo en el API.
-    # Si mañana entra un tercer tipo (ej. nota de crédito) se agrega aquí.
+    # tipo_factura le dice a VO el método SAT: 1 = PUE, 2 = PPD. Los dos
+    # documentos de contado comparten el 1. El sufijo del webId es otra cosa:
+    # -1 diagnóstico, -2 anticipo, -3 reparación pagada de contado.
     CODIGO_TIPO = {
         TIPO_PUE: 1,
+        TIPO_PUE_REPARACION: 1,
         TIPO_PPD: 2,
     }
-    # Sufijo del webId por tipo: SAT9596-1 (PUE), SAT9596-2 (PPD).
-    SUFIJO_TIPO = CODIGO_TIPO
+    SUFIJO_TIPO = {
+        TIPO_PUE: 1,
+        TIPO_PPD: 2,
+        TIPO_PUE_REPARACION: 3,
+    }
 
     orden = models.ForeignKey(
         'servicio_tecnico.OrdenServicio',
@@ -109,9 +114,9 @@ class DocumentoFiscalOrden(models.Model):
         help_text='Identificador público del portal (ej. SAT9596-1)',
     )
     tipo = models.CharField(
-        max_length=3,
+        max_length=16,
         choices=TIPO_CHOICES,
-        help_text='PUE (servicio pagado al 100%) o PPD (anticipo)',
+        help_text='pue (diagnóstico), pue_rep (contado de la reparación) o ppd',
     )
     descripcion = models.CharField(
         max_length=200,
@@ -212,7 +217,8 @@ class DocumentoFiscalOrden(models.Model):
         verbose_name_plural = 'Documentos fiscales de órdenes'
         ordering = ['orden_id', 'tipo']
         constraints = [
-            # Una orden factura como máximo un PUE y un PPD.
+            # Una orden factura como máximo un documento de cada tipo
+            # (diagnóstico, reparación de contado y anticipo).
             models.UniqueConstraint(
                 fields=['orden', 'tipo'],
                 name='unico_documento_fiscal_por_tipo',
@@ -235,7 +241,7 @@ class DocumentoFiscalOrden(models.Model):
 
     @property
     def codigo_tipo(self) -> int:
-        """Número que el API expone a VO: 1 = PUE, 2 = PPD."""
+        """Número SAT que el API expone a VO: 1 = PUE, 2 = PPD."""
         return self.CODIGO_TIPO.get(self.tipo, 0)
 
 
@@ -243,8 +249,8 @@ class ConceptoDocumentoFiscal(models.Model):
     """
     Una línea del documento fiscal (un servicio facturado).
 
-    Objetivo: un PUE puede llevar varios servicios (Diagnóstico + Limpieza y
-    Mantenimiento). El PPD lleva una sola línea de anticipo.
+    Objetivo: el PUE de mostrador puede llevar varios servicios (Limpieza,
+    kit, respaldo). El del diagnóstico y el PPD llevan una sola línea.
 
     Args/campos:
         documento: documento fiscal dueño de la línea.

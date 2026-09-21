@@ -376,7 +376,8 @@ class IntegracionSoloServicioAceptadoTest(BaseIntegracionCotizacionMixin, TestCa
             empleado=self.empleado,
             monto=Decimal('225.00'),
             tipo='anticipo',
-            metodo='efectivo',
+            metodo='transferencia',
+            saldo_a_cubrir='reparacion',
             codigo_pais='MX',
         )
         self._cerrar_solo_servicio()
