@@ -1378,6 +1378,19 @@ class BusquedaProductoForm(forms.Form):
         label='Stock',
     )
 
+    clave_sat = forms.ChoiceField(
+        required=False,
+        choices=[
+            ('', 'Clave SAT: todas'),
+            ('con', 'Con clave SAT'),
+            ('sin', 'Sin clave SAT'),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+        }),
+        label='Clave SAT',
+    )
+
 
 # ============================================================================
 # FORMULARIO: UNIDAD DE INVENTARIO

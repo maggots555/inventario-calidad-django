@@ -344,7 +344,18 @@ def editar_categoria(request, pk):
 @permission_required_with_message('almacen.view_productoalmacen')
 def lista_productos(request):
     """
-    Lista productos con búsqueda, filtros y paginación.
+    Lista los productos activos del almacén, con filtros y paginación.
+
+    Objetivo de negocio:
+        Quien captura claves SAT necesita ver cuáles productos ya la tienen
+        y cuáles siguen vacíos, sin recorrer el catálogo completo.
+
+    Args:
+        request: GET con q, tipo, categoria, stock y clave_sat
+            ('' todas, 'con' o 'sin').
+
+    Efectos secundarios:
+        Ninguno. Solo lee ProductoAlmacen.
     """
     productos = ProductoAlmacen.objects.filter(activo=True).select_related(
         'categoria', 'proveedor_principal', 'sucursal'
@@ -360,7 +371,8 @@ def lista_productos(request):
             productos = productos.filter(
                 Q(codigo_producto__icontains=q) |
                 Q(nombre__icontains=q) |
-                Q(descripcion__icontains=q)
+                Q(descripcion__icontains=q) |
+                Q(clave_sat__icontains=q)
             )
         
         # Filtro por tipo
@@ -384,6 +396,19 @@ def lista_productos(request):
             productos = productos.filter(stock_actual=0)
         elif stock == 'disponible':
             productos = productos.filter(stock_actual__gt=0)
+
+        # Paso: los conteos de clave se calculan antes de filtrar por ella,
+        # para que los badges sigan diciendo cuántas hay de cada lado.
+        total_con_clave = productos.exclude(clave_sat='').count()
+        total_sin_clave = productos.filter(clave_sat='').count()
+        clave_sat = form.cleaned_data.get('clave_sat')
+        if clave_sat == 'con':
+            productos = productos.exclude(clave_sat='')
+        elif clave_sat == 'sin':
+            productos = productos.filter(clave_sat='')
+    else:
+        total_con_clave = productos.exclude(clave_sat='').count()
+        total_sin_clave = productos.filter(clave_sat='').count()
     
     # Contar por tipo
     total_resurtibles = productos.filter(tipo_producto='resurtible').count()
@@ -399,6 +424,8 @@ def lista_productos(request):
         'form': form,
         'total_resurtibles': total_resurtibles,
         'total_unicos': total_unicos,
+        'total_con_clave': total_con_clave,
+        'total_sin_clave': total_sin_clave,
         'total': productos.count(),
     }
     

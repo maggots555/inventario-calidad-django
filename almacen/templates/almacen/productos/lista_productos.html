@@ -32,7 +32,7 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label">Buscar</label>
                     {{ form.q }}
                 </div>
@@ -48,9 +48,13 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
                     <label class="form-label">Stock</label>
                     {{ form.stock }}
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-search me-1"></i>Filtrar
+                <div class="col-md-2">
+                    <label class="form-label">Clave SAT</label>
+                    {{ form.clave_sat }}
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100" title="Filtrar">
+                        <i class="bi bi-search"></i>
                     </button>
                 </div>
             </form>
@@ -62,9 +66,17 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
         <span class="badge bg-primary me-2">
             <i class="bi bi-arrow-repeat me-1"></i>Resurtibles: {{ total_resurtibles }}
         </span>
-        <span class="badge bg-info">
+        <span class="badge bg-info me-2">
             <i class="bi bi-box me-1"></i>Únicos: {{ total_unicos }}
         </span>
+        <a href="?clave_sat=con{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}"
+           class="badge bg-success text-decoration-none me-2">
+            <i class="bi bi-check2-square me-1"></i>Con clave SAT: {{ total_con_clave }}
+        </a>
+        <a href="?clave_sat=sin{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}"
+           class="badge bg-warning text-dark text-decoration-none">
+            <i class="bi bi-exclamation-triangle me-1"></i>Sin clave SAT: {{ total_sin_clave }}
+        </a>
     </div>
 
     <!-- Tabla de Productos -->
@@ -79,6 +91,7 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
                             <th>Tipo</th>
                             <th>Categoría</th>
                             <th class="text-center">Stock</th>
+                            <th>Clave SAT</th>
                             <th class="text-end">Costo Unit.</th>
                             <th>Proveedor</th>
                             <th class="text-end">Acciones</th>
@@ -116,6 +129,13 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
                                     <span class="badge bg-success">{{ producto.stock_actual }}</span>
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if producto.clave_sat %}
+                                    <span class="badge bg-success">{{ producto.clave_sat }}</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Sin clave</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 ${{ producto.costo_unitario|floatformat:2 }}
                             </td>
@@ -139,7 +159,7 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="9" class="text-center py-5">
                                 <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
                                 <p class="text-muted mb-2">No se encontraron productos</p>
                                 <a href="{% url 'almacen:crear_producto' %}" class="btn btn-primary btn-sm">
@@ -160,7 +180,7 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
         <ul class="pagination justify-content-center">
             {% if productos.has_previous %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ productos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">
+                <a class="page-link" href="?page={{ productos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}{% if request.GET.clave_sat %}&clave_sat={{ request.GET.clave_sat }}{% endif %}">
                     <i class="bi bi-chevron-left"></i>
                 </a>
             </li>
@@ -171,14 +191,14 @@ Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
                 <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                 {% elif num > productos.number|add:'-3' and num < productos.number|add:'3' %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">{{ num }}</a>
+                    <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}{% if request.GET.clave_sat %}&clave_sat={{ request.GET.clave_sat }}{% endif %}">{{ num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}
             
             {% if productos.has_next %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ productos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">
+                <a class="page-link" href="?page={{ productos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}{% if request.GET.clave_sat %}&clave_sat={{ request.GET.clave_sat }}{% endif %}">
                     <i class="bi bi-chevron-right"></i>
                 </a>
             </li>
