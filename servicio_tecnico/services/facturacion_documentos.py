@@ -68,9 +68,12 @@ CLAVE_UNIDAD_SERVICIO = 'E48'
 # 84111506 = servicios de facturación/anticipos. ACT = actividad.
 CLAVE_SAT_ANTICIPO = '84111506'
 CLAVE_UNIDAD_ANTICIPO = 'ACT'
+# 01010101 = "no existe en el catálogo". Se usa cuando el producto de
+# almacén todavía no tiene su ClaveProdServ. H87 = pieza.
+CLAVE_SAT_MERCANCIA = '01010101'
+CLAVE_UNIDAD_PIEZA = 'H87'
 
 DESCRIPCION_ANTICIPO = 'Anticipo del bien o servicio'
-DESCRIPCION_REPARACION = 'Reparación de equipo'
 
 
 def _dinero(valor) -> Decimal:
@@ -244,25 +247,196 @@ def _lineas_servicios_venta_mostrador(orden) -> list[LineaFacturable]:
     return lineas
 
 
-def _tiene_piezas_por_cobrar(orden) -> bool:
+def _clave_mercancia(producto) -> tuple[str, str]:
     """
-    True si la orden incluye mercancía (piezas cotizadas o vendidas en VM).
+    Clave SAT de una mercancía y su unidad.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Nos sirve para no mezclar bolsillos. Si la orden trae piezas, el dinero
-    que entró puede ser de las piezas y no de los servicios, así que los
-    servicios de mostrador NO se facturan PUE por su cuenta.
+    La clave vive en el producto de almacén. Si todavía no la capturaron,
+    no detenemos la factura: usamos la clave genérica del SAT.
+
+    Args:
+        producto: ProductoAlmacen o None.
+
+    Returns:
+        tuple (clave de 8 dígitos, unidad H87).
+    """
+    clave = (getattr(producto, 'clave_sat', '') or '').strip()
+    if len(clave) == 8 and clave.isdigit():
+        return clave, CLAVE_UNIDAD_PIEZA
+    return CLAVE_SAT_MERCANCIA, CLAVE_UNIDAD_PIEZA
+
+
+def _linea_si_hay_importe(
+    descripcion: str,
+    importe,
+    cantidad,
+    clave_sat: str,
+    clave_unidad: str,
+) -> Optional[LineaFacturable]:
+    """
+    Arma una línea solo cuando el importe neto es mayor a cero.
+
+    Args:
+        descripcion: texto del concepto, ya recortado.
+        importe: total de la línea antes de IVA.
+        cantidad: unidades.
+        clave_sat / clave_unidad: catálogos del SAT.
+
+    Returns:
+        LineaFacturable o None.
+    """
+    neto = _dinero(importe)
+    if neto <= 0:
+        return None
+    piezas = Decimal(cantidad or 1)
+    if piezas <= 0:
+        piezas = Decimal('1')
+    return LineaFacturable(
+        descripcion=descripcion[:200],
+        importe=neto,
+        cantidad=piezas,
+        clave_sat=clave_sat,
+        clave_unidad=clave_unidad,
+    )
+
+
+def _cuadrar_centavos(lineas: list[LineaFacturable], neto_pagado: Decimal) -> list[LineaFacturable]:
+    """
+    Ajusta la última línea si el redondeo deja uno o dos centavos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cada línea se redondea sola. Al sumarlas, a veces el CFDI queda un
+    centavo arriba o abajo de lo que realmente se pagó. Ese centavo se
+    recorre a la última línea para que el total timbrado sea el de caja.
+    Una diferencia grande no se esconde: ahí el catálogo y el pago no
+    están diciendo lo mismo.
+
+    Args:
+        lineas: conceptos ya calculados.
+        neto_pagado: lo cobrado, ya sin IVA.
+
+    Returns:
+        La misma lista, con la última línea corregida si hizo falta.
+    """
+    if not lineas:
+        return lineas
+    suma = _dinero(sum((linea.importe for linea in lineas), Decimal('0.00')))
+    diferencia = _dinero(neto_pagado - suma)
+    if diferencia == 0 or abs(diferencia) > Decimal('0.05'):
+        return lineas
+    # Paso: solo movemos el centavo en una línea de cantidad 1. Si la
+    # cantidad es 2 o más, precio × cantidad dejaría de cuadrar con el
+    # importe y el SAT puede rechazar el timbrado.
+    indice = next(
+        (
+            pos for pos in range(len(lineas) - 1, -1, -1)
+            if lineas[pos].cantidad == Decimal('1') or lineas[pos].cantidad == Decimal('1.00')
+        ),
+        None,
+    )
+    if indice is None:
+        return lineas
+    ultima = lineas[indice]
+    nuevo = _dinero(ultima.importe + diferencia)
+    if nuevo <= 0:
+        return lineas
+    lineas[indice] = LineaFacturable(
+        descripcion=ultima.descripcion,
+        importe=nuevo,
+        cantidad=ultima.cantidad,
+        clave_sat=ultima.clave_sat,
+        clave_unidad=ultima.clave_unidad,
+    )
+    return lineas
+
+
+def _lineas_piezas_cotizadas(orden) -> list[LineaFacturable]:
+    """
+    Una línea por pieza aceptada de la cotización, precio ya sin IVA.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        list[LineaFacturable]. Vacía si no hay cotización o fue rechazada.
     """
     cotizacion = getattr(orden, 'cotizacion', None)
-    if cotizacion is not None and cotizacion.piezas_cotizadas.filter(
-        aceptada_por_cliente=True
-    ).exists():
-        return True
+    if cotizacion is None or cotizacion.usuario_acepto is False:
+        return []
+    if cotizacion.usuario_acepto:
+        piezas = cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=True)
+    else:
+        piezas = cotizacion.piezas_cotizadas.all()
+    piezas = piezas.select_related(
+        'componente',
+        'linea_cotizacion_almacen__producto',
+    )
 
+    lineas: list[LineaFacturable] = []
+    for pieza in piezas:
+        # Paso: el precio al cliente ya está sin IVA. Si una pieza vieja
+        # no lo tiene, usamos el costo (el mismo respaldo del saldo).
+        if pieza.precio_unitario_cliente is not None:
+            importe = pieza.cantidad * pieza.precio_unitario_cliente
+        else:
+            importe = pieza.costo_total
+        nombre = pieza.componente.nombre if pieza.componente_id else 'Pieza'
+        extra = (pieza.descripcion_adicional or '').strip()
+        if extra and extra.lower() not in nombre.lower():
+            descripcion = f'{nombre} — {extra}'
+        else:
+            descripcion = nombre
+        producto = None
+        linea_almacen = getattr(pieza, 'linea_cotizacion_almacen', None)
+        if linea_almacen is not None:
+            producto = linea_almacen.producto
+        clave, unidad = _clave_mercancia(producto)
+        linea = _linea_si_hay_importe(
+            descripcion, importe, pieza.cantidad, clave, unidad,
+        )
+        if linea is not None:
+            lineas.append(linea)
+    return lineas
+
+
+def _lineas_piezas_mostrador(orden) -> list[LineaFacturable]:
+    """
+    Piezas vendidas en mostrador. Su precio trae IVA incluido.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        list[LineaFacturable].
+    """
     venta = getattr(orden, 'venta_mostrador', None)
-    if venta is not None and venta.piezas_vendidas.exists():
-        return True
-    return False
+    if venta is None:
+        return []
+    vendidas = venta.piezas_vendidas.select_related(
+        'linea_cotizacion__producto',
+        'solicitud_baja__producto',
+    )
+    lineas: list[LineaFacturable] = []
+    for pieza in vendidas:
+        producto = None
+        if pieza.linea_cotizacion_id and pieza.linea_cotizacion.producto_id:
+            producto = pieza.linea_cotizacion.producto
+        elif pieza.solicitud_baja_id and pieza.solicitud_baja.producto_id:
+            producto = pieza.solicitud_baja.producto
+        clave, unidad = _clave_mercancia(producto)
+        # Paso: el subtotal de mostrador ya incluye IVA. Lo pasamos a neto
+        # de una sola vez (cantidad × precio) para no redondear dos veces.
+        linea = _linea_si_hay_importe(
+            pieza.descripcion_pieza,
+            _sin_iva(pieza.subtotal),
+            pieza.cantidad,
+            clave,
+            unidad,
+        )
+        if linea is not None:
+            lineas.append(linea)
+    return lineas
 
 
 def _reparacion_de_contado_lista(orden) -> bool:
@@ -317,10 +491,9 @@ def calcular_lineas_pue_reparacion(orden) -> list[LineaFacturable]:
     Conceptos del pago en una sola exhibición de la reparación (webId -3).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Si la orden es de puros servicios (limpieza, kit, respaldo…), cada uno
-    conserva el texto que el negocio pidió ver en la factura. Si hay piezas,
-    no las listamos: una sola línea, "Reparación de equipo", por el neto
-    de lo que ya se validó.
+    Un PUE de contado describe lo que se vendió: cada servicio de mostrador
+    y cada pieza aceptada. La clave SAT sale del producto de almacén; si
+    todavía no la tiene, se usa la genérica. El anticipo no pasa por aquí.
 
     Args:
         orden: OrdenServicio.
@@ -329,27 +502,21 @@ def calcular_lineas_pue_reparacion(orden) -> list[LineaFacturable]:
         list[LineaFacturable]. Vacía si el contado todavía no cubre el total.
 
     Efectos secundarios:
-        Lee venta mostrador, cotización y pagos. No escribe.
+        Lee venta mostrador, cotización, productos y pagos. No escribe.
     """
     if not _reparacion_de_contado_lista(orden):
         return []
 
-    # Paso: sin piezas, el detalle de servicios de mostrador sí se puede armar.
-    if not _tiene_piezas_por_cobrar(orden):
-        return _lineas_servicios_venta_mostrador(orden)
-
-    # Paso: con piezas, el CFDI no describe refacciones. El importe es el
-    # neto de los abonos de contado ya validados (vienen con IVA).
-    pagado = _suma_confirmada(orden, SALDO_REPARACION, TIPO_PAGO_COMPLETO)
-    importe = _sin_iva(pagado)
-    if importe <= 0:
+    lineas: list[LineaFacturable] = []
+    lineas.extend(_lineas_servicios_venta_mostrador(orden))
+    lineas.extend(_lineas_piezas_cotizadas(orden))
+    lineas.extend(_lineas_piezas_mostrador(orden))
+    if not lineas:
         return []
-    return [
-        LineaFacturable(
-            descripcion=DESCRIPCION_REPARACION,
-            importe=importe,
-        )
-    ]
+    # Paso: el neto de lo pagado es la cifra de caja. Si las líneas
+    # difieren por un centavo de redondeo, se corrige la última.
+    neto = _sin_iva(_suma_confirmada(orden, SALDO_REPARACION, TIPO_PAGO_COMPLETO))
+    return _cuadrar_centavos(lineas, neto)
 
 
 def calcular_linea_ppd(orden) -> Optional[LineaFacturable]:

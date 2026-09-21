@@ -78,6 +78,15 @@ Se reutiliza para ambas operaciones cambiando título y botón.
                         <small class="text-muted">Resurtible = stock renovable</small>
                     </div>
                     
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Clave SAT</label>
+                        {{ form.clave_sat }}
+                        {% if form.clave_sat.errors %}
+                            <div class="invalid-feedback d-block">{{ form.clave_sat.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Opcional. 8 dígitos del catálogo SAT. Si se deja vacía, la factura usa 01010101.</small>
+                    </div>
+
                     <div class="col-12 mb-3">
                         <label class="form-label">Descripción</label>
                         {{ form.descripcion }}

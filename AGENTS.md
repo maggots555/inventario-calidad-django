@@ -379,6 +379,7 @@ Lo que decide PUE o PPD es el **pago**, no el tipo de servicio:
 - webId `-3` (`tipo='pue_rep'`, `tipo_factura: 1`, `metodo_pago: PUE`) = reparación o servicios pagados en una sola exhibición, cuando ese dinero ya cubre el total.
 - webId `-2` (`tipo='ppd'`, `tipo_factura: 2`) = anticipo de la reparación. Varios anticipos se suman mientras no esté timbrado.
 - `PagoOrden.saldo_a_cubrir` separa el bolsillo (`diagnostico` / `reparacion`). `tipo` solo es `anticipo` o `pago_completo`. El diagnóstico no se captura como anticipo.
+- El PUE de contado (`-3`) detalla servicios y cada pieza. La ClaveProdServ vive en `ProductoAlmacen.clave_sat` (8 dígitos, opcional). Vacía = `01010101`. El PPD no lista piezas.
 - Métodos nuevos: transferencia (`03`), tarjeta de crédito (`04`), tarjeta de débito (`28`). Efectivo y "otro" ya no se capturan; los abonos viejos se siguen leyendo.
 - Prefijo del webId: `Sucursal.prefijo_facturacion` (SAT, DROP, GDL, MTY). Vacío = no factura.
 

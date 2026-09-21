@@ -204,6 +204,7 @@ class ProductoAlmacenForm(forms.ModelForm):
             'stock_maximo',
             # Costos
             'costo_unitario',
+            'clave_sat',
             # Proveedor
             'proveedor_principal',
             'tiempo_reposicion_dias',
@@ -264,6 +265,12 @@ class ProductoAlmacenForm(forms.ModelForm):
                 'step': '0.01',
                 'placeholder': '0.00',
             }),
+            'clave_sat': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '8 dígitos, ej. 43211503',
+                'maxlength': '8',
+                'inputmode': 'numeric',
+            }),
             # Proveedor
             'proveedor_principal': forms.Select(attrs={
                 'class': 'form-control form-select',
@@ -294,6 +301,7 @@ class ProductoAlmacenForm(forms.ModelForm):
             'stock_minimo': 'Stock Mínimo',
             'stock_maximo': 'Stock Máximo',
             'costo_unitario': 'Costo Unitario ($)',
+            'clave_sat': 'Clave SAT',
             'proveedor_principal': 'Proveedor Principal',
             'tiempo_reposicion_dias': 'Tiempo de Reposición (días)',
             'imagen': 'Imagen del Producto',
@@ -307,6 +315,9 @@ class ProductoAlmacenForm(forms.ModelForm):
             'stock_minimo': 'Nivel mínimo antes de alerta (solo resurtibles)',
             'stock_maximo': 'Nivel máximo recomendado (solo resurtibles)',
             'costo_unitario': 'Último precio de compra por unidad',
+            'clave_sat': (
+                'ClaveProdServ de 8 dígitos. Vacío: la factura usa 01010101.'
+            ),
         }
     
     def clean(self):

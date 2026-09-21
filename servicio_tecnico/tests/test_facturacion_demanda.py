@@ -19,9 +19,11 @@ import secrets
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import resolve, reverse
 
+from almacen.models import LineaCotizacion, ProductoAlmacen, SolicitudCotizacion
 from inventario.models import Empleado, Sucursal
 from scorecard.models import ComponenteEquipo
 from servicio_tecnico import views as st_views
@@ -464,14 +466,66 @@ class FacturacionApiTest(BaseFacturacionTest):
         self.assertEqual(data['encabezado']['tipo_factura'], 1)
         self.assertEqual(data['encabezado']['metodo_pago'], 'PUE')
         self.assertEqual(data['encabezado']['forma_pago'], '04')
-        self.assertEqual(data['conceptos'][0]['descripcion'], 'Reparación de equipo')
-        self.assertNotIn('Bateria', json.dumps(data))
+        concepto = data['conceptos'][0]
+        self.assertEqual(concepto['descripcion'], 'Bateria Dell 40 W')
+        self.assertEqual(concepto['cantidad'], 1.0)
+        self.assertEqual(concepto['precio'], 500.0)
+        self.assertEqual(concepto['clave_producto_servicio'], '01010101')
+        self.assertEqual(concepto['clave_unidad'], 'H87')
+        self.assertEqual(data['encabezado']['total'], 580.0)
         self.assertFalse(
             DocumentoFiscalOrden.objects.filter(
                 orden=self.orden,
                 tipo=DocumentoFiscalOrden.TIPO_PPD,
             ).exists()
         )
+
+    def test_la_clave_sale_del_producto_de_almacen(self):
+        """
+        Si el producto ya tiene ClaveProdServ, el PUE la usa.
+        No se copia a la cotización: se lee al armar el documento.
+        """
+        producto = ProductoAlmacen.objects.create(
+            codigo_producto='BAT-40W',
+            nombre='Bateria Dell',
+            clave_sat='43211503',
+        )
+        solicitud = SolicitudCotizacion.objects.create(orden_servicio=self.orden)
+        pieza = self.cotizacion.piezas_cotizadas.get()
+        LineaCotizacion.objects.create(
+            solicitud=solicitud,
+            producto=producto,
+            descripcion_pieza='Bateria Dell 40 W',
+            cantidad=1,
+            costo_unitario=Decimal('200.00'),
+            precio_unitario_cliente=Decimal('500.00'),
+            estado_cliente='aprobada',
+            pieza_cotizada_origen=pieza,
+        )
+        PagoOrden.objects.create(
+            orden=self.orden,
+            monto=Decimal('580.00'),
+            saldo_a_cubrir='reparacion',
+            tipo='pago_completo',
+            metodo='tarjeta_debito',
+            estado_validacion='validado',
+            registrado_por=self.empleado,
+        )
+        data = json.loads(self._get('SAT11902-3').content)
+        self.assertEqual(
+            data['conceptos'][0]['clave_producto_servicio'],
+            '43211503',
+        )
+
+    def test_clave_sat_invalida_no_se_guarda(self):
+        """Borde: letras o un largo distinto de 8 no es clave del SAT."""
+        producto = ProductoAlmacen(
+            codigo_producto='MALA',
+            nombre='Sin clave',
+            clave_sat='ABC',
+        )
+        with self.assertRaises(ValidationError):
+            producto.full_clean()
 
     def test_limpieza_capturada_como_anticipo_es_ppd(self):
         """El mismo servicio, si el pago es anticipo, sale como PPD."""

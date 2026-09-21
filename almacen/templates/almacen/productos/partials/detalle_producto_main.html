@@ -258,6 +258,10 @@ Layout 4+8: sidebar izquierdo sticky, historial a la derecha.
                             </span>
                         </li>
                         <li>
+                            <span class="total-label">Clave SAT</span>
+                            <span class="total-val">{{ producto.clave_sat|default:"01010101 (genérica)" }}</span>
+                        </li>
+                        <li>
                             <span class="total-label">Costo Unitario</span>
                             <span class="total-val text-success">${{ producto.costo_unitario|floatformat:2 }}</span>
                         </li>

@@ -19,8 +19,10 @@ Integración con otros módulos:
 Agregado: Diciembre 2025
 """
 
+import re
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import (
@@ -458,6 +460,16 @@ class ProductoAlmacen(models.Model):
         verbose_name='Costo Unitario',
         help_text='Último costo de compra por unidad'
     )
+    clave_sat = models.CharField(
+        max_length=8,
+        blank=True,
+        default='',
+        verbose_name='Clave SAT',
+        help_text=(
+            'ClaveProdServ de 8 dígitos. Vacía = la factura PUE usa '
+            '01010101 hasta que se capture.'
+        ),
+    )
     
     # ========== PROVEEDOR ==========
     proveedor_principal = models.ForeignKey(
@@ -517,7 +529,22 @@ class ProductoAlmacen(models.Model):
         related_name='productos_almacen_creados',
         verbose_name='Creado por'
     )
-    
+
+    def clean(self):
+        """
+        La clave SAT, si se captura, son exactamente 8 dígitos.
+
+        Efectos secundarios:
+            Ninguno. Solo valida antes de guardar desde un formulario.
+        """
+        super().clean()
+        clave = (self.clave_sat or '').strip()
+        if clave and re.fullmatch(r'\d{8}', clave) is None:
+            raise ValidationError({
+                'clave_sat': 'La clave del SAT debe tener 8 dígitos.',
+            })
+        self.clave_sat = clave
+
     class Meta:
         verbose_name = 'Producto de Almacén'
         verbose_name_plural = 'Productos de Almacén'

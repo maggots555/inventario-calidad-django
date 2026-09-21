@@ -253,7 +253,12 @@ class ProductoAlmacenAdmin(admin.ModelAdmin):
             'description': 'Stock mínimo y máximo solo aplican para productos resurtibles.'
         }),
         ('Costos y Proveedor', {
-            'fields': ('costo_unitario', 'proveedor_principal', 'tiempo_reposicion_dias')
+            'fields': (
+                'costo_unitario',
+                'clave_sat',
+                'proveedor_principal',
+                'tiempo_reposicion_dias',
+            )
         }),
         ('Estado', {
             'fields': ('activo', 'creado_por')
