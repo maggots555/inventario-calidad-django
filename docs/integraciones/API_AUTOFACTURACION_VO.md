@@ -93,31 +93,21 @@ tener el diagnóstico y, además, el anticipo o el pago de contado.
 ### Qué clave lleva cada concepto
 
 El diagnóstico (`-1`) y cada servicio del pago de contado (`-3`) salen con
-la ClaveProdServ fija de esa línea. El anticipo (`-2`) no detalla servicios:
-sigue siendo una sola línea (`84111506`).
-
-| Línea | `clave_producto_servicio` | `clave_unidad` | `cantidad` | Precio |
-|---|---|---|---|---|
-| Diagnóstico (webId `-1`) | `81111820` | `E48` | `1` | Neto del diagnóstico |
-| Limpieza y mantenimiento | `72151800` | `E48` | `1` | Neto del servicio |
-| Instalación / cambio de pieza (sin diagnóstico) | `81111814` | `E48` | `1` | Neto del servicio |
-| Reinstalación de sistema operativo | `81111505` | `E48` | `1` | Neto del servicio |
-| Respaldo de información | `81112218` | `E48` | `1` | Neto del servicio |
-| Paquete oro, plata o premium | `43211600` | `E48` | `1` | Neto del paquete |
-| Kit de limpieza | `43211600` | `H87` | `1` | Neto del kit |
-| Pieza aceptada de la cotización o vendida en mostrador | La `clave_sat` del producto de almacén, si tiene 8 dígitos. Si está vacía o la pieza no viene de un producto: `01010101` | `H87` | Las unidades vendidas | Precio unitario sin IVA |
+la ClaveProdServ ya resuelta por SIGMA. El portal la usa tal cual: no la
+interpreta ni la sustituye. El anticipo (`-2`) no detalla servicios: es una
+sola línea.
 
 `precio` es el unitario sin IVA. El importe de la línea es `cantidad × precio`.
 El `subtotal` del encabezado es la suma de esos importes.
 
-La clave de una pieza no se copia a la cotización: SIGMA la lee del producto
-al armar el documento. Si la capturan después de cotizar y el `-3` todavía
-no está timbrado, el siguiente GET ya la trae. La de un servicio no sale del
-producto: está fija en el catálogo de arriba. Un documento con UUID no se recalcula.
+Si capturan la clave de una pieza después de cotizar y el `-3` todavía no
+está timbrado, el siguiente GET ya la trae. Un documento con UUID no se recalcula.
 
 Varios anticipos del mismo servicio se suman en el mismo `-2` mientras no
-esté timbrado. Después del UUID ese documento queda congelado y no nace otro
-PPD: el saldo restante es complemento de pago y SIGMA no lo genera.
+esté timbrado. El importe de ese CFDI es solo el adelanto ya verificado, no
+el total de la reparación. El resto no se factura por este API: se entrega
+con un comprobante de venta. Después del UUID el `-2` queda congelado y no
+nace otro PPD.
 
 ### Condición para que exista un documento
 
@@ -263,8 +253,8 @@ Authorization: Bearer <access_token>
 }
 ```
 
-En el ejemplo la pieza ya tiene clave en el producto (`43211503`). Si el
-producto no la tuviera, esa misma línea saldría con `01010101`.
+La clave de cada concepto es la que manda SIGMA. El portal la copia al CFDI
+tal cual, sin catálogo propio.
 
 **Respuesta 200 — ejemplo PPD (anticipo)**
 
@@ -306,7 +296,7 @@ producto no la tuviera, esa misma línea saldría con `01010101`.
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `fecha_ticket` | ISO 8601 | Fecha del último pago registrado. |
+| `fecha_ticket` | ISO 8601 | Fecha del último pago registrado. En producción llega en UTC (`+00:00`) y puede traer microsegundos. No asumir `-06:00`. |
 | `folio` | string | Folio que el cliente conoce (`OOW-9596`). |
 | `web_id` | string | El identificador canónico, con prefijo y sufijo. |
 | `tipo_factura` | int | `1` PUE, `2` PPD. |
@@ -323,13 +313,18 @@ unitario. El importe de la línea es `cantidad × precio`. El `subtotal` del
 encabezado es la suma de esos importes. En una pieza, `cantidad` puede ser
 mayor a 1.
 
+Los importes son **números JSON**, no texto. `14136.5` es válido: no exijan
+dos decimales fijos. Tres campos parecen códigos y llegan como **texto**:
+`impuestos` es `"[4]"`, `numero_identificacion` es `"None"` y `empresa` es
+`"2"`. No los conviertan a arreglo, a `null` ni a número.
+
 **Errores**
 
 | Código | `razon` | Significado |
 |---|---|---|
 | 400 | `El webId no tiene un formato válido` | Texto sin dígitos o sufijo desconocido. |
 | 400 | `hay más de una orden con el mismo folio` | Manden el `webId` con prefijo. |
-| 400 | `el folio tiene más de un documento facturable...` | Manden el `webId` con sufijo (`-1`, `-2` o `-3`). |
+| 400 | `el folio tiene más de un documento facturable; indique el documento en el webId (-1 diagnóstico, -2 anticipo, -3 contado)` | Manden el `webId` con sufijo (`-1`, `-2` o `-3`). |
 | 400 | `la venta no tiene pagos validados para facturar` | Todavía no hay dinero verificado. |
 | 400 | `la venta no está disponible para autofacturación` | Orden en garantía, cancelada o de sucursal sin facturación. |
 | 400 | `la facturación en demanda solo aplica en México` | Se llamó a un host de otro país. |
@@ -394,8 +389,8 @@ duplica nada. Es seguro reintentar ante un timeout de red.
 
 | Aspecto | Valor |
 |---|---|
-| Rate limit `authenticate` | 30 peticiones por minuto por IP. |
-| Rate limit `folio` (GET/PUT) | 60 peticiones por minuto por IP. |
+| Rate limit `authenticate` | 30 peticiones por minuto por IP. Al pasarse, responde `403` (no es el JSON de error). |
+| Rate limit `folio` (GET/PUT) | 60 peticiones por minuto por IP. Al pasarse, responde `403`. |
 | Transporte | HTTPS obligatorio. |
 | Credenciales | API Key y `secret` se entregan por canal seguro, nunca por correo en texto plano. |
 | CSRF | Estos endpoints están exentos (son de servidor a servidor). |
@@ -440,16 +435,6 @@ Una respuesta `204` en el paso 3 cierra el ciclo completo.
 1. **Sufijo del `webId`.** SIGMA lo entrega como `SAT9596-1`. Si el portal no
    acepta el guion, se puede cambiar el separador o quitarlo; es un cambio
    menor de un solo módulo.
-2. **Importe del PPD.** Hoy se factura el anticipo ya verificado. Si el SAT o
-   el PAC exigen facturar el total de la operación en lugar del anticipo, hay
-   que confirmarlo antes de salir a producción.
-3. **Catálogo de claves SAT.** Diagnóstico: `81111820`. Limpieza: `72151800`.
-   Instalación de partes: `81111814`. Reinstalación de SO: `81111505`.
-   Respaldo: `81112218`. Paquetes oro/plata/premium: `43211600`.
-   Anticipo: `84111506`. Kit de limpieza: `43211600`.
-   Piezas sin clave propia: `01010101`.
-   No hace falta que el portal resuelva el catálogo: usa la clave que llega
-   en cada concepto.
 
 ---
 
