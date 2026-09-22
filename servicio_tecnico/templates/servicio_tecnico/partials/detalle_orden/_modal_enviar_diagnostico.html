@@ -51,18 +51,27 @@
                                 <label for="inputFolioDiagnostico" class="diag-section-label">
                                     <i class="bi bi-upc-scan me-1"></i>Folio del diagnóstico <span class="text-danger">*</span>
                                 </label>
+                                <!-- EXPLICACIÓN PARA PRINCIPIANTES:
+                                   folio_sicser ya trae el número de SICSER si la orden se importó.
+                                   Solo lo copiamos cuando es un folio CIS (MX_CIS_…, CL_CIS_…).
+                                   Un DPS de garantía no trae "_CIS_" y el campo queda vacío.
+                                   value no pone readonly: el técnico puede corregirlo antes de enviar.
+                                -->
+                                {% with folio_guardado=detalle.folio_sicser|default:'' %}
                                 <input type="text"
                                        class="form-control form-control-sm"
                                        id="inputFolioDiagnostico"
                                        name="folio"
                                        placeholder="Ej: MX_CIS_MX_MONTERREY1_02690"
+                                       {% if '_CIS_' in folio_guardado|upper %}value="{{ folio_guardado }}"{% endif %}
                                        required>
                                 <div class="diag-asunto-preview mt-2" id="previewAsuntoDiagnostico">
                                     <span class="diag-asunto-label">Asunto:</span>
                                     <strong class="text-success">DIAGNOSTICO FOLIO
-                                        <span id="spanFolioPreview" class="text-primary">___</span>
+                                        <span id="spanFolioPreview" class="text-primary">{% if '_CIS_' in folio_guardado|upper %}{{ folio_guardado }}{% else %}___{% endif %}</span>
                                     </strong>
                                 </div>
+                                {% endwith %}
                             </div>
 
                             <!--

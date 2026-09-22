@@ -254,3 +254,42 @@ class DetalleOrdenPartialsRenderTest(TestCase):
                 html,
                 f'Falta ID crítico en HTML renderizado: {needle}',
             )
+
+    def test_prellena_folio_cis_en_modal_diagnostico(self):
+        """
+        Objetivo: si la importación SICSER guardó un folio CIS, el modal
+        de diagnóstico lo muestra ya escrito, pero el input sigue editable.
+
+        Efectos: actualiza folio_sicser de la orden de prueba y renderiza.
+        """
+        folio = 'MX_CIS_MX_GUADALAJARA_03430'
+        detalle = self.orden.detalle_equipo
+        detalle.folio_sicser = folio
+        detalle.save(update_fields=['folio_sicser'])
+
+        html = self._get_detalle().content.decode('utf-8')
+
+        # El value prellena el input; no hay readonly para que se pueda corregir.
+        self.assertIn(f'value="{folio}"', html)
+        self.assertIn(f'>{folio}</span>', html)
+        self.assertNotIn('id="inputFolioDiagnostico" readonly', html)
+        self.assertIn('id="inputFolioDiagnostico"', html)
+        self.assertIn('required', html)
+
+    def test_no_prellena_dps_de_garantia_en_modal_diagnostico(self):
+        """
+        Objetivo: un DPS de garantía Dell no es folio CIS; el campo queda vacío.
+
+        Efectos: guarda un folio_sicser numérico y renderiza el detalle.
+        """
+        detalle = self.orden.detalle_equipo
+        detalle.folio_sicser = '467826738'
+        detalle.save(update_fields=['folio_sicser'])
+
+        html = self._get_detalle().content.decode('utf-8')
+
+        self.assertNotIn('value="467826738"', html)
+        self.assertIn(
+            'id="spanFolioPreview" class="text-primary">___</span>',
+            html,
+        )
