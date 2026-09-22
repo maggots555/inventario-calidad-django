@@ -38,6 +38,9 @@ from servicio_tecnico.models import (
     VentaMostrador,
 )
 from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
+from servicio_tecnico.services.facturacion_documentos import (
+    _lineas_servicios_venta_mostrador,
+)
 from servicio_tecnico.services.facturacion_demanda import (
     RAZON_COLISION,
     RAZON_NO_FACTURABLE,
@@ -336,6 +339,7 @@ class FacturacionApiTest(BaseFacturacionTest):
         conceptos = json.loads(response.content)['conceptos']
         self.assertEqual(len(conceptos), 1)
         self.assertEqual(conceptos[0]['descripcion'], 'Diagnóstico')
+        self.assertEqual(conceptos[0]['clave_producto_servicio'], '81111820')
         self.assertEqual(conceptos[0]['precio'], 500.0)
         self.assertEqual(conceptos[0]['empresa'], '2')
 
@@ -437,6 +441,8 @@ class FacturacionApiTest(BaseFacturacionTest):
             data['conceptos'][0]['descripcion'],
             'Limpieza y Mantenimiento',
         )
+        self.assertEqual(data['conceptos'][0]['clave_producto_servicio'], '72151800')
+        self.assertEqual(data['conceptos'][0]['clave_unidad'], 'E48')
         # Y no se creó también un PPD por ese mismo dinero.
         self.assertEqual(
             list(
@@ -445,6 +451,73 @@ class FacturacionApiTest(BaseFacturacionTest):
             ),
             [DocumentoFiscalOrden.TIPO_PUE_REPARACION],
         )
+
+    def test_cada_servicio_de_mostrador_lleva_su_clave_sat(self):
+        """
+        Cada línea de mostrador sale con la ClaveProdServ de Contabilidad.
+
+        El kit es mercancía: misma clave de equipo que el paquete, unidad H87.
+        """
+        orden = self._crear_orden('OOW-11960', 'SN-FAC-VM-11960')
+        VentaMostrador.objects.create(
+            orden=orden,
+            folio_venta='VM-TEST-CLAVES',
+            paquete='premium',
+            costo_paquete=Decimal('116.00'),
+            incluye_cambio_pieza=True,
+            costo_cambio_pieza=Decimal('116.00'),
+            incluye_limpieza=True,
+            costo_limpieza=Decimal('116.00'),
+            incluye_kit_limpieza=True,
+            costo_kit=Decimal('116.00'),
+            incluye_reinstalacion_so=True,
+            costo_reinstalacion=Decimal('116.00'),
+            incluye_respaldo=True,
+            costo_respaldo=Decimal('116.00'),
+        )
+        por_descripcion = {
+            linea.descripcion: (linea.clave_sat, linea.clave_unidad)
+            for linea in _lineas_servicios_venta_mostrador(orden)
+        }
+        self.assertEqual(
+            por_descripcion['Paquete Solución Premium'],
+            ('43211600', 'E48'),
+        )
+        self.assertEqual(
+            por_descripcion['Cambio de pieza (mano de obra)'],
+            ('81111814', 'E48'),
+        )
+        self.assertEqual(
+            por_descripcion['Limpieza y Mantenimiento'],
+            ('72151800', 'E48'),
+        )
+        self.assertEqual(
+            por_descripcion['Reinstalación de sistema operativo'],
+            ('81111505', 'E48'),
+        )
+        self.assertEqual(
+            por_descripcion['Respaldo de información'],
+            ('81112218', 'E48'),
+        )
+        self.assertEqual(
+            por_descripcion['Kit de limpieza'],
+            ('43211600', 'H87'),
+        )
+        # Oro y plata usan la misma clave de equipo que premium.
+        for codigo, folio, orden_cliente in (
+            ('oro', 'VM-TEST-ORO', 'OOW-11961'),
+            ('plata', 'VM-TEST-PLATA', 'OOW-11962'),
+        ):
+            otra = self._crear_orden(orden_cliente, f'SN-{folio}')
+            VentaMostrador.objects.create(
+                orden=otra,
+                folio_venta=folio,
+                paquete=codigo,
+                costo_paquete=Decimal('116.00'),
+            )
+            lineas = _lineas_servicios_venta_mostrador(otra)
+            self.assertEqual(len(lineas), 1)
+            self.assertEqual(lineas[0].clave_sat, '43211600')
 
     def test_reparacion_con_piezas_de_contado_es_pue_3(self):
         """

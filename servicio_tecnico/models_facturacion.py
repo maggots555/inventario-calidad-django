@@ -274,7 +274,7 @@ class ConceptoDocumentoFiscal(models.Model):
     )
     clave_sat = models.CharField(
         max_length=12,
-        help_text='ClaveProdServ del SAT (ej. 81111812 servicios técnicos)',
+        help_text='ClaveProdServ del SAT (8 dígitos; la de cada servicio está en facturacion_documentos)',
     )
     clave_unidad = models.CharField(
         max_length=6,

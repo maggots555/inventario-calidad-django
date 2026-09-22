@@ -61,10 +61,19 @@ from servicio_tecnico.services.pagos_orden import (
 
 CENTAVO = Decimal('0.01')
 
-# Claves del catálogo del SAT. Fase 1: una clave genérica por naturaleza.
-# 81111812 = servicios de mantenimiento/soporte técnico. E48 = unidad de servicio.
-CLAVE_SAT_SERVICIO = '81111812'
+# Claves del catálogo del SAT. Cada servicio lleva la suya: una sola clave
+# genérica facturaba el diagnóstico como si fuera limpieza.
+# E48 = unidad de servicio.
 CLAVE_UNIDAD_SERVICIO = 'E48'
+CLAVE_SAT_DIAGNOSTICO = '81111820'
+# Instalación / cambio de pieza sin diagnóstico.
+CLAVE_SAT_INSTALACION_PARTES = '81111814'
+CLAVE_SAT_LIMPIEZA = '72151800'
+CLAVE_SAT_REINSTALACION_SO = '81111505'
+CLAVE_SAT_RESPALDO = '81112218'
+# Oro, plata, premium y el kit de limpieza: equipo, no servicio de diagnóstico.
+CLAVE_SAT_PAQUETE = '43211600'
+CLAVE_SAT_KIT = '43211600'
 # 84111506 = servicios de facturación/anticipos. ACT = actividad.
 CLAVE_SAT_ANTICIPO = '84111506'
 CLAVE_UNIDAD_ANTICIPO = 'ACT'
@@ -105,13 +114,14 @@ class LineaFacturable:
         descripcion: texto que verá el cliente.
         importe: total de la línea antes de IVA.
         cantidad: piezas/servicios (normalmente 1).
-        clave_sat / clave_unidad: catálogos del SAT.
+        clave_sat / clave_unidad: catálogos del SAT. El default es solo el
+        diagnóstico; el resto de las líneas debe pasar su clave.
     """
 
     descripcion: str
     importe: Decimal
     cantidad: Decimal = Decimal('1.00')
-    clave_sat: str = CLAVE_SAT_SERVICIO
+    clave_sat: str = CLAVE_SAT_DIAGNOSTICO
     clave_unidad: str = CLAVE_UNIDAD_SERVICIO
 
 
@@ -205,9 +215,9 @@ def _lineas_servicios_venta_mostrador(orden) -> list[LineaFacturable]:
     """
     Servicios de venta mostrador como líneas sin IVA.
 
-    Objetivo: "Limpieza y Mantenimiento", kit, reinstalación de SO, etc. son
-    servicios puros; son exactamente lo que el negocio quiere facturar PUE.
-    Las piezas vendidas en mostrador NO entran aquí: eso es mercancía.
+    Objetivo: cada servicio sale con su ClaveProdServ (limpieza, respaldo,
+    instalación de partes, paquete, kit). Las piezas vendidas en mostrador
+    NO entran aquí.
 
     Args:
         orden: OrdenServicio.
@@ -221,28 +231,54 @@ def _lineas_servicios_venta_mostrador(orden) -> list[LineaFacturable]:
 
     lineas: list[LineaFacturable] = []
 
-    def agregar(descripcion: str, monto_con_iva) -> None:
-        """Suma una línea solo si el servicio tiene costo real."""
+    def agregar(descripcion: str, monto_con_iva, clave_sat: str) -> None:
+        """Suma una línea solo si el servicio tiene costo y su clave SAT."""
         importe = _sin_iva(monto_con_iva)
         if importe > 0:
-            lineas.append(LineaFacturable(descripcion=descripcion, importe=importe))
+            lineas.append(LineaFacturable(
+                descripcion=descripcion,
+                importe=importe,
+                clave_sat=clave_sat,
+            ))
 
-    # Paso 1: el paquete comercial (premium, oro, plata…) si se eligió uno.
+    # Paso 1: oro, plata y premium comparten la clave de equipo, no la del diagnóstico.
     if venta.paquete and venta.paquete != 'ninguno':
-        agregar(f'Paquete {venta.get_paquete_display()}', venta.costo_paquete)
+        agregar(
+            f'Paquete {venta.get_paquete_display()}',
+            venta.costo_paquete,
+            CLAVE_SAT_PAQUETE,
+        )
 
-    # Paso 2: cada servicio suelto es un concepto propio, con el texto que
-    # el negocio pidió ver en la factura.
+    # Paso 2: cada servicio suelto lleva la ClaveProdServ que pidió Contabilidad.
     if venta.incluye_limpieza:
-        agregar('Limpieza y Mantenimiento', venta.costo_limpieza)
-    if venta.incluye_kit_limpieza:
-        agregar('Kit de limpieza', venta.costo_kit)
+        agregar('Limpieza y Mantenimiento', venta.costo_limpieza, CLAVE_SAT_LIMPIEZA)
     if venta.incluye_reinstalacion_so:
-        agregar('Reinstalación de sistema operativo', venta.costo_reinstalacion)
+        agregar(
+            'Reinstalación de sistema operativo',
+            venta.costo_reinstalacion,
+            CLAVE_SAT_REINSTALACION_SO,
+        )
     if venta.incluye_respaldo:
-        agregar('Respaldo de información', venta.costo_respaldo)
+        agregar('Respaldo de información', venta.costo_respaldo, CLAVE_SAT_RESPALDO)
     if venta.incluye_cambio_pieza:
-        agregar('Cambio de pieza (mano de obra)', venta.costo_cambio_pieza)
+        agregar(
+            'Cambio de pieza (mano de obra)',
+            venta.costo_cambio_pieza,
+            CLAVE_SAT_INSTALACION_PARTES,
+        )
+
+    # Paso 3: el kit es mercancía (unidad H87), con la clave de equipo.
+    # No hereda la del diagnóstico ni la genérica de pieza sin catálogo.
+    if venta.incluye_kit_limpieza:
+        linea_kit = _linea_si_hay_importe(
+            'Kit de limpieza',
+            _sin_iva(venta.costo_kit),
+            Decimal('1'),
+            CLAVE_SAT_KIT,
+            CLAVE_UNIDAD_PIEZA,
+        )
+        if linea_kit is not None:
+            lineas.append(linea_kit)
 
     return lineas
 
@@ -482,6 +518,7 @@ def calcular_lineas_pue(orden) -> list[LineaFacturable]:
         LineaFacturable(
             descripcion=descripcion_servicio_diagnostico(orden),
             importe=diagnostico.monto,
+            clave_sat=CLAVE_SAT_DIAGNOSTICO,
         )
     ]
 

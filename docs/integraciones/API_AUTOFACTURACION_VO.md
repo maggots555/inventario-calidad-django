@@ -90,22 +90,30 @@ El método no sale del tipo de servicio. Sale del pago que registró SIGMA.
 sufijo distingue el documento, no un método SAT nuevo. Una orden puede
 tener el diagnóstico y, además, el anticipo o el pago de contado.
 
-### Qué lleva cada concepto del `-3`
+### Qué clave lleva cada concepto
 
-El pago en una sola exhibición describe lo que se vendió. El anticipo no:
-sigue siendo una sola línea.
+El diagnóstico (`-1`) y cada servicio del pago de contado (`-3`) salen con
+la ClaveProdServ fija de esa línea. El anticipo (`-2`) no detalla servicios:
+sigue siendo una sola línea (`84111506`).
 
 | Línea | `clave_producto_servicio` | `clave_unidad` | `cantidad` | Precio |
 |---|---|---|---|---|
-| Servicio de mostrador (limpieza, kit, reinstalación, respaldo, cambio de pieza, paquete) | `81111812` | `E48` | `1` | Neto del servicio |
+| Diagnóstico (webId `-1`) | `81111820` | `E48` | `1` | Neto del diagnóstico |
+| Limpieza y mantenimiento | `72151800` | `E48` | `1` | Neto del servicio |
+| Instalación / cambio de pieza (sin diagnóstico) | `81111814` | `E48` | `1` | Neto del servicio |
+| Reinstalación de sistema operativo | `81111505` | `E48` | `1` | Neto del servicio |
+| Respaldo de información | `81112218` | `E48` | `1` | Neto del servicio |
+| Paquete oro, plata o premium | `43211600` | `E48` | `1` | Neto del paquete |
+| Kit de limpieza | `43211600` | `H87` | `1` | Neto del kit |
 | Pieza aceptada de la cotización o vendida en mostrador | La `clave_sat` del producto de almacén, si tiene 8 dígitos. Si está vacía o la pieza no viene de un producto: `01010101` | `H87` | Las unidades vendidas | Precio unitario sin IVA |
 
 `precio` es el unitario sin IVA. El importe de la línea es `cantidad × precio`.
 El `subtotal` del encabezado es la suma de esos importes.
 
-La clave no se copia a la cotización. SIGMA la lee del producto al armar el
-documento. Si la capturan después de cotizar y el `-3` todavía no está
-timbrado, el siguiente GET ya la trae. Un documento con UUID no se recalcula.
+La clave de una pieza no se copia a la cotización: SIGMA la lee del producto
+al armar el documento. Si la capturan después de cotizar y el `-3` todavía
+no está timbrado, el siguiente GET ya la trae. La de un servicio no sale del
+producto: está fija en el catálogo de arriba. Un documento con UUID no se recalcula.
 
 Varios anticipos del mismo servicio se suman en el mismo `-2` mientras no
 esté timbrado. Después del UUID ese documento queda congelado y no nace otro
@@ -188,7 +196,7 @@ Authorization: Bearer <access_token>
   },
   "conceptos": [
     {
-      "clave_producto_servicio": "81111812",
+      "clave_producto_servicio": "81111820",
       "descripcion": "Diagnóstico",
       "clave_unidad": "E48",
       "precio": 500.00,
@@ -224,7 +232,7 @@ Authorization: Bearer <access_token>
   },
   "conceptos": [
     {
-      "clave_producto_servicio": "81111812",
+      "clave_producto_servicio": "72151800",
       "descripcion": "Limpieza y Mantenimiento",
       "clave_unidad": "E48",
       "precio": 500.00,
@@ -435,10 +443,13 @@ Una respuesta `204` en el paso 3 cierra el ciclo completo.
 2. **Importe del PPD.** Hoy se factura el anticipo ya verificado. Si el SAT o
    el PAC exigen facturar el total de la operación en lugar del anticipo, hay
    que confirmarlo antes de salir a producción.
-3. **Catálogo de claves SAT.** Servicios: `81111812`. Anticipo: `84111506`.
-   Piezas: la clave de 8 dígitos capturada en el producto de almacén. Si el
-   producto todavía no la tiene, la línea usa `01010101`. No hace falta que
-   el portal resuelva el catálogo: usa la clave que llega en cada concepto.
+3. **Catálogo de claves SAT.** Diagnóstico: `81111820`. Limpieza: `72151800`.
+   Instalación de partes: `81111814`. Reinstalación de SO: `81111505`.
+   Respaldo: `81112218`. Paquetes oro/plata/premium: `43211600`.
+   Anticipo: `84111506`. Kit de limpieza: `43211600`.
+   Piezas sin clave propia: `01010101`.
+   No hace falta que el portal resuelva el catálogo: usa la clave que llega
+   en cada concepto.
 
 ---
 
