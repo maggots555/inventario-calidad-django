@@ -64,7 +64,8 @@ class DocumentoFiscalOrden(models.Model):
         orden: orden de servicio dueña del documento (varios por orden).
         web_id: texto público que el cliente teclea en el portal (SAT9596-1).
         tipo: 'pue' (diagnóstico), 'pue_rep' (reparación de contado) o 'ppd'.
-        descripcion: texto del concepto principal, ya resuelto por el servicio.
+        descripcion: etiqueta del seguimiento (Diagnóstico, Reparación o
+            Anticipo Reparación). No es el detalle de los conceptos del CFDI.
         subtotal / iva / total / tasa_iva: montos congelados al momento de
             quedar disponible; una vez timbrado ya no se recalculan.
         disponible_desde: cuándo el pago quedó validado y el cliente pudo ver
@@ -120,7 +121,7 @@ class DocumentoFiscalOrden(models.Model):
     )
     descripcion = models.CharField(
         max_length=200,
-        help_text='Texto del concepto: Diagnóstico, Limpieza y Mantenimiento, Anticipo…',
+        help_text='Etiqueta del seguimiento: Diagnóstico, Reparación o Anticipo Reparación',
     )
 
     # ── Montos congelados ───────────────────────────────────────────────────

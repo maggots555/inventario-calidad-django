@@ -340,6 +340,13 @@ class FacturacionApiTest(BaseFacturacionTest):
         self.assertEqual(len(conceptos), 1)
         self.assertEqual(conceptos[0]['descripcion'], 'Diagnóstico')
         self.assertEqual(conceptos[0]['clave_producto_servicio'], '81111820')
+        self.assertEqual(
+            DocumentoFiscalOrden.objects.get(
+                orden=self.orden,
+                tipo=DocumentoFiscalOrden.TIPO_PUE,
+            ).descripcion,
+            'Diagnóstico',
+        )
         self.assertEqual(conceptos[0]['precio'], 500.0)
         self.assertEqual(conceptos[0]['empresa'], '2')
 
@@ -443,6 +450,11 @@ class FacturacionApiTest(BaseFacturacionTest):
         )
         self.assertEqual(data['conceptos'][0]['clave_producto_servicio'], '72151800')
         self.assertEqual(data['conceptos'][0]['clave_unidad'], 'E48')
+        # El seguimiento no copia el primer servicio: el -3 es la reparación.
+        self.assertEqual(
+            DocumentoFiscalOrden.objects.get(orden=orden).descripcion,
+            'Reparación',
+        )
         # Y no se creó también un PPD por ese mismo dinero.
         self.assertEqual(
             list(
@@ -625,6 +637,10 @@ class FacturacionApiTest(BaseFacturacionTest):
         self.assertEqual(
             data['conceptos'][0]['descripcion'],
             'Anticipo del bien o servicio',
+        )
+        self.assertEqual(
+            DocumentoFiscalOrden.objects.get(orden=orden).descripcion,
+            'Anticipo Reparación',
         )
         self.assertFalse(
             DocumentoFiscalOrden.objects.filter(

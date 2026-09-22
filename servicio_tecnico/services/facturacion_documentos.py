@@ -84,6 +84,14 @@ CLAVE_UNIDAD_PIEZA = 'H87'
 
 DESCRIPCION_ANTICIPO = 'Anticipo del bien o servicio'
 
+# Etiqueta del seguimiento del cliente. No es el concepto del CFDI: el -3
+# puede traer limpieza, piezas y respaldo, y la primera línea mentiría.
+ETIQUETA_SEGUIMIENTO = {
+    DocumentoFiscalOrden.TIPO_PUE: 'Diagnóstico',
+    DocumentoFiscalOrden.TIPO_PUE_REPARACION: 'Reparación',
+    DocumentoFiscalOrden.TIPO_PPD: 'Anticipo Reparación',
+}
+
 
 def _dinero(valor) -> Decimal:
     """Redondea a 2 decimales como un cajero (0.005 sube a 0.01)."""
@@ -642,7 +650,8 @@ def _guardar_documento(
     subtotal = _dinero(sum((linea.importe for linea in lineas), Decimal('0.00')))
     iva = _dinero(subtotal * IVA_TASA_MX)
     total = _dinero(subtotal + iva)
-    descripcion = lineas[0].descripcion
+    # Paso: el cliente ve "Reparación", no el primer servicio de la lista.
+    descripcion = ETIQUETA_SEGUIMIENTO.get(tipo, lineas[0].descripcion)
 
     if existente is None:
         documento = DocumentoFiscalOrden(orden=orden, tipo=tipo)
