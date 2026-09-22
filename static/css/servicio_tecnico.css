@@ -1143,6 +1143,52 @@
     50% { opacity: 0.7; }
 }
 
+/* Velocidad de subida: verde buena, naranja media, rojo baja, gris midiendo. */
+#infoArchivos .badge-velocidad {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#infoArchivos .badge-velocidad-buena {
+    background-color: #157347;
+    color: #fff;
+}
+
+#infoArchivos .badge-velocidad-media {
+    background-color: #c2410c;
+    color: #fff;
+}
+
+#infoArchivos .badge-velocidad-mala {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+#infoArchivos .badge-velocidad-midiendo {
+    background-color: #64748b;
+    color: #fff;
+}
+
+[data-bs-theme="dark"] #infoArchivos .badge-velocidad-buena {
+    background-color: #34d399;
+    color: #0f172a;
+}
+
+[data-bs-theme="dark"] #infoArchivos .badge-velocidad-media {
+    background-color: #fb923c;
+    color: #0f172a;
+}
+
+[data-bs-theme="dark"] #infoArchivos .badge-velocidad-mala {
+    background-color: #f87171;
+    color: #0f172a;
+}
+
+[data-bs-theme="dark"] #infoArchivos .badge-velocidad-midiendo {
+    background-color: #94a3b8;
+    color: #0f172a;
+}
+
 /* Badge de archivos seleccionados */
 #archivosSeleccionados {
     animation: fadeIn 0.3s ease-out;

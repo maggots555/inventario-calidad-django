@@ -1,7 +1,7 @@
 "use strict";
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 8.2 - Correcciones de robustez del caché IndexedDB
+// Versión 8.3 - Velocidad de subida junto al conteo de MB
 // ============================================================================
 /**
  * CLASE: ImageCache
@@ -304,7 +304,133 @@ ImageCache.DB_NAME = 'sigma-upload-cache';
 ImageCache.DB_VERSION = 1;
 ImageCache.STORE_NAME = 'pending-uploads';
 ImageCache.TTL_MS = 24 * 60 * 60 * 1000; // 24 horas en ms
-// ============================================================================
+/**
+ * Mide qué tan rápido salen las fotos hacia el servidor.
+ *
+ * Objetivo: pintar MB/s junto al conteo de MB que ya existe, con color
+ * según la red del taller.
+ *
+ * No habla con el servidor. Solo mira los bytes que el navegador ya envió
+ * y el tiempo entre avisos de progreso.
+ *
+ * Umbrales:
+ * - verde  ≥ 1 MB/s
+ * - naranja de 0.25 a 1 MB/s
+ * - rojo   < 0.25 MB/s
+ */
+class MedidorVelocidadSubida {
+    constructor() {
+        // 1 MB/s y 0.25 MB/s, en bytes, para no convertir en cada aviso.
+        this.UMBRAL_BUENA_BPS = 1 * 1024 * 1024;
+        this.UMBRAL_MEDIA_BPS = 0.25 * 1024 * 1024;
+        // Arranque: con pocos bytes la cifra miente y saldría rojo al instante.
+        this.MS_CALENTAMIENTO = 400;
+        // Ignora ráfagas de menos de 80 ms: el evento progress a veces dispara dos veces.
+        this.MS_MINIMO_MUESTRA = 80;
+        // 35% muestra nueva, 65% historial. Evita que el color parpadee.
+        this.PESO_NUEVA = 0.35;
+        this.inicioMs = 0;
+        this.ultimaMs = 0;
+        this.ultimaBytes = 0;
+        this.velocidadBps = 0;
+        this.tieneMuestra = false;
+    }
+    /**
+     * Reinicia el reloj de una subida nueva.
+     *
+     * @param ahoraMs - performance.now() en el momento de abrir el XHR.
+     * Efecto: olvida cualquier velocidad de un intento anterior.
+     */
+    iniciar(ahoraMs) {
+        this.inicioMs = ahoraMs;
+        this.ultimaMs = ahoraMs;
+        this.ultimaBytes = 0;
+        this.velocidadBps = 0;
+        this.tieneMuestra = false;
+    }
+    /**
+     * Anota cuántos bytes ya salieron y devuelve cómo pintarlos.
+     *
+     * @param bytesEnviados - e.loaded del evento progress.
+     * @param ahoraMs - performance.now() de este aviso.
+     * @returns texto y clase CSS. No toca el DOM.
+     */
+    registrar(bytesEnviados, ahoraMs) {
+        const transcurridoMs = ahoraMs - this.inicioMs;
+        // Todavía no hay una ventana útil: no adivinar el color.
+        if (transcurridoMs < this.MS_CALENTAMIENTO) {
+            this.ultimaMs = ahoraMs;
+            this.ultimaBytes = bytesEnviados;
+            return {
+                fase: 'midiendo',
+                texto: 'midiendo…',
+                etiqueta: 'Calculando velocidad',
+                clase: 'badge-velocidad-midiendo',
+            };
+        }
+        const deltaMs = ahoraMs - this.ultimaMs;
+        const deltaBytes = bytesEnviados - this.ultimaBytes;
+        // Solo promediar si pasó tiempo real y los bytes no retrocedieron.
+        if (deltaMs >= this.MS_MINIMO_MUESTRA && deltaBytes >= 0) {
+            const instantanea = deltaBytes / (deltaMs / 1000);
+            this.velocidadBps = this.tieneMuestra
+                ? (this.velocidadBps * (1 - this.PESO_NUEVA)) + (instantanea * this.PESO_NUEVA)
+                : instantanea;
+            this.tieneMuestra = true;
+            this.ultimaMs = ahoraMs;
+            this.ultimaBytes = bytesEnviados;
+        }
+        // Si aún no hubo intervalo útil, usar el promedio desde que empezó.
+        if (!this.tieneMuestra) {
+            const segundos = transcurridoMs / 1000;
+            this.velocidadBps = segundos > 0 ? bytesEnviados / segundos : 0;
+        }
+        return this.clasificar(this.velocidadBps);
+    }
+    /**
+     * Traduce bytes/segundo al texto y al color del badge.
+     *
+     * @param bps - velocidad ya suavizada, en bytes por segundo.
+     * @returns estado listo para el HTML. No escribe en pantalla.
+     */
+    clasificar(bps) {
+        const mbPorSegundo = bps / (1024 * 1024);
+        // Por encima de 10 MB/s el decimal estorba; por debajo de 1 hace falta.
+        const decimales = mbPorSegundo >= 10 ? 0 : (mbPorSegundo >= 1 ? 1 : 2);
+        const texto = `${mbPorSegundo.toFixed(decimales)} MB/s`;
+        if (bps >= this.UMBRAL_BUENA_BPS) {
+            return { fase: 'buena', texto, etiqueta: 'Buena velocidad', clase: 'badge-velocidad-buena' };
+        }
+        if (bps >= this.UMBRAL_MEDIA_BPS) {
+            return { fase: 'media', texto, etiqueta: 'Velocidad media', clase: 'badge-velocidad-media' };
+        }
+        return { fase: 'mala', texto, etiqueta: 'Velocidad baja', clase: 'badge-velocidad-mala' };
+    }
+}
+/**
+ * Arma la línea de "subiendo N imágenes" con MB y velocidad.
+ *
+ * @param cantidad - cuántas fotos van en esta petición.
+ * @param mbSubidos - MB ya enviados, con 2 decimales.
+ * @param tamanioMB - MB totales de la petición.
+ * @param velocidad - resultado del medidor.
+ * @returns HTML del bloque #infoArchivos. No toca el DOM.
+ */
+function htmlProgresoSubida(cantidad, mbSubidos, tamanioMB, velocidad) {
+    const plural = cantidad !== 1 ? 'es' : '';
+    const icono = velocidad.fase === 'midiendo' ? 'bi-hourglass-split' : 'bi-speedometer2';
+    return `
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+            <span><i class="bi bi-cloud-arrow-up text-primary"></i> Subiendo <strong>${cantidad}</strong> imagen${plural}...</span>
+            <span class="d-inline-flex align-items-center gap-1 flex-wrap">
+                <span class="badge bg-primary">${mbSubidos} / ${tamanioMB} MB</span>
+                <span class="badge badge-velocidad ${velocidad.clase}" title="${velocidad.etiqueta}">
+                    <i class="bi ${icono}"></i> ${velocidad.texto}
+                </span>
+            </span>
+        </div>
+    `;
+}
 class UploadImagenesDual {
     constructor() {
         // NUEVO v5.0: IDs de campos Django (leídos desde data-* attributes del form)
@@ -959,6 +1085,9 @@ class UploadImagenesDual {
             const tamanioMB = (tamanioTotal / (1024 * 1024)).toFixed(2);
             console.log(`📤 Enviando ${archivos.length} archivo(s), ${tamanioMB} MB`);
             const xhr = new XMLHttpRequest();
+            // Reloj propio de esta petición: un reintento no hereda la velocidad anterior.
+            const medidorVelocidad = new MedidorVelocidadSubida();
+            medidorVelocidad.iniciar(performance.now());
             // Progreso de subida
             xhr.upload.addEventListener('progress', (e) => {
                 if (!e.lengthComputable)
@@ -969,18 +1098,15 @@ class UploadImagenesDual {
                 if (this.porcentajeProgreso)
                     this.porcentajeProgreso.textContent = porcentaje + '%';
                 if (porcentaje < 100) {
-                    // Subiendo datos al servidor
+                    // Subiendo datos al servidor. Al 100% ya no hay velocidad que mostrar:
+                    // lo que falta es que Django comprima y guarde.
+                    const velocidad = medidorVelocidad.registrar(e.loaded, performance.now());
+                    const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
                     if (this.textoProgreso) {
                         this.textoProgreso.textContent = `Subiendo... ${porcentaje}%`;
                     }
                     if (this.infoArchivos) {
-                        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
-                        this.infoArchivos.innerHTML = `
-                            <div class="d-flex align-items-center justify-content-between flex-wrap">
-                                <span><i class="bi bi-cloud-arrow-up text-primary"></i> Subiendo <strong>${archivos.length}</strong> imagen${archivos.length !== 1 ? 'es' : ''}...</span>
-                                <span class="badge bg-primary">${mbSubidos} / ${tamanioMB} MB</span>
-                            </div>
-                        `;
+                        this.infoArchivos.innerHTML = htmlProgresoSubida(archivos.length, mbSubidos, tamanioMB, velocidad);
                     }
                 }
                 else {
