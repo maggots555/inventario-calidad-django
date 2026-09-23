@@ -61,12 +61,6 @@
           <span>${{ p.costo_unitario|floatformat:2 }}</span>
         </div>
         {% endfor %}
-        {% if monto_mano_obra %}
-        <div class="fr-pieza-item">
-          <span>Mano de obra</span>
-          <span>${{ monto_mano_obra|floatformat:2 }}</span>
-        </div>
-        {% endif %}
         <div class="fr-pieza-total">
           <span>Total</span>
           <span>${{ monto_total|floatformat:2 }}</span>

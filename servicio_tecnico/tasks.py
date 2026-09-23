@@ -401,7 +401,7 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         usuario_id  : ID del usuario Django que disparó la acción (para notificaciones)
     """
     import re
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -466,9 +466,8 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         monto_total_piezas = sum(
             (p['costo_unitario'] or 0) * (p['cantidad'] or 1) for p in piezas
         )
-        monto_mano_obra = feedback.cotizacion.costo_mano_obra or 0
 
-        # ── Contexto para template email ──
+        # EXPLICACIÓN: el correo lista solo piezas. La mano de obra no se manda.
         ahora_local = timezone.localtime(timezone.now())
         context_email = {
             'nombre_cliente': nombre_cliente,
@@ -479,8 +478,7 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
             'motivo_rechazo': feedback.cotizacion.get_motivo_rechazo_display(),
             'piezas': piezas,
             'monto_total_piezas': monto_total_piezas,
-            'monto_mano_obra': monto_mano_obra,
-            'monto_total': monto_total_piezas + monto_mano_obra,
+            'monto_total': monto_total_piezas,
             'feedback_url': feedback_url,
             'dias_vigencia': 7,
             'fecha_envio': ahora_local.strftime('%d/%m/%Y'),
@@ -502,14 +500,22 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         if jefe_calidad_email:
             cc_list.append(jefe_calidad_email)
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El enlace personal debe llegar aunque
+        # Gmail u Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_feedback_rechazo import (
+            construir_texto_plano_feedback_rechazo,
+        )
+        texto_plano = construir_texto_plano_feedback_rechazo(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=cc_list,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Adjuntar logo SIC ──
         try:
@@ -522,6 +528,10 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[FEEDBACK-RECHAZO] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[FEEDBACK-RECHAZO]')
 
         # ── Adjuntar iconos de redes sociales ──
         try:

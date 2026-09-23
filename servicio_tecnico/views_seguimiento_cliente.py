@@ -732,11 +732,10 @@ def feedback_rechazo_view(request, token):
     detalle = orden.detalle_equipo
     piezas = feedback.cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=False)
 
-    # ── Calcular monto total rechazado ──
+    # EXPLICACIÓN: el cliente solo ve piezas. La mano de obra no se muestra.
     monto_piezas = sum(
         (p.costo_unitario or 0) * (p.cantidad or 1) for p in piezas
     )
-    monto_mano_obra = feedback.cotizacion.costo_mano_obra or 0
 
     if request.method == 'POST':
         form = FeedbackRechazoClienteForm(request.POST)
@@ -792,8 +791,7 @@ def feedback_rechazo_view(request, token):
         'detalle': detalle,
         'piezas': piezas,
         'monto_piezas': monto_piezas,
-        'monto_mano_obra': monto_mano_obra,
-        'monto_total': monto_piezas + monto_mano_obra,
+        'monto_total': monto_piezas,
         'motivo_rechazo': feedback.cotizacion.get_motivo_rechazo_display(),
         'dias_restantes': feedback.dias_restantes,
     }
