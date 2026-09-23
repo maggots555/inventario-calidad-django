@@ -1,673 +1,357 @@
+{% comment %}
+  Correo transaccional: evidencia en video al cliente.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que imagenes_cliente.html (tablas, CSS inline, paleta SIC).
+  Cada video conserva su miniatura CID (cid:thumb_video_<id>), su URL y
+  su texto. Solo cambia el layout: Outlook ignora flex, gradientes y sombras.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evidencia en Video - {{ detalle.orden_cliente }}</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Evidencia en video - {% if detalle.orden_cliente %}{{ detalle.orden_cliente }}{% else %}{{ orden.numero_orden_interno }}{% endif %}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
+            .video-thumb { width: 100% !important; max-width: 100% !important; }
         }
-        
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
-        }
-        
-        .container {
-            max-width: 700px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
-            color: #051d63;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .header::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        
-        .logo-container {
-            position: relative;
-            z-index: 1;
-            margin-bottom: 15px;
-        }
-        
-        .logo-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-        
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .subtitle {
-            font-size: 16px;
-            opacity: 0.9;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .content {
-            padding: 40px 30px;
-        }
-        
-        .greeting {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        
-        .intro-text {
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 25px;
-            line-height: 1.7;
-        }
-        
-        .equipment-info {
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 12px;
-            padding: 25px;
-            margin: 25px 0;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-        
-        .info-title {
-            font-size: 20px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 700;
-            text-align: center;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        
-        .info-row {
-            display: flex;
-            padding: 12px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        
-        .info-label {
-            font-weight: 600;
-            color: #667eea;
-            min-width: 150px;
-            font-size: 14px;
-        }
-        
-        .info-value {
-            color: #333;
-            font-size: 15px;
-            flex: 1;
-        }
-        
-        .info-value.highlight {
-            font-weight: 700;
-            color: #764ba2;
-        }
-
-        .ai-analysis-box {
-            background: #f0f7ff;
-            border-left: 4px solid #1f6391;
-            border-radius: 0 8px 8px 0;
-            padding: 22px 24px;
-            margin: 25px 0;
-        }
-
-        .ai-analysis-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 14px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #d0e8f8;
-        }
-
-        .ai-analysis-badge {
-            display: inline-block;
-            background: #1f6391;
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            padding: 3px 10px;
-            border-radius: 20px;
-            text-transform: uppercase;
-        }
-
-        .ai-analysis-title {
-            font-size: 15px;
-            font-weight: 700;
-            color: #1e3a5f;
-            flex: 1;
-        }
-
-        .ai-analysis-body {
-            font-size: 14px;
-            color: #2d3748;
-            line-height: 1.75;
-        }
-
-        .ai-analysis-footer {
-            margin-top: 14px;
-            padding-top: 10px;
-            border-top: 1px solid #d0e8f8;
-            font-size: 11px;
-            color: #6b849e;
-        }
-
-        .videos-section {
-            margin: 30px 0;
-        }
-
-        .videos-section-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 25px;
-            text-align: center;
-            border-bottom: 3px solid #17a2b8;
-            padding-bottom: 12px;
-        }
-
-        .video-item {
-            background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
-            border: 2px solid #bfdbfe;
-            border-radius: 12px;
-            padding: 28px 24px;
-            margin-bottom: 25px;
-            text-align: center;
-            box-shadow: 0 2px 12px rgba(31, 99, 145, 0.1);
-        }
-
-        .video-tipo {
-            display: inline-block;
-            background: #1f6391;
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 700;
-            padding: 6px 16px;
-            border-radius: 20px;
-            margin-bottom: 18px;
-            letter-spacing: 0.3px;
-        }
-
-        .video-thumb-table {
-            margin: 0 auto 16px;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .video-thumb-td {
-            position: relative;
-            line-height: 0;
-            font-size: 0;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        .video-thumb {
-            display: block;
-            width: 380px;
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-        }
-
-        .click-to-play {
-            display: block;
-            margin: 10px auto 16px;
-            font-size: 14px;
-            font-weight: 600;
-            color: #1f6391;
-            text-decoration: none;
-        }
-
-        .click-to-play:hover {
-            color: #0d4a6e;
-            text-decoration: underline;
-        }
-
-        .video-meta {
-            font-size: 14px;
-            color: #3b5f80;
-            margin-bottom: 16px;
-            line-height: 1.6;
-        }
-
-        .video-descripcion {
-            font-size: 14px;
-            color: #3b5f80;
-            margin-bottom: 18px;
-            line-height: 1.6;
-            font-style: italic;
-        }
-
-        .video-play-btn {
-            display: inline-block;
-            padding: 12px 28px;
-            background: linear-gradient(135deg, #1f6391 0%, #1558a8 100%);
-            color: #ffffff !important;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            box-shadow: 0 4px 12px rgba(31, 99, 145, 0.35);
-        }
-
-        .video-play-btn:hover {
-            background: linear-gradient(135deg, #1558a8 0%, #0d4a6e 100%);
-        }
-        
-        .help-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #17a2b8;
-        }
-        
-        .help-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #17a2b8;
-            margin-bottom: 10px;
-        }
-        
-        .help-text {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.6;
-        }
-        
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .signature {
-            margin-bottom: 15px;
-        }
-        
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-        
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-        
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-        
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-            text-align: center;
-        }
-        
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            text-align: center;
-        }
-        
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-        }
-        
-        .social-link:hover {
-            background-color: rgba(255, 255, 255, 0.35);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.8);
-        }
-        
-        .social-icon {
-            font-size: 18px;
-        }
-        
-        @media (max-width: 600px) {
-            .container {
-                margin: 10px;
-                border-radius: 0;
-            }
-            
-            .content {
-                padding: 20px 15px;
-            }
-            
-            .info-row {
-                flex-direction: column;
-            }
-            
-            .info-label {
-                min-width: auto;
-                margin-bottom: 5px;
-            }
-
-            .video-item {
-                padding: 20px 15px;
-            }
-
-            .video-thumb {
-                width: 280px;
-            }
-
-            .video-play-btn {
-                padding: 10px 20px;
-                font-size: 14px;
-            }
-            
-            .social-media {
-                padding: 15px 5px;
-            }
-            
-            .social-links {
-                gap: 8px;
-                padding: 0 5px;
-            }
-            
-            .social-link {
-                padding: 6px 10px;
-                font-size: 11px;
-                gap: 6px;
-                flex: 0 1 auto;
-                min-width: 0;
-            }
-            
-            .social-icon {
-                font-size: 14px;
-            }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo-container">
-                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            </div>
-            <div class="logo">🎬 EVIDENCIA EN VIDEO DEL SERVICIO</div>
-            <div class="subtitle">Registro Visual del Proceso de Reparación</div>
-        </div>
-        
-        <div class="content">
-            <div class="greeting">
-                Estimado/a cliente,
-            </div>
-            
-            <div class="intro-text">
-                Le compartimos la evidencia en video del servicio realizado a su equipo. 
-                Estos videos documentan el proceso de diagnóstico y reparación llevado a cabo 
-                por nuestro equipo técnico.
-            </div>
-            
-            <div class="equipment-info">
-                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
-                
-                <div class="info-row">
-                    <div class="info-label">🎯 Número de Orden:</div>
-                    <div class="info-value highlight">
-                        {% if detalle.orden_cliente %}
-                            {{ detalle.orden_cliente }}
-                        {% else %}
-                            {{ orden.numero_orden_interno }}
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="info-row">
-                    <div class="info-label">💻 Equipo:</div>
-                    <div class="info-value">
-                        {{ detalle.tipo_equipo }} {{ detalle.marca }} 
-                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
-                    </div>
-                </div>
-                
-                <div class="info-row">
-                    <div class="info-label">🔢 Número de Serie:</div>
-                    <div class="info-value">{{ detalle.numero_serie }}</div>
-                </div>
-                
-                <div class="info-row">
-                    <div class="info-label">📅 Fecha de Ingreso:</div>
-                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
-                </div>
-            </div>
-
-            {% if analisis_ia_texto %}
-            <div class="ai-analysis-box">
-                <div class="ai-analysis-header">
-                    <span class="ai-analysis-badge">IA</span>
-                    <span class="ai-analysis-title">Resumen Ejecutivo del Servicio</span>
-                </div>
-                <div class="ai-analysis-body">
-                    {{ analisis_ia_texto|linebreaksbr }}
-                </div>
-                <div class="ai-analysis-footer">
-                    Resumen generado automáticamente por IA ({{ analisis_ia_modelo }}) a partir de los videos de evidencia.
-                    Este reporte describe las acciones observables durante el proceso de servicio.
-                </div>
-            </div>
-            {% endif %}
-
-            <div style="margin: 30px 0;">
-                <div style="font-size: 20px; font-weight: 700; color: #2c3e50; margin-bottom: 25px; text-align: center; border-bottom: 3px solid #17a2b8; padding-bottom: 12px;">
-                    🎥 VIDEOS DE EVIDENCIA ({{ cantidad_videos }})
-                </div>
-                
-                {% for video in videos_data %}
-                <div style="background: #f0f7ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 32px 28px; margin-bottom: 28px; text-align: center;">
-
-                    <!-- Badge de tipo de video con más espacio inferior -->
-                    <span style="display: inline-block; background: #1f6391; color: #ffffff; font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 20px; letter-spacing: 0.3px;">
-                        {{ video.tipo_display }}
-                    </span>
-
-                    {% if video.tiene_thumbnail %}
-                    <!-- Thumbnail con tamaño estándar fijo — object-fit:cover recorta
-                         el exceso tanto en videos verticales como horizontales,
-                         garantizando que todos los thumbnails ocupen el mismo recuadro -->
-                    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 20px; border-radius: 10px; overflow: hidden; width: 320px; max-width: 100%;">
-                        <tr>
-                            <td style="line-height: 0; font-size: 0; border-radius: 10px; overflow: hidden; width: 320px; height: 210px;">
-                                <a href="{{ video.video_url }}" target="_blank" style="display:block; line-height:0; font-size:0; border: 3px solid #1f6391; border-radius: 10px; overflow: hidden;">
-                                    <img src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" style="display: block; width: 320px; max-width: 100%; height: 210px; object-fit: cover; border-radius: 8px;" />
-                                </a>
-                            </td>
-                        </tr>
-                    </table>
-                    {% else %}
-                    <div style="font-size: 48px; margin-bottom: 20px;">🎬</div>
-                    {% endif %}
-
-                    {% if video.descripcion %}
-                    <!-- Descripción con más margen superior e inferior para no pegarse al thumbnail ni al meta -->
-                    <div style="font-size: 14px; color: #3b5f80; margin: 4px 0 20px; line-height: 1.7; font-style: italic;">
-                        "{{ video.descripcion }}"
-                    </div>
-                    {% endif %}
-
-                    <!-- Meta: duración y tamaño, separado del contenido anterior y del botón -->
-                    <div style="font-size: 14px; color: #3b5f80; margin: 0 0 22px; line-height: 1.6;">
-                        {% if video.duracion %}⏱ {{ video.duracion }}{% endif %}
-                        {% if video.duracion and video.tamano %}&nbsp;·&nbsp;{% endif %}
-                        {% if video.tamano %}📦 {{ video.tamano }} MB{% endif %}
-                    </div>
-
-                    {% if video.video_url %}
-                    <a href="{{ video.video_url }}" target="_blank" style="display: inline-block; padding: 13px 32px; background-color: #1f6391; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
-                        ▶ Reproducir video
-                    </a>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-
-            {% if mensaje_personalizado %}
-            <div style="margin: 25px 0; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #1f6391; border-radius: 6px;">
-                <p style="margin: 0 0 10px; font-size: 14px; color: #495057; font-weight: 700;">
-                    💬 Mensaje adicional del equipo:
-                </p>
-                <p style="margin: 0; font-size: 14px; color: #212529; line-height: 1.6; font-style: italic;">
-                    {{ mensaje_personalizado|linebreaksbr }}
-                </p>
-            </div>
-            {% endif %}
-
-            <div class="help-section">
-                <div class="help-title">ℹ️ Información Importante</div>
-                <div class="help-text">
-                    <strong>•</strong> Los videos adjuntos documentan el proceso de servicio de su equipo.<br>
-                    <strong>•</strong> Esta evidencia forma parte de nuestro registro de calidad y transparencia.<br>
-                    <strong>•</strong> Si tiene alguna pregunta sobre el servicio realizado, no dude en contactarnos.<br>
-                    <strong>•</strong> Le mantendremos informado sobre cualquier actualización de su equipo.
-                </div>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
-                <p style="margin: 0; font-size: 14px;">
-                    Gracias por confiar en nuestros servicios.
-                </p>
-            </div>
-
-            {% if seguimiento_url %}
-            <div style="margin-top: 20px; padding: 16px 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; border-left: 4px solid #0284c7; text-align: center;">
-                <p style="margin: 0 0 10px; font-size: 14px; color: #0c4a6e;">
-                    🔍 Consulta el <strong>estado de tu equipo</strong> en cualquier momento:
-                </p>
-                <a href="{{ seguimiento_url }}" style="display: inline-block; padding: 10px 24px; background-color: #0284c7; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">Ver seguimiento de mi equipo</a>
-            </div>
-            {% endif %}
-        </div>
-        
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">
-                    Sistema de Servicio Técnico
-                </div>
-                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
-                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
-                </div>
-            </div>
-            
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-            
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Facebook</span>
-                    </a>
-                    {% if whatsapp_empleado %}
-                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>WhatsApp</span>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="timestamp">
-                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    {# Preheader: primera frase del cuerpo, para la bandeja antes de abrir. #}
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Le compartimos la evidencia en video del servicio realizado a su equipo.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Evidencia en video del servicio
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Registro Visual del Proceso de Reparación
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Estimado/a cliente,
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Le compartimos la evidencia en video del servicio realizado a su equipo.
+                                Estos videos documentan el proceso de diagnóstico y reparación llevado a cabo
+                                por nuestro equipo técnico.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Información de su equipo
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Número de Orden
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                                        {% if detalle.orden_cliente %}
+                                            {{ detalle.orden_cliente }}
+                                        {% else %}
+                                            {{ orden.numero_orden_interno }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Equipo
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.tipo_equipo }} {{ detalle.marca }}
+                                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Número de Serie
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ detalle.numero_serie }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Fecha de Ingreso
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if analisis_ia_texto %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f7ff" class="email-panel" style="background-color:#f0f7ff;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:18px 18px 8px 18px;">
+                                        {# El sello "IA" es HTML: se lee aunque el cliente bloquee imágenes. #}
+                                        <p style="margin:0 0 10px 0;">
+                                            <span style="display:inline-block;background-color:#1f6391;color:#ffffff;font-size:11px;line-height:16px;font-weight:700;letter-spacing:0.5px;padding:4px 10px;text-transform:uppercase;">IA</span>
+                                            <span class="email-title" style="font-size:15px;line-height:22px;font-weight:700;color:#1e3a5f;">&nbsp;Resumen Ejecutivo del Servicio</span>
+                                        </p>
+                                        <div class="email-body-text" style="font-size:14px;line-height:24px;color:#1e293b;">
+                                            {{ analisis_ia_texto|linebreaksbr }}
+                                        </div>
+                                        <p class="email-muted" style="margin:14px 0 0 0;padding-top:10px;border-top:1px solid #d0e8f8;font-size:12px;line-height:18px;color:#64748b;">
+                                            Resumen generado automáticamente por IA ({{ analisis_ia_modelo }}) a partir de los videos de evidencia.
+                                            Este reporte describe las acciones observables durante el proceso de servicio.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;text-align:center;">
+                                Videos de evidencia ({{ cantidad_videos }})
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% for video in videos_data %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f7ff" class="email-panel" style="background-color:#f0f7ff;border:1px solid #c5d9e8;">
+                                <tr>
+                                    <td align="center" style="padding:20px 16px;">
+                                        <p style="margin:0 0 16px 0;">
+                                            <span style="display:inline-block;background-color:#1f6391;color:#ffffff;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.3px;padding:6px 16px;">
+                                                {{ video.tipo_display }}
+                                            </span>
+                                        </p>
+
+                                        {% if video.tiene_thumbnail %}
+                                        {# Alto automático: Outlook ignora object-fit y recortaría mal el cuadro. #}
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px auto;">
+                                            <tr>
+                                                <td align="center" bgcolor="#1f6391" style="padding:3px;background-color:#1f6391;">
+                                                    {% if video.video_url %}
+                                                    <a href="{{ video.video_url }}" target="_blank" style="display:block;line-height:0;font-size:0;text-decoration:none;">
+                                                        <img class="video-thumb" src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" width="320" style="display:block;width:320px;max-width:100%;height:auto;border:0;">
+                                                    </a>
+                                                    {% else %}
+                                                    <img class="video-thumb" src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" width="320" style="display:block;width:320px;max-width:100%;height:auto;border:0;">
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+
+                                        {% if video.descripcion %}
+                                        <p class="email-body-text" style="margin:4px 0 16px 0;font-size:14px;line-height:22px;color:#334155;font-style:italic;">
+                                            "{{ video.descripcion }}"
+                                        </p>
+                                        {% endif %}
+
+                                        {% if video.duracion or video.tamano %}
+                                        <p class="email-muted" style="margin:0 0 16px 0;font-size:14px;line-height:20px;color:#475569;">
+                                            {% if video.duracion %}{{ video.duracion }}{% endif %}{% if video.duracion and video.tamano %} · {% endif %}{% if video.tamano %}{{ video.tamano }} MB{% endif %}
+                                        </p>
+                                        {% endif %}
+
+                                        {% if video.video_url %}
+                                        <!--[if mso]>
+                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ video.video_url }}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                            <w:anchorlock/>
+                                            <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Reproducir video</center>
+                                        </v:roundrect>
+                                        <![endif]-->
+                                        <!--[if !mso]><!-->
+                                        <a href="{{ video.video_url }}" target="_blank" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:15px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Reproducir video</a>
+                                        <!--<![endif]-->
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                    {% if mensaje_personalizado %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Mensaje adicional del equipo:
+                                        </p>
+                                        <div class="email-body-text" style="font-size:15px;line-height:24px;color:#334155;font-style:italic;">
+                                            {{ mensaje_personalizado|linebreaksbr }}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Información Importante
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Los videos adjuntos documentan el proceso de servicio de su equipo.<br>
+                                            Esta evidencia forma parte de nuestro registro de calidad y transparencia.<br>
+                                            Si tiene alguna pregunta sobre el servicio realizado, no dude en contactarnos.<br>
+                                            Le mantendremos informado sobre cualquier actualización de su equipo.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:8px 32px 24px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:14px;line-height:20px;color:#64748b;text-align:center;">
+                                Gracias por confiar en nuestros servicios.
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if seguimiento_url %}
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 24px 32px;">
+                            <p class="email-body-text" style="margin:0 0 12px 0;font-size:14px;line-height:22px;color:#334155;text-align:center;">
+                                Consulta el <strong>estado de tu equipo</strong> en cualquier momento:
+                            </p>
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ seguimiento_url }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver seguimiento de mi equipo</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ seguimiento_url }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Ver seguimiento de mi equipo</a>
+                            <!--<![endif]-->
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Servicio Técnico
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 16px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx/" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio Web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.instagram.com/sic_mexico/?hl=es" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.facebook.com/LatAmSic" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        {% if whatsapp_empleado %}
+                                        <a href="https://wa.me/{{ whatsapp_empleado }}" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

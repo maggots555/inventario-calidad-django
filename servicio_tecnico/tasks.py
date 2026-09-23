@@ -5040,7 +5040,7 @@ def enviar_evidencia_video_task(
         mensaje_personalizado : Texto opcional que el usuario agrega al correo
     """
     from pathlib import Path
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -5254,14 +5254,22 @@ def enviar_evidencia_video_task(
         email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. Cada URL de video y el seguimiento deben
+        # llegar aunque Gmail u Outlook bloqueen el HTML.
+        from servicio_tecnico.services.email_evidencia_video import (
+            construir_texto_plano_evidencia_video,
+        )
+        texto_plano = construir_texto_plano_evidencia_video(context)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         try:
             logo_path = finders.find('images/logos/logo_sic.png')
@@ -5273,6 +5281,10 @@ def enviar_evidencia_video_task(
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[EVIDENCIA-VIDEO] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[EVIDENCIA-VIDEO]')
 
         try:
             iconos_sociales = {
