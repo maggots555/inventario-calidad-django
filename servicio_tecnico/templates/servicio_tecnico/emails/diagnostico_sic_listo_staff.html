@@ -1,166 +1,210 @@
+{% comment %}
+  Correo interno: el Diagnóstico SIC ya está guardado.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta de tablas y CSS inline que imagenes_cliente.html.
+  Hay dos textos: responsable (enviar al cliente) y Compras (cotizar).
+  El pie es interno: no lleva redes sociales.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Diagnóstico SIC — {{ referencia_orden }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f0f4f8;
-            font-family: "Segoe UI", Arial, sans-serif;
-            color: #333;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .wrapper {
-            max-width: 640px;
-            margin: 20px auto;
-            background: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-            padding: 28px 32px 22px;
-            text-align: center;
-            border-bottom: 3px solid #1565c0;
-            background: #e8f4fd;
-        }
-        .header.compras {
-            background: #fff8e1;
-            border-bottom-color: #f9a825;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 1.25rem;
-            color: #051d63;
-            font-weight: 800;
-        }
-        .header.compras h1 { color: #e65100; }
-        .header p { margin: 8px 0 0; font-size: 0.95rem; color: #1565c0; }
-        .content { padding: 28px 32px; }
-        .content p {
-            font-size: 0.95rem;
-            line-height: 1.65;
-            margin: 0 0 14px;
-            color: #374151;
-        }
-        .info-box {
-            margin: 0 0 20px;
-            background: #f8fafc;
-            border-radius: 10px;
-            border-left: 5px solid #1565c0;
-            padding: 14px 18px;
-        }
-        .info-box.compras { border-left-color: #f9a825; }
-        .info-row { padding: 6px 0; font-size: 0.92rem; }
-        .info-label {
-            font-weight: 700;
-            color: #1e40af;
-            display: inline-block;
-            min-width: 140px;
-        }
-        .sic-box {
-            margin: 0 0 20px;
-            background: #f1f5f9;
-            border-radius: 8px;
-            padding: 14px 16px;
-            font-size: 0.9rem;
-            line-height: 1.55;
-            white-space: pre-wrap;
-            color: #334155;
-        }
-        .btn {
-            display: inline-block;
-            margin-top: 8px;
-            background-color: #1565c0;
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 12px 22px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        .btn.compras { background-color: #e65100; }
-        .footer {
-            background: #2c3e50;
-            color: #fff;
-            padding: 18px 28px;
-            text-align: center;
-            font-size: 12px;
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="wrapper">
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
         {% if audiencia == 'compras' %}
-        <div class="header compras">
-            <h1>Diagnóstico SIC disponible — cotizar piezas</h1>
-            <p>Orden {{ referencia_orden }}</p>
-        </div>
+        Diagnóstico SIC disponible — cotizar piezas. Orden {{ referencia_orden }}.
         {% else %}
-        <div class="header">
-            <h1>Diagnóstico listo para compartir</h1>
-            <p>Orden {{ referencia_orden }}</p>
-        </div>
+        Diagnóstico listo para compartir. Orden {{ referencia_orden }}.
         {% endif %}
-
-        <div class="content">
-            {% if audiencia == 'compras' %}
-            <p>
-                El técnico guardó el Diagnóstico SIC. Revisa los componentes
-                identificados y comienza la búsqueda o cotización de piezas.
-            </p>
-            {% else %}
-            <p>
-                La orden ya tiene Diagnóstico SIC. Entra al detalle y usa
-                «Enviar diagnóstico» para compartirlo con el cliente.
-            </p>
-            {% endif %}
-
-            <div class="info-box {% if audiencia == 'compras' %}compras{% endif %}">
-                {% if folio_cliente %}
-                <div class="info-row">
-                    <span class="info-label">Folio cliente</span>
-                    {{ folio_cliente }}
-                </div>
-                {% endif %}
-                {% if service_tag %}
-                <div class="info-row">
-                    <span class="info-label">Service Tag</span>
-                    {{ service_tag }}
-                </div>
-                {% endif %}
-                <div class="info-row">
-                    <span class="info-label">Folio interno</span>
-                    {{ folio_interno }}
-                </div>
-                {% if nombre_cliente %}
-                <div class="info-row">
-                    <span class="info-label">Cliente</span>
-                    {{ nombre_cliente }}
-                </div>
-                {% endif %}
-            </div>
-
-            {% if extracto_sic %}
-            <p><strong>Extracto del Diagnóstico SIC:</strong></p>
-            <div class="sic-box">{{ extracto_sic }}</div>
-            {% endif %}
-
-            <p>
-                {% if audiencia == 'compras' %}
-                <a class="btn compras" href="{{ url_detalle }}">Revisar piezas a cotizar</a>
-                {% else %}
-                <a class="btn" href="{{ url_detalle }}">Abrir orden y enviar al cliente</a>
-                {% endif %}
-            </p>
-        </div>
-
-        <div class="footer">
-            Aviso interno de SIGMA — Servicio Técnico
-            {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
-        </div>
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    {% if audiencia == 'compras' %}
+                    <tr>
+                        <td class="email-header email-warn email-pad" bgcolor="#fff7ed" align="center" style="padding:20px 32px;background-color:#fff7ed;border-bottom:4px solid #c2410c;">
+                            <p class="email-warn-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#c2410c;">
+                                Diagnóstico SIC disponible — cotizar piezas
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden {{ referencia_orden }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Diagnóstico listo para compartir
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden {{ referencia_orden }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            {% if audiencia == 'compras' %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                El técnico guardó el Diagnóstico SIC. Revisa los componentes
+                                identificados y comienza la búsqueda o cotización de piezas.
+                            </p>
+                            {% else %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                La orden ya tiene Diagnóstico SIC. Entra al detalle y usa
+                                «Enviar diagnóstico» para compartirlo con el cliente.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid {% if audiencia == 'compras' %}#c2410c{% else %}#1f6391{% endif %};">
+                                {% if folio_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:12px 18px 8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                        Folio cliente
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:12px 18px 8px 18px;font-size:15px;line-height:20px;color:#0f172a;">
+                                        {{ folio_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if service_tag %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Service Tag
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ service_tag }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Folio interno
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ folio_interno }}
+                                    </td>
+                                </tr>
+                                {% if nombre_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Cliente
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ nombre_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if extracto_sic %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                Extracto del Diagnóstico SIC:
+                            </p>
+                            {# El texto va pegado a la etiqueta: pre-wrap copia la sangría del HTML. #}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="email-body-text" align="left" style="padding:14px 16px;font-size:14px;line-height:22px;color:#334155;text-align:left;white-space:pre-wrap;">{{ extracto_sic }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 28px 32px;">
+                            {% if audiencia == 'compras' %}
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_detalle }}" style="height:44px;v-text-anchor:middle;width:260px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Revisar piezas a cotizar</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_detalle }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Revisar piezas a cotizar</a>
+                            <!--<![endif]-->
+                            {% else %}
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_detalle }}" style="height:44px;v-text-anchor:middle;width:300px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Abrir orden y enviar al cliente</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_detalle }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Abrir orden y enviar al cliente</a>
+                            <!--<![endif]-->
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:18px 32px;background-color:#1e293b;">
+                            <p style="margin:0;font-size:13px;line-height:20px;color:#cbd5e1;">
+                                Aviso interno de SIGMA — Servicio Técnico
+                                {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

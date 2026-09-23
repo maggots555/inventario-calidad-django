@@ -59,7 +59,7 @@ def _enviar_lote_email(
     Returns:
         Cantidad de correos enviados (0 si no hay emails válidos).
     """
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
 
     from servicio_tecnico.services.notificaciones_diagnostico import (
@@ -76,13 +76,24 @@ def _enviar_lote_email(
         contexto,
     )
 
-    email_msg = EmailMessage(
+    # EXPLICACIÓN: HTML + texto plano. La URL de la orden debe llegar
+    # aunque el cliente de correo bloquee el HTML.
+    from servicio_tecnico.services.email_diagnostico_sic_listo import (
+        construir_texto_plano_diagnostico_sic_listo,
+    )
+    texto_plano = construir_texto_plano_diagnostico_sic_listo(contexto)
+
+    email_msg = EmailMultiAlternatives(
         subject=asunto,
-        body=html,
+        body=texto_plano,
         from_email=_remitente_sistema_servicio_tecnico(),
         to=emails_to,
     )
-    email_msg.content_subtype = 'html'
+    email_msg.attach_alternative(html, 'text/html')
+
+    from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+    adjuntar_logo_blanco_email(email_msg, log_prefix)
+
     email_msg.send(fail_silently=False)
 
     logger.info(
