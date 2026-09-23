@@ -40,12 +40,13 @@ def enviar_formato_venta_mostrador_email_task(
         db_alias: Alias de BD del país (Celery multi-tenant)
 
     Efectos secundarios:
-        Envía EmailMessage con PDF adjunto; registra historial en la orden.
+        Envía EmailMultiAlternatives (HTML + texto plano) con PDF adjunto;
+        registra historial en la orden.
     """
     from django.conf import settings
     from django.contrib.auth import get_user_model
     from django.contrib.staticfiles import finders
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from email.mime.application import MIMEApplication
@@ -118,10 +119,17 @@ def enviar_formato_venta_mostrador_email_task(
                 except User.DoesNotExist:
                     pass
 
+        from servicio_tecnico.services.email_formato_venta_mostrador import (
+            nombre_para_saludo,
+        )
+        # EXPLICACIÓN: persona de contacto, si no el nombre de la orden.
+        nombre_cliente = nombre_para_saludo(formato, detalle)
+
         context_email = {
             'orden': orden,
             'detalle': detalle,
             'orden_sicser': orden_sicser,
+            'nombre_cliente': nombre_cliente,
             'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
             'hora_envio_texto': ahora_local.strftime('%H:%M'),
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
@@ -148,13 +156,20 @@ def enviar_formato_venta_mostrador_email_task(
                 else getattr(settings, 'DEFAULT_FROM_EMAIL', None)
             )
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN: HTML + texto plano. El aviso del PDF debe llegar
+        # aunque el cliente bloquee el HTML. El PDF se adjunta igual.
+        from servicio_tecnico.services.email_formato_venta_mostrador import (
+            construir_texto_plano_formato_venta_mostrador,
+        )
+        texto_plano = construir_texto_plano_formato_venta_mostrador(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=from_email,
             to=destinatarios,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         try:
             logo_path = finders.find('images/logos/logo_sic.png')
@@ -168,6 +183,9 @@ def enviar_formato_venta_mostrador_email_task(
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning('[FORMATO_VM] Error al adjuntar logo: %s', e)
+
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[FORMATO_VM]')
 
         try:
             iconos_sociales = {
