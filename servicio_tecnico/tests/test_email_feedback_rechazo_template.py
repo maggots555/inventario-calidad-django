@@ -33,7 +33,7 @@ def _contexto(**overrides):
         dict: Contexto para render_to_string.
     """
     contexto = {
-        'nombre_cliente': 'Estimado usuario',
+        'nombre_cliente': 'usuario',
         'folio': 'FL-8801',
         'marca_equipo': 'Dell',
         'modelo_equipo': 'XPS 13',
@@ -67,7 +67,8 @@ class FeedbackRechazoEmailTemplateTests(SimpleTestCase):
         self.assertNotIn('{#', html)
         self.assertIn('Tu opinión nos importa', html)
         self.assertIn('Nos gustaría conocer tu experiencia', html)
-        self.assertIn('Estimado/a Estimado usuario,', html)
+        self.assertIn('Estimado/a usuario,', html)
+        self.assertNotIn('Estimado/a Estimado', html)
         self.assertIn('Tu comentario es completamente confidencial.', html)
         self.assertIn('FL-8801', html)
         self.assertIn('Laptop Dell', html)

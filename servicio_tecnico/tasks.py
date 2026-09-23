@@ -439,8 +439,8 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         feedback_url = f"{site_url}/feedback/{feedback.token}/"
 
         # ── Datos del cliente y equipo ──
-        # NOTA: No se registra nombre del cliente en el sistema, usamos saludo genérico
-        nombre_cliente = 'Estimado usuario'
+        # El template ya pone "Estimado/a". Aquí solo va "usuario".
+        nombre_cliente = 'usuario'
         marca_equipo = detalle.marca or ''
         modelo_equipo = detalle.modelo or ''
         tipo_equipo = detalle.tipo_equipo or ''
@@ -637,7 +637,7 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
         usuario_id : ID del usuario Django que disparó la acción (para notificaciones)
     """
     import re
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -665,8 +665,8 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
             logger.error(f"[VIGENCIA-VENCIDA] Orden {orden.numero_orden_interno} sin email de cliente.")
             return {'success': False, 'mensaje': 'Sin email de cliente.'}
 
-        # NOTA: No se registra nombre del cliente en el sistema, usamos saludo genérico
-        nombre_cliente = 'Estimado usuario'
+        # El template ya pone "Estimado/a". Aquí solo va "usuario".
+        nombre_cliente = 'usuario'
         folio = (
             detalle.orden_cliente if detalle and detalle.orden_cliente
             else orden.numero_orden_interno
@@ -699,14 +699,22 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
         if jefe_calidad_email:
             cc_list.append(jefe_calidad_email)
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. El aviso de vigencia debe llegar aunque
+        # el cliente bloquee el HTML. Este correo no lleva enlace.
+        from servicio_tecnico.services.email_vigencia_vencida import (
+            construir_texto_plano_vigencia_vencida,
+        )
+        texto_plano = construir_texto_plano_vigencia_vencida(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html_content,
+            body=texto_plano,
             from_email=remitente,
             to=[email_cliente],
             cc=cc_list,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Adjuntar logo SIC ──
         try:
@@ -719,6 +727,10 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[VIGENCIA-VENCIDA] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[VIGENCIA-VENCIDA]')
 
         # ── Adjuntar iconos de redes sociales ──
         try:
