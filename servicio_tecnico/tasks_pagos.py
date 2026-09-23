@@ -68,12 +68,13 @@ def notificar_validacion_pago_task(
         db_alias: alias de BD del país (Celery multi-tenant).
 
     Efectos secundarios:
-        Un correo HTML. No crea push ni campana (eso ya lo hizo el service).
+        Un correo HTML + texto plano. No crea push ni campana
+        (eso ya lo hizo el service).
 
     Returns:
         dict: success y mensaje para logs de Celery.
     """
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
 
@@ -166,29 +167,41 @@ def notificar_validacion_pago_task(
         else:
             url_pagos = f'{url_orden}#seccionPagos'
 
+        context_email = {
+            'pago': pago,
+            'orden': pago.orden,
+            'tipo_evento': tipo_evento,
+            'url_pagos': url_pagos,
+            'referencia_orden': referencia.texto,
+            'folio_cliente': referencia.orden_cliente,
+            'service_tag': referencia.service_tag,
+            'folio_interno': referencia.folio_interno,
+            'ahora_local': ahora_local,
+            'pais': _pais_email,
+        }
         html = render_to_string(
             'servicio_tecnico/emails/validacion_pago.html',
-            {
-                'pago': pago,
-                'orden': pago.orden,
-                'tipo_evento': tipo_evento,
-                'url_pagos': url_pagos,
-                'referencia_orden': referencia.texto,
-                'folio_cliente': referencia.orden_cliente,
-                'service_tag': referencia.service_tag,
-                'folio_interno': referencia.folio_interno,
-                'ahora_local': ahora_local,
-                'pais': _pais_email,
-            },
+            context_email,
         )
 
-        email_msg = EmailMessage(
+        # EXPLICACIÓN: HTML + texto plano. La URL de la bandeja o de
+        # los cobros debe llegar aunque bloqueen el HTML.
+        from servicio_tecnico.services.email_validacion_pago import (
+            construir_texto_plano_validacion_pago,
+        )
+        texto_plano = construir_texto_plano_validacion_pago(context_email)
+
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            body=html,
+            body=texto_plano,
             from_email=_remitente_sistema_facturacion(),
             to=emails_to,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html, 'text/html')
+
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
+
         email_msg.send(fail_silently=False)
 
         logger.info(

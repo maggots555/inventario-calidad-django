@@ -1,172 +1,256 @@
+{% comment %}
+  Correo interno: validación de un pago en la cuenta de la empresa.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta de tablas y CSS inline que imagenes_cliente.html.
+  El texto no cambia. Hay tres avisos: pendiente, validado y no aparece.
+  El pie es interno: no lleva redes sociales.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Validación de pago — {{ referencia_orden }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f0f4f8;
-            font-family: "Segoe UI", Arial, sans-serif;
-            color: #333;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .wrapper {
-            max-width: 640px;
-            margin: 20px auto;
-            background: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-            padding: 28px 32px 22px;
-            text-align: center;
-            border-bottom: 3px solid #1565c0;
-            background: #e8f4fd;
-        }
-        .header.ok { background: #e8f5e9; border-bottom-color: #2e7d32; }
-        .header.warn { background: #fff8e1; border-bottom-color: #f9a825; }
-        .header h1 {
-            margin: 0;
-            font-size: 1.25rem;
-            color: #051d63;
-            font-weight: 800;
-        }
-        .header.ok h1 { color: #1b5e20; }
-        .header.warn h1 { color: #e65100; }
-        .header p { margin: 8px 0 0; font-size: 0.95rem; color: #1565c0; }
-        .content { padding: 28px 32px; }
-        .content p { font-size: 0.95rem; line-height: 1.65; margin: 0 0 14px; color: #374151; }
-        .info-box {
-            margin: 0 0 20px;
-            background: #f8fafc;
-            border-radius: 10px;
-            border-left: 5px solid #1565c0;
-            padding: 14px 18px;
-        }
-        .info-box.ok { border-left-color: #2e7d32; }
-        .info-box.warn { border-left-color: #f9a825; }
-        .info-row { padding: 6px 0; font-size: 0.92rem; }
-        .info-label { font-weight: 700; color: #1e40af; display: inline-block; min-width: 140px; }
-        .btn {
-            display: inline-block;
-            margin-top: 8px;
-            background-color: #1565c0;
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 12px 22px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        .footer {
-            background: #2c3e50;
-            color: #fff;
-            padding: 18px 28px;
-            text-align: center;
-            font-size: 12px;
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-ok { background-color: #052e16 !important; }
+            .email-ok-title { color: #86efac !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="wrapper">
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
         {% if tipo_evento == 'validado' %}
-        <div class="header ok">
-            <h1>Pago validado en la cuenta</h1>
-            <p>Orden {{ referencia_orden }}</p>
-        </div>
+        Pago validado en la cuenta. Orden {{ referencia_orden }}.
         {% elif tipo_evento == 'no_aparece' %}
-        <div class="header warn">
-            <h1>El pago aún no aparece en la cuenta</h1>
-            <p>Orden {{ referencia_orden }}</p>
-        </div>
+        El pago aún no aparece en la cuenta. Orden {{ referencia_orden }}.
         {% else %}
-        <div class="header">
-            <h1>Pago pendiente de validar</h1>
-            <p>Orden {{ referencia_orden }}</p>
-        </div>
+        Pago pendiente de validar. Orden {{ referencia_orden }}.
         {% endif %}
-
-        <div class="content">
-            {% if tipo_evento == 'pendiente' %}
-            <p>
-                Recepción registró un abono. Revisa si ya se refleja en la
-                cuenta de la empresa y confírmalo en la bandeja de pagos.
-            </p>
-            {% elif tipo_evento == 'validado' %}
-            <p>
-                Facturación confirmó que este pago ya aparece en la cuenta
-                de la empresa.
-            </p>
-            {% else %}
-            <p>
-                Facturación no encontró este pago en la cuenta. Revisa el
-                comprobante, el monto o la referencia y corrígelo si hace falta.
-            </p>
-            {% endif %}
-
-            <div class="info-box {% if tipo_evento == 'validado' %}ok{% elif tipo_evento == 'no_aparece' %}warn{% endif %}">
-                <div class="info-row">
-                    <span class="info-label">Monto</span>
-                    ${{ pago.monto|floatformat:2 }}
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Método</span>
-                    {{ pago.get_metodo_display }}
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Tipo</span>
-                    {{ pago.get_tipo_display }}
-                </div>
-                {% if folio_cliente %}
-                <div class="info-row">
-                    <span class="info-label">Folio cliente</span>
-                    {{ folio_cliente }}
-                </div>
-                {% endif %}
-                {% if service_tag %}
-                <div class="info-row">
-                    <span class="info-label">Service Tag</span>
-                    {{ service_tag }}
-                </div>
-                {% endif %}
-                <div class="info-row">
-                    <span class="info-label">Folio interno</span>
-                    {{ folio_interno }}
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Registró</span>
-                    {{ pago.registrado_por.nombre_completo }}
-                </div>
-                {% if pago.notas %}
-                <div class="info-row">
-                    <span class="info-label">Notas del cobro</span>
-                    {{ pago.notas }}
-                </div>
-                {% endif %}
-                {% if pago.nota_validacion %}
-                <div class="info-row">
-                    <span class="info-label">Nota de Facturación</span>
-                    {{ pago.nota_validacion }}
-                </div>
-                {% endif %}
-            </div>
-
-            <p>
-                {% if tipo_evento == 'pendiente' %}
-                <a class="btn" href="{{ url_pagos }}">Abrir bandeja de pagos</a>
-                {% else %}
-                <a class="btn" href="{{ url_pagos }}">Abrir cobros de la orden</a>
-                {% endif %}
-            </p>
-        </div>
-
-        <div class="footer">
-            Aviso interno de SIGMA
-            {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
-        </div>
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    {% if tipo_evento == 'validado' %}
+                    <tr>
+                        <td class="email-header email-ok email-pad" bgcolor="#f0fdf4" align="center" style="padding:20px 32px;background-color:#f0fdf4;border-bottom:4px solid #166534;">
+                            <p class="email-ok-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#166534;">
+                                Pago validado en la cuenta
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden {{ referencia_orden }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% elif tipo_evento == 'no_aparece' %}
+                    <tr>
+                        <td class="email-header email-warn email-pad" bgcolor="#fff7ed" align="center" style="padding:20px 32px;background-color:#fff7ed;border-bottom:4px solid #c2410c;">
+                            <p class="email-warn-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#c2410c;">
+                                El pago aún no aparece en la cuenta
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden {{ referencia_orden }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Pago pendiente de validar
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Orden {{ referencia_orden }}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            {% if tipo_evento == 'pendiente' %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Recepción registró un abono. Revisa si ya se refleja en la
+                                cuenta de la empresa y confírmalo en la bandeja de pagos.
+                            </p>
+                            {% elif tipo_evento == 'validado' %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Facturación confirmó que este pago ya aparece en la cuenta
+                                de la empresa.
+                            </p>
+                            {% else %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Facturación no encontró este pago en la cuenta. Revisa el
+                                comprobante, el monto o la referencia y corrígelo si hace falta.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid {% if tipo_evento == 'validado' %}#166534{% elif tipo_evento == 'no_aparece' %}#c2410c{% else %}#1f6391{% endif %};">
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:12px 18px 8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                        Monto
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:12px 18px 8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                                        ${{ pago.monto|floatformat:2 }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Método
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ pago.get_metodo_display }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Tipo
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ pago.get_tipo_display }}
+                                    </td>
+                                </tr>
+                                {% if folio_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Folio cliente
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ folio_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if service_tag %}
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Service Tag
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ service_tag }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Folio interno
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ folio_interno }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Registró
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ pago.registrado_por.nombre_completo }}
+                                    </td>
+                                </tr>
+                                {% if pago.notas %}
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Notas del cobro
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ pago.notas }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if pago.nota_validacion %}
+                                <tr>
+                                    <td class="info-label email-label" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Nota de Facturación
+                                    </td>
+                                    <td class="info-value email-body-text" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ pago.nota_validacion }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 28px 32px;">
+                            {% if tipo_evento == 'pendiente' %}
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_pagos }}" style="height:44px;v-text-anchor:middle;width:260px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Abrir bandeja de pagos</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_pagos }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Abrir bandeja de pagos</a>
+                            <!--<![endif]-->
+                            {% else %}
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_pagos }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Abrir cobros de la orden</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_pagos }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Abrir cobros de la orden</a>
+                            <!--<![endif]-->
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:18px 32px;background-color:#1e293b;">
+                            <p style="margin:0;font-size:13px;line-height:20px;color:#cbd5e1;">
+                                Aviso interno de SIGMA
+                                {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
