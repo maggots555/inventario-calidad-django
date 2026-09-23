@@ -1,308 +1,260 @@
+{% comment %}
+  Correo transaccional: encuesta de satisfacción al entregar el equipo.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que imagenes_cliente.html (tablas, CSS inline, paleta SIC).
+  Cada estrella sigue siendo un enlace ?estrellas=1 … 5: el correo no
+  ejecuta JavaScript. El pie de ESTE correo no es el de los demás:
+  conserva SIC, sicfix.mx y sus cuatro redes.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>¿Cómo fue tu experiencia? — {{ folio }}</title>
-<style>
-  body { margin:0; padding:0; background:#f0f4f8; font-family:'Segoe UI',Arial,sans-serif; }
-  .wrapper { max-width:600px; margin:0 auto; }
-  /* Header */
-  .header {
-    background: linear-gradient(135deg, #f8f9ff 0%, #e8f4ff 50%, #d4e9ff 100%);
-    padding: 32px 32px 24px;
-    text-align: center;
-    border-bottom: 3px solid #90caf9;
-  }
-  .header img.logo { height:48px; margin-bottom:16px; }
-  .header .emoji-big { font-size:3rem; display:block; margin-bottom:8px; }
-  .header h1 {
-    margin:0; font-size:1.6rem; font-weight:800;
-    color:#1565c0; letter-spacing:-0.5px;
-  }
-  .header p { margin:8px 0 0; color:#5c6bc0; font-size:0.95rem; }
-  /* Equipo info */
-  .equipo-box {
-    margin: 24px 32px;
-    background: white;
-    border-radius: 12px;
-    border-left: 5px solid #667eea;
-    padding: 16px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-  .equipo-box .label {
-    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em;
-    color:#7c3aed; font-weight:700; margin-bottom:4px;
-  }
-  .equipo-box .equipo-nombre {
-    font-size:1.1rem; font-weight:800; color:#1e1b4b; margin:0 0 8px;
-  }
-  .equipo-box .folio-badge {
-    display:inline-block; background:#ede9fe; color:#7c3aed;
-    border-radius:20px; padding:3px 12px; font-size:0.8rem; font-weight:600;
-  }
-  .equipo-box .fecha-entrega {
-    margin-top:8px; font-size:0.82rem; color:#6b7280;
-  }
-  /* Mensaje principal */
-  .mensaje {
-    padding: 8px 32px 24px;
-    text-align: center;
-  }
-  .mensaje h2 { font-size:1.25rem; color:#374151; font-weight:700; margin:0 0 10px; }
-  .mensaje p  { color:#6b7280; font-size:0.92rem; line-height:1.6; margin:0 0 24px; }
-  /* CTA Button (respaldo si el cliente de correo no pinta las estrellas) */
-  .cta-wrapper { text-align:center; padding:0 32px 32px; }
-  .cta-btn {
-    display:inline-block;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color:white !important;
-    text-decoration:none;
-    padding:16px 36px;
-    border-radius:50px;
-    font-size:1.05rem;
-    font-weight:700;
-    letter-spacing:0.3px;
-    box-shadow:0 6px 20px rgba(102,126,234,0.45);
-  }
-  /* One-Click Survey: cada estrella es un <a>, no JavaScript (el correo no lo ejecuta) */
-  .star-rating-wrap { text-align:center; padding:0 16px 8px; }
-  .star-rating-hint { color:#6b7280; font-size:0.85rem; margin:0 0 12px; }
-  .cta-fallback-hint { color:#9ca3af; font-size:0.78rem; margin:16px 0 10px; }
-  /* Vigencia */
-  .vigencia {
-    margin: 0 32px 24px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 10px;
-    padding: 12px 16px;
-    font-size: 0.82rem;
-    color: #92400e;
-    text-align: center;
-  }
-  /* Info lista */
-  .info-lista {
-    margin: 0 32px 28px;
-    padding: 16px 20px;
-    background: #f0fdf4;
-    border-radius: 10px;
-    border: 1px solid #bbf7d0;
-  }
-  .info-lista p {
-    margin:0 0 8px; font-size:0.8rem; color:#065f46; font-weight:600;
-  }
-  .info-lista ul {
-    margin:0; padding-left:18px;
-  }
-  .info-lista li {
-    font-size:0.8rem; color:#047857; margin-bottom:4px;
-  }
-  /* Footer — mismo diseño que el resto de correos del sistema */
-  .footer {
-    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    color: white;
-    padding: 30px;
-    text-align: center;
-  }
-  .footer a { color: #ffffff; text-decoration: none; }
-  .company {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 5px 0;
-  }
-  .company-link {
-    font-size: 14px;
-    opacity: 0.9;
-    margin-bottom: 5px;
-  }
-  .company-link a { color: #7dd3fc; text-decoration: none; }
-  .social-media {
-    margin: 20px 0;
-    padding: 15px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    text-align: center;
-  }
-  .social-title {
-    font-size: 14px;
-    margin-bottom: 12px;
-    opacity: 0.9;
-    text-align: center;
-  }
-  .social-links {
-    text-align: center;
-  }
-  .social-link {
-    display: inline-block;
-    padding: 10px 20px;
-    margin: 4px;
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 25px;
-    text-decoration: none;
-    color: #ffffff !important;
-    font-size: 14px;
-    font-weight: 600;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-  }
-  .timestamp {
-    font-size: 12px;
-    opacity: 0.8;
-    margin-top: 15px;
-  }
-  /* Responsive */
-  @media (max-width:600px) {
-    .header, .equipo-box, .mensaje, .cta-wrapper, .star-rating-wrap, .vigencia, .info-lista {
-      padding-left:16px; padding-right:16px; margin-left:8px; margin-right:8px;
-    }
-    .social-link { padding: 6px 10px; font-size: 11px; }
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>¿Cómo fue tu experiencia? — {{ folio }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .star-cell { width: 52px !important; }
+        }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-note { background-color: #1c1917 !important; }
+            .email-note-text { color: #fde68a !important; }
+        }
+    </style>
 </head>
-<body>
-<div class="wrapper">
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Nos gustaría conocer cómo fue tu experiencia con nosotros.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+    </div>
 
-  <!-- ── HEADER ── -->
-  <div class="header">
-    <img src="cid:logo_sic" alt="SIC" class="logo">
-    <span class="emoji-big">⭐</span>
-    <h1>¡Tu equipo fue entregado!</h1>
-    <p>Nos gustaría conocer cómo fue tu experiencia con nosotros.</p>
-  </div>
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
 
-  <!-- ── INFO DEL EQUIPO ── -->
-  <div class="equipo-box">
-    <div class="label">Equipo reparado</div>
-    <p class="equipo-nombre">
-      {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
-    </p>
-    <span class="folio-badge">Folio: {{ folio }}</span>
-    {% if fecha_entrega %}
-    <p class="fecha-entrega">📅 Entregado el {{ fecha_entrega }}</p>
-    {% endif %}
-  </div>
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                ¡Tu equipo fue entregado!
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Nos gustaría conocer cómo fue tu experiencia con nosotros.
+                            </p>
+                        </td>
+                    </tr>
 
-  <!-- ── MENSAJE ── -->
-  <div class="mensaje">
-    <h2>¿Cómo te tratamos?</h2>
-    <p>
-      Tu opinión es muy importante para nosotros. Toca una estrella para
-      empezar: te abre el formulario con esa calificación ya marcada.
-      Completarlo toma unos <strong>2 minutos</strong>.
-    </p>
-  </div>
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Equipo reparado
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:16px;line-height:24px;font-weight:700;color:#0f172a;">
+                                            {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
+                                        </p>
+                                        <p class="email-label" style="margin:0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Folio: {{ folio }}
+                                        </p>
+                                        {% if fecha_entrega %}
+                                        <p class="email-muted" style="margin:8px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                            Entregado el {{ fecha_entrega }}
+                                        </p>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-  <!-- ── ONE-CLICK SURVEY ──
-     EXPLICACIÓN PARA PRINCIPIANTES:
-     El correo NO puede ejecutar JavaScript. Cada estrella es un enlace
-     distinto (?estrellas=1 … 5). Al hacer clic se abre el formulario web
-     con esa calificación prellenada; el voto se guarda al enviar el form.
-     Usamos <table> + estilos inline porque Outlook ignora casi todo el CSS. -->
-  <div class="star-rating-wrap">
-    <p class="star-rating-hint">Toca una estrella para calificar:</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 8px;">
-      <tr>
-        <td align="center" valign="top" width="88" style="padding:4px 2px;">
-          <a href="{{ feedback_url }}?estrellas=1" target="_blank" style="text-decoration:none; display:block;">
-            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
-            <span style="font-size:12px; font-weight:700; color:#374151;">1</span><br>
-            <span style="font-size:10px; color:#6b7280;">Muy malo</span>
-          </a>
-        </td>
-        <td align="center" valign="top" width="88" style="padding:4px 2px;">
-          <a href="{{ feedback_url }}?estrellas=2" target="_blank" style="text-decoration:none; display:block;">
-            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
-            <span style="font-size:12px; font-weight:700; color:#374151;">2</span><br>
-            <span style="font-size:10px; color:#6b7280;">Malo</span>
-          </a>
-        </td>
-        <td align="center" valign="top" width="88" style="padding:4px 2px;">
-          <a href="{{ feedback_url }}?estrellas=3" target="_blank" style="text-decoration:none; display:block;">
-            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
-            <span style="font-size:12px; font-weight:700; color:#374151;">3</span><br>
-            <span style="font-size:10px; color:#6b7280;">Regular</span>
-          </a>
-        </td>
-        <td align="center" valign="top" width="88" style="padding:4px 2px;">
-          <a href="{{ feedback_url }}?estrellas=4" target="_blank" style="text-decoration:none; display:block;">
-            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
-            <span style="font-size:12px; font-weight:700; color:#374151;">4</span><br>
-            <span style="font-size:10px; color:#6b7280;">Bueno</span>
-          </a>
-        </td>
-        <td align="center" valign="top" width="88" style="padding:4px 2px;">
-          <a href="{{ feedback_url }}?estrellas=5" target="_blank" style="text-decoration:none; display:block;">
-            <span style="font-size:36px; line-height:1.1; color:#f59e0b;">★</span><br>
-            <span style="font-size:12px; font-weight:700; color:#374151;">5</span><br>
-            <span style="font-size:10px; color:#6b7280;">Excelente</span>
-          </a>
-        </td>
-      </tr>
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 8px 32px;">
+                            <p class="email-title" style="margin:0 0 10px 0;font-size:20px;line-height:26px;font-weight:700;color:#1f6391;text-align:center;">
+                                ¿Cómo te tratamos?
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#334155;text-align:center;">
+                                Tu opinión es muy importante para nosotros. Toca una estrella para
+                                empezar: te abre el formulario con esa calificación ya marcada.
+                                Completarlo toma unos <strong>2 minutos</strong>.
+                            </p>
+                        </td>
+                    </tr>
+
+                    {# Cada estrella es un enlace. Outlook no ejecuta JavaScript. #}
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 16px 8px 16px;">
+                            <p class="email-muted" style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#475569;text-align:center;">
+                                Toca una estrella para calificar:
+                            </p>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 8px auto;">
+                                <tr>
+                                    <td class="star-cell" align="center" valign="top" width="64" style="padding:4px 2px;">
+                                        <a href="{{ feedback_url }}?estrellas=1" target="_blank" style="text-decoration:none;display:block;">
+                                            <span style="font-size:32px;line-height:1.1;color:#f59e0b;">★</span><br>
+                                            <span style="font-size:12px;line-height:16px;font-weight:700;color:#0f172a;">1</span><br>
+                                            <span style="font-size:10px;line-height:14px;color:#475569;">Muy malo</span>
+                                        </a>
+                                    </td>
+                                    <td class="star-cell" align="center" valign="top" width="64" style="padding:4px 2px;">
+                                        <a href="{{ feedback_url }}?estrellas=2" target="_blank" style="text-decoration:none;display:block;">
+                                            <span style="font-size:32px;line-height:1.1;color:#f59e0b;">★</span><br>
+                                            <span style="font-size:12px;line-height:16px;font-weight:700;color:#0f172a;">2</span><br>
+                                            <span style="font-size:10px;line-height:14px;color:#475569;">Malo</span>
+                                        </a>
+                                    </td>
+                                    <td class="star-cell" align="center" valign="top" width="64" style="padding:4px 2px;">
+                                        <a href="{{ feedback_url }}?estrellas=3" target="_blank" style="text-decoration:none;display:block;">
+                                            <span style="font-size:32px;line-height:1.1;color:#f59e0b;">★</span><br>
+                                            <span style="font-size:12px;line-height:16px;font-weight:700;color:#0f172a;">3</span><br>
+                                            <span style="font-size:10px;line-height:14px;color:#475569;">Regular</span>
+                                        </a>
+                                    </td>
+                                    <td class="star-cell" align="center" valign="top" width="64" style="padding:4px 2px;">
+                                        <a href="{{ feedback_url }}?estrellas=4" target="_blank" style="text-decoration:none;display:block;">
+                                            <span style="font-size:32px;line-height:1.1;color:#f59e0b;">★</span><br>
+                                            <span style="font-size:12px;line-height:16px;font-weight:700;color:#0f172a;">4</span><br>
+                                            <span style="font-size:10px;line-height:14px;color:#475569;">Bueno</span>
+                                        </a>
+                                    </td>
+                                    <td class="star-cell" align="center" valign="top" width="64" style="padding:4px 2px;">
+                                        <a href="{{ feedback_url }}?estrellas=5" target="_blank" style="text-decoration:none;display:block;">
+                                            <span style="font-size:32px;line-height:1.1;color:#f59e0b;">★</span><br>
+                                            <span style="font-size:12px;line-height:16px;font-weight:700;color:#0f172a;">5</span><br>
+                                            <span style="font-size:10px;line-height:14px;color:#475569;">Excelente</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:8px 32px 24px 32px;">
+                            <p class="email-muted" style="margin:0 0 12px 0;font-size:13px;line-height:18px;color:#64748b;text-align:center;">
+                                ¿No se ven las estrellas? Usa este botón:
+                            </p>
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ feedback_url }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">O completa la encuesta aquí</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ feedback_url }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">O completa la encuesta aquí</a>
+                            <!--<![endif]-->
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fffbeb" class="email-note" style="background-color:#fffbeb;border:1px solid #fde68a;">
+                                <tr>
+                                    <td class="email-note-text" align="center" style="padding:14px 16px;font-size:14px;line-height:22px;color:#92400e;text-align:center;">
+                                        Este enlace es <strong>personal y de uso único</strong>.
+                                        Válido durante <strong>{{ dias_vigencia }} días</strong> desde la fecha de entrega.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 28px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Sobre la encuesta:
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Toca una estrella para abrir el formulario ya calificado<br>
+                                            No requiere crear cuenta ni iniciar sesión<br>
+                                            El enlace es seguro y solo funciona una vez<br>
+                                            Tus respuestas son confidenciales
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 4px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                SIC - Comercialización y Servicios
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:20px;">
+                                <a href="https://sicfix.mx" style="color:#7dd3fc;text-decoration:underline;">sicfix.mx</a>
+                            </p>
+                            <p style="margin:0 0 10px 0;padding-top:12px;border-top:1px solid #334155;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio Web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://instagram.com/sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://facebook.com/sicfix.mx" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://wa.me/523318189988" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Este correo fue enviado el {{ fecha_envio }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
     </table>
-  </div>
-
-  <!-- ── BOTÓN CTA DE RESPALDO ── -->
-  <div class="cta-wrapper">
-    <p class="cta-fallback-hint">¿No se ven las estrellas? Usa este botón:</p>
-    <a href="{{ feedback_url }}" class="cta-btn">
-      ⭐&nbsp;&nbsp;O completa la encuesta aquí
-    </a>
-  </div>
-
-  <!-- ── VIGENCIA ── -->
-  <div class="vigencia">
-    ⏳ Este enlace es <strong>personal y de uso único</strong>.
-    Válido durante <strong>{{ dias_vigencia }} días</strong> desde la fecha de entrega.
-  </div>
-
-  <!-- ── INFORMACIÓN ── -->
-  <div class="info-lista">
-    <p>✅ Sobre la encuesta:</p>
-    <ul>
-      <li>Toca una estrella para abrir el formulario ya calificado</li>
-      <li>No requiere crear cuenta ni iniciar sesión</li>
-      <li>El enlace es seguro y solo funciona una vez</li>
-      <li>Tus respuestas son confidenciales</li>
-    </ul>
-  </div>
-
-  <!-- ── FOOTER ──
-     EXPLICACIÓN PARA PRINCIPIANTES:
-     Mismo diseño visual que diagnóstico/cotización (pills de redes +
-     empresa + fecha). El contenido no cambia: las 4 redes, el nombre
-     de SIC, sicfix.mx y la fecha de envío. -->
-  <div class="footer">
-    <div class="company">SIC - Comercialización y Servicios</div>
-    <div class="company-link">
-      <a href="https://sicfix.mx">sicfix.mx</a>
-    </div>
-
-    <div class="social-media">
-      <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-      <div class="social-links">
-        <a href="https://sicfix.mx" class="social-link" target="_blank">
-          <img src="cid:icon_link" alt="Web" style="width:18px; height:18px; vertical-align:middle;">
-          <span>Sitio Web</span>
-        </a>
-        <a href="https://instagram.com/sicfix.mx" class="social-link" target="_blank">
-          <img src="cid:icon_instagram" alt="Instagram" style="width:18px; height:18px; vertical-align:middle;">
-          <span>Instagram</span>
-        </a>
-        <a href="https://facebook.com/sicfix.mx" class="social-link" target="_blank">
-          <img src="cid:icon_facebook" alt="Facebook" style="width:18px; height:18px; vertical-align:middle;">
-          <span>Facebook</span>
-        </a>
-        <a href="https://wa.me/523318189988" class="social-link" target="_blank">
-          <img src="cid:icon_whatsapp" alt="WhatsApp" style="width:18px; height:18px; vertical-align:middle;">
-          <span>WhatsApp</span>
-        </a>
-      </div>
-    </div>
-
-    <div class="timestamp">
-      Este correo fue enviado el {{ fecha_envio }}
-    </div>
-  </div>
-
-</div>
 </body>
 </html>

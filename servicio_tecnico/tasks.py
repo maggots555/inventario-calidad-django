@@ -2494,7 +2494,7 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_ali
     Se dispara cuando una orden cambia a estado 'entregado' con cotización aceptada.
     """
     import re
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -2572,11 +2572,19 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_ali
         if jefe_calidad_2_email:
             cc_list.append(jefe_calidad_2_email)
 
-        email_msg = EmailMessage(
-            subject=asunto, body=html_content,
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # HTML + texto plano. Las cinco estrellas deben llegar aunque
+        # el cliente bloquee el HTML.
+        from servicio_tecnico.services.email_feedback_satisfaccion import (
+            construir_texto_plano_feedback_satisfaccion,
+        )
+        texto_plano = construir_texto_plano_feedback_satisfaccion(context_email)
+
+        email_msg = EmailMultiAlternatives(
+            subject=asunto, body=texto_plano,
             from_email=remitente, to=[email_cliente], cc=cc_list,
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Logo SIC (CID inline) ──
         try:
@@ -2589,6 +2597,10 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_ali
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[FEEDBACK-SATISFACCION] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[FEEDBACK-SATISFACCION]')
 
         # ── Iconos de redes sociales ──
         iconos_sociales = {
@@ -2684,7 +2696,7 @@ def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
     la encuesta de satisfacción antes de que expire (día 10 de 12).
     """
     import re
-    from django.core.mail import EmailMessage
+    from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
     from django.utils import timezone
     from django.conf import settings
@@ -2758,11 +2770,18 @@ def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
         email_solo  = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
         remitente   = f"Servicio Técnico System <{email_solo}>"
 
-        email_msg = EmailMessage(
-            subject=asunto, body=html_content,
+        # EXPLICACIÓN: mismo texto plano que el envío inicial. El asunto
+        # del recordatorio no cambia; solo el cuerpo HTML se rediseñó.
+        from servicio_tecnico.services.email_feedback_satisfaccion import (
+            construir_texto_plano_feedback_satisfaccion,
+        )
+        texto_plano = construir_texto_plano_feedback_satisfaccion(context_email)
+
+        email_msg = EmailMultiAlternatives(
+            subject=asunto, body=texto_plano,
             from_email=remitente, to=[email_cliente],
         )
-        email_msg.content_subtype = 'html'
+        email_msg.attach_alternative(html_content, 'text/html')
 
         # ── Logo SIC (CID inline) ──
         try:
@@ -2775,6 +2794,10 @@ def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f"[RECORDATORIO-ENCUESTA] Error al adjuntar logo: {e}")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[RECORDATORIO-ENCUESTA]')
 
         # ── Iconos de redes sociales ──
         iconos_sociales = {
