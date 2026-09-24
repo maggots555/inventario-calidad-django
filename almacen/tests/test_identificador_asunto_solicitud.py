@@ -148,6 +148,13 @@ class NotificarFrontAsuntoIdentificadorTest(
         self.assertIn(ruta_detalle, cuerpo)
         self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', cuerpo)
         self.assertIn('Abrir solicitud en SIGMA', cuerpo)
+        self.assertIn('cid:logo_sic_white', cuerpo)
+        cids = [
+            adjunto.get('Content-ID', '')
+            for adjunto in capturados[0].attachments
+            if hasattr(adjunto, 'get')
+        ]
+        self.assertIn('<logo_sic_white>', cids)
 
     def test_front_pnc_html_incluye_enlace_detalle(self) -> None:
         """PNC a Front también incluye el botón absoluto al detalle."""

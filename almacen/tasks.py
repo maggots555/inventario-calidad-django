@@ -258,6 +258,11 @@ def notificar_front_cotizacion_task(
         except Exception as e:
             logger.warning(f"[COTIZACION] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra (#1e293b). El a color se queda: la
+        # plantilla PNC de esta misma tarea aún usa cid:logo_sic.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[COTIZACION]')
+
         # Adjuntar iconos de redes sociales
         try:
             iconos_sociales = {

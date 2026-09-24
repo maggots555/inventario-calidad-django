@@ -1,689 +1,369 @@
+{% comment %}
+  Correo interno: cotización lista para que Recepción la comparta.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Un correo NO es una página web. Outlook ignora flex, gradientes y
+  sombras. Por eso este HTML usa tablas (role="presentation"), CSS en
+  línea y ancho ~600 px. La barra de marca es la misma de Servicio
+  Técnico. El pie es interno: no lleva redes sociales.
+
+  El texto de negocio (saludo, instrucciones, vigencia, botón) no cambia.
+  El style de abajo SOLO tiene media queries y dark mode: si Gmail lo
+  recorta, el correo se sigue leyendo.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Cotización - S/T: {% if solicitud.orden_servicio %}{{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:"Sin Service Tag" }}{% elif solicitud.service_tag %}{{ solicitud.service_tag }}{% else %}Sin Service Tag{% endif %}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* Solo refuerzos. El layout NO depende de estas reglas. */
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
-        }
-        
-        .container {
-            max-width: 750px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #e8f5e9 50%, #81c784 100%);
-            color: #1b5e20;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .logo-container {
-            position: relative;
-            z-index: 1;
-            margin-bottom: 15px;
-        }
-        
-        .logo-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-        
-        .logo {
-            font-size: 26px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .subtitle {
-            font-size: 16px;
-            opacity: 0.9;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .content {
-            padding: 40px 30px;
-        }
-        
-        .greeting {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        
-        .intro-text {
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 25px;
-            line-height: 1.7;
-        }
-        
-        .equipment-info {
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 12px;
-            padding: 25px;
-            margin: 25px 0;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-        
-        .info-title {
-            font-size: 18px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 700;
-            text-align: center;
-            border-bottom: 2px solid #4caf50;
-            padding-bottom: 10px;
-        }
-        
-        .info-row {
-            display: flex;
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        
-        .info-label {
-            font-weight: 600;
-            color: #4caf50;
-            min-width: 140px;
-            font-size: 14px;
-        }
-        
-        .info-value {
-            color: #333;
-            font-size: 15px;
-            flex: 1;
-        }
-        
-        .info-value.highlight {
-            font-weight: 700;
-            color: #1b5e20;
-        }
-        
-        /* Tabla de líneas */
-        .lineas-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 25px 0;
-            font-size: 14px;
-        }
-        
-        .lineas-table thead {
-            background-color: #4caf50;
-            color: white;
-        }
-        
-        .lineas-table th {
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: 600;
-        }
-        
-        .lineas-table th.text-center {
-            text-align: center;
-        }
-        
-        .lineas-table th.text-end {
-            text-align: right;
-        }
-        
-        .lineas-table td {
-            padding: 12px 10px;
-            border-bottom: 1px solid #e9ecef;
-            vertical-align: top;
-        }
-        
-        .lineas-table td.text-center {
-            text-align: center;
-        }
-        
-        .lineas-table td.text-end {
-            text-align: right;
-        }
-        
-        .lineas-table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .lineas-table tfoot {
-            background-color: #e8f5e9;
-            font-weight: 700;
-        }
-        
-        .lineas-table tfoot td {
-            padding: 14px 10px;
-            border-bottom: none;
-        }
-        
-        .linea-descripcion {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        
-        .linea-notas {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 4px;
-        }
-        
-        .linea-imagenes {
-            margin-top: 8px;
-        }
-        
-        .linea-imagen-thumb {
-            display: inline-block;
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 6px;
-            border: 1px solid #dee2e6;
-            margin: 4px 6px 4px 0;
-        }
-        
-        .message-box {
-            background: linear-gradient(135deg, #e8f4fd 0%, #d4edda 100%);
-            border-left: 4px solid #4caf50;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-        
-        .message-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        
-        .message-content {
-            font-size: 15px;
-            color: #555;
-            line-height: 1.7;
-            font-style: italic;
-        }
-        
-        .attachments-box {
-            background: #fff3cd;
-            border: 2px dashed #ffc107;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            text-align: center;
-        }
-        
-        .attachments-title {
-            font-weight: 700;
-            color: #856404;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .attachments-count {
-            font-size: 32px;
-            font-weight: 700;
-            color: #ffc107;
-            margin: 10px 0;
-        }
-        
-        .attachments-text {
-            color: #856404;
-            font-size: 14px;
-        }
-        
-        .help-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #17a2b8;
-        }
-        
-        .help-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #17a2b8;
-            margin-bottom: 10px;
-        }
-        
-        .help-text {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.6;
-        }
-        
-        .vigencia-box {
-            background: #fff3cd;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #ffc107;
-        }
-        
-        .vigencia-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #856404;
-            margin-bottom: 10px;
-        }
-        
-        .vigencia-text {
-            font-size: 14px;
-            color: #856404;
-            line-height: 1.6;
-        }
-
-        .cta-box {
-            background: #e8f5e9;
-            border-left: 4px solid #4caf50;
-            border-radius: 8px;
-            padding: 18px;
-            margin: 22px 0;
-            text-align: center;
-        }
-
-        .cta-title {
-            font-size: 15px;
-            font-weight: 700;
-            color: #1b5e20;
-            margin-bottom: 8px;
-        }
-
-        .btn-detalle {
-            display: inline-block;
-            margin-top: 14px;
-            background-color: #2e7d32;
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 12px 22px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .signature {
-            margin-bottom: 15px;
-        }
-        
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-        
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-        
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-        
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-        }
-        
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-        }
-        
-        @media (max-width: 600px) {
-            .container {
-                margin: 10px;
-                border-radius: 0;
-            }
-            
-            .content {
-                padding: 20px 15px;
-            }
-            
-            .info-row {
-                flex-direction: column;
-            }
-            
-            .info-label {
-                min-width: auto;
-                margin-bottom: 5px;
-            }
-            
-            .lineas-table {
-                font-size: 12px;
-            }
-            
-            .lineas-table th,
-            .lineas-table td {
-                padding: 8px 6px;
-            }
-            
-            .social-links {
-                gap: 8px;
-            }
-            
-            .social-link {
-                padding: 6px 10px;
-                font-size: 11px;
-            }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
+            .email-td { background-color: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
+            .email-total { background-color: #0f172a !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <!-- Encabezado -->
-        <div class="header">
-            <div class="logo-container">
-                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            </div>
-            <div class="logo">📋 NUEVA COTIZACIÓN</div>
-            <div class="subtitle">
-                S/T: {% if solicitud.orden_servicio %}{{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:"Sin Service Tag" }}{% elif solicitud.service_tag %}{{ solicitud.service_tag }}{% else %}Sin Service Tag{% endif %}
-            </div>
-        </div>
-        
-        <div class="content">
-            <!-- Saludo -->
-            <div class="greeting">
-                Equipo de Recepción,
-            </div>
-            
-            <div class="intro-text">
-                Se ha generado una nueva solicitud de cotización que requiere ser compartida con el cliente.
-                A continuación encontrarás el detalle de las piezas cotizadas con sus costos e imágenes de referencia.
-            </div>
-            
-            <!-- Información del equipo (si hay orden vinculada) -->
-            {% if info_equipo %}
-            <div class="equipment-info">
-                <div class="info-title">💻 INFORMACIÓN DEL EQUIPO</div>
-                
-                {% if solicitud.numero_orden_cliente %}
-                <div class="info-row">
-                    <div class="info-label">🎯 Orden Cliente:</div>
-                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
-                </div>
-                {% endif %}
-                
-                <div class="info-row">
-                    <div class="info-label">📦 Equipo:</div>
-                    <div class="info-value">
-                        {{ info_equipo.tipo }} {{ info_equipo.marca }}
-                        {% if info_equipo.modelo %}{{ info_equipo.modelo }}{% endif %}
-                    </div>
-                </div>
-                
-                <div class="info-row">
-                    <div class="info-label">🔢 Service Tag:</div>
-                    <div class="info-value">{{ info_equipo.service_tag|default:"-" }}</div>
-                </div>
-            </div>
-            {% elif solicitud.sin_orden_activa %}
-            <div class="equipment-info">
-                <div class="info-title">👤 DATOS DEL CLIENTE</div>
-                
-                <div class="info-row">
-                    <div class="info-label">📛 Cliente:</div>
-                    <div class="info-value">{{ solicitud.nombre_cliente|default:"-" }}</div>
-                </div>
-                
-                {% if solicitud.service_tag %}
-                <div class="info-row">
-                    <div class="info-label">🔢 Service Tag:</div>
-                    <div class="info-value">{{ solicitud.service_tag }}</div>
-                </div>
-                {% endif %}
-                
-                {% if solicitud.email_cliente %}
-                <div class="info-row">
-                    <div class="info-label">📧 Email:</div>
-                    <div class="info-value">{{ solicitud.email_cliente }}</div>
-                </div>
-                {% endif %}
-                
-                {% if solicitud.telefono_cliente %}
-                <div class="info-row">
-                    <div class="info-label">📱 Teléfono:</div>
-                    <div class="info-value">{{ solicitud.telefono_cliente }}</div>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-            
-            <!-- Tabla de líneas de cotización -->
-            <table class="lineas-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Producto / Descripción</th>
-                        <th class="text-center">Cant.</th>
-                        <th class="text-end">Costo Unit.</th>
-                        <th class="text-end">Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in lineas_con_imagenes %}
-                    <tr>
-                        <td>{{ item.linea.numero_linea }}</td>
-                        <td>
-                            <div class="linea-descripcion">
-                                {{ item.linea.producto.nombre }}
-                            </div>
-                            {% if item.linea.descripcion_pieza %}
-                            <div class="linea-notas">{{ item.linea.descripcion_pieza }}</div>
-                            {% endif %}
-                            {% if item.linea.notas %}
-                            <div class="linea-notas"><em>{{ item.linea.notas }}</em></div>
-                            {% endif %}
-                            {% if item.imagenes %}
-                            <div class="linea-imagenes" style="margin-top: 10px;">
-                                {% for img in item.imagenes %}
-                                <img src="cid:{{ img.cid }}" alt="{{ img.descripcion }}" class="linea-imagen-thumb" title="{{ img.descripcion }}">
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">{{ item.linea.cantidad }}</td>
-                        <td class="text-end">
-                            {% if item.linea.costo_unitario and item.linea.costo_unitario > 0 %}
-                                ${{ item.linea.costo_unitario|floatformat:2 }}
-                            {% else %}
-                                <span style="color: #ffc107;">Pendiente</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-end">
-                            {% if item.linea.subtotal > 0 %}
-                                <strong>${{ item.linea.subtotal|floatformat:2 }}</strong>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="4" class="text-end">TOTAL:</td>
-                        <td class="text-end" style="font-size: 18px; color: #1b5e20;">
-                            ${{ solicitud.costo_total|floatformat:2 }}
-                        </td>
-                    </tr>
-                </tfoot>
-            </table>
-            
-            <!-- Mensaje personalizado -->
-            {% if mensaje_personalizado %}
-            <div class="message-box">
-                <div class="message-title">💬 Nota adicional</div>
-                <div class="message-content">
-                    {{ mensaje_personalizado|linebreaks }}
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Instrucciones -->
-            <div class="help-section">
-                <div class="help-title">📌 Instrucciones para Recepción</div>
-                <div class="help-text">
-                    <strong>1.</strong> Comparte esta cotización con el cliente para su revisión y aprobación.<br>
-                    <strong>2.</strong> Registra la respuesta del cliente en el sistema (aprobación/rechazo por línea).<br>
-                    <strong>3.</strong> Una vez aprobadas las líneas, Almacén generará las órdenes de compra correspondientes.<br>
-                    <strong>4.</strong> Si el cliente tiene dudas, coordina con el área de Almacén para aclaraciones.
-                </div>
-            </div>
-            
-            <!-- Aviso de vigencia -->
-            <div class="vigencia-box">
-                <div class="vigencia-title">⏱️ VIGENCIA DE LA COTIZACIÓN</div>
-                <div class="vigencia-text">
-                    Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir de la fecha de envío.
-                    Después de ese lapso, los precios pueden variar y será necesario solicitar una recotización.
-                </div>
-            </div>
-            
-            <div class="cta-box">
-                <div class="cta-title">Abrir solicitud en SIGMA</div>
-                <div class="help-text">
-                    Al abrir la orden podrás añadir los servicios adicionales y compartir la cotización al cliente.
-                </div>
-                <a class="btn-detalle" href="{{ url_detalle }}">Abrir solicitud en SIGMA</a>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
-                <p style="margin: 0; font-size: 14px;">
-                    {% if nombre_usuario %}
-                    Cotización generada por: <strong>{{ nombre_usuario }}</strong>
-                    {% else %}
-                    Cotización generada desde el Sistema de Almacén
-                    {% endif %}
-                </p>
-            </div>
-        </div>
-        
-        <!-- Footer -->
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">
-                    Sistema de Almacén SIC
-                </div>
-                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
-                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para consultas sobre esta cotización, contacte directamente al área de Almacén.
-                </div>
-            </div>
-            
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-            
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Facebook</span>
-                    </a>
-                    {% if whatsapp_empleado %}
-                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>WhatsApp</span>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="timestamp">
-                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    {# Preheader: texto de la bandeja, antes de abrir el correo. #}
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Nueva cotización lista para compartir con el cliente.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Nueva cotización
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                S/T: {% if solicitud.orden_servicio %}{{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:"Sin Service Tag" }}{% elif solicitud.service_tag %}{{ solicitud.service_tag }}{% else %}Sin Service Tag{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Equipo de Recepción,
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Se ha generado una nueva solicitud de cotización que requiere ser compartida con el cliente.
+                                A continuación encontrarás el detalle de las piezas cotizadas con sus costos e imágenes de referencia.
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if info_equipo %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Información del equipo
+                                        </p>
+                                    </td>
+                                </tr>
+                                {% if solicitud.numero_orden_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Orden Cliente:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">
+                                        {{ solicitud.numero_orden_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Equipo:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ info_equipo.tipo }} {{ info_equipo.marca }}
+                                        {% if info_equipo.modelo %}{{ info_equipo.modelo }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Service Tag:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ info_equipo.service_tag|default:"-" }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% elif solicitud.sin_orden_activa %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Datos del cliente
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Cliente:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;">
+                                        {{ solicitud.nombre_cliente|default:"-" }}
+                                    </td>
+                                </tr>
+                                {% if solicitud.service_tag %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Service Tag:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ solicitud.service_tag }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if solicitud.email_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Email:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ solicitud.email_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if solicitud.telefono_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Teléfono:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ solicitud.telefono_cliente }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {# Tabla de piezas: datos reales, estilos en cada celda (Outlook ignora el thead CSS). #}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+                                <tr>
+                                    <td class="email-td" bgcolor="#1f6391" width="32" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">#</td>
+                                    <td class="email-td" bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Producto / Descripción</td>
+                                    <td class="email-td" bgcolor="#1f6391" width="44" align="center" valign="top" style="padding:10px 6px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;text-align:center;">Cant.</td>
+                                    <td class="email-td" bgcolor="#1f6391" width="78" align="right" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;text-align:right;">Costo Unit.</td>
+                                    <td class="email-td" bgcolor="#1f6391" width="78" align="right" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;text-align:right;">Subtotal</td>
+                                </tr>
+                                {% for item in lineas_con_imagenes %}
+                                <tr>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;border-bottom:1px solid #e2e8f0;">{{ item.linea.numero_linea }}</td>
+                                    <td class="email-td" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;">
+                                        <p class="email-body-text" style="margin:0;font-size:13px;line-height:18px;font-weight:700;color:#0f172a;">
+                                            {{ item.linea.producto.nombre }}
+                                        </p>
+                                        {% if item.linea.descripcion_pieza %}
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:#64748b;">{{ item.linea.descripcion_pieza }}</p>
+                                        {% endif %}
+                                        {% if item.linea.notas %}
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:#64748b;font-style:italic;">{{ item.linea.notas }}</p>
+                                        {% endif %}
+                                        {% if item.imagenes %}
+                                        {% for img in item.imagenes %}
+                                        {# Ancho fijo en el atributo: Outlook ignora object-fit y el alto CSS. #}
+                                        <img src="cid:{{ img.cid }}" alt="{{ img.descripcion }}" width="96" style="display:block;width:96px;max-width:96px;height:auto;border:1px solid #e2e8f0;margin:8px 0 0 0;">
+                                        {% endfor %}
+                                        {% endif %}
+                                    </td>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" align="center" valign="top" style="padding:10px 6px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;text-align:center;border-bottom:1px solid #e2e8f0;">{{ item.linea.cantidad }}</td>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" align="right" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;text-align:right;border-bottom:1px solid #e2e8f0;">
+                                        {% if item.linea.costo_unitario and item.linea.costo_unitario > 0 %}
+                                            ${{ item.linea.costo_unitario|floatformat:2 }}
+                                        {% else %}
+                                            <span style="color:#b45309;">Pendiente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" align="right" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">
+                                        {% if item.linea.subtotal > 0 %}
+                                            ${{ item.linea.subtotal|floatformat:2 }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                <tr>
+                                    <td class="email-total email-label" colspan="4" align="right" bgcolor="#f0f7ff" style="padding:12px 8px;background-color:#f0f7ff;color:#1f6391;font-size:13px;line-height:18px;font-weight:700;text-align:right;">TOTAL:</td>
+                                    <td class="email-total email-title" align="right" bgcolor="#f0f7ff" style="padding:12px 8px;background-color:#f0f7ff;color:#1f6391;font-size:16px;line-height:22px;font-weight:700;text-align:right;">
+                                        ${{ solicitud.costo_total|floatformat:2 }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if mensaje_personalizado %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8f4fd" class="email-panel" style="background-color:#e8f4fd;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Nota adicional
+                                        </p>
+                                        <div class="email-body-text" style="font-size:15px;line-height:24px;color:#334155;font-style:italic;">
+                                            {{ mensaje_personalizado|linebreaks }}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Instrucciones para Recepción
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            <strong>1.</strong> Comparte esta cotización con el cliente para su revisión y aprobación.<br>
+                                            <strong>2.</strong> Registra la respuesta del cliente en el sistema (aprobación/rechazo por línea).<br>
+                                            <strong>3.</strong> Una vez aprobadas las líneas, Almacén generará las órdenes de compra correspondientes.<br>
+                                            <strong>4.</strong> Si el cliente tiene dudas, coordina con el área de Almacén para aclaraciones.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#c2410c;">
+                                            Vigencia de la cotización
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir de la fecha de envío.
+                                            Después de ese lapso, los precios pueden variar y será necesario solicitar una recotización.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0 0 8px 0;font-size:15px;line-height:22px;font-weight:700;color:#1f6391;text-align:center;">
+                                Abrir solicitud en SIGMA
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#334155;text-align:center;">
+                                Al abrir la orden podrás añadir los servicios adicionales y compartir la cotización al cliente.
+                            </p>
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_detalle }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Abrir solicitud en SIGMA</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_detalle }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Abrir solicitud en SIGMA</a>
+                            <!--<![endif]-->
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:16px 32px 28px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:0;font-size:14px;line-height:20px;color:#64748b;text-align:center;">
+                                {% if nombre_usuario %}
+                                Cotización generada por: <strong>{{ nombre_usuario }}</strong>
+                                {% else %}
+                                Cotización generada desde el Sistema de Almacén
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    {# Pie interno: sin redes. El aviso de no responder se conserva. #}
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:24px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Almacén SIC
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para consultas sobre esta cotización, contacte directamente al área de Almacén.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 12px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
