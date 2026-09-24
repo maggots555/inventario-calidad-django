@@ -14,11 +14,14 @@
 </head>
 <body class="fs-body">
 
+{# Misma malla animada que la encuesta de satisfacción #}
+<canvas id="particles-canvas"></canvas>
+
 {% if estado == 'formulario' %}
 <div class="fs-card">
 
   <div class="fs-card-header">
-    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="fs-header-logo">
+    <img src="{% static 'images/logos/logo_sic_white.svg' %}" alt="SIC" class="fs-header-logo">
     <p class="fs-header-title">Tu opinión nos importa</p>
     <p class="fs-header-subtitle">Cuéntanos qué podemos mejorar — solo toma 2 minutos</p>
   </div>
@@ -250,5 +253,6 @@
     }
   })();
 </script>
+<script src="{% static 'js/feedback_particles.js' %}"></script>
 </body>
 </html>

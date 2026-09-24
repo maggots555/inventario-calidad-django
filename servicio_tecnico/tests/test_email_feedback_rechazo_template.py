@@ -151,6 +151,15 @@ class FeedbackRechazoPaginaClienteTests(SimpleTestCase):
         self.assertIn('$1500.00', html)
         self.assertNotIn('Mano de obra', html)
         self.assertNotIn('$570.00', html)
+        # El header es azul: el logo a color se pierde. El blanco es el de satisfacción.
+        # {% static %} puede agregar hash (logo_sic_white.abc123.svg).
+        self.assertRegex(
+            html,
+            r'<img src="[^"]*logo_sic_white[^"]*" alt="SIC" class="fs-header-logo">',
+        )
+        # Misma malla animada que satisfacción. El JS puede llevar hash de static.
+        self.assertIn('id="particles-canvas"', html)
+        self.assertRegex(html, r'feedback_particles[^"]*\.js')
 
 
 class FeedbackRechazoTextoPlanoTests(SimpleTestCase):
