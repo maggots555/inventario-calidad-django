@@ -242,6 +242,7 @@ class NotificarFrontAsuntoIdentificadorTest(
         self.assertIn(ruta_detalle, cuerpo)
         self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', cuerpo)
         self.assertIn('Ver detalle de la solicitud', cuerpo)
+        self.assertIn('cid:logo_sic_white', cuerpo)
 
     def test_pnc_cliente_con_orden_asunto_usa_orden_cliente(self) -> None:
         """PNC al cliente con orden → subject con orden_cliente."""

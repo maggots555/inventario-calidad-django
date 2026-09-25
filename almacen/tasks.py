@@ -466,6 +466,11 @@ def notificar_compras_nueva_cotizacion_task(
         except Exception as e:
             logger.warning(f"[COTIZACION-COMPRAS] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra. Los iconos se siguen pegando: el HTML
+        # nuevo no los cita, y quitarlos es limpieza del envío.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[COTIZACION-COMPRAS]')
+
         # Adjuntar iconos de redes sociales (CID para mostrar inline)
         try:
             iconos_sociales = {
