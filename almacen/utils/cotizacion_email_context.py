@@ -140,6 +140,41 @@ def _obtener_service_tag_solicitud(solicitud: 'SolicitudCotizacion') -> str:
     return ''
 
 
+def nombre_cliente_visible_solicitud(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Nombre del cliente que debe verse en un correo de Almacén.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    La solicitud solo guarda el nombre cuando recepción la crea sin orden.
+    Si la cotización nació de una orden, el nombre vive en el equipo
+    (DetalleEquipo), no en la solicitud. Por eso un correo que solo lee
+    solicitud.nombre_cliente sale en blanco aunque el cliente sí exista.
+
+    Args:
+        solicitud: SolicitudCotizacion (con o sin orden vinculada).
+
+    Returns:
+        str: Nombre ya recortado, o cadena vacía si no hay ninguno.
+
+    Efectos secundarios:
+        Ninguno. Si la orden no tiene detalle, no truena: devuelve vacío.
+    """
+    # 1) Lo que recepción tecleó en la solicitud (modo sin orden).
+    propio = (getattr(solicitud, 'nombre_cliente', None) or '').strip()
+    if propio:
+        return propio
+
+    # 2) Cliente de la orden. getattr no sirve: si no hay detalle, Django lanza.
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is None:
+        return ''
+    try:
+        detalle = orden.detalle_equipo
+    except Exception:
+        return ''
+    return (getattr(detalle, 'nombre_cliente', None) or '').strip()
+
+
 def identificador_asunto_solicitud(solicitud: 'SolicitudCotizacion') -> str:
     """
     Identificador visible en el asunto (subject) de correos de Almacén.

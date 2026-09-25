@@ -601,6 +601,7 @@ def notificar_compras_cotizacion_aceptada_task(
     from config.paises_config import get_pais_actual, fecha_local_pais
     from .utils.cotizacion_email_context import (
         identificador_asunto_solicitud,
+        nombre_cliente_visible_solicitud,
         url_absoluta_detalle_solicitud,
     )
 
@@ -611,6 +612,7 @@ def notificar_compras_cotizacion_aceptada_task(
         try:
             solicitud = SolicitudCotizacion.objects.select_related(
                 'orden_servicio',
+                'orden_servicio__detalle_equipo',
                 'creado_por',
             ).prefetch_related(
                 'lineas__producto',
@@ -659,6 +661,8 @@ def notificar_compras_cotizacion_aceptada_task(
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
             'url_detalle': url_detalle,
+            # EXPLICACIÓN: el nombre suele vivir en la orden, no en la solicitud.
+            'nombre_cliente': nombre_cliente_visible_solicitud(solicitud),
         }
 
         html_content = render_to_string(
@@ -679,6 +683,10 @@ def notificar_compras_cotizacion_aceptada_task(
         )
         email_msg.content_subtype = 'html'
         _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        # Logo blanco de la barra. Los iconos siguen en el helper compartido:
+        # otros correos de Compras aún los citan.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
         email_msg.send(fail_silently=False)
 
         logger.info(
