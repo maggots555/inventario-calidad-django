@@ -22,7 +22,10 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase, override_settings
 
-from servicio_tecnico.utils.pdf_diagnostico import PDFGeneratorDiagnostico
+from servicio_tecnico.utils.pdf_diagnostico import (
+    PDFGeneratorDiagnostico,
+    ContactoAlFondo,
+)
 
 
 def _orden(**overrides_detalle):
@@ -307,3 +310,39 @@ class PdfDiagnosticoPlatypusTest(SimpleTestCase):
         self.assertLess(leyenda['y_min'], contacto['y_min'] - 200)
         self.assertGreater(contacto['y_min'], 680)
         self.assertLess(contacto['y_max'], pie['y_min'])
+
+    def test_contacto_en_hoja_corta_tambien_va_al_fondo(self):
+        """Si todo cabe en una hoja, la fila igual se pega al pie, no a la leyenda."""
+        resultado = self._generar(email='j.alvarez@sic.com.mx')
+        self.assertTrue(resultado['success'], resultado.get('error'))
+        cajas = _cajas(resultado['_bytes'])
+        contacto = next(c for c in cajas if c['texto'] == 'Contacto')
+        pie = next(c for c in cajas if c['texto'] == 'Página')
+        leyenda = next(c for c in cajas if c['texto'] == 'necesaria')
+
+        self.assertEqual(contacto['pagina'], 1)
+        self.assertEqual(max(c['pagina'] for c in cajas), 1)
+        self.assertGreater(contacto['y_min'], 680)
+        self.assertLess(contacto['y_max'], pie['y_min'])
+        self.assertLess(leyenda['y_max'], contacto['y_min'])
+
+    def test_wrap_sigue_el_contrato_de_platypus(self):
+        """
+        Cabe → se estira al alto disponible. No cabe → pide más alto y
+        split() devuelve [] (Platypus mueve el bloque, no lo parte).
+        """
+        generador = PDFGeneratorDiagnostico(
+            orden=_orden(),
+            folio='F1',
+            email_empleado='j.alvarez@sic.com.mx',
+        )
+        bloque = ContactoAlFondo(generador._construir_contacto())
+
+        _ancho, alto_estira = bloque.wrap(400, 200)
+        self.assertLess(bloque._alto_fila, 40)
+        self.assertAlmostEqual(alto_estira, 200, delta=1)
+        self.assertAlmostEqual(bloque.height, alto_estira)
+
+        _ancho, alto_no_cabe = bloque.wrap(400, 5)
+        self.assertGreater(alto_no_cabe, 5)
+        self.assertEqual(bloque.split(400, 5), [])

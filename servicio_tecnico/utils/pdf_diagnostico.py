@@ -37,6 +37,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.rl_config import _FUZZ
 from reportlab.platypus import (
     CondPageBreak,
     Flowable,
@@ -82,6 +83,14 @@ class ContactoAlFondo(Flowable):
         Siempre cierra el PDF, en el hueco justo encima del pie
         (folio a la izquierda y «Página N» a la derecha).
 
+    Cómo lo pide Platypus (no es una coordenada Y fija):
+        wrap() dice cuánto alto usa el bloque. Si cabe, se estira hasta el
+        fondo del marco y draw() pinta la fila en y=0 de ese bloque.
+        Si no cabe, wrap() devuelve más alto del disponible. El marco llama
+        a split(); la clase base devuelve [] y ReportLab pasa el bloque
+        completo a la hoja siguiente. Es el mismo contrato que usa una
+        tabla que no cabe: no se parte, se mueve.
+
     Args:
         tabla: Table ya armada con empresa y, si hay, el correo.
 
@@ -92,27 +101,35 @@ class ContactoAlFondo(Flowable):
     def __init__(self, tabla: Table):
         super().__init__()
         self.tabla = tabla
-        self._alto = 0.0
+        self._alto_fila = 0.0
 
     def wrap(self, availWidth, availHeight):
         """
-        Mide la fila y se estira hasta el fondo del marco.
+        Mide la fila con alto de sobra y decide si cabe en esta hoja.
 
-        Si no cabe en lo que queda, devuelve un alto mayor para que
-        ReportLab la pase a la hoja siguiente (ahí sí se pega al fondo).
+        Args:
+            availWidth: ancho útil del marco.
+            availHeight: alto que queda en la hoja actual.
+
+        Returns:
+            (ancho, alto) que el marco debe reservar.
         """
-        _ancho, alto = self.tabla.wrap(availWidth, max(availHeight, 1))
-        self._alto = alto
-        # No cabe: el split vacío provoca el salto de página.
-        if alto > availHeight:
-            return availWidth, availHeight + 1
-        return availWidth, availHeight
+        # Alto generoso a propósito: una tabla "larga" de ReportLab deja de
+        # medir filas si el alto pedido ya se llenó. Aquí la fila es una.
+        _ancho, alto = self.tabla.wrap(availWidth, 1000)
+        self._alto_fila = alto
+        self.width = availWidth
 
-    def split(self, availWidth, availHeight):
-        """Si no cabe, no se parte: se va completa a la siguiente hoja."""
-        if self._alto > availHeight:
-            return []
-        return [self]
+        # No cabe en el resto de esta hoja. El marco verá que nos pasamos
+        # y nos mandará enteros a la siguiente (split() de Flowable = []).
+        if alto > availHeight + _FUZZ:
+            self.height = alto
+            return availWidth, availHeight + 1
+
+        # Cabe. Ocupamos el resto del marco, menos el margen de error que
+        # ReportLab usa en sus propias cuentas, para no fallar por float.
+        self.height = max(availHeight - _FUZZ, alto)
+        return availWidth, self.height
 
     def draw(self):
         """y=0 es el fondo del marco, encima de la línea del pie."""
