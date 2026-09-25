@@ -512,6 +512,10 @@ def enviar_notificacion_no_atribuible(incidencia, justificacion, marcado_por='Si
         
         # Adjuntar versión HTML
         email.attach_alternative(html_content, "text/html")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email, '[SCORECARD]')
         
         # Enviar
         email.send(fail_silently=False)
