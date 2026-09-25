@@ -25,6 +25,10 @@ interface EmpleadoPanelData {
     cargo: string;
     area: string;
     rol: string;
+    /** Código interno del rol (ej. 'dispatcher'), no la etiqueta visible. */
+    rolCodigo: string;
+    atiendeDell: boolean;
+    atiendeLenovo: boolean;
     email: string;
     sucursal: string;
     jefe: string;
@@ -118,6 +122,9 @@ function leerDatosEmpleado(el: HTMLElement): EmpleadoPanelData | null {
         cargo: d.cargo || '',
         area: d.area || '',
         rol: d.rol || '',
+        rolCodigo: d.rolCodigo || '',
+        atiendeDell: d.atiendeDell === 'true',
+        atiendeLenovo: d.atiendeLenovo === 'true',
         email: d.email || '',
         sucursal: d.sucursal || 'Sin asignar',
         jefe: d.jefe || 'Sin asignar',
@@ -253,6 +260,32 @@ function htmlAcciones(data: EmpleadoPanelData): string {
 }
 
 /**
+ * Texto de la ficha: qué marcas de garantía atiende un dispatcher.
+ *
+ * Solo aplica al rol dispatcher. Si no tiene casillas, se dice claro
+ * para que no parezca que el dato se olvidó.
+ */
+function htmlGarantiasAsignadas(data: EmpleadoPanelData): string {
+    if (data.rolCodigo !== 'dispatcher') {
+        return '';
+    }
+
+    const marcas: string[] = [];
+    if (data.atiendeDell) {
+        marcas.push('Dell');
+    }
+    if (data.atiendeLenovo) {
+        marcas.push('Lenovo');
+    }
+
+    const valor = marcas.length > 0
+        ? escapeHtml(marcas.join(' y '))
+        : '<span class="text-muted">Ninguna asignada</span>';
+
+    return `<div><dt>Garantías</dt><dd>${valor}</dd></div>`;
+}
+
+/**
  * Pinta todo el cuerpo del Offcanvas con la ficha del empleado.
  */
 function renderPanel(body: HTMLElement, data: EmpleadoPanelData): void {
@@ -279,6 +312,7 @@ function renderPanel(body: HTMLElement, data: EmpleadoPanelData): void {
             <div class="le-panel-section-title">Datos</div>
             <dl class="le-panel-dl">
                 <div><dt>Rol sistema</dt><dd>${data.rol ? escapeHtml(data.rol) : '<span class="text-muted">Sin rol</span>'}</dd></div>
+                ${htmlGarantiasAsignadas(data)}
                 <div><dt>Email</dt><dd>${data.email ? escapeHtml(data.email) : '<span class="text-muted">Sin email</span>'}</dd></div>
                 <div><dt>Sucursal</dt><dd>${escapeHtml(data.sucursal)}</dd></div>
                 <div><dt>Jefe directo</dt><dd>${escapeHtml(data.jefe)}</dd></div>

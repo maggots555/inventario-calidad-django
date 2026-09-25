@@ -124,6 +124,16 @@ class ListaEmpleadosTests(TestCase):
             tiene_acceso_sistema=True,
         )
 
+        self.emp_dispatcher = Empleado.objects.create(
+            nombre_completo='Dora Dispatcher',
+            cargo='Dispatcher',
+            area='Operaciones',
+            email='dora@example.com',
+            activo=True,
+            rol='dispatcher',
+            atiende_garantias_dell=True,
+        )
+
         self.url = reverse('lista_empleados')
 
     def test_lista_responde_200_y_marca_layout_nuevo(self) -> None:
@@ -197,6 +207,25 @@ class ListaEmpleadosTests(TestCase):
         content = response.content.decode()
         self.assertIn('No se encontraron empleados', content)
         self.assertNotIn('Pedro Pendiente', content)
+
+    def test_ficha_lleva_garantias_solo_como_datos_del_dispatcher(self) -> None:
+        """
+        La lista manda al panel si atiende Dell o Lenovo.
+
+        El texto "Garantías" lo pinta el TypeScript al abrir la ficha.
+        Aquí se comprueba el dato que ese script lee, y que un técnico
+        no queda marcado aunque el campo exista.
+        """
+        user = User.objects.get(pk=self.usuario_lectura.pk)
+        request = _request_con_usuario(self.factory, user, self.url)
+        response = lista_empleados(request)
+        content = response.content.decode()
+
+        self.assertIn('data-rol-codigo="dispatcher"', content)
+        self.assertIn('data-atiende-dell="true"', content)
+        self.assertIn('data-atiende-lenovo="false"', content)
+        # Ana es técnico: el modelo deja las casillas apagadas.
+        self.assertIn('data-rol-codigo="tecnico"', content)
 
     def test_get_estado_acceso_codigo(self) -> None:
         """Helper del modelo devuelve códigos estables para la UI."""

@@ -60,6 +60,9 @@ function leerDatosEmpleado(el) {
         cargo: d.cargo || '',
         area: d.area || '',
         rol: d.rol || '',
+        rolCodigo: d.rolCodigo || '',
+        atiendeDell: d.atiendeDell === 'true',
+        atiendeLenovo: d.atiendeLenovo === 'true',
         email: d.email || '',
         sucursal: d.sucursal || 'Sin asignar',
         jefe: d.jefe || 'Sin asignar',
@@ -167,6 +170,28 @@ function htmlAcciones(data) {
     </div>`;
 }
 /**
+ * Texto de la ficha: qué marcas de garantía atiende un dispatcher.
+ *
+ * Solo aplica al rol dispatcher. Si no tiene casillas, se dice claro
+ * para que no parezca que el dato se olvidó.
+ */
+function htmlGarantiasAsignadas(data) {
+    if (data.rolCodigo !== 'dispatcher') {
+        return '';
+    }
+    const marcas = [];
+    if (data.atiendeDell) {
+        marcas.push('Dell');
+    }
+    if (data.atiendeLenovo) {
+        marcas.push('Lenovo');
+    }
+    const valor = marcas.length > 0
+        ? escapeHtml(marcas.join(' y '))
+        : '<span class="text-muted">Ninguna asignada</span>';
+    return `<div><dt>Garantías</dt><dd>${valor}</dd></div>`;
+}
+/**
  * Pinta todo el cuerpo del Offcanvas con la ficha del empleado.
  */
 function renderPanel(body, data) {
@@ -190,6 +215,7 @@ function renderPanel(body, data) {
             <div class="le-panel-section-title">Datos</div>
             <dl class="le-panel-dl">
                 <div><dt>Rol sistema</dt><dd>${data.rol ? escapeHtml(data.rol) : '<span class="text-muted">Sin rol</span>'}</dd></div>
+                ${htmlGarantiasAsignadas(data)}
                 <div><dt>Email</dt><dd>${data.email ? escapeHtml(data.email) : '<span class="text-muted">Sin email</span>'}</dd></div>
                 <div><dt>Sucursal</dt><dd>${escapeHtml(data.sucursal)}</dd></div>
                 <div><dt>Jefe directo</dt><dd>${escapeHtml(data.jefe)}</dd></div>
