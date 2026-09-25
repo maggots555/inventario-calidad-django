@@ -100,11 +100,26 @@ interface TipoConfig {
  * "un objeto donde cada clave es un string (como 'exito')
  *  y cada valor es un TipoConfig (con icono y clase)."
  */
+/**
+ * Icono de aviso informativo.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El emoji ℹ️ se ve como un círculo con una "i" y en la campanita queda
+ * chueco. Este dibujo es una tarjetita con tres líneas: se lee como
+ * "hay un aviso", sin esa letra.
+ */
+const ICONO_INFO_SVG: string = `
+<svg class="notif-icono-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <rect x="3" y="3.5" width="18" height="17" rx="5" fill="currentColor" opacity="0.18"></rect>
+    <rect x="3.9" y="4.4" width="16.2" height="15.2" rx="4.2" fill="none" stroke="currentColor" stroke-width="1.6"></rect>
+    <path d="M8 9.2h8M8 12.2h8M8 15.2h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+</svg>`.trim();
+
 const TIPO_CONFIG: Record<string, TipoConfig> = {
     exito:   { icono: '✅', clase: 'text-success' },
     error:   { icono: '❌', clase: 'text-danger'  },
     warning: { icono: '⚠️', clase: 'text-warning' },
-    info:    { icono: 'ℹ️',  clase: 'text-info'    },
+    info:    { icono: ICONO_INFO_SVG, clase: 'text-info' },
 };
 
 
@@ -641,7 +656,7 @@ class PanelNotificaciones {
              * del <a> para no interferir con la navegación.
              */
             const contenidoHtml = `
-                    <div class="notif-icono">${cfg.icono}</div>
+                    <div class="notif-icono notif-icono--${n.tipo}">${cfg.icono}</div>
                     <div class="notif-contenido">
                         <div class="notif-titulo ${cfg.clase}">${this.escaparHtml(n.titulo)}</div>
                         <div class="notif-mensaje">${this.escaparHtml(n.mensaje)}</div>

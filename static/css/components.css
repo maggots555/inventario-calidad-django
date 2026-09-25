@@ -3033,13 +3033,10 @@ input[readonly].form-control:focus {
     background: #dbeafe;
 }
 
-/* Notificaciones leídas — opacidad reducida */
+/* Leídas: se distinguen por no tener el fondo azul, no por verse lavadas.
+   Antes opacity 0.7 bajaba el contraste y el mensaje casi no se leía. */
 .notif-leida {
-    opacity: 0.7;
-}
-
-.notif-leida:hover {
-    opacity: 0.9;
+    opacity: 1;
 }
 
 /* ── Icono de la notificación ── */
@@ -3049,6 +3046,18 @@ input[readonly].form-control:focus {
     line-height: 1.4;
     width: 28px;
     text-align: center;
+}
+
+/* El aviso informativo usa un SVG, no el emoji de la "i". */
+.notif-icono-svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+    margin: 1px auto 0;
+}
+
+.notif-icono--info {
+    color: #0369a1;
 }
 
 /* ── Contenido (título + mensaje + meta) ── */
@@ -3068,9 +3077,14 @@ input[readonly].form-control:focus {
     text-overflow: ellipsis;
 }
 
+/* El azul "info" de Bootstrap es muy claro sobre blanco. */
+.notif-titulo.text-info {
+    color: #075985 !important;
+}
+
 .notif-mensaje {
     font-size: 12px;
-    color: #6b7280;
+    color: #334155;
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -3088,7 +3102,7 @@ input[readonly].form-control:focus {
 
 .notif-fecha {
     font-size: 11px;
-    color: #9ca3af;
+    color: #475569;
 }
 
 .notif-app {
@@ -3245,11 +3259,15 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-mensaje {
-    color: #94a3b8;
+    color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .notif-fecha {
-    color: var(--text-muted);
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .notif-icono--info {
+    color: #7dd3fc;
 }
 
 [data-bs-theme="dark"] .notif-app {
@@ -3271,7 +3289,7 @@ input[readonly].form-control:focus {
 }
 
 [data-bs-theme="dark"] .notif-titulo.text-info {
-    color: #38bdf8 !important;
+    color: #e0f2fe !important;
 }
 
 [data-bs-theme="dark"] .notif-btn-eliminar {
