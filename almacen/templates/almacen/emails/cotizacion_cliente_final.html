@@ -1,665 +1,350 @@
+{% comment %}
+  Correo al cliente: cotización final (reparación o reacondicionado).
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que imagenes_cliente.html: tablas, CSS inline, ~600 px
+  y barra de marca. El PDF sigue adjunto; este HTML solo resume.
+  Las redes se quedan (es cliente) y el sitio sigue siendo sicfix.mx.
+
+  El texto de negocio no cambia. El style de abajo solo refuerza
+  móvil y dark mode.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Cotización SIC — {{ solicitud.numero_solicitud }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f6f8;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .container {
-            max-width: 700px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        /* Encabezado estándar del sistema — gradiente azul claro igual que los demás correos */
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
-            color: #051d63;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        /* Patrón de puntos decorativo en el fondo del header */
-        .header::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        /* Contenedor del logo para posicionarlo sobre el ::before */
-        .logo-container {
-            position: relative;
-            z-index: 1;
-            margin-bottom: 15px;
-        }
-        .logo-image {
-            max-width: 180px;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-        }
-        /* Título del tipo de documento */
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            position: relative;
-            z-index: 1;
-            color: #051d63;
-        }
-        /* Subtítulo: empresa + folio */
-        .subtitle {
-            font-size: 14px;
-            opacity: 0.85;
-            position: relative;
-            z-index: 1;
-            color: #1a3a6b;
-        }
-        /* Banda con el tipo de servicio — debajo del header */
-        .servicio-band {
-            background-color: #1d4e8f;
-            color: #ffffff;
-            text-align: center;
-            padding: 10px 20px;
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-        .content {
-            padding: 32px;
-        }
-        .saludo {
-            font-size: 17px;
-            color: #1a2f5a;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-        .intro-text {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 24px;
-        }
-        /* Datos del equipo — una fila por campo (mejor en clientes de correo) */
-        .equipo-card {
-            background-color: #f0f4fa;
-            border-left: 4px solid #003366;
-            border-radius: 6px;
-            padding: 18px 20px;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-        .equipo-card .equipo-titulo {
-            font-weight: 700;
-            color: #003366;
-            margin-bottom: 14px;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .equipo-fila {
-            margin: 0 0 10px 0;
-            line-height: 1.6;
-            font-size: 14px;
-        }
-        .equipo-fila:last-child {
-            margin-bottom: 0;
-        }
-        .equipo-label {
-            font-weight: 600;
-            color: #333;
-            display: inline-block;
-            min-width: 120px;
-        }
-        .equipo-valor {
-            color: #555;
-        }
-        /* Aviso importante — vigencia de la cotización */
-        .aviso-vigencia {
-            background-color: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
-            padding: 16px 20px;
-            margin: 24px 0;
-            text-align: center;
-        }
-        .aviso-vigencia-titulo {
-            font-weight: 700;
-            color: #856404;
-            font-size: 14px;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .aviso-vigencia-texto {
-            font-size: 13px;
-            color: #664d03;
-            line-height: 1.6;
-            margin: 0;
-        }
-        /* Totales de la cotización — caja destacada */
-        .totales-box {
-            border: 2px solid #003366;
-            border-radius: 6px;
-            overflow: hidden;
-            margin-bottom: 24px;
-        }
-        .totales-header {
-            background-color: #003366;
-            color: #ffffff;
-            text-align: center;
-            padding: 10px;
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .totales-body {
-            padding: 0;
-        }
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 18px;
-            border-bottom: 1px solid #e8eaf0;
-            font-size: 14px;
-        }
-        .total-row:last-child {
-            border-bottom: none;
-        }
-        .total-row .etiqueta {
-            color: #444;
-        }
-        .total-row .monto {
-            font-weight: 600;
-            color: #333;
-        }
-        /* Fila destacada: Total con IVA */
-        .total-row.destacado {
-            background-color: #003366;
-        }
-        .total-row.destacado .etiqueta,
-        .total-row.destacado .monto {
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 16px;
-        }
-        /* Fila total a pagar (legacy; ya no se usa en reparación) */
-        .total-row.final {
-            background-color: #1d4e8f;
-        }
-        .total-row.final .etiqueta,
-        .total-row.final .monto {
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 15px;
-        }
-        /* PDF adjunto — aviso */
-        .pdf-notice {
-            background-color: #fff8e1;
-            border: 1px solid #ffe082;
-            border-radius: 6px;
-            padding: 14px 18px;
-            font-size: 13px;
-            color: #5d4037;
-            margin-bottom: 24px;
-        }
-        .pdf-notice strong {
-            color: #e65100;
-        }
-        /* Aviso informativo: la cotización incluye Solución Plata (detalle en el PDF).
-           Amarillo a propósito: no es una alerta, solo un dato para el cliente. */
-        .aviso-paquete-plata {
-            background-color: #fff8e1;
-            border: 1px solid #ffe082;
-            border-radius: 6px;
-            padding: 14px 18px;
-            font-size: 13px;
-            color: #5d4037;
-            margin-bottom: 16px;
-            line-height: 1.45;
-        }
-        .aviso-paquete-plata strong {
-            color: #e65100;
-        }
-        /* Mensaje personalizado del usuario */
-        .mensaje-personalizado {
-            background-color: #f0f4fa;
-            border-left: 3px solid #1d4e8f;
-            border-radius: 4px;
-            padding: 14px 18px;
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 24px;
-            white-space: pre-wrap;
-        }
-        /* Bloques del cuerpo México — condiciones de pago y datos bancarios */
-        .condiciones-pago {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 18px 20px;
-            margin-bottom: 24px;
-            border-left: 4px solid #1565c0;
-        }
-        .condiciones-titulo {
-            font-weight: 700;
-            color: #1565c0;
-            margin-bottom: 12px;
-            font-size: 15px;
-        }
-        .condiciones-lista {
-            margin: 0;
-            padding-left: 22px;
-            font-size: 14px;
-            color: #444;
-            line-height: 1.8;
-        }
-        .datos-bancarios {
-            background-color: #f0f4fa;
-            border: 1px solid #c5d5ea;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 24px;
-            text-align: center;
-        }
-        .banco-titular, .banco-linea {
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 6px;
-            line-height: 1.6;
-        }
-        /* Recuadro azul de referencia de pago */
-        .referencia-pago {
-            background-color: #e3f2fd;
-            border: 2px solid #1565c0;
-            border-radius: 8px;
-            padding: 16px 20px;
-            margin-top: 16px;
-        }
-        .referencia-pago.referencia-pendiente {
-            background-color: #fff8e1;
-            border-color: #ffc107;
-        }
-        .referencia-etiqueta {
-            font-size: 12px;
-            font-weight: 700;
-            color: #1565c0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-        .referencia-valor {
-            font-size: 22px;
-            font-weight: 800;
-            color: #0d47a1;
-            letter-spacing: 1px;
-            margin: 0;
-        }
-        .factura-box {
-            background-color: #fff8e1;
-            border: 1px solid #ffe082;
-            border-radius: 8px;
-            padding: 18px 20px;
-            margin-bottom: 24px;
-        }
-        .factura-link a {
-            color: #1565c0;
-            font-weight: 600;
-            word-break: break-all;
-        }
-        /* Footer — idéntico al estándar del sistema */
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .footer a {
-            color: #ffffff;
-            text-decoration: none;
-        }
-        /* Bloque de firma */
-        .signature {
-            margin-bottom: 15px;
-        }
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-        /* Nombre de empresa con separador superior */
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        /* Timestamp de envío */
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-        /* Sección de redes sociales */
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-            text-align: center;
-        }
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            text-align: center;
-        }
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-        }
-        .social-link:hover {
-            background-color: rgba(255, 255, 255, 0.35);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.8);
-        }
-        /* Responsive: ajustes para pantallas pequeñas (móvil) */
-        @media only screen and (max-width: 600px) {
-            .container { margin: 10px; }
-            .content { padding: 20px; }
-            .header { padding: 20px; }
-            .logo { font-size: 20px; }
-            .subtitle { font-size: 13px; }
-            .equipo-grid { flex-direction: column; }
-            .equipo-label { min-width: 100px; display: block; margin-bottom: 2px; }
-            .total-row { flex-direction: column; gap: 4px; text-align: center; }
-            .social-media { padding: 15px 5px; }
-            .social-links { gap: 8px; padding: 0 5px; }
-            .social-link { padding: 6px 10px; font-size: 11px; gap: 6px; flex: 0 1 auto; min-width: 0; }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
         }
     </style>
 </head>
-<body>
-<div class="container">
-
-    <!-- =============================================================== -->
-    <!-- ENCABEZADO: Logo centrado + Título del documento + Folio        -->
-    <!-- Mismo estilo que los demás correos del sistema                   -->
-    <!-- =============================================================== -->
-    <div class="header">
-        <!-- Logo SIC adjunto como imagen inline (CID) -->
-        <div class="logo-container">
-            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-        </div>
-        <!-- Título del tipo de documento con emoji identificador -->
-        <div class="logo">💼 COTIZACIÓN DE SERVICIO</div>
-        <!-- Empresa + folio de la solicitud -->
-        <div class="subtitle">{{ empresa_nombre }} &nbsp;·&nbsp; Folio: {{ solicitud.numero_solicitud }}</div>
-        <div class="subtitle">{{ fecha_envio_texto }}</div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Cotización SIC. El detalle de precios va en el PDF adjunto.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
 
-    <!-- Banda con el tipo específico de propuesta (Diagnóstico / Venta Mostrador, etc.) -->
-    <div class="servicio-band">
-        {{ titulo_propuesta }}
-    </div>
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
 
-    <!-- =============================================================== -->
-    <!-- CUERPO PRINCIPAL                                                  -->
-    <!-- =============================================================== -->
-    <div class="content">
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
 
-        <!-- Cuerpo del mensaje: México (texto legal) o genérico (otros países) -->
-        {% if pais_codigo == 'MX' and cotizacion_email %}
-            {% include 'almacen/emails/partials/cuerpo_cotizacion_mexico.html' %}
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px 12px 32px;background-color:#ffffff;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Cotización de servicio
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                {{ empresa_nombre }} · Folio: {{ solicitud.numero_solicitud }}
+                            </p>
+                            <p class="email-subtitle" style="margin:4px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                {{ fecha_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#1f6391" align="center" style="padding:10px 20px;background-color:#1f6391;">
+                            <p style="margin:0;font-size:15px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ titulo_propuesta }}
+                            </p>
+                        </td>
+                    </tr>
 
-            <!-- Datos del equipo — justo después del aviso de factura -->
-            {% if info_equipo %}
-            {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
-            {% endif %}
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            {% if pais_codigo == 'MX' and cotizacion_email %}
+                                {% include 'almacen/emails/partials/cuerpo_cotizacion_mexico.html' %}
+                                {% if info_equipo %}
+                                    {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
+                                {% endif %}
+                            {% else %}
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                {% if nombre_cliente %}
+                                    Estimado/a {{ nombre_cliente }},
+                                {% else %}
+                                    Estimado/a cliente,
+                                {% endif %}
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#334155;">
+                                Adjunto encontrará la propuesta de cotización para su equipo.
+                                El PDF incluye el detalle completo de las piezas y/o servicios con sus precios
+                                individuales. A continuación le presentamos el resumen de los totales.
+                            </p>
+                            {% if info_equipo %}
+                                {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
+                            {% endif %}
+                            {% endif %}
 
-        {% else %}
-        <p class="saludo">
-            {% if nombre_cliente %}
-                Estimado/a {{ nombre_cliente }},
-            {% else %}
-                Estimado/a cliente,
-            {% endif %}
-        </p>
-        <p class="intro-text">
-            Adjunto encontrará la propuesta de cotización para su equipo.
-            El PDF incluye el detalle completo de las piezas y/o servicios con sus precios
-            individuales. A continuación le presentamos el resumen de los totales.
-        </p>
+                            {% if es_reacondicionado %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Equipo reacondicionado ofertado
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">Marca:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ info_equipo_reac.marca }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Modelo:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo_reac.modelo }}</td>
+                                </tr>
+                                {% if info_equipo_reac.procesador %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Procesador:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo_reac.procesador }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if info_equipo_reac.ram %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">RAM:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo_reac.ram }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if info_equipo_reac.sistema_operativo %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Sistema operativo:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo_reac.sistema_operativo }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Incluye cargador:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{% if info_equipo_reac.incluye_cargador %}Sí{% else %}No{% endif %}</td>
+                                </tr>
+                                {% if info_equipo_reac.especificaciones %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Especificaciones:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo_reac.especificaciones }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
 
-        {% if info_equipo %}
-        {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
-        {% endif %}
-        {% endif %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:0 0 16px 0;">
+                                <tr>
+                                    <td colspan="2" bgcolor="#1f6391" align="center" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:13px;line-height:18px;font-weight:700;">
+                                        Inversión y opciones de pago
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">Subtotal (sin IVA)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ costeo_reac.subtotal_sin_iva|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">IVA (16%)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ costeo_reac.iva|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td bgcolor="#1f6391" style="padding:12px;background-color:#1f6391;color:#ffffff;font-size:15px;line-height:20px;font-weight:700;">TOTAL DE CONTADO (con IVA)</td>
+                                    <td bgcolor="#1f6391" align="right" style="padding:12px;background-color:#1f6391;color:#ffffff;font-size:15px;line-height:20px;font-weight:700;text-align:right;">${{ costeo_reac.total_precio_contado_mxn|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">Pago diferido a 3 meses (con IVA)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ costeo_reac.opciones_diferidas_con_iva.diferido_3_meses|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">Pago diferido a 6 meses (con IVA)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ costeo_reac.opciones_diferidas_con_iva.diferido_6_meses|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td bgcolor="#1e293b" style="padding:12px;background-color:#1e293b;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;">Pago diferido a 12 meses (con IVA)</td>
+                                    <td bgcolor="#1e293b" align="right" style="padding:12px;background-color:#1e293b;color:#ffffff;font-size:14px;line-height:20px;font-weight:700;text-align:right;">${{ costeo_reac.opciones_diferidas_con_iva.diferido_12_meses|floatformat:2 }} MXN</td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff8e1" style="background-color:#fff8e1;margin:0 0 16px 0;">
+                                <tr>
+                                    <td style="padding:14px 16px;font-size:13px;line-height:20px;color:#334155;">
+                                        <strong>PDF adjunto:</strong> El archivo incluye las especificaciones del equipo
+                                        y el detalle de precios de contado y financiamiento.
+                                    </td>
+                                </tr>
+                            </table>
+                            {% else %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;margin:0 0 16px 0;">
+                                <tr>
+                                    <td colspan="2" bgcolor="#1f6391" align="center" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:13px;line-height:18px;font-weight:700;">
+                                        Resumen de Cotización
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">Subtotal (sin IVA)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ calculo.precio_sin_iva|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td class="email-body-text" bgcolor="#ffffff" style="padding:10px 12px;background-color:#ffffff;color:#334155;font-size:14px;line-height:20px;border-bottom:1px solid #e2e8f0;">IVA (16%)</td>
+                                    <td class="email-body-text" bgcolor="#ffffff" align="right" style="padding:10px 12px;background-color:#ffffff;color:#0f172a;font-size:14px;line-height:20px;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${{ calculo.iva|floatformat:2 }} MXN</td>
+                                </tr>
+                                <tr>
+                                    <td bgcolor="#1f6391" style="padding:12px;background-color:#1f6391;color:#ffffff;font-size:15px;line-height:20px;font-weight:700;">TOTAL CON IVA (16%)</td>
+                                    <td bgcolor="#1f6391" align="right" style="padding:12px;background-color:#1f6391;color:#ffffff;font-size:15px;line-height:20px;font-weight:700;text-align:right;">${{ calculo.precio_con_iva|floatformat:2 }} MXN</td>
+                                </tr>
+                            </table>
 
-        <!-- Resumen de Totales (lo que el cliente necesita ver) -->
-        {% if es_reacondicionado %}
-        <div class="equipo-card">
-            <div class="equipo-titulo">Equipo reacondicionado ofertado</div>
-            <p class="equipo-fila"><span class="equipo-label">Marca:</span> <span class="equipo-valor">{{ info_equipo_reac.marca }}</span></p>
-            <p class="equipo-fila"><span class="equipo-label">Modelo:</span> <span class="equipo-valor">{{ info_equipo_reac.modelo }}</span></p>
-            {% if info_equipo_reac.procesador %}
-            <p class="equipo-fila"><span class="equipo-label">Procesador:</span> <span class="equipo-valor">{{ info_equipo_reac.procesador }}</span></p>
-            {% endif %}
-            {% if info_equipo_reac.ram %}
-            <p class="equipo-fila"><span class="equipo-label">RAM:</span> <span class="equipo-valor">{{ info_equipo_reac.ram }}</span></p>
-            {% endif %}
-            {% if info_equipo_reac.sistema_operativo %}
-            <p class="equipo-fila"><span class="equipo-label">Sistema operativo:</span> <span class="equipo-valor">{{ info_equipo_reac.sistema_operativo }}</span></p>
-            {% endif %}
-            <p class="equipo-fila"><span class="equipo-label">Incluye cargador:</span> <span class="equipo-valor">{% if info_equipo_reac.incluye_cargador %}Sí{% else %}No{% endif %}</span></p>
-            {% if info_equipo_reac.especificaciones %}
-            <p class="equipo-fila"><span class="equipo-label">Especificaciones:</span> <span class="equipo-valor">{{ info_equipo_reac.especificaciones }}</span></p>
-            {% endif %}
-        </div>
-        <div class="totales-box">
-            <div class="totales-header">Inversión y opciones de pago</div>
-            <div class="totales-body">
-                <div class="total-row">
-                    <span class="etiqueta">Subtotal (sin IVA)</span>
-                    <span class="monto">${{ costeo_reac.subtotal_sin_iva|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row">
-                    <span class="etiqueta">IVA (16%)</span>
-                    <span class="monto">${{ costeo_reac.iva|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row destacado">
-                    <span class="etiqueta">TOTAL DE CONTADO (con IVA)</span>
-                    <span class="monto">${{ costeo_reac.total_precio_contado_mxn|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row">
-                    <span class="etiqueta">Pago diferido a 3 meses (con IVA)</span>
-                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_3_meses|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row">
-                    <span class="etiqueta">Pago diferido a 6 meses (con IVA)</span>
-                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_6_meses|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row final">
-                    <span class="etiqueta">Pago diferido a 12 meses (con IVA)</span>
-                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_12_meses|floatformat:2 }} MXN</span>
-                </div>
-            </div>
-        </div>
-        <div class="pdf-notice">
-            <strong>📎 PDF adjunto:</strong> El archivo incluye las especificaciones del equipo
-            y el detalle de precios de contado y financiamiento.
-        </div>
-        {% else %}
-        <div class="totales-box">
-            <div class="totales-header">Resumen de Cotización</div>
-            <div class="totales-body">
+                            {% if incluye_paquete_plata %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff8e1" class="aviso-paquete-plata" style="background-color:#fff8e1;margin:0 0 16px 0;">
+                                <tr>
+                                    <td class="aviso-paquete-plata" bgcolor="#fff8e1" style="padding:14px 16px;background-color:#fff8e1;font-size:13px;line-height:20px;color:#334155;">
+                                        Esta cotización incluye <strong>Solución Plata</strong>.
+                                        Consulte en el PDF adjunto el detalle de lo que incluye el paquete.
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
 
-                {# EXPLICACIÓN: mismo desglose que el PDF — Subtotal → IVA → Total #}
-                <div class="total-row">
-                    <span class="etiqueta">Subtotal (sin IVA)</span>
-                    <span class="monto">${{ calculo.precio_sin_iva|floatformat:2 }} MXN</span>
-                </div>
-                <div class="total-row">
-                    <span class="etiqueta">IVA (16%)</span>
-                    <span class="monto">${{ calculo.iva|floatformat:2 }} MXN</span>
-                </div>
-                <!-- Total con IVA — siempre visible y destacado (reparación completa) -->
-                <div class="total-row destacado">
-                    <span class="etiqueta">TOTAL CON IVA (16%)</span>
-                    <span class="monto">${{ calculo.precio_con_iva|floatformat:2 }} MXN</span>
-                </div>
-            </div>
-        </div>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff8e1" style="background-color:#fff8e1;margin:0 0 16px 0;">
+                                <tr>
+                                    <td style="padding:14px 16px;font-size:13px;line-height:20px;color:#334155;">
+                                        <strong>PDF adjunto:</strong> El archivo <em>{{ solicitud.numero_solicitud }}.pdf</em>
+                                        incluye el desglose completo de piezas y servicios con precios individuales
+                                        (sin IVA), días estimados de entrega y tipo de cada componente.
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
 
-        {% if incluye_paquete_plata %}
-        <div class="aviso-paquete-plata">
-            Esta cotización incluye <strong>Solución Plata</strong>.
-            Consulte en el PDF adjunto el detalle de lo que incluye el paquete.
-        </div>
-        {% endif %}
+                            {% if mensaje_personalizado %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+                                <tr>
+                                    <td class="email-body-text" style="padding:14px 16px;font-size:14px;line-height:22px;color:#334155;">
+                                        {{ mensaje_personalizado }}
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
 
-        <!-- Aviso del PDF adjunto (reparación) -->
-        <div class="pdf-notice">
-            <strong>📎 PDF adjunto:</strong> El archivo <em>{{ solicitud.numero_solicitud }}.pdf</em>
-            incluye el desglose completo de piezas y servicios con precios individuales
-            (sin IVA), días estimados de entrega y tipo de cada componente.
-        </div>
-        {% endif %}
+                            {% if pais_codigo == 'MX' and cotizacion_email %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;margin:0 0 16px 0;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#c2410c;">
+                                            Aviso importante — Vigencia de la cotización
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir
+                                            de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
+                                            Posterior a este plazo deberá solicitarse recotización.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% include 'almacen/emails/partials/cierre_cotizacion_mexico.html' %}
+                            {% else %}
+                            <p class="email-muted" style="margin:8px 0 0 0;font-size:12px;line-height:18px;color:#64748b;text-align:center;">
+                                Esta cotización tiene una vigencia de <strong>15 días hábiles</strong> a partir
+                                de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
 
-        <!-- Mensaje personalizado del técnico (si existe) -->
-        {% if mensaje_personalizado %}
-        <div class="mensaje-personalizado">{{ mensaje_personalizado }}</div>
-        {% endif %}
-
-        <!-- Nota de vigencia -->
-        {% if pais_codigo == 'MX' and cotizacion_email %}
-        <div class="aviso-vigencia">
-            <p class="aviso-vigencia-titulo">⚠️ Aviso importante — Vigencia de la cotización</p>
-            <p class="aviso-vigencia-texto">
-                Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir
-                de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
-                Posterior a este plazo deberá solicitarse recotización.
-            </p>
-        </div>
-
-        <!-- Cierre del mensaje (Nota / Saludos) — al final del correo México -->
-        {% include 'almacen/emails/partials/cierre_cotizacion_mexico.html' %}
-        {% else %}
-        <p style="font-size: 12px; color: #888; text-align: center; margin-top: 8px;">
-            Esta cotización tiene una vigencia de <strong>15 días hábiles</strong> a partir
-            de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
-        </p>
-        {% endif %}
-
-    </div>
-
-    <!-- =============================================================== -->
-    <!-- FOOTER — Idéntico al estándar del sistema                        -->
-    <!-- =============================================================== -->
-    <div class="footer">
-
-        <!-- Bloque de firma del responsable -->
-        <div class="signature">
-            <div class="signature-name">
-                Sistema de Cotizaciones
-            </div>
-            {% if nombre_usuario %}
-            <div class="signature-role" style="margin-top: 10px; font-size: 14px;">
-                👤 Enviado por: {{ nombre_usuario }}
-            </div>
-            {% endif %}
-            <!-- Aviso correo automático NO RESPONDA -->
-            <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
-                ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-            </div>
-            <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
-                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                Para seguimiento de su cotización, contacte directamente a
-                {% if nombre_usuario %}
-                    <strong>{{ nombre_usuario }}</strong>
-                {% else %}
-                    su responsable de seguimiento
-                {% endif %}.
-            </div>
-        </div>
-
-        <!-- Nombre de la empresa + país -->
-        <div class="company">{{ empresa_nombre }}</div>
-        {% if pais_nombre %}
-        <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-        {% endif %}
-
-        <!-- Redes sociales con íconos CID (adjuntados por el backend) -->
-        <div class="social-media">
-            <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-            <div class="social-links">
-                <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                    <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                    <span>Sitio Web</span>
-                </a>
-                <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                    <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                    <span>Instagram</span>
-                </a>
-                <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                    <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                    <span>Facebook</span>
-                </a>
-                {% if whatsapp_empleado %}
-                <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                    <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
-                    <span>WhatsApp</span>
-                </a>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Timestamp completo: fecha Y hora -->
-        <div class="timestamp">
-            📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-        </div>
-    </div>
-
-</div>
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Cotizaciones
+                            </p>
+                            {% if nombre_usuario %}
+                            <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#e2e8f0;">
+                                Enviado por: {{ nombre_usuario }}
+                            </p>
+                            {% endif %}
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para seguimiento de su cotización, contacte directamente a
+                                {% if nombre_usuario %}
+                                    <strong>{{ nombre_usuario }}</strong>
+                                {% else %}
+                                    su responsable de seguimiento
+                                {% endif %}.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            {% if pais_nombre %}
+                            <p style="margin:4px 0 16px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            {% endif %}
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicfix.mx/" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio Web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.instagram.com/sic_mexico/?hl=es" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.facebook.com/LatAmSic" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        {% if whatsapp_empleado %}
+                                        <a href="https://wa.me/{{ whatsapp_empleado }}" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

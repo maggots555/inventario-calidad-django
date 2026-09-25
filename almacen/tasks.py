@@ -1162,6 +1162,11 @@ def enviar_cotizacion_cliente_task(
         except Exception as e:
             logger.warning(f"[COTIZACION-CLIENTE] Error al adjuntar logo: {e}")
 
+        # Logo blanco de la barra (#1e293b). Los iconos sí se usan:
+        # este correo va al cliente y el pie lleva redes.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[COTIZACION-CLIENTE]')
+
         # Adjuntar iconos de redes sociales (CID inline)
         try:
             iconos = {

@@ -1,13 +1,18 @@
-{# Cuerpo del correo de cotización — México (texto legal y comercial) #}
+{% comment %}
+  Cuerpo México del correo de cotización al cliente.
 
-<p class="saludo">Buenos días:</p>
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  El texto legal no cambia. Solo el contenedor: tablas e inline,
+  porque Outlook ignora las clases de la página vieja.
+{% endcomment %}
+<p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">Buenos días:</p>
 
-<p class="intro-text">
+<p class="email-body-text" style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#334155;">
     Me dirijo de <strong>{{ empresa_nombre_mayus }}</strong>; por medio del presente me permito
     hacer de su conocimiento la cotización.
 </p>
 
-<p class="intro-text">
+<p class="email-body-text" style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#334155;">
     En caso de aceptar la cotización o cotizaciones, solicitamos por favor nos confirme por este
     medio qué cotización va aceptar, realice el pago y nos adjunte su comprobante (incluyendo la
     referencia en el recuadro azul, líneas abajo) para que éste sea aplicado inmediatamente.
@@ -15,52 +20,85 @@
     REFERENCIAS COMPLETAS.</strong>
 </p>
 
-<div class="condiciones-pago">
-    <p class="condiciones-titulo">Nuestras condiciones de pago</p>
-    <ul class="condiciones-lista">
-        <li>50% por concepto de anticipo para proceder a solicitar la(s) pieza(s).</li>
-        <li>50% restante a la entrega de su equipo ya reparado.</li>
-        <li>O pago en una sola exhibición antes de la reparación.</li>
-    </ul>
-</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+    <tr>
+        <td style="padding:16px 18px;">
+            <p class="email-label" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                Nuestras condiciones de pago
+            </p>
+            <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                • 50% por concepto de anticipo para proceder a solicitar la(s) pieza(s).
+            </p>
+            <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                • 50% restante a la entrega de su equipo ya reparado.
+            </p>
+            <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                • O pago en una sola exhibición antes de la reparación.
+            </p>
+        </td>
+    </tr>
+</table>
 
-<div class="datos-bancarios">
-    <p class="banco-titular">
-        <strong>{{ cotizacion_email.banco }}</strong> a nombre de
-        <strong>{{ cotizacion_email.titular_cuenta }}</strong>
-    </p>
-    <p class="banco-linea">Cuenta <strong>{{ cotizacion_email.numero_cuenta }}</strong></p>
-    <p class="banco-linea">CLABE <strong>{{ cotizacion_email.clabe }}</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+    <tr>
+        <td style="padding:16px 18px;">
+            <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                <strong>{{ cotizacion_email.banco }}</strong> a nombre de
+                <strong>{{ cotizacion_email.titular_cuenta }}</strong>
+            </p>
+            <p class="email-body-text" style="margin:0 0 4px 0;font-size:14px;line-height:22px;color:#334155;">
+                Cuenta <strong>{{ cotizacion_email.numero_cuenta }}</strong>
+            </p>
+            <p class="email-body-text" style="margin:0 0 12px 0;font-size:14px;line-height:22px;color:#334155;">
+                CLABE <strong>{{ cotizacion_email.clabe }}</strong>
+            </p>
+            {% if referencia_pago %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1f6391" style="background-color:#1f6391;">
+                <tr>
+                    <td align="center" style="padding:14px 12px;">
+                        <p style="margin:0 0 6px 0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.04em;color:#ffffff;">
+                            COLOCAR COMO REFERENCIA:
+                        </p>
+                        <p style="margin:0;font-size:20px;line-height:26px;font-weight:700;color:#ffffff;">
+                            {{ referencia_pago }}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            {% else %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;">
+                <tr>
+                    <td align="center" style="padding:14px 12px;">
+                        <p class="email-warn-title" style="margin:0 0 6px 0;font-size:12px;line-height:16px;font-weight:700;letter-spacing:0.04em;color:#c2410c;">
+                            REFERENCIA DE PAGO
+                        </p>
+                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:20px;color:#334155;">
+                            Pendiente — contacte a su responsable de seguimiento para obtenerla.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            {% endif %}
+        </td>
+    </tr>
+</table>
 
-    {% if referencia_pago %}
-    <div class="referencia-pago">
-        <p class="referencia-etiqueta">COLOCAR COMO REFERENCIA:</p>
-        <p class="referencia-valor">{{ referencia_pago }}</p>
-    </div>
-    {% else %}
-    <div class="referencia-pago referencia-pendiente">
-        <p class="referencia-etiqueta">REFERENCIA DE PAGO</p>
-        <p class="referencia-valor" style="font-size: 14px;">
-            Pendiente — contacte a su responsable de seguimiento para obtenerla.
-        </p>
-    </div>
-    {% endif %}
-</div>
-
-<div class="factura-box">
-    <p class="intro-text" style="margin-bottom: 12px;">
-        <strong>SI REQUIERE FACTURA</strong> favor de enviar su cédula fiscal no mayor a 30 días
-        y uso de CFDI en el enlace que a continuación se indica:
-    </p>
-    <p class="factura-link">
-        <a href="{{ cotizacion_email.formulario_factura_url }}" target="_blank">
-            Formulario de datos fiscales (Google Forms)
-        </a>
-    </p>
-    <p class="intro-text" style="margin-top: 12px; margin-bottom: 0;">
-        <strong>TIENE HASTA EL DÍA {{ fecha_limite_factura_texto|upper }}</strong>
-        EN EL QUE HA REALIZADO SU PAGO PARA SUBIR SUS DATOS FISCALES Y PODER RECIBIR SU FACTURA.
-    </p>
-</div>
-
-{# Cierre (Nota / Saludos) va al final del correo — ver cierre_cotizacion_mexico.html #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+    <tr>
+        <td style="padding:16px 18px;">
+            <p class="email-body-text" style="margin:0 0 12px 0;font-size:14px;line-height:22px;color:#334155;">
+                <strong>SI REQUIERE FACTURA</strong> favor de enviar su cédula fiscal no mayor a 30 días
+                y uso de CFDI en el enlace que a continuación se indica:
+            </p>
+            <p style="margin:0 0 12px 0;font-size:14px;line-height:22px;">
+                <a href="{{ cotizacion_email.formulario_factura_url }}" target="_blank" style="color:#1f6391;font-weight:700;text-decoration:underline;">
+                    Formulario de datos fiscales (Google Forms)
+                </a>
+            </p>
+            <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                <strong>TIENE HASTA EL DÍA {{ fecha_limite_factura_texto|upper }}</strong>
+                EN EL QUE HA REALIZADO SU PAGO PARA SUBIR SUS DATOS FISCALES Y PODER RECIBIR SU FACTURA.
+            </p>
+        </td>
+    </tr>
+</table>

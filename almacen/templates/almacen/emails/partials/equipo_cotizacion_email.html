@@ -1,28 +1,39 @@
-{# Tarjeta de datos del equipo — una fila por dato (compatible con clientes de correo) #}
-<div class="equipo-card">
-    <div class="equipo-titulo">Datos del Equipo</div>
+{% comment %}
+  Datos del equipo en el correo de cotización.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Una fila por dato, en tabla. Outlook no respeta el flex de la versión vieja.
+{% endcomment %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 16px 0;">
+    <tr>
+        <td colspan="2" style="padding:16px 18px 8px 18px;">
+            <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                Datos del Equipo
+            </p>
+        </td>
+    </tr>
     {% if info_equipo.marca %}
-    <p class="equipo-fila">
-        <span class="equipo-label">Marca:</span>
-        <span class="equipo-valor">{{ info_equipo.marca }}</span>
-    </p>
+    <tr>
+        <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">Marca:</td>
+        <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ info_equipo.marca }}</td>
+    </tr>
     {% endif %}
     {% if info_equipo.modelo %}
-    <p class="equipo-fila">
-        <span class="equipo-label">Modelo:</span>
-        <span class="equipo-valor">{{ info_equipo.modelo }}</span>
-    </p>
+    <tr>
+        <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Modelo:</td>
+        <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo.modelo }}</td>
+    </tr>
     {% endif %}
     {% if info_equipo.tipo %}
-    <p class="equipo-fila">
-        <span class="equipo-label">Tipo:</span>
-        <span class="equipo-valor">{{ info_equipo.tipo }}</span>
-    </p>
+    <tr>
+        <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Tipo:</td>
+        <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo.tipo }}</td>
+    </tr>
     {% endif %}
     {% if info_equipo.service_tag %}
-    <p class="equipo-fila">
-        <span class="equipo-label">Service Tag:</span>
-        <span class="equipo-valor">{{ info_equipo.service_tag }}</span>
-    </p>
+    <tr>
+        <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Service Tag:</td>
+        <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ info_equipo.service_tag }}</td>
+    </tr>
     {% endif %}
-</div>
+</table>
