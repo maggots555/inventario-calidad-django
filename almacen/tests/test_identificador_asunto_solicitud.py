@@ -188,6 +188,9 @@ class NotificarFrontAsuntoIdentificadorTest(
         self.assertEqual(len(capturados), 1)
         ruta_detalle = f'/almacen/solicitudes-cotizacion/{solicitud.pk}/'
         self.assertIn(f'https://mexico.sigmasystem.work{ruta_detalle}', capturados[0].body)
+        self.assertIn('Abrir solicitud en SIGMA', capturados[0].body)
+        self.assertIn('cid:logo_sic_white', capturados[0].body)
+        self.assertIn('Partes no disponibles', capturados[0].body)
 
     def test_compras_sin_orden_html_incluye_enlace_detalle(self) -> None:
         """Front → Compras (sin orden): el HTML lleva el enlace absoluto."""
