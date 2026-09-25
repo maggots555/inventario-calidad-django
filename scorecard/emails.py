@@ -195,6 +195,10 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
         
         # Adjuntar versión HTML
         email.attach_alternative(html_content, "text/html")
+
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email, '[SCORECARD]')
         
         # Adjuntar imágenes de evidencia (comprimidas)
         imagenes_adjuntadas = 0

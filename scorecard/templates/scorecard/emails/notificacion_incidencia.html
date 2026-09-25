@@ -1,317 +1,338 @@
+{% comment %}
+  Correo interno: notificación de una incidencia de Score Card.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Un correo no es una página web. Outlook ignora grid, gradientes y
+  sombras. Por eso este HTML usa tablas y CSS en línea. El color del
+  aviso cambia con la severidad. El pie es interno: no lleva redes.
+
+  El texto de negocio no cambia.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Notificación de Incidencia - Score Card</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .email-container {
-            max-width: 700px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .email-header {
-            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .email-header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        .email-header p {
-            margin: 10px 0 0 0;
-            font-size: 14px;
-            opacity: 0.9;
-        }
-        .email-body {
-            padding: 30px;
-        }
-        .alert-box {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        .alert-box.critical {
-            background-color: #f8d7da;
-            border-left-color: #dc3545;
-        }
-        .alert-box.high {
-            background-color: #fff3cd;
-            border-left-color: #fd7e14;
-        }
-        .info-section {
-            margin-bottom: 25px;
-        }
-        .info-section h2 {
-            color: #0d6efd;
-            font-size: 18px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e9ecef;
-        }
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .info-item {
-            background-color: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-        }
-        .info-item label {
-            display: block;
-            font-size: 12px;
-            color: #6c757d;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }
-        .info-item value {
-            display: block;
-            font-size: 14px;
-            color: #212529;
-            font-weight: 500;
-        }
-        .badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: white;
-        }
-        .badge-critico { background-color: #dc3545; }
-        .badge-alto { background-color: #fd7e14; }
-        .badge-medio { background-color: #ffc107; color: #333; }
-        .badge-bajo { background-color: #28a745; }
-        .description-box {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #0d6efd;
-            margin-bottom: 15px;
-        }
-        .description-box h3 {
-            margin-top: 0;
-            font-size: 14px;
-            color: #0d6efd;
-            font-weight: 600;
-        }
-        .description-box p {
-            margin: 0;
-            font-size: 14px;
-            color: #495057;
-        }
-        .email-footer {
-            background-color: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6c757d;
-            border-top: 1px solid #dee2e6;
-        }
-        .divider {
-            height: 1px;
-            background-color: #dee2e6;
-            margin: 20px 0;
-        }
-        /* Responsive */
-        @media only screen and (max-width: 600px) {
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-            .email-body {
-                padding: 20px;
-            }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-stop { background-color: #450a0a !important; }
+            .email-ok { background-color: #052e16 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="email-container">
-        <!-- Header -->
-        <div class="email-header">
-            <h1>🔔 Notificación de Incidencia</h1>
-            <p>Sistema de Control de Calidad - Score Card</p>
-        </div>
-        
-        <!-- Body -->
-        <div class="email-body">
-            <!-- Alert Box según severidad -->
-            <div class="alert-box {% if incidencia.grado_severidad == 'critico' %}critical{% elif incidencia.grado_severidad == 'alto' %}high{% endif %}">
-                <strong>⚠️ Incidencia Registrada:</strong> {{ incidencia.folio }}<br>
-                <strong>Severidad:</strong> 
-                <span class="badge badge-{{ incidencia.grado_severidad }}">
-                    {{ incidencia.get_grado_severidad_display|upper }}
-                </span>
-            </div>
-            
-            <!-- Información del Equipo -->
-            <div class="info-section">
-                <h2>📱 Información del Equipo</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <label>Tipo de Equipo</label>
-                        <value>{{ incidencia.get_tipo_equipo_display }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Marca</label>
-                        <value>{{ incidencia.marca }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Modelo</label>
-                        <value>{{ incidencia.modelo }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Número de Serie (Service Tag)</label>
-                        <value><strong>{{ incidencia.numero_serie }}</strong></value>
-                    </div>
-                    {% if incidencia.numero_orden %}
-                    <div class="info-item">
-                        <label>Orden Cliente</label>
-                        <value><strong>{{ incidencia.numero_orden }}</strong></value>
-                    </div>
-                    {% endif %}
-                    {% if incidencia.servicio_realizado %}
-                    <div class="info-item">
-                        <label>Servicio Realizado</label>
-                        <value>{{ incidencia.servicio_realizado.nombre }}</value>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <!-- Ubicación y Responsables -->
-            <div class="info-section">
-                <h2>👥 Ubicación y Responsables</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <label>Sucursal</label>
-                        <value>{{ incidencia.sucursal.nombre }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Área Detectora</label>
-                        <value>{{ incidencia.area_detectora }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Técnico Responsable</label>
-                        <value>{{ incidencia.tecnico_responsable.nombre_completo }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Área del Técnico</label>
-                        <value>{{ incidencia.area_tecnico|default:"N/A" }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Inspector de Calidad</label>
-                        <value>{{ incidencia.inspector_calidad }}</value>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Clasificación del Fallo -->
-            <div class="info-section">
-                <h2>🔍 Clasificación del Fallo</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <label>Tipo de Incidencia</label>
-                        <value>{{ incidencia.tipo_incidencia.nombre }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Categoría del Fallo</label>
-                        <value>{{ incidencia.get_categoria_fallo_display }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Componente Afectado</label>
-                        <value>{{ incidencia.componente_afectado.nombre|default:"N/A" }}</value>
-                    </div>
-                    <div class="info-item">
-                        <label>Fecha de Detección</label>
-                        <value>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</value>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Descripción -->
-            <div class="info-section">
-                <h2>📝 Descripción de la Incidencia</h2>
-                <div class="description-box">
-                    <h3>Descripción:</h3>
-                    <p>{{ incidencia.descripcion_incidencia }}</p>
-                </div>
-                
-                {% if incidencia.acciones_tomadas %}
-                <div class="description-box">
-                    <h3>Acciones Tomadas:</h3>
-                    <p>{{ incidencia.acciones_tomadas }}</p>
-                </div>
-                {% endif %}
-                
-                {% if incidencia.causa_raiz %}
-                <div class="description-box">
-                    <h3>Causa Raíz:</h3>
-                    <p>{{ incidencia.causa_raiz }}</p>
-                </div>
-                {% endif %}
-            </div>
-            
-            <!-- Mensaje Adicional -->
-            {% if mensaje_adicional %}
-            <div class="divider"></div>
-            <div class="info-section">
-                <h2>💬 Mensaje Adicional</h2>
-                <div class="description-box">
-                    <p>{{ mensaje_adicional }}</p>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Evidencias Fotográficas -->
-            {% if evidencias %}
-            <div class="divider"></div>
-            <div class="info-section">
-                <h2>📷 Evidencias Fotográficas</h2>
-                <div class="alert-box">
-                    <strong>📎 Imágenes Adjuntas:</strong> Este correo incluye {{ evidencias|length }} imagen(es) adjunta(s) que muestran la incidencia reportada.
-                    <br><small style="margin-top: 8px; display: block;">Las imágenes se encuentran al final del correo o en la sección de archivos adjuntos.</small>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Reincidencia -->
-            {% if incidencia.es_reincidencia %}
-            <div class="divider"></div>
-            <div class="alert-box critical">
-                <strong>⚠️ ATENCIÓN:</strong> Esta es una incidencia reincidente relacionada con: 
-                <strong>{{ incidencia.incidencia_relacionada.folio }}</strong>
-            </div>
-            {% endif %}
-        </div>
-        
-        <!-- Footer -->
-        <div class="email-footer">
-            <p><strong>Score Card System - Control de Calidad</strong></p>
-            <p>Este es un mensaje automático. Por favor no responda a este correo.</p>
-            <p style="margin-top: 10px; font-size: 11px; color: #adb5bd;">
-                © 2025 Score Card System. Todos los derechos reservados. Hecho por Jorge Magos
-            </p>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Incidencia {{ incidencia.folio }}. Severidad {{ incidencia.get_grado_severidad_display }}.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Notificación de Incidencia
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Sistema de Control de Calidad - Score Card
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 24px 32px;">
+                            {% if incidencia.grado_severidad == 'critico' %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef2f2" class="email-stop" style="background-color:#fef2f2;border-left:4px solid #b91c1c;">
+                            {% elif incidencia.grado_severidad == 'alto' %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                            {% elif incidencia.grado_severidad == 'bajo' %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0fdf4" class="email-ok" style="background-color:#f0fdf4;border-left:4px solid #166534;">
+                            {% else %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef9c3" style="background-color:#fef9c3;border-left:4px solid #a16207;">
+                            {% endif %}
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-body-text" style="margin:0 0 6px 0;font-size:15px;line-height:22px;color:#0f172a;">
+                                            <strong>Incidencia Registrada:</strong> {{ incidencia.folio }}
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:20px;color:#334155;">
+                                            <strong>Severidad:</strong>
+                                            {% if incidencia.grado_severidad == 'critico' %}
+                                            <span style="display:inline-block;background-color:#b91c1c;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;padding:4px 10px;">{{ incidencia.get_grado_severidad_display|upper }}</span>
+                                            {% elif incidencia.grado_severidad == 'alto' %}
+                                            <span style="display:inline-block;background-color:#c2410c;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;padding:4px 10px;">{{ incidencia.get_grado_severidad_display|upper }}</span>
+                                            {% elif incidencia.grado_severidad == 'bajo' %}
+                                            <span style="display:inline-block;background-color:#166534;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;padding:4px 10px;">{{ incidencia.get_grado_severidad_display|upper }}</span>
+                                            {% else %}
+                                            <span style="display:inline-block;background-color:#a16207;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;padding:4px 10px;">{{ incidencia.get_grado_severidad_display|upper }}</span>
+                                            {% endif %}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                Información del Equipo
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;">Tipo de Equipo</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ incidencia.get_tipo_equipo_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Marca</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.marca }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Modelo</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.modelo }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Número de Serie (Service Tag)</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.numero_serie }}</td>
+                                </tr>
+                                {% if incidencia.numero_orden %}
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Orden Cliente</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.numero_orden }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if incidencia.servicio_realizado %}
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px 14px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Servicio Realizado</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px 14px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.servicio_realizado.nombre }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                Ubicación y Responsables
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;">Sucursal</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ incidencia.sucursal.nombre }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Área Detectora</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.area_detectora }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Técnico Responsable</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.tecnico_responsable.nombre_completo }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Área del Técnico</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.area_tecnico|default:"N/A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px 14px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Inspector de Calidad</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px 14px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.inspector_calidad }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                Clasificación del Fallo
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;">Tipo de Incidencia</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ incidencia.tipo_incidencia.nombre }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Categoría del Fallo</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.get_categoria_fallo_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Componente Afectado</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.componente_afectado.nombre|default:"N/A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="42%" valign="top" style="padding:10px 18px 14px 18px;font-size:13px;line-height:18px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Fecha de Detección</td>
+                                    <td class="info-value email-body-text" width="58%" valign="top" style="padding:10px 18px 14px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                Descripción de la Incidencia
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 12px 0;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">Descripción:</p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ incidencia.descripcion_incidencia }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% if incidencia.acciones_tomadas %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;margin:0 0 12px 0;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">Acciones Tomadas:</p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ incidencia.acciones_tomadas }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                            {% if incidencia.causa_raiz %}
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">Causa Raíz:</p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ incidencia.causa_raiz }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if mensaje_adicional %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">Mensaje Adicional</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8f4fd" class="email-panel" style="background-color:#e8f4fd;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ mensaje_adicional }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if evidencias %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">Evidencias Fotográficas</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            <strong>Imágenes Adjuntas:</strong> Este correo incluye {{ evidencias|length }} imagen(es) adjunta(s) que muestran la incidencia reportada.
+                                        </p>
+                                        <p class="email-muted" style="margin:0;font-size:12px;line-height:18px;color:#64748b;">
+                                            Las imágenes se encuentran al final del correo o en la sección de archivos adjuntos.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if incidencia.es_reincidencia %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef2f2" class="email-stop" style="background-color:#fef2f2;border-left:4px solid #b91c1c;">
+                                <tr>
+                                    <td style="padding:14px 16px;">
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            <strong>ATENCIÓN:</strong> Esta es una incidencia reincidente relacionada con:
+                                            <strong>{{ incidencia.incidencia_relacionada.folio }}</strong>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:24px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 8px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Score Card System - Control de Calidad
+                            </p>
+                            <p style="margin:0 0 12px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Este es un mensaje automático. Por favor no responda a este correo.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:11px;line-height:16px;color:#94a3b8;">
+                                © 2025 Score Card System. Todos los derechos reservados. Hecho por Jorge Magos
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
