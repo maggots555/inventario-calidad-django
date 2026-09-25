@@ -643,6 +643,10 @@ def enviar_notificacion_cierre_incidencia(incidencia, mensaje_adicional='', envi
         
         # Adjuntar versión HTML
         email.attach_alternative(html_content, "text/html")
+
+        # Logo blanco de la barra. Sirve para cierre atribuible y no atribuible.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email, '[SCORECARD]')
         
         # Enviar
         email.send(fail_silently=False)

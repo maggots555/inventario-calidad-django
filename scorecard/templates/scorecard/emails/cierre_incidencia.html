@@ -1,186 +1,220 @@
+{% comment %}
+  Correo interno: incidencia atribuible cerrada.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta de tablas e inline. El recuadro ámbar avisa que sí
+  cuenta en el Score Card. El pie es interno: no lleva redes.
+  El texto de negocio no cambia.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Incidencia Cerrada</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .container {
-            background-color: white;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px 8px 0 0;
-            margin: -30px -30px 20px -30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .status-badge {
-            display: inline-block;
-            background-color: #28a745;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .section {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-left: 4px solid #28a745;
-            border-radius: 4px;
-        }
-        .section h2 {
-            margin-top: 0;
-            color: #28a745;
-            font-size: 18px;
-        }
-        .info-grid {
-            display: table;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .info-row {
-            display: table-row;
-        }
-        .info-label {
-            display: table-cell;
-            font-weight: bold;
-            padding: 8px 10px 8px 0;
-            color: #666;
-            width: 40%;
-        }
-        .info-value {
-            display: table-cell;
-            padding: 8px 0;
-            color: #333;
-        }
-        .alert-box {
-            background-color: #d4edda;
-            border: 2px solid #28a745;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .alert-box h3 {
-            margin-top: 0;
-            color: #155724;
-        }
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 2px solid #e9ecef;
-            text-align: center;
-            color: #6c757d;
-            font-size: 12px;
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>✅ Incidencia Cerrada</h1>
-            <div class="status-badge">CERRADA</div>
-        </div>
-
-        <p>Hola <strong>{{ tecnico.nombre_completo }}</strong>,</p>
-
-        <p>Te informamos que la incidencia <strong>{{ incidencia.folio }}</strong> ha sido <strong>cerrada</strong>.</p>
-
-        <div class="alert-box">
-            <h3>📊 Impacto en Score Card</h3>
-            <p>Esta incidencia <strong>SÍ se contabilizará</strong> en tu Score Card y métricas de desempeño.</p>
-        </div>
-
-        <div class="section">
-            <h2>📄 Información de la Incidencia</h2>
-            <div class="info-grid">
-                <div class="info-row">
-                    <div class="info-label">Folio:</div>
-                    <div class="info-value">{{ incidencia.folio }}</div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Equipo:</div>
-                    <div class="info-value">{{ incidencia.get_tipo_equipo_display }} - {{ incidencia.marca }} {{ incidencia.modelo }}</div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Número de Serie:</div>
-                    <div class="info-value">{{ incidencia.numero_serie }}</div>
-                </div>
-                {% if incidencia.numero_orden %}
-                <div class="info-row">
-                    <div class="info-label">Orden Cliente:</div>
-                    <div class="info-value">{{ incidencia.numero_orden }}</div>
-                </div>
-                {% endif %}
-                {% if incidencia.servicio_realizado %}
-                <div class="info-row">
-                    <div class="info-label">Servicio Realizado:</div>
-                    <div class="info-value">{{ incidencia.servicio_realizado.nombre }}</div>
-                </div>
-                {% endif %}
-                <div class="info-row">
-                    <div class="info-label">Fecha Detección:</div>
-                    <div class="info-value">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Fecha Cierre:</div>
-                    <div class="info-value">{{ fecha_cierre|date:"d/m/Y H:i" }}</div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Tipo:</div>
-                    <div class="info-value">{{ incidencia.tipo_incidencia.nombre }}</div>
-                </div>
-                <div class="info-row">
-                    <div class="info-label">Severidad:</div>
-                    <div class="info-value">{{ incidencia.get_grado_severidad_display }}</div>
-                </div>
-            </div>
-        </div>
-
-        {% if incidencia.descripcion_incidencia %}
-        <div class="section">
-            <h2>🔍 Descripción de la Incidencia</h2>
-            <p style="white-space: pre-line; background-color: white; padding: 15px; border-radius: 4px;">{{ incidencia.descripcion_incidencia }}</p>
-        </div>
-        {% endif %}
-
-        {% if mensaje_adicional %}
-        <div class="section">
-            <h2>✅ Acciones Correctivas y Conclusión</h2>
-            <p style="white-space: pre-line; background-color: white; padding: 15px; border-radius: 4px;">{{ mensaje_adicional }}</p>
-        </div>
-        {% endif %}
-
-        <p><strong>Recomendación:</strong> Revisa esta incidencia para evitar que vuelva a ocurrir en servicios futuros.</p>
-
-        <div class="footer">
-            <p><strong>Sistema de Score Card - Control de Calidad</strong></p>
-            <p>Cerrada por: {{ enviado_por }}</p>
-            <p>Fecha: {{ fecha_cierre|date:"d/m/Y H:i" }}</p>
-            <p style="margin-top: 15px; font-size: 11px;">
-                Este es un mensaje automático, por favor no responder a este correo.
-            </p>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Incidencia {{ incidencia.folio }} cerrada. Sí se contabiliza en el Score Card.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Incidencia Cerrada
+                            </p>
+                            <p class="email-label" style="margin:10px 0 0 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                Cerrada
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;">
+                                Hola <strong>{{ tecnico.nombre_completo }}</strong>,
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Te informamos que la incidencia <strong>{{ incidencia.folio }}</strong> ha sido <strong>cerrada</strong>.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 8px 0;font-size:16px;line-height:22px;font-weight:700;color:#c2410c;">
+                                            Impacto en Score Card
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:15px;line-height:24px;color:#334155;">
+                                            Esta incidencia <strong>SÍ se contabilizará</strong> en tu Score Card y métricas de desempeño.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">
+                                Información de la Incidencia
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">Folio:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;">{{ incidencia.folio }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Equipo:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.get_tipo_equipo_display }} - {{ incidencia.marca }} {{ incidencia.modelo }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Número de Serie:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.numero_serie }}</td>
+                                </tr>
+                                {% if incidencia.numero_orden %}
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Orden Cliente:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.numero_orden }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if incidencia.servicio_realizado %}
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Servicio Realizado:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.servicio_realizado.nombre }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Fecha Detección:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Fecha Cierre:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ fecha_cierre|date:"d/m/Y H:i" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Tipo:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.tipo_incidencia.nombre }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="40%" valign="top" style="padding:10px 18px 14px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Severidad:</td>
+                                    <td class="info-value email-body-text" width="60%" valign="top" style="padding:10px 18px 14px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ incidencia.get_grado_severidad_display }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if incidencia.descripcion_incidencia %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">Descripción de la Incidencia</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="email-body-text" style="padding:14px 16px;font-size:14px;line-height:22px;color:#334155;white-space:pre-line;">{{ incidencia.descripcion_incidencia }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if mensaje_adicional %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 8px 32px;">
+                            <p class="email-label" style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#1f6391;">Acciones Correctivas y Conclusión</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td class="email-body-text" style="padding:14px 16px;font-size:14px;line-height:22px;color:#334155;white-space:pre-line;">{{ mensaje_adicional }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 28px 32px;">
+                            <p class="email-body-text" style="margin:0;font-size:15px;line-height:24px;color:#334155;">
+                                <strong>Recomendación:</strong> Revisa esta incidencia para evitar que vuelva a ocurrir en servicios futuros.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:24px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 8px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Score Card - Control de Calidad
+                            </p>
+                            <p style="margin:0 0 4px 0;font-size:14px;line-height:20px;color:#e2e8f0;">
+                                Cerrada por: {{ enviado_por }}
+                            </p>
+                            <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#cbd5e1;">
+                                Fecha: {{ fecha_cierre|date:"d/m/Y H:i" }}
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Este es un mensaje automático, por favor no responder a este correo.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
