@@ -109,10 +109,8 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
 
     etiqueta, service_tag = _etiqueta_orden(orden)
     titulo = f'Equipo listo para avisar al cliente — {etiqueta}'
-    mensaje = (
-        f'La orden {etiqueta} (S/T: {service_tag}) está lista. '
-        f'Notifica al cliente que puede recolectar el equipo.'
-    )
+    # Campanita y push comparten este texto. En garantía se nombra la sede.
+    mensaje = _mensaje_equipo_listo(orden, etiqueta, service_tag)
 
     enviados = 0
     user_ids_notificados: list[int] = []
@@ -273,6 +271,53 @@ def _marca_normalizada(orden) -> str:
     except Exception:
         marca = ''
     return marca.strip().lower()
+
+
+def _nombre_sucursal(orden) -> str:
+    """
+    Nombre de la sucursal donde está registrada la orden.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        Nombre de la sede, o un texto fijo si no se pudo leer.
+    """
+    try:
+        nombre = (orden.sucursal.nombre or '').strip()
+    except Exception:
+        nombre = ''
+    return nombre or 'sucursal no registrada'
+
+
+def _mensaje_equipo_listo(orden, etiqueta: str, service_tag: str) -> str:
+    """
+    Texto que ven campanita y push.
+
+    Objetivo: en garantía el dispatcher necesita saber en qué sucursal
+    está el equipo. Fuera de garantía el aviso sigue igual (recepción
+    ya trabaja en su sede).
+
+    Args:
+        orden: OrdenServicio.
+        etiqueta: folio visible (orden de cliente o número interno).
+        service_tag: número de serie.
+
+    Returns:
+        Cuerpo del aviso (campanita y push usan el mismo texto).
+    """
+    if getattr(orden, 'es_fuera_garantia', False):
+        return (
+            f'La orden {etiqueta} (S/T: {service_tag}) está lista. '
+            f'Notifica al cliente que puede recolectar el equipo.'
+        )
+
+    # Paso: la sede va en el cuerpo, no en el título, para no recortar el folio.
+    sucursal = _nombre_sucursal(orden)
+    return (
+        f'La orden {etiqueta} (S/T: {service_tag}) está lista en {sucursal}. '
+        f'Notifica al cliente que puede recolectar el equipo.'
+    )
 
 
 def _etiqueta_orden(orden) -> tuple[str, str]:

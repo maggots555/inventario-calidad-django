@@ -269,6 +269,9 @@ class DestinatariosGarantiaOowTest(TestCase):
             comentario__icontains='Aviso a recepción',
         )
         self.assertEqual(historial.count(), 1)
+        aviso_recep = Notificacion.objects.filter(usuario=self.user_recep).first()
+        self.assertIsNotNone(aviso_recep)
+        self.assertNotIn('está lista en', aviso_recep.mensaje)
 
     @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
     def test_garantia_dell_solo_su_dispatcher(self, _mock_push):
@@ -300,6 +303,14 @@ class DestinatariosGarantiaOowTest(TestCase):
             comentario__icontains='Aviso a dispatchers',
         )
         self.assertEqual(historial.count(), 1)
+        # Campanita y push dicen en qué sucursal está el equipo.
+        aviso_dell = Notificacion.objects.filter(usuario=self.user_dell).first()
+        self.assertIsNotNone(aviso_dell)
+        self.assertIn('está lista en Sucursal Destinatarios', aviso_dell.mensaje)
+        self.assertIn(
+            'Sucursal Destinatarios',
+            _mock_push.call_args.kwargs['mensaje'],
+        )
 
     @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
     def test_garantia_lenovo_solo_su_dispatcher(self, _mock_push):
