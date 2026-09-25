@@ -171,19 +171,6 @@ def enviar_formato_venta_mostrador_email_task(
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header(
-                        'Content-Disposition', 'inline', filename='logo_sic.png',
-                    )
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning('[FORMATO_VM] Error al adjuntar logo: %s', e)
-
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, '[FORMATO_VM]')
 

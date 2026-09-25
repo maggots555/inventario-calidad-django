@@ -517,17 +517,6 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # ── Adjuntar logo SIC ──
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[FEEDBACK-RECHAZO] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -716,17 +705,6 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='defa
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # ── Adjuntar logo SIC ──
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[VIGENCIA-VENCIDA] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -1146,20 +1124,9 @@ def enviar_diagnostico_cliente_task(
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # Adjuntar logo SIC
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[DIAGNOSTICO] Error al adjuntar logo: {e}")
 
-        # Logo blanco de la barra de marca (cid:logo_sic_white). El a color
-        # (cid:logo_sic) se queda por si alguna plantilla vieja lo usa.
+        # Logo blanco de la barra de marca (cid:logo_sic_white).
+        # El PNG azul ya no se adjunta: ninguna plantilla lo muestra.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, '[DIAGNOSTICO]')
 
@@ -1721,17 +1688,6 @@ def enviar_imagenes_cliente_task(
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # Adjuntar logo SIC
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[IMAGENES] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -2063,17 +2019,6 @@ def enviar_imagenes_egreso_cliente_task(
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # Adjuntar logo SIC
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[IMAGENES-EGRESO] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -2374,19 +2319,6 @@ def enviar_notificacion_equipo_disponible_task(
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header(
-                        'Content-Disposition', 'inline', filename='logo_sic.png'
-                    )
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning('[EQUIPO-DISPONIBLE] Logo CID: %s', e)
-
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, '[EQUIPO-DISPONIBLE]')
@@ -2598,17 +2530,6 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_ali
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # ── Logo SIC (CID inline) ──
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[FEEDBACK-SATISFACCION] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -2795,17 +2716,6 @@ def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # ── Logo SIC (CID inline) ──
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[RECORDATORIO-ENCUESTA] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -3284,17 +3194,6 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None, db_alias='d
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
-        # ── Logo SIC (CID inline) ──
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[SEGUIMIENTO-CLIENTE] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -4910,17 +4809,6 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
             except Exception as e:
                 logger.warning(f"[REWIND-EMAIL] No se pudo adjuntar thumbnail: {e}")
 
-        # ── Logo SIC ─────────────────────────────────────────────────────────
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[REWIND-EMAIL] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -5315,17 +5203,6 @@ def enviar_evidencia_video_task(
             cc=destinatarios_copia if destinatarios_copia else None,
         )
         email_msg.attach_alternative(html_content, 'text/html')
-
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[EVIDENCIA-VIDEO] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -5824,19 +5701,6 @@ def enviar_formato_garantia_email_task(
             to=destinatarios,
         )
         email_msg.attach_alternative(html_content, 'text/html')
-
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header(
-                        'Content-Disposition', 'inline', filename='logo_sic.png',
-                    )
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning('[FORMATO_GARANTIA] Error al adjuntar logo: %s', e)
 
         # Logo blanco de la barra de marca (cid:logo_sic_white).
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email

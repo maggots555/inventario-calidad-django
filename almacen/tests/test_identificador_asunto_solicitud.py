@@ -155,6 +155,7 @@ class NotificarFrontAsuntoIdentificadorTest(
             if hasattr(adjunto, 'get')
         ]
         self.assertIn('<logo_sic_white>', cids)
+        self.assertNotIn('<logo_sic>', cids)
 
     def test_front_pnc_html_incluye_enlace_detalle(self) -> None:
         """PNC a Front también incluye el botón absoluto al detalle."""

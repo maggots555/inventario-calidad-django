@@ -10,9 +10,8 @@ La imagen se PEGA al mensaje con un Content-ID (CID). El HTML dice
 Outlook no pinta SVG: por eso usamos PNG
 (``static/images/logos/logo_sic_white.png``).
 
-El logo a color (``cid:logo_sic``) se queda para plantillas viejas
-con fondo blanco. Este helper SOLO pega el blanco para la barra
-``#1e293b``. No sustituye el CID antiguo.
+El PNG azul (``logo_sic.png``) sigue en static/ para PDF y favicon.
+Los correos ya no lo adjuntan: la barra solo pide este blanco.
 """
 
 from __future__ import annotations

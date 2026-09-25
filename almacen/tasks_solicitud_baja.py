@@ -55,7 +55,7 @@ def notificar_almacenista_solicitud_baja_task(
 
     from almacen.models import SolicitudBaja
     from almacen.tasks import (
-        _adjuntar_logo_e_iconos_email,
+        _adjuntar_iconos_email,
         _remitente_sistema_compras,
     )
     from almacen.utils.notificar_solicitud_baja import (
@@ -158,7 +158,7 @@ def notificar_almacenista_solicitud_baja_task(
             cc=emails_cc,
         )
         email_msg.content_subtype = 'html'
-        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        _adjuntar_iconos_email(email_msg, log_prefix)
         # Logo blanco de la barra. Los iconos siguen en el helper compartido.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, log_prefix)
@@ -275,7 +275,7 @@ def notificar_solicitud_baja_procesada_task(
     from django.utils import timezone
 
     from almacen.tasks import (
-        _adjuntar_logo_e_iconos_email,
+        _adjuntar_iconos_email,
         _remitente_sistema_compras,
     )
     from almacen.utils.notificar_solicitud_baja import (
@@ -367,7 +367,7 @@ def notificar_solicitud_baja_procesada_task(
             cc=emails_cc,
         )
         email_msg.content_subtype = 'html'
-        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        _adjuntar_iconos_email(email_msg, log_prefix)
         # Logo blanco de la barra. Los iconos siguen en el helper compartido.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, log_prefix)

@@ -27,7 +27,7 @@ class _MensajeFalso:
 
 
 class AdjuntarLogoBlancoEmailTests(SimpleTestCase):
-    """El helper debe pegar el PNG blanco sin tocar cid:logo_sic."""
+    """El helper pega solo el PNG blanco de la barra."""
 
     def test_adjunta_png_con_cid_logo_sic_white(self):
         """Feliz: finders encuentra el PNG y el CID coincide con la plantilla."""
@@ -52,3 +52,25 @@ class AdjuntarLogoBlancoEmailTests(SimpleTestCase):
 
         self.assertFalse(ok)
         self.assertEqual(mensaje.partes, [])
+
+    def test_los_envios_no_pegan_el_logo_azul(self):
+        """El PNG azul sigue para PDF y favicon; ningún correo lo adjunta."""
+        from pathlib import Path
+
+        raiz = Path(__file__).resolve().parents[2]
+        # Estos archivos arman el mensaje. Si vuelve '<logo_sic>', el azul
+        # viaja otra vez aunque la plantilla no lo muestre.
+        archivos = [
+            raiz / 'servicio_tecnico/tasks.py',
+            raiz / 'servicio_tecnico/tasks_formato_venta_mostrador.py',
+            raiz / 'servicio_tecnico/tasks_diagnostico.py',
+            raiz / 'servicio_tecnico/tasks_pagos.py',
+            raiz / 'almacen/tasks.py',
+            raiz / 'almacen/tasks_solicitud_baja.py',
+            raiz / 'almacen/tasks_vigencia_cotizacion.py',
+            raiz / 'inventario/utils.py',
+            raiz / 'scorecard/emails.py',
+        ]
+        for ruta in archivos:
+            texto = ruta.read_text(encoding='utf-8')
+            self.assertNotIn("'<logo_sic>'", texto, ruta.name)

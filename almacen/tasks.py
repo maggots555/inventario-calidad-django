@@ -246,21 +246,9 @@ def notificar_front_cotizacion_task(
         )
         email_msg.content_subtype = 'html'
 
-        # Adjuntar logo SIC
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[COTIZACION] Error al adjuntar logo: {e}")
 
-        # Logo blanco de la barra (#1e293b). Front y PNC ya usan este CID.
-        # El a color y los iconos se siguen pegando: el HTML nuevo no los
-        # cita, y quitarlos es limpieza del envío, no del diseño.
+        # Logo blanco de la barra (cid:logo_sic_white).
+        # El PNG azul ya no se adjunta: ninguna plantilla lo muestra.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, '[COTIZACION]')
 
@@ -454,20 +442,9 @@ def notificar_compras_nueva_cotizacion_task(
         )
         email_msg.content_subtype = 'html'
 
-        # Adjuntar logo SIC (CID para mostrar inline en el correo)
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[COTIZACION-COMPRAS] Error al adjuntar logo: {e}")
 
-        # Logo blanco de la barra. Los iconos se siguen pegando: el HTML
-        # nuevo no los cita, y quitarlos es limpieza del envío.
+        # Logo blanco de la barra (cid:logo_sic_white).
+        # El PNG azul ya no se adjunta: ninguna plantilla lo muestra.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, '[COTIZACION-COMPRAS]')
 
@@ -511,33 +488,25 @@ def notificar_compras_nueva_cotizacion_task(
         return {'success': False, 'mensaje': f'Error: {str(e)}'}
 
 
-def _adjuntar_logo_e_iconos_email(email_msg, log_prefix: str) -> None:
+def _adjuntar_iconos_email(email_msg, log_prefix: str) -> None:
     """
-    Adjunta logo SIC e iconos sociales como CID (inline) a un EmailMessage.
+    Pega los iconos de redes como CID (inline) a un correo ya armado.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Los correos HTML no pueden usar {% static %}; las imágenes van embebidas
-    con Content-ID (cid:logo_sic) para que el cliente de correo las muestre.
+    El logo de la barra es el blanco y lo pega otro helper
+    (cid:logo_sic_white). El PNG azul (logo_sic.png) ya no viaja
+    en el correo: el HTML no lo muestra. Aquí solo van link,
+    Instagram, Facebook y WhatsApp, que el pie de algunos avisos sí usa.
 
     Args:
-        email_msg: EmailMessage ya creado.
-        log_prefix: Prefijo para mensajes de log (ej. '[COTIZ-ACEPTADA]').
+        email_msg: EmailMessage ya creado. Todavía no se ha enviado.
+        log_prefix: Prefijo de log (ej. '[COTIZ-ACEPTADA]').
+
+    Efectos secundarios:
+        Añade imágenes al mensaje. No envía el correo ni toca la base.
     """
     from django.contrib.staticfiles import finders
     from email.mime.image import MIMEImage
-
-    try:
-        logo_path = finders.find('images/logos/logo_sic.png')
-        if logo_path:
-            with open(logo_path, 'rb') as f:
-                logo_mime = MIMEImage(f.read(), _subtype='png')
-                logo_mime.add_header('Content-ID', '<logo_sic>')
-                logo_mime.add_header(
-                    'Content-Disposition', 'inline', filename='logo_sic.png'
-                )
-                email_msg.attach(logo_mime)
-    except Exception as e:
-        logger.warning(f'{log_prefix} Error al adjuntar logo: {e}')
 
     try:
         iconos_sociales = {
@@ -687,7 +656,7 @@ def notificar_compras_cotizacion_aceptada_task(
             to=destinatarios,
         )
         email_msg.content_subtype = 'html'
-        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        _adjuntar_iconos_email(email_msg, log_prefix)
         # Logo blanco de la barra. Los iconos siguen en el helper compartido:
         # otros correos de Compras aún los citan.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
@@ -846,7 +815,7 @@ def notificar_respuesta_cotizacion_rechazada_task(
             to=emails,
         )
         email_msg.content_subtype = 'html'
-        _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        _adjuntar_iconos_email(email_msg, log_prefix)
         # Logo blanco de la barra. Los iconos siguen en el helper compartido.
         from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
         adjuntar_logo_blanco_email(email_msg, log_prefix)
@@ -1169,17 +1138,6 @@ def enviar_cotizacion_cliente_task(
         )
         email_msg.content_subtype = 'html'
 
-        # Adjuntar el logo SIC como imagen inline (CID)
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f"[COTIZACION-CLIENTE] Error al adjuntar logo: {e}")
 
         # Logo blanco de la barra (#1e293b). Los iconos sí se usan:
         # este correo va al cliente y el pie lleva redes.
@@ -1399,19 +1357,6 @@ def notificar_cliente_pnc_task(
             cc=[e for e in copia_empleados if e and e != email_cliente],
         )
         email_msg.content_subtype = 'html'
-
-        try:
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as f:
-                    logo_mime = MIMEImage(f.read(), _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header(
-                        'Content-Disposition', 'inline', filename='logo_sic.png'
-                    )
-                    email_msg.attach(logo_mime)
-        except Exception as e:
-            logger.warning(f'[PNC-CLIENTE] Error al adjuntar logo: {e}')
 
         # Logo blanco de la barra (#1e293b). Los iconos sí se usan:
         # este correo va al cliente y el pie lleva redes.

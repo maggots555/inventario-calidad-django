@@ -389,6 +389,7 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
             if hasattr(adjunto, 'get')
         ]
         self.assertIn('<logo_sic_white>', cids)
+        self.assertNotIn('<logo_sic>', cids)
 
 
 class DetalleSolicitudFlagsPncTest(BaseIntegracionCotizacionMixin, TestCase):
