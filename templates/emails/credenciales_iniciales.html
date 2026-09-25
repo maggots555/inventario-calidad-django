@@ -1,240 +1,317 @@
+{% comment %}
+  Correo interno: credenciales de acceso de un empleado nuevo (o reenvío).
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Un correo NO es una página web. Gmail y Outlook ignoran flex, grid,
+  gradientes y casi todo el CSS del style. Por eso este HTML usa:
+  - Tablas anidadas (role="presentation") para el layout
+  - CSS en línea (style="...") en cada celda
+  - Ancho ~600 px (híbrido: width + max-width + tabla fantasma MSO)
+  - Paleta SIC #1f6391 (sin morados genéricos ni emojis de título)
+
+  El style de abajo SOLO tiene media queries y dark mode: si Gmail
+  lo recorta, el correo sigue leyéndose porque el layout ya está inline.
+
+  El texto de negocio (saludo, contraseña, pasos, pie) no cambia.
+  Este aviso es interno: el pie no lleva redes sociales.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>{% if es_reenvio %}Reenvío de {% endif %}Credenciales de Acceso</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f4f4f4;
+        /* Solo refuerzos. El layout NO depende de estas reglas. */
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .email-container {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .header .icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-        .content {
-            padding: 30px;
-        }
-        .credentials-box {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #0d6efd;
-            margin: 20px 0;
-        }
-        .credentials-box h3 {
-            margin-top: 0;
-            color: #0056b3;
-        }
-        .credential-item {
-            margin: 15px 0;
-            padding: 12px;
-            background: white;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-        }
-        .credential-label {
-            font-weight: bold;
-            color: #0056b3;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-        .credential-value {
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            color: #212529;
-            background: #e7f3ff;
-            padding: 8px 12px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 5px;
-            border: 1px dashed #0d6efd;
-        }
-        .warning-box {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-        .warning-box strong {
-            color: #856404;
-        }
-        .warning-box ul {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-        .warning-box li {
-            margin: 5px 0;
-        }
-        .button {
-            display: inline-block;
-            padding: 14px 35px;
-            background: #0d6efd;
-            color: white !important;
-            text-decoration: none;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-weight: bold;
-            font-size: 16px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: background 0.3s;
-        }
-        .button:hover {
-            background: #0056b3;
-        }
-        .info-box {
-            background: #e7f3ff;
-            border-left: 4px solid #0d6efd;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-        .info-box strong {
-            color: #0056b3;
-        }
-        .footer {
-            background: #343a40;
-            color: #adb5bd;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-        }
-        .footer p {
-            margin: 5px 0;
-        }
-        .divider {
-            border: none;
-            border-top: 1px solid #dee2e6;
-            margin: 25px 0;
-        }
-        .text-center {
-            text-align: center;
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-secret { background-color: #0f172a !important; color: #e2e8f0 !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
+            .email-steps { background-color: #0f172a !important; }
         }
     </style>
 </head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <div class="icon">🔐</div>
-            <h1>{{ nombre_sistema }}</h1>
-            <p style="margin: 10px 0 0 0; font-size: 16px;">
-                {% if es_reenvio %}
-                    Reenvío de Credenciales de Acceso
-                {% else %}
-                    ¡Bienvenido al Sistema!
-                {% endif %}
-            </p>
-        </div>
-        
-        <div class="content">
-            <p>Hola <strong>{{ empleado.nombre_completo }}</strong>,</p>
-            
-            {% if es_reenvio %}
-                <p>Como solicitaste, te reenviamos tus credenciales de acceso al <strong>Sistema Integral de Gestión</strong>.</p>
-            {% else %}
-                <p>¡Nos complace informarte que se te ha otorgado acceso al <strong>Sistema Integral de Gestión</strong>!</p>
-                <p>A partir de ahora podrás acceder a todas las funcionalidades del sistema usando tus credenciales personales.</p>
-            {% endif %}
-            
-            <div class="credentials-box">
-                <h3>📋 TUS CREDENCIALES DE ACCESO</h3>
-                
-                <div class="credential-item">
-                    <div class="credential-label">👤 Usuario:</div>
-                    <div class="credential-value">{{ usuario }}</div>
-                </div>
-                
-                <div class="credential-item">
-                    <div class="credential-label">🔑 Contraseña Temporal:</div>
-                    <div class="credential-value">{{ contraseña_temporal }}</div>
-                </div>
-            </div>
-            
-            <div class="warning-box">
-                <strong>⚠️ IMPORTANTE - CAMBIO DE CONTRASEÑA OBLIGATORIO:</strong>
-                <ul>
-                    <li><strong>🔐 Esta contraseña es TEMPORAL y de un solo uso</strong></li>
-                    <li><strong>Al iniciar sesión por primera vez, el sistema te obligará a cambiarla</strong> por una contraseña personal segura</li>
-                    <li>No podrás acceder a ninguna función del sistema hasta que cambies tu contraseña</li>
-                    <li>Este proceso es <strong>obligatorio por seguridad</strong> y solo ocurre una vez</li>
-                    <li>Después de cambiarla, tendrás acceso completo al sistema</li>
-                    <li>Por seguridad, <strong>no compartas estas credenciales</strong> con nadie</li>
-                </ul>
-            </div>
-            
-            <div class="info-box" style="background: #d1ecf1; border-left-color: #0c5460;">
-                <strong>📌 ¿Qué pasará en tu primer inicio de sesión?</strong><br><br>
-                1️⃣ Ingresarás con tu usuario y contraseña temporal<br>
-                2️⃣ El sistema te redirigirá automáticamente a la página de cambio de contraseña<br>
-                3️⃣ Ingresarás tu contraseña temporal nuevamente (verificación)<br>
-                4️⃣ Crearás tu nueva contraseña personal (mínimo 8 caracteres)<br>
-                5️⃣ ¡Listo! Tendrás acceso completo al sistema
-            </div>
-            
-            <div class="text-center">
-                <a href="{{ url_login }}" class="button">
-                    🌐 Acceder al Sistema Ahora
-                </a>
-                <p style="margin-top: 15px; font-size: 14px; color: #666;">
-                    <strong>🔗 Dirección del sistema:</strong><br>
-                    <a href="{{ url_sistema }}" style="color: #0d6efd; text-decoration: none; font-weight: bold;">{{ url_sistema }}</a>
-                </p>
-            </div>
-            
-            <div class="info-box">
-                <strong>📄 Información de tu cuenta:</strong><br>
-                📧 Email: {{ empleado.email }}<br>
-                👔 Cargo: {{ empleado.cargo }}<br>
-                🏢 Área: {{ empleado.area }}<br>
-                {% if empleado.sucursal %}
-                    🏪 Sucursal: {{ empleado.sucursal.nombre }}<br>
-                {% endif %}
-            </div>
-            
-            <div class="divider"></div>
-            
-            <p style="font-size: 13px; color: #666;">
-                <strong>¿Problemas para acceder?</strong><br>
-                Si tienes dificultades para iniciar sesión o cambiar tu contraseña, contacta al administrador del sistema.
-            </p>
-            
-            <p style="font-size: 13px; color: #666; margin-top: 15px;">
-                <strong>Recomendaciones de seguridad:</strong><br>
-                • Elige una contraseña fuerte (mínimo 8 caracteres)<br>
-                • Combina letras, números y símbolos<br>
-                • No uses información personal obvia<br>
-                • Cierra sesión cuando termines de trabajar
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p style="margin: 0; font-weight: bold; font-size: 14px; color: #fff;">{{ nombre_sistema }}</p>
-            <p style="margin: 10px 0 0 0;">Este es un email automático, por favor no responder.</p>
-            <p style="margin: 5px 0 0 0;">© {% now "Y" %} - Todos los derechos reservados</p>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    {# Preheader: texto de la bandeja ANTES de abrir. No es un párrafo nuevo del cuerpo. #}
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        {% if es_reenvio %}
+            Reenvío de tus credenciales de acceso al Sistema Integral de Gestión.
+        {% else %}
+            Tus credenciales de acceso al Sistema Integral de Gestión.
+        {% endif %}
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                {{ nombre_sistema }}
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:16px;line-height:22px;color:#475569;">
+                                {% if es_reenvio %}
+                                    Reenvío de Credenciales de Acceso
+                                {% else %}
+                                    ¡Bienvenido al Sistema!
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    {# ----- Saludo: el if es el mismo de siempre (alta vs reenvío) ----- #}
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Hola <strong>{{ empleado.nombre_completo }}</strong>,
+                            </p>
+                            {% if es_reenvio %}
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Como solicitaste, te reenviamos tus credenciales de acceso al <strong>Sistema Integral de Gestión</strong>.
+                            </p>
+                            {% else %}
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:26px;color:#334155;">
+                                ¡Nos complace informarte que se te ha otorgado acceso al <strong>Sistema Integral de Gestión</strong>!
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                A partir de ahora podrás acceder a todas las funcionalidades del sistema usando tus credenciales personales.
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {# ----- Usuario y contraseña: cajas de texto, no una imagen ----- #}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            TUS CREDENCIALES DE ACCESO
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 18px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Usuario:
+                                        </p>
+                                        <p class="email-secret" style="margin:0;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;color:#0f172a;background-color:#e8f4fd;border:1px solid #1f6391;padding:8px 12px;">
+                                            {{ usuario }}
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 18px 16px 18px;">
+                                        <p class="email-label" style="margin:0 0 6px 0;font-size:14px;line-height:20px;font-weight:700;color:#1f6391;">
+                                            Contraseña Temporal:
+                                        </p>
+                                        <p class="email-secret" style="margin:0;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:24px;color:#0f172a;background-color:#e8f4fd;border:1px solid #1f6391;padding:8px 12px;word-break:break-all;">
+                                            {{ contraseña_temporal }}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 10px 0;font-size:15px;line-height:22px;font-weight:700;color:#9a3412;">
+                                            IMPORTANTE - CAMBIO DE CONTRASEÑA OBLIGATORIO:
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            <strong>Esta contraseña es TEMPORAL y de un solo uso</strong>
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            <strong>Al iniciar sesión por primera vez, el sistema te obligará a cambiarla</strong> por una contraseña personal segura
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            No podrás acceder a ninguna función del sistema hasta que cambies tu contraseña
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            Este proceso es <strong>obligatorio por seguridad</strong> y solo ocurre una vez
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            Después de cambiarla, tendrás acceso completo al sistema
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Por seguridad, <strong>no compartas estas credenciales</strong> con nadie
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8f4fd" class="email-steps" style="background-color:#e8f4fd;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-label" style="margin:0 0 10px 0;font-size:15px;line-height:22px;font-weight:700;color:#1f6391;">
+                                            ¿Qué pasará en tu primer inicio de sesión?
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            1. Ingresarás con tu usuario y contraseña temporal
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            2. El sistema te redirigirá automáticamente a la página de cambio de contraseña
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            3. Ingresarás tu contraseña temporal nuevamente (verificación)
+                                        </p>
+                                        <p class="email-body-text" style="margin:0 0 6px 0;font-size:14px;line-height:22px;color:#334155;">
+                                            4. Crearás tu nueva contraseña personal (mínimo 8 caracteres)
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            5. ¡Listo! Tendrás acceso completo al sistema
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 24px 32px;">
+                            {# Botón a prueba de Outlook: VML para Word + enlace HTML para el resto. #}
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_login }}" style="height:44px;v-text-anchor:middle;width:280px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Acceder al Sistema Ahora</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_login }}" class="email-cta" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Acceder al Sistema Ahora</a>
+                            <!--<![endif]-->
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:14px;line-height:22px;color:#475569;text-align:center;">
+                                <strong>Dirección del sistema:</strong><br>
+                                <a href="{{ url_sistema }}" class="email-label" style="color:#1f6391;text-decoration:underline;font-weight:700;">{{ url_sistema }}</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Información de tu cuenta:
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">
+                                        Email:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;">
+                                        {{ empleado.email }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Cargo:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ empleado.cargo }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Área:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ empleado.area }}
+                                    </td>
+                                </tr>
+                                {% if empleado.sucursal %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">
+                                        Sucursal:
+                                    </td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">
+                                        {{ empleado.sucursal.nombre }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:8px 32px 28px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#475569;">
+                                <strong>¿Problemas para acceder?</strong><br>
+                                Si tienes dificultades para iniciar sesión o cambiar tu contraseña, contacta al administrador del sistema.
+                            </p>
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#475569;">
+                                <strong>Recomendaciones de seguridad:</strong><br>
+                                • Elige una contraseña fuerte (mínimo 8 caracteres)<br>
+                                • Combina letras, números y símbolos<br>
+                                • No uses información personal obvia<br>
+                                • Cierra sesión cuando termines de trabajar
+                            </p>
+                        </td>
+                    </tr>
+
+                    {# Pie interno: mismas tres líneas de siempre, fondo sólido (Outlook no pinta gradientes). #}
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:24px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 8px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ nombre_sistema }}
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                Este es un email automático, por favor no responder.
+                            </p>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#cbd5e1;">
+                                © {% now "Y" %} - Todos los derechos reservados
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

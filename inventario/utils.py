@@ -17,11 +17,10 @@ Funciones principales:
 import secrets
 import string
 from django.contrib.auth.models import Group, User
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # El empleado guarda el rol en minúsculas ('tecnico', 'facturacion').
@@ -149,6 +148,105 @@ def crear_usuario_para_empleado(empleado, contraseña_temporal=None):
     return user, contraseña_temporal
 
 
+def construir_texto_plano_credenciales(context: dict) -> str:
+    """
+    Arma el cuerpo text/plain del correo de credenciales iniciales.
+
+    Objetivo de negocio:
+        Si la bandeja no muestra el HTML, el empleado igual lee su
+        usuario, la contraseña temporal y la misma URL para entrar.
+
+    Args:
+        context: El mismo diccionario que credenciales_iniciales.html.
+            Claves: empleado, contraseña_temporal, usuario, es_reenvio,
+            nombre_sistema, url_login, url_sistema.
+
+    Returns:
+        str: Cuerpo en texto plano, con las mismas frases del HTML.
+
+    Efectos secundarios:
+        Ninguno. No envía correo ni toca la base de datos.
+    """
+    empleado = context['empleado']
+    nombre_sistema = context.get('nombre_sistema') or ''
+    es_reenvio = bool(context.get('es_reenvio'))
+
+    # El saludo cambia según sea el alta o un reenvío pedido a mano.
+    if es_reenvio:
+        titulo = 'Reenvío de Credenciales de Acceso'
+        cuerpo = (
+            'Como solicitaste, te reenviamos tus credenciales de acceso '
+            'al Sistema Integral de Gestión.'
+        )
+    else:
+        titulo = '¡Bienvenido al Sistema!'
+        cuerpo = (
+            '¡Nos complace informarte que se te ha otorgado acceso al '
+            'Sistema Integral de Gestión!\n'
+            'A partir de ahora podrás acceder a todas las funcionalidades '
+            'del sistema usando tus credenciales personales.'
+        )
+
+    # Sucursal es opcional: el HTML también la omite si no hay.
+    sucursal = getattr(empleado, 'sucursal', None)
+    nombre_sucursal = getattr(sucursal, 'nombre', '') if sucursal else ''
+
+    lineas = [
+        nombre_sistema,
+        titulo,
+        '',
+        f'Hola {empleado.nombre_completo},',
+        cuerpo,
+        '',
+        'TUS CREDENCIALES DE ACCESO',
+        f"Usuario: {context.get('usuario') or ''}",
+        f"Contraseña Temporal: {context.get('contraseña_temporal') or ''}",
+        '',
+        'IMPORTANTE - CAMBIO DE CONTRASEÑA OBLIGATORIO:',
+        'Esta contraseña es TEMPORAL y de un solo uso',
+        'Al iniciar sesión por primera vez, el sistema te obligará a cambiarla por una contraseña personal segura',
+        'No podrás acceder a ninguna función del sistema hasta que cambies tu contraseña',
+        'Este proceso es obligatorio por seguridad y solo ocurre una vez',
+        'Después de cambiarla, tendrás acceso completo al sistema',
+        'Por seguridad, no compartas estas credenciales con nadie',
+        '',
+        '¿Qué pasará en tu primer inicio de sesión?',
+        '1. Ingresarás con tu usuario y contraseña temporal',
+        '2. El sistema te redirigirá automáticamente a la página de cambio de contraseña',
+        '3. Ingresarás tu contraseña temporal nuevamente (verificación)',
+        '4. Crearás tu nueva contraseña personal (mínimo 8 caracteres)',
+        '5. ¡Listo! Tendrás acceso completo al sistema',
+        '',
+        'Acceder al Sistema Ahora:',
+        context.get('url_login') or '',
+        'Dirección del sistema:',
+        context.get('url_sistema') or '',
+        '',
+        'Información de tu cuenta:',
+        f'Email: {empleado.email}',
+        f'Cargo: {empleado.cargo}',
+        f'Área: {empleado.area}',
+    ]
+    if nombre_sucursal:
+        lineas.append(f'Sucursal: {nombre_sucursal}')
+
+    lineas.extend([
+        '',
+        '¿Problemas para acceder?',
+        'Si tienes dificultades para iniciar sesión o cambiar tu contraseña, contacta al administrador del sistema.',
+        '',
+        'Recomendaciones de seguridad:',
+        'Elige una contraseña fuerte (mínimo 8 caracteres)',
+        'Combina letras, números y símbolos',
+        'No uses información personal obvia',
+        'Cierra sesión cuando termines de trabajar',
+        '',
+        nombre_sistema,
+        'Este es un email automático, por favor no responder.',
+    ])
+    return '\n'.join(lineas)
+
+
 def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=False):
     """
     Envía email al empleado con sus credenciales de acceso
@@ -211,7 +309,10 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
         
         # Renderizar template HTML del email
         html_message = render_to_string('emails/credenciales_iniciales.html', context)
-        plain_message = strip_tags(html_message)  # Versión texto plano (fallback)
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El texto plano es el mismo aviso, sin diseño. Si la bandeja
+        # bloquea el HTML, el empleado igual ve usuario, contraseña y el enlace.
+        plain_message = construir_texto_plano_credenciales(context)
         
         # Asunto del email
         asunto = '¡Bienvenido al Sistema Integral de Gestión!' if not es_reenvio else 'Credenciales de Acceso - Reenvío'
@@ -226,15 +327,20 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
         # Remitente personalizado para este correo específico
         from_email_personalizado = f'SIGMA <{settings.EMAIL_HOST_USER}>'
         
-        # Enviar email usando configuración SMTP de settings.py
-        send_mail(
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # send_mail no puede pegar imágenes. EmailMultiAlternatives manda
+        # el texto plano Y el HTML, y deja adjuntar el logo de la barra
+        # (el HTML dice src="cid:logo_sic_white").
+        email_msg = EmailMultiAlternatives(
             subject=asunto,
-            message=plain_message,
+            body=plain_message,
             from_email=from_email_personalizado,
-            recipient_list=[empleado.email],
-            html_message=html_message,
-            fail_silently=False,  # Lanza excepción si hay error (para detectarlo)
+            to=[empleado.email],
         )
+        email_msg.attach_alternative(html_message, 'text/html')
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[CREDENCIALES]')
+        email_msg.send(fail_silently=False)
         
         print(f"✅ Email enviado correctamente a {empleado.email}")
         
