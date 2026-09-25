@@ -190,7 +190,12 @@ def notificar_recotizacion_solicitada_task(
         _adjuntar_logo_e_iconos_email,
         _remitente_sistema_compras,
     )
-    from almacen.utils.cotizacion_email_context import url_base_pais_email
+    from almacen.utils.cotizacion_email_context import (
+        asunto_recotizacion_solicitada,
+        equipo_visible_solicitud,
+        nombre_cliente_visible_solicitud,
+        url_base_pais_email,
+    )
     from almacen.utils.notificar_vigencia_cotizacion import (
         armar_destinatarios_email_recotizacion,
         notificar_recotizacion_a_compras,
@@ -204,6 +209,7 @@ def notificar_recotizacion_solicitada_task(
         try:
             solicitud = SolicitudCotizacion.objects.select_related(
                 'orden_servicio',
+                'orden_servicio__detalle_equipo',
                 'creado_por',
             ).get(pk=solicitud_id)
         except SolicitudCotizacion.DoesNotExist:
@@ -254,6 +260,8 @@ def notificar_recotizacion_solicitada_task(
                 f"{url_base_pais_email()}"
                 f"/almacen/solicitudes-cotizacion/{solicitud.pk}/"
             ),
+            'nombre_cliente': nombre_cliente_visible_solicitud(solicitud),
+            'equipo': equipo_visible_solicitud(solicitud),
         }
 
         html_content = render_to_string(
@@ -261,15 +269,7 @@ def notificar_recotizacion_solicitada_task(
             context,
         )
 
-        referencia = (
-            solicitud.numero_orden_cliente
-            or solicitud.service_tag
-            or solicitud.numero_solicitud
-        )
-        asunto = (
-            f'🔄 Recotización solicitada — {solicitud.numero_solicitud} '
-            f'({referencia})'
-        )
+        asunto = asunto_recotizacion_solicitada(solicitud)
 
         email_msg = EmailMessage(
             subject=asunto,
@@ -279,6 +279,9 @@ def notificar_recotizacion_solicitada_task(
         )
         email_msg.content_subtype = 'html'
         _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        # Logo blanco de la barra. Los iconos siguen en el helper compartido.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
         email_msg.send(fail_silently=False)
 
         logger.info(

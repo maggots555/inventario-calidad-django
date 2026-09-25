@@ -175,6 +175,114 @@ def nombre_cliente_visible_solicitud(solicitud: 'SolicitudCotizacion') -> str:
     return (getattr(detalle, 'nombre_cliente', None) or '').strip()
 
 
+def _texto_choice(objeto, campo: str) -> str:
+    """
+    Lee un campo y, si tiene choices, devuelve la etiqueta visible.
+
+    Args:
+        objeto: Modelo o sustituto con el campo.
+        campo: Nombre del campo (marca, tipo_equipo, etc.).
+
+    Returns:
+        str: Etiqueta recortada, o cadena vacía.
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    valor = (getattr(objeto, campo, None) or '')
+    valor = str(valor).strip()
+    if not valor:
+        return ''
+    # get_marca_display() existe solo si el campo tiene choices.
+    lector = getattr(objeto, f'get_{campo}_display', None)
+    if not callable(lector):
+        return valor
+    try:
+        return str(lector() or valor).strip()
+    except Exception:
+        return valor
+
+
+def _unir_partes_equipo(*partes: str) -> str:
+    """Junta tipo, marca y modelo sin huecos ni dobles espacios."""
+    return ' '.join(parte for parte in partes if parte)
+
+
+def equipo_visible_solicitud(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Texto del equipo que debe verse en un correo de Almacén.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Igual que el nombre del cliente: si hay orden, marca y modelo viven
+    en DetalleEquipo. Los campos solicitud.marca / solicitud.modelo solo
+    se llenan cuando la cotización se creó sin orden. Leer solo esos
+    deja la fila Equipo en blanco.
+
+    Args:
+        solicitud: SolicitudCotizacion (con o sin orden vinculada).
+
+    Returns:
+        str: Tipo, marca y modelo unidos, o cadena vacía.
+
+    Efectos secundarios:
+        Ninguno. Si la orden no tiene detalle, usa los campos de la solicitud.
+    """
+    orden = getattr(solicitud, 'orden_servicio', None)
+    if orden is not None:
+        try:
+            detalle = orden.detalle_equipo
+        except Exception:
+            detalle = None
+        if detalle is not None:
+            de_orden = _unir_partes_equipo(
+                _texto_choice(detalle, 'tipo_equipo'),
+                _texto_choice(detalle, 'marca'),
+                (getattr(detalle, 'modelo', None) or '').strip(),
+            )
+            if de_orden:
+                return de_orden
+
+    # Sin orden, o la orden no trae equipo: lo que recepción capturó.
+    return _unir_partes_equipo(
+        _texto_choice(solicitud, 'tipo_equipo'),
+        _texto_choice(solicitud, 'marca'),
+        (getattr(solicitud, 'modelo', None) or '').strip(),
+    )
+
+
+def asunto_recotizacion_solicitada(solicitud: 'SolicitudCotizacion') -> str:
+    """
+    Asunto del correo de recotización a Compras.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Compras reconoce primero la orden del cliente (OOW-…), no el folio
+    interno SOL-…. El SOL va entre paréntesis. Si no hay orden, el
+    asunto sigue llevando el SOL y, si existe, el Service Tag.
+
+    Args:
+        solicitud: SolicitudCotizacion recotizada.
+
+    Returns:
+        str: Asunto listo, con el emoji de recotización.
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    folio = (getattr(solicitud, 'numero_solicitud', None) or '').strip()
+    orden_cliente = (getattr(solicitud, 'numero_orden_cliente', None) or '').strip()
+    service_tag = (getattr(solicitud, 'service_tag', None) or '').strip()
+
+    # Con orden: OOW primero, SOL entre paréntesis.
+    if orden_cliente:
+        identificador = f'{orden_cliente} ({folio})' if folio else orden_cliente
+    elif service_tag and folio and service_tag != folio:
+        identificador = f'{folio} ({service_tag})'
+    else:
+        identificador = folio or service_tag
+
+    return f'🔄 Recotización solicitada — {identificador}'
+
+
 def identificador_asunto_solicitud(solicitud: 'SolicitudCotizacion') -> str:
     """
     Identificador visible en el asunto (subject) de correos de Almacén.

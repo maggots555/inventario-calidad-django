@@ -12,7 +12,10 @@ from types import SimpleNamespace
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 
-from almacen.utils.cotizacion_email_context import nombre_cliente_visible_solicitud
+from almacen.utils.cotizacion_email_context import (
+    equipo_visible_solicitud,
+    nombre_cliente_visible_solicitud,
+)
 
 
 PLANTILLA = 'almacen/emails/cotizacion_aceptada_compras.html'
@@ -209,3 +212,38 @@ class NombreClienteVisibleSolicitudTests(SimpleTestCase):
         """Sin ninguno de los dos, el correo muestra el guion, no truena."""
         solicitud = SimpleNamespace(nombre_cliente='  ', orden_servicio=None)
         self.assertEqual(nombre_cliente_visible_solicitud(solicitud), '')
+
+
+class EquipoVisibleSolicitudTests(SimpleTestCase):
+    """El equipo del correo sale de la orden si la solicitud no lo trae."""
+
+    def test_usa_el_de_la_orden_si_la_solicitud_esta_vacia(self):
+        """Cotización con orden: marca y modelo están en el equipo."""
+        solicitud = SimpleNamespace(
+            marca='',
+            modelo='',
+            tipo_equipo='',
+            orden_servicio=SimpleNamespace(
+                detalle_equipo=SimpleNamespace(
+                    tipo_equipo='laptop',
+                    get_tipo_equipo_display=lambda: 'Laptop',
+                    marca='Dell',
+                    modelo='Latitude',
+                ),
+            ),
+        )
+        self.assertEqual(
+            equipo_visible_solicitud(solicitud),
+            'Laptop Dell Latitude',
+        )
+
+    def test_sin_orden_usa_lo_capturado_en_la_solicitud(self):
+        """Sin orden: tipo, marca visible y modelo de la propia solicitud."""
+        solicitud = SimpleNamespace(
+            marca='dell',
+            get_marca_display=lambda: 'Dell',
+            modelo='Inspiron',
+            tipo_equipo='',
+            orden_servicio=None,
+        )
+        self.assertEqual(equipo_visible_solicitud(solicitud), 'Dell Inspiron')
