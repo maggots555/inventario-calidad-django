@@ -159,6 +159,9 @@ def notificar_almacenista_solicitud_baja_task(
         )
         email_msg.content_subtype = 'html'
         _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        # Logo blanco de la barra. Los iconos siguen en el helper compartido.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
         email_msg.send(fail_silently=False)
 
         logger.info(
@@ -365,6 +368,9 @@ def notificar_solicitud_baja_procesada_task(
         )
         email_msg.content_subtype = 'html'
         _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        # Logo blanco de la barra. Los iconos siguen en el helper compartido.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
         email_msg.send(fail_silently=False)
 
         logger.info(
