@@ -382,6 +382,13 @@ class NotificarClientePncTaskTest(BaseIntegracionCotizacionMixin, TestCase):
         self.assertIn('NO RESPONDA', body)
         self.assertIn('responsable de seguimiento', body)
         self.assertIn('Visítanos y síguenos en nuestras redes sociales', body)
+        self.assertIn('cid:logo_sic_white', body)
+        cids = [
+            adjunto.get('Content-ID', '')
+            for adjunto in msg.attachments
+            if hasattr(adjunto, 'get')
+        ]
+        self.assertIn('<logo_sic_white>', cids)
 
 
 class DetalleSolicitudFlagsPncTest(BaseIntegracionCotizacionMixin, TestCase):

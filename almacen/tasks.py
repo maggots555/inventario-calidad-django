@@ -1326,6 +1326,11 @@ def notificar_cliente_pnc_task(
                 'cantidad': linea.cantidad,
             })
 
+        # Misma regla que el asunto: con orden → orden_cliente, no el SOL interno.
+        from .utils.cotizacion_email_context import identificador_asunto_solicitud
+
+        referencia_cliente = identificador_asunto_solicitud(solicitud)
+
         context = {
             'solicitud': solicitud,
             'lineas_listado': lineas_listado,
@@ -1333,6 +1338,7 @@ def notificar_cliente_pnc_task(
             'nombre_cliente': nombre_cliente or 'Cliente',
             'mensaje_personalizado': mensaje_personalizado,
             'tiene_orden_vinculada': bool(solicitud.orden_servicio_id),
+            'referencia_cliente': referencia_cliente,
             'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
             'hora_envio_texto': ahora_local.strftime('%H:%M'),
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
@@ -1346,10 +1352,8 @@ def notificar_cliente_pnc_task(
             context,
         )
 
-        # EXPLICACIÓN: con orden → orden_cliente; sin orden → S/T (helper común)
-        from .utils.cotizacion_email_context import identificador_asunto_solicitud
-
-        numero_display = identificador_asunto_solicitud(solicitud)
+        # EXPLICACIÓN: el asunto usa la misma referencia que el párrafo del cuerpo.
+        numero_display = referencia_cliente
 
         # EXPLICACIÓN PARA PRINCIPIANTES: el emoji ⚠️ va en el asunto (no en el HTML)
         # para que destaque en la bandeja del cliente, igual que el PNC a recepción.
@@ -1384,6 +1388,11 @@ def notificar_cliente_pnc_task(
                     email_msg.attach(logo_mime)
         except Exception as e:
             logger.warning(f'[PNC-CLIENTE] Error al adjuntar logo: {e}')
+
+        # Logo blanco de la barra (#1e293b). Los iconos sí se usan:
+        # este correo va al cliente y el pie lleva redes.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, '[PNC-CLIENTE]')
 
         try:
             iconos_sociales = {

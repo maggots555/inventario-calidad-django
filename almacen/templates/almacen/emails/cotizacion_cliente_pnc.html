@@ -1,314 +1,279 @@
+{% comment %}
+  Correo al cliente: partes no disponibles (PNC).
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta de tablas y CSS inline que imagenes_cliente.html.
+  El encabezado va en ámbar porque es un aviso, no una cotización.
+  Este SÍ lleva redes: es para el cliente. Van en tabla, con texto
+  visible, y el sitio sigue siendo sicgroup.mx (no se copia sicfix).
+
+  El texto de negocio no cambia. El style de abajo solo refuerza
+  móvil y dark mode.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Aviso: componentes no disponibles</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
         }
-        .container {
-            max-width: 650px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #fff8e1 50%, #ffb74d 100%);
-            color: #e65100;
-            padding: 28px 24px;
-            text-align: center;
-        }
-        .logo-image {
-            max-width: 160px;
-            height: auto;
-            display: block;
-            margin: 0 auto 12px auto;
-        }
-        .logo { font-size: 22px; font-weight: bold; margin-bottom: 6px; }
-        .subtitle { font-size: 14px; opacity: 0.9; }
-        .content { padding: 32px 28px; }
-        .greeting { font-size: 17px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
-        .intro-text { font-size: 15px; color: #555; margin-bottom: 20px; line-height: 1.7; }
-        .alert-box {
-            background: #fff3cd;
-            border: 2px solid #ff9800;
-            border-radius: 10px;
-            padding: 18px;
-            margin: 18px 0 22px 0;
-        }
-        .alert-title { font-size: 16px; font-weight: 700; color: #e65100; margin-bottom: 8px; }
-        .alert-text { font-size: 14px; color: #5d4037; line-height: 1.7; }
-        .lineas-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 14px;
-        }
-        .lineas-table thead { background-color: #ef6c00; color: white; }
-        .lineas-table th, .lineas-table td {
-            padding: 10px 8px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-            vertical-align: top;
-        }
-        .badge-no {
-            display: inline-block;
-            background: #ffecb3;
-            color: #e65100;
-            font-weight: 700;
-            font-size: 11px;
-            padding: 3px 7px;
-            border-radius: 4px;
-        }
-        /* Texto comercial formal debajo del alert (carta PNC al cliente) */
-        .carta-pnc {
-            font-size: 15px;
-            color: #555;
-            margin: 0 0 22px 0;
-            line-height: 1.7;
-            text-align: justify;
-        }
-        .seguimiento-box {
-            background: #e3f2fd;
-            border-left: 4px solid #1976d2;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 22px 0;
-            font-size: 14px;
-            color: #37474f;
-            line-height: 1.7;
-        }
-        .message-box {
-            background: #f8f9fa;
-            border-left: 4px solid #ff9800;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 20px 0;
-            font-size: 14px;
-            color: #555;
-            font-style: italic;
-        }
-        /* Footer alineado al de cotizacion_front_pnc.html (PNC a recepción) */
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-        }
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            border: 2px solid rgba(255, 255, 255, 0.5);
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-warn { background-color: #1c1917 !important; }
+            .email-warn-title { color: #fdba74 !important; }
+            .email-td { background-color: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            <div class="logo">Aviso sobre su solicitud</div>
-            <div class="subtitle">
-                {% if solicitud.orden_servicio %}
-                    S/T: {{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:solicitud.numero_solicitud }}
-                {% elif solicitud.service_tag %}
-                    S/T: {{ solicitud.service_tag }}
-                {% else %}
-                    {{ solicitud.numero_solicitud }}
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="content">
-            <div class="greeting">Estimado/a {{ nombre_cliente }},</div>
-
-            <div class="alert-box">
-                <div class="alert-title">Componentes no disponibles para cotización</div>
-                <div class="alert-text">
-                    Le informamos que, tras la búsqueda en el mercado, los componentes
-                    solicitados <strong>no están disponibles para cotizar</strong>
-                    en este momento (descontinuados, sin stock de proveedores o con
-                    tiempos de importación que no permiten continuar el proceso normal).
-                </div>
-            </div>
-
-            {# EXPLICACIÓN: carta de retiro solo si el equipo ya ingresó (hay orden vinculada) #}
-            {% if tiene_orden_vinculada %}
-            <div class="carta-pnc">
-                Me dirijo de SIC MÉXICO; respecto al equipo de cómputo que dejó con
-                nosotros para revisión, le comento que no podemos hacerle una cotización
-                de reparación debido a que por el momento no hay piezas disponibles para
-                este modelo. En caso de existir respuesta por parte de nuestros proveedores
-                referente a la(s) pieza(s) le estaré haciendo llegar nuestra propuesta
-                indicando tiempo de entrega y precio de las refacciones correspondientes.
-                Pero es muy importante que mientras eso sucede pueda retirar su equipo ya
-                que no contamos con fecha estimada para darle respuesta al respecto; en
-                cuanto su equipo esté disponible para ser retirado una de mis compañeras
-                lo confirmará por éste mismo medio.
-            </div>
-            {% endif %}
-
-            <div class="intro-text">
-                A continuación el listado de componentes revisados:
-            </div>
-
-            <table class="lineas-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Componente</th>
-                        <th>Cant.</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in lineas_listado %}
-                    <tr>
-                        <td>{{ item.numero }}</td>
-                        <td>
-                            <strong>{{ item.producto }}</strong>
-                            {% if item.descripcion %}
-                            <br><span style="font-size: 12px; color: #6c757d;">{{ item.descripcion }}</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ item.cantidad }}</td>
-                        <td><span class="badge-no">No disponible</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <div class="seguimiento-box">
-                Nuestro equipo de atención le contactará si existen
-                <strong>alternativas</strong> aplicables a su caso
-                (por ejemplo, otras opciones de servicio).
-                Mientras tanto, puede comunicarse con el centro de servicio
-                si desea más información sobre su solicitud
-                <strong>{{ solicitud.numero_solicitud }}</strong>.
-            </div>
-
-            {% if mensaje_personalizado %}
-            <div class="message-box">
-                <strong>Nota adicional:</strong><br>
-                {{ mensaje_personalizado|linebreaks }}
-            </div>
-            {% endif %}
-
-            <p style="margin-top: 24px; font-size: 13px; color: #777; text-align: center;">
-                {% if nombre_usuario %}
-                Mensaje enviado por: <strong>{{ nombre_usuario }}</strong>
-                {% else %}
-                Mensaje enviado desde el Sistema de Almacén
-                {% endif %}
-            </p>
-        </div>
-
-        {# Footer igual al de cotizacion_front_pnc.html (PNC a recepción) #}
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">
-                    Sistema de Almacén SIC
-                </div>
-                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
-                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para consultas sobre esta notificación, contacte directamente a su responsable de seguimiento.
-                </div>
-            </div>
-
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicgroup.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Facebook</span>
-                    </a>
-                    {% if whatsapp_empleado %}
-                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
-                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>WhatsApp</span>
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="timestamp">
-                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Los componentes solicitados no están disponibles para cotizar.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-warn email-pad" bgcolor="#fff7ed" align="center" style="padding:20px 32px;background-color:#fff7ed;border-bottom:4px solid #c2410c;">
+                            <p class="email-warn-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#c2410c;">
+                                Aviso sobre su solicitud
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                {% if solicitud.orden_servicio %}
+                                    S/T: {{ solicitud.orden_servicio.detalle_equipo.numero_serie|default:solicitud.numero_solicitud }}
+                                {% elif solicitud.service_tag %}
+                                    S/T: {{ solicitud.service_tag }}
+                                {% else %}
+                                    {{ solicitud.numero_solicitud }}
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Estimado/a {{ nombre_cliente }},
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fff7ed" class="email-warn" style="background-color:#fff7ed;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 8px 0;font-size:16px;line-height:22px;font-weight:700;color:#c2410c;">
+                                            Componentes no disponibles para cotización
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:15px;line-height:24px;color:#334155;">
+                                            Le informamos que, tras la búsqueda en el mercado, los componentes
+                                            solicitados <strong>no están disponibles para cotizar</strong>
+                                            en este momento (descontinuados, sin stock de proveedores o con
+                                            tiempos de importación que no permiten continuar el proceso normal).
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if tiene_orden_vinculada %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <p class="email-body-text" style="margin:0;font-size:15px;line-height:24px;color:#334155;">
+                                Me dirijo de SIC MÉXICO; respecto al equipo de cómputo que dejó con
+                                nosotros para revisión, le comento que no podemos hacerle una cotización
+                                de reparación debido a que por el momento no hay piezas disponibles para
+                                este modelo. En caso de existir respuesta por parte de nuestros proveedores
+                                referente a la(s) pieza(s) le estaré haciendo llegar nuestra propuesta
+                                indicando tiempo de entrega y precio de las refacciones correspondientes.
+                                Pero es muy importante que mientras eso sucede pueda retirar su equipo ya
+                                que no contamos con fecha estimada para darle respuesta al respecto; en
+                                cuanto su equipo esté disponible para ser retirado una de mis compañeras
+                                lo confirmará por éste mismo medio.
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 16px 32px;">
+                            <p class="email-body-text" style="margin:0;font-size:16px;line-height:26px;color:#334155;">
+                                A continuación el listado de componentes revisados:
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+                                <tr>
+                                    <td class="email-td" bgcolor="#1f6391" width="32" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">#</td>
+                                    <td class="email-td" bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Componente</td>
+                                    <td class="email-td" bgcolor="#1f6391" width="52" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Cant.</td>
+                                    <td class="email-td" bgcolor="#1f6391" width="110" align="center" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;text-align:center;">Estado</td>
+                                </tr>
+                                {% for item in lineas_listado %}
+                                <tr>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;border-bottom:1px solid #e2e8f0;">{{ item.numero }}</td>
+                                    <td class="email-td" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;">
+                                        <p class="email-body-text" style="margin:0;font-size:13px;line-height:18px;font-weight:700;color:#0f172a;">{{ item.producto }}</p>
+                                        {% if item.descripcion %}
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:#64748b;">{{ item.descripcion }}</p>
+                                        {% endif %}
+                                    </td>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;border-bottom:1px solid #e2e8f0;">{{ item.cantidad }}</td>
+                                    <td class="email-td" bgcolor="#ffffff" align="center" valign="top" style="padding:10px 8px;background-color:#ffffff;font-size:13px;line-height:18px;font-weight:700;text-align:center;color:#c2410c;border-bottom:1px solid #e2e8f0;">
+                                        No disponible
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#e8f4fd" class="email-panel" style="background-color:#e8f4fd;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            Nuestro equipo de atención le contactará si existen
+                                            <strong>alternativas</strong> aplicables a su caso
+                                            (por ejemplo, otras opciones de servicio).
+                                            Mientras tanto, puede comunicarse con el centro de servicio
+                                            si desea más información sobre su solicitud
+                                            <strong>{{ referencia_cliente|default:solicitud.numero_solicitud }}</strong>.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if mensaje_personalizado %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #c2410c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-warn-title" style="margin:0 0 8px 0;font-size:14px;line-height:20px;font-weight:700;color:#c2410c;">
+                                            Nota adicional:
+                                        </p>
+                                        <div class="email-body-text" style="font-size:14px;line-height:22px;color:#334155;font-style:italic;">
+                                            {{ mensaje_personalizado|linebreaks }}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:8px 32px 28px 32px;border-top:1px solid #e2e8f0;">
+                            <p class="email-muted" style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#64748b;text-align:center;">
+                                {% if nombre_usuario %}
+                                Mensaje enviado por: <strong>{{ nombre_usuario }}</strong>
+                                {% else %}
+                                Mensaje enviado desde el Sistema de Almacén
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+
+                    {# Pie de cliente: redes en tabla. La URL del sitio no se cambia. #}
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:28px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Almacén SIC
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para consultas sobre esta notificación, contacte directamente a su responsable de seguimiento.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 16px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                Visítanos y síguenos en nuestras redes sociales
+                            </p>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://sicgroup.mx/" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_link" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Sitio Web
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.instagram.com/sic_mexico/?hl=es" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_instagram" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding:8px 4px;">
+                                        <a href="https://www.facebook.com/LatAmSic" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_facebook" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> Facebook
+                                        </a>
+                                    </td>
+                                    <td align="center" style="padding:8px 4px;">
+                                        {% if whatsapp_empleado %}
+                                        <a href="https://wa.me/{{ whatsapp_empleado }}" target="_blank" style="color:#ffffff;text-decoration:underline;font-weight:600;font-size:14px;line-height:20px;">
+                                            <img src="cid:icon_whatsapp" alt="" width="16" height="16" style="width:16px;height:16px;border:0;vertical-align:middle;"> WhatsApp
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
