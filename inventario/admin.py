@@ -124,6 +124,7 @@ class EmpleadoAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'area', 'cargo', 'rol', 'sucursal', 'activo', 'mostrar_en_carga_trabajo',
+        'atiende_garantias_dell', 'atiende_garantias_lenovo',
         'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_ingreso',
     )
     search_fields = ('nombre_completo', 'cargo', 'area', 'email')
@@ -135,8 +136,15 @@ class EmpleadoAdmin(admin.ModelAdmin):
             'fields': ('nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp', 'foto_perfil', 'preview_foto')
         }),
         ('Ubicación y Jerarquía', {
-            'fields': ('sucursal', 'jefe_directo', 'rol'),
-            'description': 'Sucursal donde trabaja el empleado, su jefe directo y rol en el sistema'
+            'fields': (
+                'sucursal', 'jefe_directo', 'rol',
+                'atiende_garantias_dell', 'atiende_garantias_lenovo',
+            ),
+            'description': (
+                'Sucursal, jefe directo y rol. Las casillas Dell y Lenovo '
+                'solo aplican al rol Dispatcher: el aviso de equipo listo en '
+                'garantía usa esa marca. En otro rol se apagan al guardar.'
+            ),
         }),
         ('Acceso al Sistema', {
             'fields': ('user', 'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_envio_credenciales', 'fecha_activacion_acceso'),
@@ -156,6 +164,16 @@ class EmpleadoAdmin(admin.ModelAdmin):
         }),
     )
     
+    class Media:
+        """
+        JS que oculta Dell/Lenovo si el rol del admin no es Dispatcher.
+
+        Efectos secundarios: ninguno en el servidor; solo muestra u oculta
+        filas del formulario.
+        """
+
+        js = ('js/empleado_marcas_garantia.js',)
+
     def tiene_foto(self, obj):
         """
         Muestra un ícono indicando si el empleado tiene foto de perfil

@@ -422,6 +422,7 @@ class EmpleadoForm(forms.ModelForm):
             'nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp',
             'foto_perfil', 'sucursal', 'jefe_directo', 'rol', 'activo',
             'mostrar_en_carga_trabajo',
+            'atiende_garantias_dell', 'atiende_garantias_lenovo',
         ]
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
@@ -464,6 +465,12 @@ class EmpleadoForm(forms.ModelForm):
                 'class': 'form-check-input'
             }),
             'mostrar_en_carga_trabajo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'atiende_garantias_dell': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'atiende_garantias_lenovo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
         }
@@ -513,6 +520,26 @@ class EmpleadoForm(forms.ModelForm):
                 )
         
         return email
+
+    def clean(self):
+        """
+        Apaga Dell y Lenovo si el rol guardado no es Dispatcher.
+
+        Objetivo: el formulario no debe persistir esas casillas en un técnico
+        o un recepcionista, aunque el navegador las haya enviado ocultas.
+
+        Returns:
+            dict: datos ya limpios del formulario.
+
+        Efectos secundarios: ninguno (solo ajusta cleaned_data; el modelo
+        también apaga las casillas en save()).
+        """
+        datos = super().clean()
+        # El <select> de rol manda: otro rol no atiende garantías por marca.
+        if datos.get('rol') != 'dispatcher':
+            datos['atiende_garantias_dell'] = False
+            datos['atiende_garantias_lenovo'] = False
+        return datos
 
 
 class MovimientoFraccionarioForm(forms.ModelForm):

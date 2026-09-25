@@ -561,71 +561,18 @@ def notificar_dispatchers_ingreso(sender, instance: DetalleEquipo, created: bool
 
 
 @receiver(post_save, sender=OrdenServicio)
-def notificar_dispatchers_finalizacion(sender, instance: OrdenServicio, created: bool, **kwargs):
-    """
-    Notifica a todos los dispatchers cuando el estado del flujo normal
-    cambia a 'finalizado' (listo para entrega).
-
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    El pre_save guardar_estado_rhitso_anterior guarda instance._estado_anterior
-    antes de que se sobreescriba el valor en la BD.
-    Aquí lo comparamos: si el estado anterior NO era 'finalizado' y el actual SÍ
-    lo es, significa que acaba de finalizar → notificamos.
-
-    Ignoramos created=True (ingreso) porque eso ya lo maneja
-    notificar_dispatchers_ingreso sobre DetalleEquipo.
-    """
-    if created:
-        return
-
-    # Solo notificar para órdenes EN GARANTÍA
-    if instance.es_fuera_garantia:
-        return
-
-    estado_anterior = getattr(instance, '_estado_anterior', None)
-
-    if instance.estado == 'finalizado' and estado_anterior != 'finalizado':
-        from notificaciones.push_service import enviar_push_a_usuario  # noqa
-        from inventario.models import Empleado                          # noqa
-
-        dispatchers = Empleado.objects.filter(
-            rol='dispatcher',
-            user__is_active=True,
-        ).select_related('user')
-
-        if not dispatchers.exists():
-            return
-
-        url_orden = reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': instance.pk})
-
-        try:
-            etiqueta_orden = instance.detalle_equipo.orden_cliente or instance.numero_orden_interno
-            service_tag = instance.detalle_equipo.numero_serie or 'S/N no registrado'
-        except Exception:
-            etiqueta_orden = instance.numero_orden_interno
-            service_tag = 'S/N no registrado'
-
-        for dispatcher in dispatchers:
-            _push_seguro(
-                enviar_push_a_usuario,
-                usuario=dispatcher.user,
-                titulo=f'✅ Orden lista: {etiqueta_orden}',
-                mensaje=f'La orden {etiqueta_orden} ha finalizado y está lista para entrega. Service Tag: {service_tag}',
-                url=url_orden,
-            )
-
-
-@receiver(post_save, sender=OrdenServicio)
 def notificar_recepcion_al_finalizar(sender, instance: OrdenServicio, created: bool, **kwargs):
     """
-    Avisa a recepción cuando la orden pasa a 'finalizado'.
+    Avisa al staff correcto cuando la orden pasa a 'finalizado'.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     ================================
-    Disparador B del plan "equipo disponible": cambio a Finalizado / Listo
-    para Entrega. Si el aviso ya se mandó al subir fotos de egreso, el helper
-    omite (flag aviso_recepcion_listo_enviado). Aplica a garantía y OOW.
+    Este es el único disparo del aviso "equipo listo". Subir fotos de egreso
+    ya deja la orden en Finalizado, y ese save() llega aquí. No se vuelve a
+    avisar si el estado se guarda otra vez (flag aviso_recepcion_listo_enviado).
+
+    Garantía: dispatcher de Dell o de Lenovo.
+    Fuera de garantía: responsable de seguimiento o recepcionistas.
     """
     if created:
         return

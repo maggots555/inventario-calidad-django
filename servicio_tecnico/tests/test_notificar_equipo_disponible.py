@@ -151,11 +151,11 @@ class AvisoRecepcionEquipoListoTest(TestCase):
 
 class DestinatariosGarantiaOowTest(TestCase):
     """
-    OOW → recepción; garantía → dispatchers.
+    OOW → recepción; garantía Dell/Lenovo → el dispatcher de esa marca.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Creamos un recepcionista y un dispatcher. Según es_fuera_garantia,
-    solo uno de los dos debe recibir la campanita.
+    Hay un recepcionista, un dispatcher de Dell y uno de Lenovo.
+    La campanita solo le llega a quien corresponde.
     """
 
     databases = {'default', 'mexico'}
@@ -178,18 +178,33 @@ class DestinatariosGarantiaOowTest(TestCase):
             user=self.user_recep,
             rol='recepcionista',
         )
-        self.user_disp = User.objects.create_user(
-            username='disp_dest',
+        self.user_dell = User.objects.create_user(
+            username='disp_dell',
             password='testpass123',
         )
-        self.dispatcher = Empleado.objects.create(
-            nombre_completo='Dispatcher Dest',
+        self.dispatcher_dell = Empleado.objects.create(
+            nombre_completo='Dispatcher Dell',
             cargo='Dispatcher',
             area='Operaciones',
-            email='disp.dest@test.local',
+            email='disp.dell@test.local',
             sucursal=self.sucursal,
-            user=self.user_disp,
+            user=self.user_dell,
             rol='dispatcher',
+            atiende_garantias_dell=True,
+        )
+        self.user_lenovo = User.objects.create_user(
+            username='disp_lenovo',
+            password='testpass123',
+        )
+        self.dispatcher_lenovo = Empleado.objects.create(
+            nombre_completo='Dispatcher Lenovo',
+            cargo='Dispatcher',
+            area='Operaciones',
+            email='disp.lenovo@test.local',
+            sucursal=self.sucursal,
+            user=self.user_lenovo,
+            rol='dispatcher',
+            atiende_garantias_lenovo=True,
         )
         self.user_tec = User.objects.create_user(
             username='tec_dest',
@@ -205,7 +220,7 @@ class DestinatariosGarantiaOowTest(TestCase):
             rol='tecnico',
         )
 
-    def _crear_orden(self, folio: str, responsable=None) -> OrdenServicio:
+    def _crear_orden(self, folio: str, responsable=None, marca: str = 'Dell') -> OrdenServicio:
         orden = OrdenServicio.objects.create(
             sucursal=self.sucursal,
             tipo_servicio='diagnostico',
@@ -217,7 +232,7 @@ class DestinatariosGarantiaOowTest(TestCase):
             orden=orden,
             orden_cliente=folio,
             tipo_equipo='Laptop',
-            marca='DELL',
+            marca=marca,
             modelo='XPS',
             numero_serie=f'ST-{folio}',
             email_cliente='cliente.dest@test.local',
@@ -234,7 +249,7 @@ class DestinatariosGarantiaOowTest(TestCase):
         orden = self._crear_orden('OOW-DEST-01', responsable=self.recepcionista)
         self.assertTrue(orden.es_fuera_garantia)
 
-        ok = notificar_recepcion_equipo_listo(orden, motivo='egreso')
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
         self.assertTrue(ok)
 
         self.assertGreaterEqual(
@@ -242,7 +257,11 @@ class DestinatariosGarantiaOowTest(TestCase):
             1,
         )
         self.assertEqual(
-            Notificacion.objects.filter(usuario=self.user_disp).count(),
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
+            0,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_lenovo).count(),
             0,
         )
         historial = HistorialOrden.objects.filter(
@@ -252,17 +271,25 @@ class DestinatariosGarantiaOowTest(TestCase):
         self.assertEqual(historial.count(), 1)
 
     @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
-    def test_garantia_notifica_dispatcher_no_recepcion(self, _mock_push):
-        """En garantía: campanita a dispatchers, no a recepción."""
-        orden = self._crear_orden('SIC-DEST-99', responsable=self.recepcionista)
+    def test_garantia_dell_solo_su_dispatcher(self, _mock_push):
+        """En garantía Dell: campanita al dispatcher Dell, no a Lenovo ni recepción."""
+        orden = self._crear_orden(
+            'SIC-DEST-99',
+            responsable=self.recepcionista,
+            marca='Dell',
+        )
         self.assertFalse(orden.es_fuera_garantia)
 
         ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
         self.assertTrue(ok)
 
         self.assertGreaterEqual(
-            Notificacion.objects.filter(usuario=self.user_disp).count(),
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
             1,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_lenovo).count(),
+            0,
         )
         self.assertEqual(
             Notificacion.objects.filter(usuario=self.user_recep).count(),
@@ -273,6 +300,56 @@ class DestinatariosGarantiaOowTest(TestCase):
             comentario__icontains='Aviso a dispatchers',
         )
         self.assertEqual(historial.count(), 1)
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_lenovo_solo_su_dispatcher(self, _mock_push):
+        """En garantía Lenovo: solo el dispatcher con esa casilla."""
+        orden = self._crear_orden('SIC-DEST-LV', marca='Lenovo')
+        self.assertFalse(orden.es_fuera_garantia)
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
+        self.assertTrue(ok)
+
+        self.assertGreaterEqual(
+            Notificacion.objects.filter(usuario=self.user_lenovo).count(),
+            1,
+        )
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
+            0,
+        )
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_otra_marca_no_avisa(self, _mock_push):
+        """HP dentro de garantía no tiene contrato: nadie recibe campanita."""
+        orden = self._crear_orden('SIC-DEST-HP', marca='HP')
+        self.assertFalse(orden.es_fuera_garantia)
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
+        self.assertFalse(ok)
+        self.assertEqual(Notificacion.objects.count(), 0)
+        historial = HistorialOrden.objects.filter(
+            orden=orden,
+            comentario__icontains='destinatarios: 0',
+        )
+        self.assertEqual(historial.count(), 1)
+
+    @patch('servicio_tecnico.tasks.enviar_recordatorio_imagen_task')
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_signal_garantia_avisa_una_vez(self, _mock_push, _mock_recordatorio):
+        """Pasar a Finalizado avisa una vez; un segundo guardado no repite."""
+        orden = self._crear_orden('SIC-DEST-SIG', marca='DELL')
+        orden.estado = 'finalizado'
+        orden.save()
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
+            1,
+        )
+        orden.save()
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
+            1,
+        )
 
 
 class NotificarEquipoDisponibleVistaTest(TestCase):

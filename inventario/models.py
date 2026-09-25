@@ -660,7 +660,59 @@ class Empleado(models.Model):
         verbose_name='Rol en el Sistema',
         help_text='Define los permisos y accesos del empleado en el sistema'
     )
-    
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Dentro de garantía solo hay contrato con Dell y Lenovo, y no las
+    # atiende la misma persona. Estas casillas dicen a qué dispatcher avisar
+    # cuando el equipo queda listo. En cualquier otro rol no aplican:
+    # save() las apaga para que un técnico no reciba ese aviso.
+    atiende_garantias_dell = models.BooleanField(
+        default=False,
+        verbose_name='Atiende garantías Dell',
+        help_text=(
+            'Si está activo, este dispatcher recibe el aviso de equipo listo '
+            'cuando la orden en garantía es marca Dell. Solo aplica al rol Dispatcher.'
+        ),
+    )
+    atiende_garantias_lenovo = models.BooleanField(
+        default=False,
+        verbose_name='Atiende garantías Lenovo',
+        help_text=(
+            'Si está activo, este dispatcher recibe el aviso de equipo listo '
+            'cuando la orden en garantía es marca Lenovo. Solo aplica al rol Dispatcher.'
+        ),
+    )
+
+    def save(self, *args, **kwargs):
+        """
+        Guarda el empleado y apaga las marcas de garantía si no es dispatcher.
+
+        Objetivo: Dell y Lenovo solo tienen sentido en el rol Dispatcher.
+        Si el rol cambia (o alguien marca las casillas por error), no deben
+        quedar encendidas.
+
+        Args:
+            *args, **kwargs: los mismos que Model.save(), incluido update_fields.
+
+        Efectos secundarios:
+            Escribe la fila del empleado. Si el rol no es dispatcher, también
+            guarda las dos casillas en False.
+        """
+        # Paso 1: un recepcionista, técnico, etc. no atiende garantías por marca.
+        if self.rol != 'dispatcher':
+            self.atiende_garantias_dell = False
+            self.atiende_garantias_lenovo = False
+            # Paso 2: un save parcial (update_fields) ignoraría el apagado
+            # si esas columnas no van en la lista. Las agregamos.
+            campos = kwargs.get('update_fields')
+            if campos is not None:
+                kwargs['update_fields'] = set(campos) | {
+                    'atiende_garantias_dell',
+                    'atiende_garantias_lenovo',
+                }
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.nombre_completo
     

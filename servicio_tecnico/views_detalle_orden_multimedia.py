@@ -302,19 +302,12 @@ def handle_subir_imagenes(request, orden, empleado_actual):
                         es_sistema=True
                     )
 
-                # Guardar cambios si hubo actualización de estado
+                # Guardar cambios si hubo actualización de estado.
+                # EXPLICACIÓN: si el egreso pasó la orden a Finalizado, el
+                # signal notificar_recepcion_al_finalizar manda el único aviso
+                # de equipo listo. No se llama otra vez desde aquí.
                 if cambio_realizado:
                     orden.save()
-
-                # Aviso a recepción: fotos de egreso (anti-dup con finalizado).
-                # EXPLICACIÓN: Si el save() anterior ya pasó a finalizado, el
-                # signal pudo haber avisado; el flag evita el duplicado.
-                # Si la orden YA estaba finalizada, solo este disparo avisa.
-                if tipo_imagen == 'egreso':
-                    from servicio_tecnico.services.notificaciones_recepcion import (
-                        notificar_recepcion_equipo_listo,
-                    )
-                    notificar_recepcion_equipo_listo(orden, motivo='egreso')
 
                 # Construir mensaje de respuesta
                 mensaje = f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'

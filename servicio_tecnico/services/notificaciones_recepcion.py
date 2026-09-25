@@ -3,19 +3,20 @@ Aviso staff cuando el equipo está listo para recolección.
 
 EXPLICACIÓN PARA PRINCIPIANTES:
 ================================
-Cuando se suben fotos de egreso o la orden pasa a "finalizado", alguien del
-staff debe enterarse para poder avisar al cliente (botón
-"Notificar equipo disponible").
+Cuando la orden pasa a "finalizado", alguien del staff debe enterarse
+para poder avisar al cliente (botón "Notificar equipo disponible").
 
 ¿A quién le llega?
   - Fuera de garantía (OOW/FL, es_fuera_garantia=True):
       responsable_seguimiento, o todos los rol=recepcionista.
   - En garantía (es_fuera_garantia=False):
-      todos los empleados con rol=dispatcher.
+      dispatchers con la casilla de la marca del equipo.
+      Dell → atiende_garantias_dell. Lenovo → atiende_garantias_lenovo.
+      Otra marca no debería existir en garantía: no se avisa a nadie.
 
-Hay DOS disparadores posibles (egreso y cambio a finalizado). Para no spamear,
-usamos el flag `orden.aviso_recepcion_listo_enviado`: la primera llamada gana;
-la segunda se omite (viceversa).
+El aviso sale una sola vez, cuando la orden pasa a "finalizado".
+El flag `orden.aviso_recepcion_listo_enviado` evita repetirlo si el estado
+se guarda otra vez.
 
 Canales:
   - Campanita in-app (`notificar_info`)
@@ -46,7 +47,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     El nombre histórico dice "recepcion", pero el destinatario depende de
-    si la orden es OOW (recepción) o garantía (dispatchers).
+    si la orden es OOW (recepción) o garantía (dispatcher de esa marca).
 
     Args:
         orden: instancia de OrdenServicio (debe tener pk).
@@ -196,8 +197,7 @@ def _resolver_destinatarios_aviso(orden) -> list:
     EXPLICACIÓN PARA PRINCIPIANTES:
     - OOW (fuera de garantía): el responsable de seguimiento (suele ser
       recepcionista). Si no hay, todos los recepcionistas activos.
-    - Garantía: todos los dispatchers activos (mismo criterio que otros
-      avisos de "orden lista" del sistema).
+    - Garantía: solo el dispatcher que atiende esa marca (Dell o Lenovo).
 
     Returns:
         Lista de Empleado con user cargado (select_related).
@@ -205,13 +205,31 @@ def _resolver_destinatarios_aviso(orden) -> list:
     from inventario.models import Empleado
 
     # ------------------------------------------------------------------
-    # GARANTÍA → dispatchers
+    # GARANTÍA → dispatcher de la marca del equipo
     # ------------------------------------------------------------------
     if not getattr(orden, 'es_fuera_garantia', False):
+        marca = _marca_normalizada(orden)
+        # Paso 1: cada marca tiene su propia casilla en el empleado.
+        if marca == 'dell':
+            filtro_marca = {'atiende_garantias_dell': True}
+        elif marca == 'lenovo':
+            filtro_marca = {'atiende_garantias_lenovo': True}
+        else:
+            # Paso 2: HP, Acer, etc. no tienen contrato de garantía.
+            # No avisamos a todos "por si acaso".
+            logger.warning(
+                '[AVISO-EQUIPO-LISTO] Orden %s en garantía con marca %r: '
+                'solo Dell y Lenovo tienen dispatcher asignado',
+                orden.pk,
+                marca or '(vacía)',
+            )
+            return []
+
         return list(
             Empleado.objects.filter(
                 rol='dispatcher',
                 user__is_active=True,
+                **filtro_marca,
             ).select_related('user')
         )
 
@@ -238,6 +256,23 @@ def _resolver_destinatarios_aviso(orden) -> list:
             user__is_active=True,
         ).select_related('user')
     )
+
+
+def _marca_normalizada(orden) -> str:
+    """
+    Marca del equipo en minúsculas, para comparar Dell/DELL igual.
+
+    Args:
+        orden: OrdenServicio, con o sin detalle_equipo cargado.
+
+    Returns:
+        Texto en minúsculas ('dell', 'lenovo', …) o cadena vacía.
+    """
+    try:
+        marca = orden.detalle_equipo.marca or ''
+    except Exception:
+        marca = ''
+    return marca.strip().lower()
 
 
 def _etiqueta_orden(orden) -> tuple[str, str]:
