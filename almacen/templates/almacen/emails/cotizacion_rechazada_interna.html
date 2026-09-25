@@ -1,376 +1,319 @@
+{% comment %}
+  Correo interno: el cliente rechazó toda la cotización.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta de tablas e inline que el aviso de aceptación.
+  El encabezado va en rojo porque no se deben generar compras.
+  El pie es interno: no lleva redes sociales.
+
+  El texto de negocio no cambia. El style de abajo solo refuerza
+  móvil y dark mode.
+{% endcomment %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Cotización rechazada — {{ solicitud.numero_solicitud }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .info-label, .info-value { display: block !important; width: 100% !important; }
         }
-        .container {
-            max-width: 750px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(180deg, #ffffff 0%, #ffebee 50%, #ef5350 100%);
-            color: #b71c1c;
-            padding: 30px;
-            text-align: center;
-        }
-        .logo-image {
-            max-width: 160px;
-            height: auto;
-            display: block;
-            margin: 0 auto 12px;
-        }
-        .logo { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
-        .subtitle { font-size: 15px; opacity: 0.9; }
-        .badge {
-            display: inline-block;
-            background-color: #c62828;
-            color: #fff;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 700;
-            margin-top: 12px;
-        }
-        .content { padding: 36px 28px; }
-        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 16px; font-weight: 600; }
-        .intro-text { font-size: 15px; color: #555; margin-bottom: 22px; }
-        .alert-box {
-            background: #ffebee;
-            border-left: 4px solid #c62828;
-            border-radius: 8px;
-            padding: 18px;
-            margin: 20px 0;
-        }
-        .alert-title { font-size: 15px; font-weight: 700; color: #b71c1c; margin-bottom: 8px; }
-        .alert-text { font-size: 14px; color: #555; white-space: pre-line; }
-        .equipment-info {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 22px 0;
-            border: 1px solid #e9ecef;
-        }
-        .info-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 14px;
-            border-bottom: 2px solid #ef5350;
-            padding-bottom: 8px;
-        }
-        .info-row {
-            display: flex;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .info-row:last-child { border-bottom: none; }
-        .info-label { font-weight: 600; color: #c62828; min-width: 140px; font-size: 14px; }
-        .info-value { color: #333; font-size: 14px; flex: 1; }
-        .info-value.highlight { font-weight: 700; color: #b71c1c; }
-        .lineas-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 22px 0;
-            font-size: 14px;
-        }
-        .lineas-table thead { background-color: #e53935; color: white; }
-        .lineas-table th, .lineas-table td {
-            padding: 10px 8px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-            vertical-align: top;
-        }
-        .linea-descripcion { font-weight: 600; color: #2c3e50; }
-        .linea-notas { font-size: 12px; color: #6c757d; margin-top: 3px; }
-        .motivo { font-size: 13px; color: #c62828; margin-top: 4px; }
-        .btn-detalle {
-            display: inline-block;
-            margin: 8px 8px 0 0;
-            background-color: #c62828;
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 12px 22px;
-            border-radius: 6px;
-            font-weight: 700;
-            font-size: 14px;
-        }
-        .btn-orden {
-            background-color: #455a64;
-        }
-        /* Footer alineado al estilo PNC a Front (firma, redes, timestamp) */
-        .footer {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .signature-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        .signature-role {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-        .signature-area {
-            font-size: 14px;
-            opacity: 0.85;
-        }
-        .company {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 20px 0 5px 0;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .timestamp {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 15px;
-        }
-        .social-media {
-            margin: 20px 0;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        .social-title {
-            font-size: 14px;
-            margin-bottom: 12px;
-            opacity: 0.9;
-        }
-        .social-links {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .social-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 25px;
-            text-decoration: none;
-            color: #ffffff !important;
-            font-size: 14px;
-            font-weight: 600;
-            border: 2px solid rgba(255, 255, 255, 0.5);
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+            .email-stop { background-color: #450a0a !important; }
+            .email-stop-title { color: #fca5a5 !important; }
+            .email-td { background-color: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
-            <div class="logo">COTIZACIÓN RECHAZADA</div>
-            <div class="subtitle">{{ solicitud.numero_solicitud }}</div>
-            <div class="badge">NO GENERAR COMPRAS</div>
-        </div>
-
-        <div class="content">
-            <div class="greeting">Equipo,</div>
-            <div class="intro-text">
-                {# EXPLICACIÓN: si hay técnico en la orden se nombra; si no, texto genérico #}
-                El cliente <strong>rechazó todas</strong> las piezas y/o servicios de esta
-                cotización.
-                {% if orden and orden.tecnico_asignado_actual %}
-                <strong>{{ orden.tecnico_asignado_actual.nombre_completo }}</strong>,
-                {% else %}
-                técnico asignado,
-                {% endif %}
-                por favor pasar el equipo al área correspondiente para dejarlo disponible
-                al usuario para su recolección.
-            </div>
-
-            <div class="alert-box">
-                <div class="alert-title">Importante</div>
-                <div class="alert-text">
-                    No uses «Generar compras» sobre esta solicitud.
-                    La orden de servicio (si existe) debe reflejar el rechazo del cliente.
-                </div>
-            </div>
-
-            <div class="equipment-info">
-                <div class="info-title">Datos de la solicitud</div>
-                <div class="info-row">
-                    <div class="info-label">Cliente:</div>
-                    <div class="info-value highlight">{{ solicitud.nombre_cliente|default:"-" }}</div>
-                </div>
-                {% if solicitud.numero_orden_cliente %}
-                <div class="info-row">
-                    <div class="info-label">Orden cliente:</div>
-                    <div class="info-value highlight">{{ solicitud.numero_orden_cliente }}</div>
-                </div>
-                {% endif %}
-                {% if solicitud.service_tag %}
-                <div class="info-row">
-                    <div class="info-label">Service Tag:</div>
-                    <div class="info-value">{{ solicitud.service_tag }}</div>
-                </div>
-                {% endif %}
-                {% if orden %}
-                <div class="info-row">
-                    <div class="info-label">Orden ST:</div>
-                    <div class="info-value">{{ orden.numero_orden_interno }}</div>
-                </div>
-                {% if orden.tecnico_asignado_actual %}
-                <div class="info-row">
-                    <div class="info-label">Técnico:</div>
-                    <div class="info-value">{{ orden.tecnico_asignado_actual.nombre_completo }}</div>
-                </div>
-                {% endif %}
-                {% if orden.responsable_seguimiento %}
-                <div class="info-row">
-                    <div class="info-label">Responsable:</div>
-                    <div class="info-value">{{ orden.responsable_seguimiento.nombre_completo }}</div>
-                </div>
-                {% endif %}
-                {% endif %}
-                {% if motivo_catalogo %}
-                <div class="info-row">
-                    <div class="info-label">Motivo catálogo:</div>
-                    <div class="info-value highlight">{{ motivo_catalogo }}</div>
-                </div>
-                {% endif %}
-            </div>
-
-            {% if detalle_rechazo %}
-            <div class="alert-box">
-                <div class="alert-title">Detalle de rechazo</div>
-                <div class="alert-text">{{ detalle_rechazo }}</div>
-            </div>
-            {% elif detalle_items %}
-            <div class="alert-box">
-                <div class="alert-title">Motivos por ítem</div>
-                <div class="alert-text">{{ detalle_items }}</div>
-            </div>
-            {% endif %}
-
-            {% if lineas_rechazadas %}
-            <table class="lineas-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Pieza rechazada</th>
-                        <th>Motivo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for linea in lineas_rechazadas %}
-                    <tr>
-                        <td>{{ linea.numero_linea }}</td>
-                        <td>
-                            <div class="linea-descripcion">{{ linea.descripcion_pieza }}</div>
-                            {% if linea.producto %}
-                            <div class="linea-notas">{{ linea.producto.nombre }}</div>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if linea.motivo_rechazo %}
-                            <span class="motivo">{{ linea.motivo_rechazo }}</span>
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-
-            {% if servicios_rechazados %}
-            <table class="lineas-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Servicio rechazado</th>
-                        <th>Motivo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for servicio in servicios_rechazados %}
-                    <tr>
-                        <td>{{ servicio.numero_linea }}</td>
-                        <td class="linea-descripcion">{{ servicio.get_tipo_servicio_display }}</td>
-                        <td>
-                            {% if servicio.motivo_rechazo %}
-                            <span class="motivo">{{ servicio.motivo_rechazo }}</span>
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-
-            <div style="margin-top: 18px;">
-                <a class="btn-detalle" href="{{ url_detalle }}">Ver solicitud en Almacén</a>
-                {% if url_orden %}
-                <a class="btn-detalle btn-orden" href="{{ url_orden }}">Ver orden en ST</a>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">
-                    Sistema de Almacén SIC
-                </div>
-                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
-                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
-                </div>
-                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
-                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
-                    Para consultas sobre esta notificación, contacte directamente al área de Compras.
-                </div>
-            </div>
-
-            <div class="company">{{ empresa_nombre }}</div>
-            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
-
-            <div class="social-media">
-                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
-                <div class="social-links">
-                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Sitio Web</span>
-                    </a>
-                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Instagram</span>
-                    </a>
-                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
-                        <span>Facebook</span>
-                    </a>
-                </div>
-            </div>
-
-            <div class="timestamp">
-                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
-            </div>
-        </div>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Cotización rechazada. No generar compras. {{ solicitud.numero_solicitud }}.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
     </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-stop email-pad" bgcolor="#fef2f2" align="center" style="padding:20px 32px;background-color:#fef2f2;border-bottom:4px solid #b91c1c;">
+                            <p class="email-stop-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#b91c1c;">
+                                Cotización rechazada
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                {{ solicitud.numero_solicitud }}
+                            </p>
+                            <p class="email-stop-title" style="margin:10px 0 0 0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#b91c1c;">
+                                No generar compras
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
+                                Equipo,
+                            </p>
+                            <p class="email-body-text" style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:#334155;">
+                                El cliente <strong>rechazó todas</strong> las piezas y/o servicios de esta
+                                cotización.
+                                {% if orden and orden.tecnico_asignado_actual %}
+                                <strong>{{ orden.tecnico_asignado_actual.nombre_completo }}</strong>,
+                                {% else %}
+                                técnico asignado,
+                                {% endif %}
+                                por favor pasar el equipo al área correspondiente para dejarlo disponible
+                                al usuario para su recolección.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef2f2" class="email-stop" style="background-color:#fef2f2;border-left:4px solid #b91c1c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-stop-title" style="margin:0 0 8px 0;font-size:15px;line-height:22px;font-weight:700;color:#b91c1c;">
+                                            Importante
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">
+                                            No uses «Generar compras» sobre esta solicitud.
+                                            La orden de servicio (si existe) debe reflejar el rechazo del cliente.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f8fafc" class="email-panel" style="background-color:#f8fafc;border-left:4px solid #1f6391;">
+                                <tr>
+                                    <td colspan="2" style="padding:16px 18px 8px 18px;">
+                                        <p class="email-label" style="margin:0;font-size:13px;line-height:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#1f6391;">
+                                            Datos de la solicitud
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;">Cliente:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;">{{ nombre_cliente|default:"-" }}</td>
+                                </tr>
+                                {% if solicitud.numero_orden_cliente %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Orden cliente:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">{{ solicitud.numero_orden_cliente }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if solicitud.service_tag %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Service Tag:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ solicitud.service_tag }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if orden %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Orden ST:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ orden.numero_orden_interno }}</td>
+                                </tr>
+                                {% if orden.tecnico_asignado_actual %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Técnico:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ orden.tecnico_asignado_actual.nombre_completo }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if orden.responsable_seguimiento %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Responsable:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px;font-size:15px;line-height:20px;color:#0f172a;border-top:1px solid #e2e8f0;">{{ orden.responsable_seguimiento.nombre_completo }}</td>
+                                </tr>
+                                {% endif %}
+                                {% endif %}
+                                {% if motivo_catalogo %}
+                                <tr>
+                                    <td class="info-label email-label" width="38%" valign="top" style="padding:8px 18px 16px 18px;font-size:14px;line-height:20px;font-weight:600;color:#1f6391;border-top:1px solid #e2e8f0;">Motivo catálogo:</td>
+                                    <td class="info-value email-body-text" width="62%" valign="top" style="padding:8px 18px 16px 18px;font-size:15px;line-height:20px;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">{{ motivo_catalogo }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if detalle_rechazo %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef2f2" class="email-stop" style="background-color:#fef2f2;border-left:4px solid #b91c1c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-stop-title" style="margin:0 0 8px 0;font-size:15px;line-height:22px;font-weight:700;color:#b91c1c;">
+                                            Detalle de rechazo
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ detalle_rechazo }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% elif detalle_items %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fef2f2" class="email-stop" style="background-color:#fef2f2;border-left:4px solid #b91c1c;">
+                                <tr>
+                                    <td style="padding:16px 18px;">
+                                        <p class="email-stop-title" style="margin:0 0 8px 0;font-size:15px;line-height:22px;font-weight:700;color:#b91c1c;">
+                                            Motivos por ítem
+                                        </p>
+                                        <p class="email-body-text" style="margin:0;font-size:14px;line-height:22px;color:#334155;">{{ detalle_items }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if lineas_rechazadas %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+                                <tr>
+                                    <td bgcolor="#1f6391" width="32" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">#</td>
+                                    <td bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Pieza rechazada</td>
+                                    <td bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Motivo</td>
+                                </tr>
+                                {% for linea in lineas_rechazadas %}
+                                <tr>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;border-bottom:1px solid #e2e8f0;">{{ linea.numero_linea }}</td>
+                                    <td class="email-td" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;">
+                                        <p class="email-body-text" style="margin:0;font-size:13px;line-height:18px;font-weight:700;color:#0f172a;">{{ linea.descripcion_pieza }}</p>
+                                        {% if linea.producto %}
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:#64748b;">{{ linea.producto.nombre }}</p>
+                                        {% endif %}
+                                    </td>
+                                    <td class="email-td" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;font-size:13px;line-height:18px;font-weight:700;color:#b91c1c;border-bottom:1px solid #e2e8f0;">
+                                        {% if linea.motivo_rechazo %}
+                                        {{ linea.motivo_rechazo }}
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if servicios_rechazados %}
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+                                <tr>
+                                    <td bgcolor="#1f6391" width="32" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">#</td>
+                                    <td bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Servicio rechazado</td>
+                                    <td bgcolor="#1f6391" valign="top" style="padding:10px 8px;background-color:#1f6391;color:#ffffff;font-size:12px;line-height:16px;font-weight:700;">Motivo</td>
+                                </tr>
+                                {% for servicio in servicios_rechazados %}
+                                <tr>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;border-bottom:1px solid #e2e8f0;">{{ servicio.numero_linea }}</td>
+                                    <td class="email-td email-body-text" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;color:#0f172a;font-size:13px;line-height:18px;font-weight:700;border-bottom:1px solid #e2e8f0;">{{ servicio.get_tipo_servicio_display }}</td>
+                                    <td class="email-td" bgcolor="#ffffff" valign="top" style="padding:10px 8px;background-color:#ffffff;font-size:13px;line-height:18px;font-weight:700;color:#b91c1c;border-bottom:1px solid #e2e8f0;">
+                                        {% if servicio.motivo_rechazo %}
+                                        {{ servicio.motivo_rechazo }}
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:0 32px 28px 32px;">
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_detalle }}" style="height:44px;v-text-anchor:middle;width:260px;" arcsize="8%" stroke="f" fillcolor="#1f6391">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver solicitud en Almacén</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_detalle }}" style="display:inline-block;background-color:#1f6391;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;">Ver solicitud en Almacén</a>
+                            <!--<![endif]-->
+                            {% if url_orden %}
+                            <p style="margin:0;font-size:8px;line-height:8px;">&nbsp;</p>
+                            <!--[if mso]>
+                            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ url_orden }}" style="height:44px;v-text-anchor:middle;width:220px;" arcsize="8%" stroke="f" fillcolor="#1e293b">
+                                <w:anchorlock/>
+                                <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:bold;">Ver orden en ST</center>
+                            </v:roundrect>
+                            <![endif]-->
+                            <!--[if !mso]><!-->
+                            <a href="{{ url_orden }}" style="display:inline-block;background-color:#1e293b;color:#ffffff;text-decoration:none;font-size:16px;line-height:20px;font-weight:700;padding:12px 28px;border-radius:6px;mso-hide:all;margin-top:10px;">Ver orden en ST</a>
+                            <!--<![endif]-->
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:24px 32px;background-color:#1e293b;">
+                            <p style="margin:0 0 12px 0;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                Sistema de Almacén SIC
+                            </p>
+                            <p style="margin:0 0 8px 0;font-size:14px;line-height:22px;color:#e2e8f0;">
+                                <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#cbd5e1;">
+                                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                                Para consultas sobre esta notificación, contacte directamente al área de Compras.
+                            </p>
+                            <p style="margin:0;padding-top:12px;border-top:1px solid #334155;font-size:16px;line-height:22px;font-weight:700;color:#ffffff;">
+                                {{ empresa_nombre }}
+                            </p>
+                            <p style="margin:4px 0 12px 0;font-size:13px;line-height:18px;color:#cbd5e1;">
+                                {{ pais_nombre }}
+                            </p>
+                            <p style="margin:0;font-size:12px;line-height:18px;color:#94a3b8;">
+                                Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

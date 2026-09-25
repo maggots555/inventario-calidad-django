@@ -737,6 +737,7 @@ def notificar_respuesta_cotizacion_rechazada_task(
     from config.paises_config import get_pais_actual, fecha_local_pais
     from .utils.cotizacion_email_context import (
         identificador_asunto_solicitud,
+        nombre_cliente_visible_solicitud,
         url_absoluta_detalle_orden,
         url_absoluta_detalle_solicitud,
     )
@@ -753,6 +754,7 @@ def notificar_respuesta_cotizacion_rechazada_task(
         try:
             solicitud = SolicitudCotizacion.objects.select_related(
                 'orden_servicio',
+                'orden_servicio__detalle_equipo',
                 'orden_servicio__tecnico_asignado_actual',
                 'orden_servicio__tecnico_asignado_actual__user',
                 'orden_servicio__responsable_seguimiento',
@@ -820,6 +822,7 @@ def notificar_respuesta_cotizacion_rechazada_task(
             'url_detalle': url_detalle,
             'url_orden': url_orden,
             'orden': orden,
+            'nombre_cliente': nombre_cliente_visible_solicitud(solicitud),
         }
 
         html_content = render_to_string(
@@ -839,6 +842,9 @@ def notificar_respuesta_cotizacion_rechazada_task(
         )
         email_msg.content_subtype = 'html'
         _adjuntar_logo_e_iconos_email(email_msg, log_prefix)
+        # Logo blanco de la barra. Los iconos siguen en el helper compartido.
+        from servicio_tecnico.services.email_cid_assets import adjuntar_logo_blanco_email
+        adjuntar_logo_blanco_email(email_msg, log_prefix)
         email_msg.send(fail_silently=False)
 
         logger.info(
