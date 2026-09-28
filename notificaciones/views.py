@@ -20,7 +20,7 @@ Endpoints disponibles (campanita 🔔):
     POST /notificaciones/api/marcar-todas/     → Marca todas como leídas (botón ✓✓)
     POST /notificaciones/api/marcar-avisos/    → Marca solo informativas (al abrir)
     POST /notificaciones/api/eliminar/<id>/    → Elimina una notificación
-    POST /notificaciones/api/eliminar-todas/   → Elimina todas las notificaciones
+    POST /notificaciones/api/eliminar-todas/   → Borra avisos y cumplidas (Por hacer se queda)
 
 Endpoints Web Push:
     GET  /notificaciones/push/vapid-key/       → Devuelve la llave pública VAPID
@@ -68,7 +68,7 @@ def _cache_key(user_id: int) -> str:
         user_id: PK del usuario.
 
     Returns:
-        str: ``notif:v3:{id}``.
+        str: ``notif:v4:{id}``.
     """
     return clave_cache_notificaciones(user_id)
 
@@ -95,28 +95,34 @@ def _contadores_usuario(user) -> dict:
     Returns:
         dict: no_leidas, no_leidas_accion, no_leidas_avisos, no_leidas_equipo,
         no_leidas_equipo_satelite, no_leidas_equipo_dropoff.
+
+    El badge de equipo listo no se apaga al abrir: cuenta hasta que el
+    correo al cliente sale (cumplida=False). El resto de Por hacer sí
+    se apaga al marcarse leída.
     """
+    # Paso: equipo listo sigue contando aunque ya se abrió.
+    equipo_pendiente = Q(
+        requiere_accion=True,
+        cumplida=False,
+        categoria__startswith=PREFIJO_CATEGORIA_EQUIPO,
+    )
     agg = Notificacion.objects.filter(usuario=user).aggregate(
         no_leidas_accion=Count(
-            'pk', filter=Q(requiere_accion=True, leida=False)
-        ),
-        no_leidas_avisos=Count(
-            'pk', filter=Q(requiere_accion=False, leida=False)
-        ),
-        no_leidas_equipo=Count(
             'pk',
-            filter=Q(
-                requiere_accion=True,
-                leida=False,
-                categoria__startswith=PREFIJO_CATEGORIA_EQUIPO,
+            filter=(
+                Q(requiere_accion=True, cumplida=False, leida=False)
+                | equipo_pendiente
             ),
         ),
-        # Paso: chips del dispatcher. No entran en el conteo si ya se vieron.
+        no_leidas_avisos=Count(
+            'pk', filter=Q(requiere_accion=False, cumplida=False, leida=False)
+        ),
+        no_leidas_equipo=Count('pk', filter=equipo_pendiente),
         no_leidas_equipo_satelite=Count(
             'pk',
             filter=Q(
                 requiere_accion=True,
-                leida=False,
+                cumplida=False,
                 categoria=CATEGORIA_EQUIPO_SATELITE,
             ),
         ),
@@ -124,7 +130,7 @@ def _contadores_usuario(user) -> dict:
             'pk',
             filter=Q(
                 requiere_accion=True,
-                leida=False,
+                cumplida=False,
                 categoria=CATEGORIA_EQUIPO_DROPOFF,
             ),
         ),
@@ -195,6 +201,7 @@ def _serializar_notificacion(n: Notificacion) -> dict:
         'categoria': n.categoria or 'general',
         'requiere_accion': bool(n.requiere_accion),
         'leida': n.leida,
+        'cumplida': bool(n.cumplida),
         'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
         'app': n.app_origen or '',
         'url': n.url or '',
@@ -205,20 +212,20 @@ def _serializar_notificacion(n: Notificacion) -> dict:
 @require_GET
 def obtener_notificaciones(request):
     """
-    Devuelve dos cortes independientes: Por hacer y Avisos.
+    Devuelve tres cortes: Por hacer, Cumplidas y Avisos.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     TypeScript llama a esta URL periódicamente con fetch().
-    Antes se devolvían las últimas 20 mezcladas: un correo de «video listo»
-    tapaba un pago por validar. Ahora cada pestaña tiene su propio tope de 20.
+    Por hacer es el trabajo que falta. Cumplidas es lo que ya se hizo
+    (el correo al cliente salió) y se pinta en verde. Avisos solo informan.
 
     La respuesta incluye:
     - no_leidas / no_leidas_accion: pendientes de acción (badge de la campanita)
     - no_leidas_avisos: informativas sin leer
-    - no_leidas_equipo: acción sin leer cuya categoria empieza por equipo_disponible
+    - no_leidas_equipo: equipo listo aún no cumplido (aunque ya se haya abierto)
     - no_leidas_equipo_satelite / no_leidas_equipo_dropoff: chips del dispatcher
-    - hay_mas_accion / hay_mas_avisos: True si hay más de 20 en ese corte
-    - accion / avisos: listas. En «Por hacer», las no leídas van primero.
+    - hay_mas_accion / hay_mas_cumplidas / hay_mas_avisos: True si hay más de 20
+    - accion / cumplidas / avisos: listas. En «Por hacer», las no leídas van primero.
 
     Optimización con cache:
     El resultado se guarda en Redis por 10 segundos. Si TypeScript
@@ -237,24 +244,32 @@ def obtener_notificaciones(request):
     if data is None:
         # Cache vacío o expirado → consultar la BD (un queryset base).
         qs = Notificacion.objects.filter(usuario=user)
-        # Paso 1: «Por hacer» pone pendientes arriba (leida=False primero)
-        # y las ya vistas debajo. Así, al marcar una, baja en la siguiente carga.
+        # Paso 1: «Por hacer» es lo no cumplido. Pendientes arriba, abiertas abajo.
         accion, hay_mas_accion = _cortar_lista(
-            qs.filter(requiere_accion=True).order_by('leida', '-fecha_creacion'),
+            qs.filter(requiere_accion=True, cumplida=False).order_by(
+                'leida', '-fecha_creacion'
+            ),
+            LIMITE_LISTA_NOTIF,
+        )
+        # Paso 2: «Cumplidas» es la tarea hecha. La más reciente arriba.
+        cumplidas, hay_mas_cumplidas = _cortar_lista(
+            qs.filter(cumplida=True).order_by('-fecha_cumplida', '-fecha_creacion'),
             LIMITE_LISTA_NOTIF,
         )
         avisos, hay_mas_avisos = _cortar_lista(
-            qs.filter(requiere_accion=False).order_by('-fecha_creacion'),
+            qs.filter(requiere_accion=False, cumplida=False).order_by('-fecha_creacion'),
             LIMITE_LISTA_NOTIF,
         )
 
-        # Paso 2: contadores sobre TODA la BD del usuario, no solo las 20.
+        # Paso 3: contadores sobre TODA la BD del usuario, no solo las 20.
         data = _contadores_usuario(user)
-        # Paso 3: el badge usa no_leidas_accion (trabajo pendiente, no ruido).
+        # Paso 4: el badge usa no_leidas_accion (trabajo pendiente, no ruido).
         data.update({
             'hay_mas_accion': hay_mas_accion,
+            'hay_mas_cumplidas': hay_mas_cumplidas,
             'hay_mas_avisos': hay_mas_avisos,
             'accion': [_serializar_notificacion(n) for n in accion],
+            'cumplidas': [_serializar_notificacion(n) for n in cumplidas],
             'avisos': [_serializar_notificacion(n) for n in avisos],
         })
 
@@ -377,20 +392,30 @@ def eliminar_notificacion(request, notificacion_id):
 @require_POST
 def eliminar_todas(request):
     """
-    Elimina TODAS las notificaciones del usuario.
+    Borra avisos y tareas cumplidas. Deja en paz lo que sigue por hacer.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Botón "Limpiar todas" en el panel. Borra todo de una vez
-    para que el usuario no tenga que eliminar una por una.
+    El botón de basura no debe llevarse el trabajo pendiente.
+    - Avisos y Cumplidas sí se borran.
+    - Por hacer que nadie ha abierto se queda.
+    - Si ya se abrió, también se puede limpiar, salvo el aviso de
+      equipo listo: ese se queda hasta que el correo al cliente salió.
     """
-    eliminadas, _ = Notificacion.objects.filter(
-        usuario=request.user
-    ).delete()
+    # Paso: lo protegido es trabajo sin consultar, o equipo listo sin correo.
+    protegidas = Q(requiere_accion=True, cumplida=False) & (
+        Q(leida=False) | Q(categoria__startswith=PREFIJO_CATEGORIA_EQUIPO)
+    )
+    eliminadas, _ = (
+        Notificacion.objects.filter(usuario=request.user)
+        .exclude(protegidas)
+        .delete()
+    )
 
     _invalidar_cache(request.user.id)
 
     logger.info(
-        f"[NOTIF] {request.user.username} eliminó {eliminadas} notificación(es)."
+        f"[NOTIF] {request.user.username} limpió avisos y cumplidas "
+        f"({eliminadas} fila(s)). Por hacer pendiente se conservó."
     )
 
     return _json_escritura_ok(request.user, extra={'eliminadas': eliminadas})

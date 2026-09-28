@@ -269,7 +269,7 @@ class OrdenPendientesYContadoresSedeTest(TestCase):
             categoria='equipo_disponible_dropoff',
             requiere_accion=True,
         )
-        # Ya vista: no debe sumar en ningún chip.
+        # Ya abierta: sigue contando. La tarea no está hecha hasta el correo.
         Notificacion.objects.create(
             titulo='Satélite vista',
             mensaje='Ya se abrió',
@@ -279,9 +279,22 @@ class OrdenPendientesYContadoresSedeTest(TestCase):
             requiere_accion=True,
             leida=True,
         )
+        # Ya cumplida: sale del chip.
+        from django.utils import timezone
+        Notificacion.objects.create(
+            titulo='Drop Off hecha',
+            mensaje='Correo enviado',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_dropoff',
+            requiere_accion=True,
+            leida=True,
+            cumplida=True,
+            fecha_cumplida=timezone.now(),
+        )
         data = self._listar()
-        self.assertEqual(data['no_leidas_equipo'], 3)
-        self.assertEqual(data['no_leidas_equipo_satelite'], 1)
+        self.assertEqual(data['no_leidas_equipo'], 4)
+        self.assertEqual(data['no_leidas_equipo_satelite'], 2)
         self.assertEqual(data['no_leidas_equipo_dropoff'], 1)
 
 

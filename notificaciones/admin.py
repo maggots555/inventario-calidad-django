@@ -23,6 +23,7 @@ class NotificacionAdmin(admin.ModelAdmin):
         'requiere_accion',
         'usuario',
         'leida',
+        'cumplida',
         'app_origen',
         'fecha_creacion',
     )
@@ -31,6 +32,7 @@ class NotificacionAdmin(admin.ModelAdmin):
         'categoria',
         'requiere_accion',
         'leida',
+        'cumplida',
         'app_origen',
         'fecha_creacion',
     )

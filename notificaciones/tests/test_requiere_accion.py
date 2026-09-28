@@ -161,6 +161,174 @@ class ApiListarDosCortesTest(TestCase):
         self.assertEqual(data['no_leidas_equipo'], 1)
 
 
+class CumplidasCampanitaTest(TestCase):
+    """
+    Abrir un aviso no es cumplir la tarea.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    leida = ya lo vi, y sigue en Por hacer.
+    cumplida = ya avisé al cliente, y pasa a la otra pestaña.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='api_cumplidas',
+            password='testpass123',
+        )
+        self.factory = RequestFactory()
+
+    def _listar(self) -> dict:
+        request = self.factory.get('/notificaciones/api/listar/')
+        request.user = self.user
+        response = notif_views.obtener_notificaciones(request)
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.content.decode())
+
+    def test_abrir_equipo_listo_no_lo_pasa_a_cumplidas(self):
+        """Leída sigue en Por hacer y el badge de equipo no se apaga."""
+        aviso = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje='Aún no se avisó al cliente',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+            leida=True,
+        )
+        data = self._listar()
+        ids_accion = [item['id'] for item in data['accion']]
+        ids_cumplidas = [item['id'] for item in data['cumplidas']]
+        self.assertIn(aviso.pk, ids_accion)
+        self.assertNotIn(aviso.pk, ids_cumplidas)
+        self.assertEqual(data['no_leidas_equipo'], 1)
+        self.assertEqual(data['no_leidas_accion'], 1)
+        self.assertFalse(data['accion'][0]['cumplida'])
+
+    def test_otra_tarea_leida_si_sale_del_badge(self):
+        """Cotizaciones y recordatorios sí se apagan al abrir."""
+        Notificacion.objects.create(
+            titulo='Pago por validar',
+            mensaje='Ya lo abrí',
+            tipo='warning',
+            usuario=self.user,
+            categoria='general',
+            requiere_accion=True,
+            leida=True,
+        )
+        data = self._listar()
+        self.assertEqual(data['no_leidas_accion'], 0)
+        self.assertEqual(len(data['accion']), 1)
+
+    def test_cumplida_sale_de_por_hacer(self):
+        """La fila verde vive solo en Cumplidas."""
+        from django.utils import timezone
+
+        aviso = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje='Correo ya enviado',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_satelite',
+            requiere_accion=True,
+            leida=True,
+            cumplida=True,
+            fecha_cumplida=timezone.now(),
+        )
+        data = self._listar()
+        ids_accion = [item['id'] for item in data['accion']]
+        self.assertNotIn(aviso.pk, ids_accion)
+        self.assertEqual(data['cumplidas'][0]['id'], aviso.pk)
+        self.assertTrue(data['cumplidas'][0]['cumplida'])
+        self.assertEqual(data['no_leidas_accion'], 0)
+        self.assertEqual(data['no_leidas_equipo'], 0)
+        self.assertEqual(data['no_leidas_equipo_satelite'], 0)
+
+
+class EliminarTodasRespetaPorHacerTest(TestCase):
+    """
+    El bote de basura no se lleva el trabajo que todavía falta.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Borra avisos y cumplidas. Una de Por hacer sin abrir se queda.
+    El aviso de equipo listo se queda aunque ya se abrió, hasta que
+    el correo al cliente salga.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='api_limpiar',
+            password='testpass123',
+        )
+        self.factory = RequestFactory()
+
+    def test_limpiar_deja_pendientes_y_equipo_sin_correo(self):
+        from django.utils import timezone
+
+        por_hacer = Notificacion.objects.create(
+            titulo='Pago por validar',
+            mensaje='Nadie lo abrió',
+            tipo='warning',
+            usuario=self.user,
+            categoria='general',
+            requiere_accion=True,
+        )
+        equipo_abierto = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje='Se abrió pero no se avisó al cliente',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+            leida=True,
+        )
+        otra_consultada = Notificacion.objects.create(
+            titulo='Recordatorio visto',
+            mensaje='Ya se consultó',
+            tipo='warning',
+            usuario=self.user,
+            categoria='general',
+            requiere_accion=True,
+            leida=True,
+        )
+        aviso = Notificacion.objects.create(
+            titulo='Video listo',
+            mensaje='Solo informa',
+            tipo='exito',
+            usuario=self.user,
+            requiere_accion=False,
+        )
+        cumplida = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje='Correo ya enviado',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+            leida=True,
+            cumplida=True,
+            fecha_cumplida=timezone.now(),
+        )
+
+        request = self.factory.post('/notificaciones/api/eliminar-todas/')
+        request.user = self.user
+        response = notif_views.eliminar_todas(request)
+        self.assertEqual(response.status_code, 200)
+
+        quedan = set(
+            Notificacion.objects.filter(usuario=self.user).values_list('pk', flat=True)
+        )
+        self.assertEqual(quedan, {por_hacer.pk, equipo_abierto.pk})
+        self.assertNotIn(otra_consultada.pk, quedan)
+        self.assertNotIn(aviso.pk, quedan)
+        self.assertNotIn(cumplida.pk, quedan)
+
+
 class MarcarAvisosNoTocaAccionTest(TestCase):
     """POST marcar-avisos deja intactas las de Por hacer."""
 

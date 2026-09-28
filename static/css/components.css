@@ -2879,9 +2879,9 @@ input[readonly].form-control:focus {
     border: 1px solid transparent;
     background: transparent;
     color: var(--gray-600, #4b5563);
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    padding: 6px 8px;
+    padding: 6px 4px;
     border-radius: 6px;
     cursor: pointer;
     display: inline-flex;
@@ -3038,6 +3038,16 @@ input[readonly].form-control:focus {
    Antes opacity 0.7 bajaba el contraste y el mensaje casi no se leía. */
 .notif-leida {
     opacity: 1;
+}
+
+/* Tarea cumplida: el correo al cliente ya salió. Verde, no el azul de «nueva». */
+.notif-cumplida {
+    background: #ecfdf5;
+    border-left: 3px solid #16a34a;
+}
+
+.notif-cumplida:hover {
+    background: #d1fae5;
 }
 
 /* ── Icono de la notificación ── */
@@ -3257,6 +3267,15 @@ input[readonly].form-control:focus {
 
 [data-bs-theme="dark"] .notif-nueva:hover {
     background: rgba(59, 130, 246, 0.2);
+}
+
+[data-bs-theme="dark"] .notif-cumplida {
+    background: rgba(52, 211, 153, 0.12);
+    border-left-color: #34d399;
+}
+
+[data-bs-theme="dark"] .notif-cumplida:hover {
+    background: rgba(52, 211, 153, 0.2);
 }
 
 [data-bs-theme="dark"] .notif-mensaje {

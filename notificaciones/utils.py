@@ -36,9 +36,9 @@ from django.contrib.auth.models import User
 
 logger = logging.getLogger('notificaciones')
 
-# Prefijo de cache Redis del panel. El "v3" evita servir 10 s el JSON viejo
-# (sin contadores de Satélite / Drop Off) cuando el cliente ya los espera.
-CACHE_KEY_PREFIX = 'notif:v3'
+# Prefijo de cache Redis del panel. El "v4" evita servir 10 s el JSON viejo
+# (sin la pestaña Cumplidas) cuando el cliente ya la espera.
+CACHE_KEY_PREFIX = 'notif:v4'
 
 
 # Filtros de la campanita para «equipo listo».
@@ -57,7 +57,7 @@ def clave_cache_notificaciones(user_id: int) -> str:
         user_id: PK del usuario destinatario.
 
     Returns:
-        str: ej. ``notif:v3:42``.
+        str: ej. ``notif:v4:42``.
     """
     return f'{CACHE_KEY_PREFIX}:{user_id}'
 
@@ -74,6 +74,61 @@ def invalidar_cache_notificaciones(user_id: int) -> None:
     """
     cache.delete(clave_cache_notificaciones(user_id))
     cache.delete(f'notif:{user_id}')
+
+
+def marcar_equipo_listo_cumplido(orden_id: int) -> int:
+    """
+    Pasa a «Cumplidas» los avisos de equipo listo de esa orden.
+
+    Objetivo: el correo al cliente ya salió. Abrir la campanita no basta;
+    esta función es la que pone la fila en verde para cada persona que
+    tenía el pendiente (dispatcher, recepción o superusuario).
+
+    Args:
+        orden_id: PK de la OrdenServicio cuyo correo ya se envió.
+
+    Returns:
+        Cuántas filas de campanita se marcaron.
+
+    Efectos secundarios:
+        Escribe cumplida, fecha_cumplida y leida. Invalida el cache
+        de la campanita de cada destinatario.
+    """
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from .models import Notificacion
+
+    # La URL guardada es la ficha de la orden más un ancla. El prefijo
+    # alcanza para encontrar todas las copias de ese aviso.
+    path = reverse(
+        'servicio_tecnico:detalle_orden',
+        kwargs={'orden_id': orden_id},
+    )
+    pendientes = Notificacion.objects.filter(
+        requiere_accion=True,
+        cumplida=False,
+        categoria__startswith=PREFIJO_CATEGORIA_EQUIPO,
+        url__startswith=path,
+    )
+    # Paso: los ids se leen antes del update, porque después el filtro ya no aplica.
+    user_ids = list(pendientes.values_list('usuario_id', flat=True).distinct())
+    ahora = timezone.now()
+    actualizadas = pendientes.update(
+        cumplida=True,
+        fecha_cumplida=ahora,
+        leida=True,
+    )
+    for user_id in user_ids:
+        if user_id:
+            invalidar_cache_notificaciones(user_id)
+    if actualizadas:
+        logger.info(
+            '[NOTIF] Equipo listo cumplido orden %s: %s aviso(s)',
+            orden_id,
+            actualizadas,
+        )
+    return actualizadas
 
 
 def copiar_notificacion_a_superusers_ausentes(

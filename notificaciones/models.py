@@ -16,7 +16,9 @@ Campos principales:
 - categoria: Agrupación de dominio (general, equipo_disponible,
   equipo_disponible_satelite, equipo_disponible_dropoff, …)
 - requiere_accion: True = pestaña «Por hacer»; False = pestaña «Avisos»
-- leida    : Si el usuario ya la vio (True) o no (False)
+- leida    : Si el usuario ya abrió el aviso (no significa que la tarea esté hecha)
+- cumplida : True = pestaña «Cumplidas» (la tarea sí se hizo, ej. correo al cliente)
+- fecha_cumplida: Cuándo pasó a cumplida
 - usuario  : Quién debe ver esta notificación (el que disparó la tarea)
 - task_id  : ID de la tarea Celery (para rastreo técnico)
 - app_origen: De qué módulo viene (ej: "servicio_tecnico")
@@ -58,8 +60,9 @@ class Notificacion(models.Model):
     )
     # EXPLICACIÓN PARA PRINCIPIANTES:
     # "tipo" es solo visual (verde/rojo). "categoria" agrupa por dominio
-    # (ej. equipo_disponible). "requiere_accion" decide la pestaña:
-    # True → «Por hacer» (hay que atenderlo); False → «Avisos» (solo informa).
+    # (ej. equipo_disponible). "requiere_accion" decide Por hacer vs Avisos.
+    # "leida" es haber abierto el aviso. "cumplida" es haber hecho la tarea:
+    # solo entonces pasa a la pestaña «Cumplidas» y se pinta en verde.
     categoria = models.CharField(
         max_length=40,
         default='general',
@@ -85,8 +88,27 @@ class Notificacion(models.Model):
         verbose_name="Leída",
         help_text=(
             "Los avisos informativos se marcan al abrir la campanita. "
-            "Los que requieren acción se marcan al pulsar el ítem o ✓✓."
+            "Los que requieren acción se marcan al pulsar el ítem o ✓✓. "
+            "Abrir no significa que la tarea ya se cumplió."
         ),
+    )
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # leida = "ya lo vi". cumplida = "ya hice el trabajo" (ej. avisé al cliente).
+    # Un equipo listo puede estar leído y seguir en Por hacer hasta el correo.
+    cumplida = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Cumplida",
+        help_text=(
+            "True: la tarea ya se hizo y el aviso pasa a «Cumplidas» (verde). "
+            "Abrir la campanita no marca este campo."
+        ),
+    )
+    fecha_cumplida = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de cumplimiento",
+        help_text="Cuándo se completó la tarea. Vacío mientras sigue en Por hacer.",
     )
     fecha_creacion = models.DateTimeField(
         auto_now_add=True,
@@ -148,6 +170,11 @@ class Notificacion(models.Model):
             models.Index(
                 fields=['usuario', 'requiere_accion', '-fecha_creacion'],
                 name='idx_notif_usr_accion_fecha',
+            ),
+            # Cumplidas se listan por usuario y por la fecha en que se terminó.
+            models.Index(
+                fields=['usuario', 'cumplida', '-fecha_cumplida'],
+                name='idx_notif_usr_cumplida_fecha',
             ),
         ]
 

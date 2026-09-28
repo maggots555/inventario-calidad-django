@@ -8,9 +8,10 @@
  * ¿Qué hace?
  * 1. Consulta al servidor periódicamente: "¿Hay notificaciones nuevas?"
  * 2. El badge rojo cuenta SOLO las de «Por hacer» (trabajo pendiente)
- * 3. Pestañas: Por hacer (requiere acción) | Avisos (informativas)
- * 4. Al abrir, se marcan leídos los avisos; las de acción siguen pendientes
- *    hasta que haces clic en ellas o pulsas ✓✓
+ * 3. Pestañas: Por hacer | Cumplidas (tarea hecha, en verde) | Avisos
+ * 4. Al abrir la campanita se marcan leídos los avisos. En Por hacer,
+ *    el clic baja el aviso pero no lo da por cumplido: equipo listo
+ *    sigue contando hasta que se envía el correo al cliente.
  *
  * Optimizaciones de producción:
  * - Polling adaptativo: 15s cuando hay actividad, 60s cuando está inactivo
@@ -30,9 +31,9 @@
 // ============================================================================
 
 /**
- * Pestaña activa: trabajo pendiente vs solo informativas.
+ * Pestaña activa: trabajo pendiente, tarea ya hecha, o solo informativa.
  */
-type NotifTabActiva = 'accion' | 'avisos';
+type NotifTabActiva = 'accion' | 'cumplidas' | 'avisos';
 
 /**
  * Chip de equipo dentro de «Por hacer».
@@ -62,6 +63,8 @@ interface NotificacionItem {
     /** True = pestaña Por hacer; False = Avisos */
     requiere_accion: boolean;
     leida: boolean;
+    /** True = la tarea ya se hizo; va a Cumplidas y se pinta en verde */
+    cumplida: boolean;
     fecha: string;
     app: string;
     url: string;  // '' cuando no hay destino; si tiene valor, la notif es navegable
@@ -70,8 +73,8 @@ interface NotificacionItem {
 /**
  * Respuesta completa del endpoint /notificaciones/api/listar/.
  *
- * EXPLICACIÓN: El servidor devuelve DOS listas independientes (tope 20 c/u)
- * para que un correo de «video listo» no tape un pago por validar.
+ * EXPLICACIÓN: El servidor devuelve tres listas (tope 20 c/u):
+ * Por hacer, Cumplidas y Avisos.
  */
 interface NotificacionesResponse {
     no_leidas: number;
@@ -81,8 +84,10 @@ interface NotificacionesResponse {
     no_leidas_equipo_satelite: number;
     no_leidas_equipo_dropoff: number;
     hay_mas_accion?: boolean;
+    hay_mas_cumplidas?: boolean;
     hay_mas_avisos?: boolean;
     accion: NotificacionItem[];
+    cumplidas: NotificacionItem[];
     avisos: NotificacionItem[];
 }
 
@@ -162,6 +167,7 @@ class PanelNotificaciones {
     private readonly btnTodas: HTMLElement | null;
     private readonly btnLimpiar: HTMLElement | null;
     private readonly tabAccion: HTMLElement | null;
+    private readonly tabCumplidas: HTMLElement | null;
     private readonly tabAvisos: HTMLElement | null;
     private readonly tabAccionCount: HTMLElement | null;
     private readonly tabAvisosCount: HTMLElement | null;
@@ -188,6 +194,7 @@ class PanelNotificaciones {
 
     /** Cortes independientes que mandó el servidor. */
     private cacheAccion: NotificacionItem[] = [];
+    private cacheCumplidas: NotificacionItem[] = [];
     private cacheAvisos: NotificacionItem[] = [];
     /** Contadores de no leídas (badge y pestañas). */
     private noLeidasAccion: number = 0;
@@ -196,6 +203,7 @@ class PanelNotificaciones {
     private noLeidasSatelite: number = 0;
     private noLeidasDropoff: number = 0;
     private hayMasAccion: boolean = false;
+    private hayMasCumplidas: boolean = false;
     private hayMasAvisos: boolean = false;
     /**
      * Generación del último GET /listar/. Si llega una respuesta vieja
@@ -219,6 +227,7 @@ class PanelNotificaciones {
         this.btnTodas = document.getElementById('notif-marcar-todas');
         this.btnLimpiar = document.getElementById('notif-limpiar-todas');
         this.tabAccion = document.getElementById('notif-tab-accion');
+        this.tabCumplidas = document.getElementById('notif-tab-cumplidas');
         this.tabAvisos = document.getElementById('notif-tab-avisos');
         this.tabAccionCount = document.getElementById('notif-tab-accion-count');
         this.tabAvisosCount = document.getElementById('notif-tab-avisos-count');
@@ -328,7 +337,7 @@ class PanelNotificaciones {
         }
 
         const itemLi: HTMLElement | null = target.closest('.notif-item');
-        if (!itemLi || itemLi.classList.contains('notif-leida')) {
+        if (!itemLi || itemLi.classList.contains('notif-leida') || itemLi.classList.contains('notif-cumplida')) {
             return;
         }
         if (itemLi.dataset.requiereAccion !== 'true') {
@@ -352,7 +361,7 @@ class PanelNotificaciones {
     }
 
     /**
-     * Registra clics en las pestañas Por hacer / Avisos.
+     * Registra clics en Por hacer / Cumplidas / Avisos.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * No volvemos a pedir datos al servidor: filtramos las listas que ya
@@ -361,6 +370,7 @@ class PanelNotificaciones {
     private registrarClicksTabs(): void {
         const tabs: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
             { el: this.tabAccion, tab: 'accion' },
+            { el: this.tabCumplidas, tab: 'cumplidas' },
             { el: this.tabAvisos, tab: 'avisos' },
         ];
 
@@ -419,6 +429,7 @@ class PanelNotificaciones {
     private actualizarEstadoVisualTabs(): void {
         const pares: Array<{ el: HTMLElement | null; tab: NotifTabActiva }> = [
             { el: this.tabAccion, tab: 'accion' },
+            { el: this.tabCumplidas, tab: 'cumplidas' },
             { el: this.tabAvisos, tab: 'avisos' },
         ];
         for (const { el, tab } of pares) {
@@ -482,6 +493,8 @@ class PanelNotificaciones {
         let items: NotificacionItem[];
         if (this.tabActiva === 'avisos') {
             items = this.cacheAvisos;
+        } else if (this.tabActiva === 'cumplidas') {
+            items = this.cacheCumplidas;
         } else if (this.chipActivo !== '') {
             items = this.filtrarAccionPorChip(this.cacheAccion);
         } else {
@@ -542,6 +555,7 @@ class PanelNotificaciones {
             ...n,
             categoria: n.categoria || 'general',
             requiere_accion: Boolean(n.requiere_accion),
+            cumplida: Boolean(n.cumplida),
         };
     }
 
@@ -596,8 +610,10 @@ class PanelNotificaciones {
             }
 
             this.hayMasAccion = Boolean(data.hay_mas_accion);
+            this.hayMasCumplidas = Boolean(data.hay_mas_cumplidas);
             this.hayMasAvisos = Boolean(data.hay_mas_avisos);
             this.cacheAccion = (data.accion || []).map((n) => this.normalizarItem(n));
+            this.cacheCumplidas = (data.cumplidas || []).map((n) => this.normalizarItem(n));
             this.cacheAvisos = (data.avisos || []).map((n) => this.normalizarItem(n));
             this.aplicarContadores(data);
             this.actualizarEstadoVisualTabs();
@@ -656,15 +672,21 @@ class PanelNotificaciones {
         if (!this.lista || this.lista.querySelector('.notif-vacia')) {
             return;
         }
-        const hayMas =
-            this.tabActiva === 'avisos' ? this.hayMasAvisos : this.hayMasAccion;
-        if (!hayMas || this.chipActivo !== '') {
+        let hayMas = this.hayMasAccion;
+        if (this.tabActiva === 'avisos') {
+            hayMas = this.hayMasAvisos;
+        } else if (this.tabActiva === 'cumplidas') {
+            hayMas = this.hayMasCumplidas;
+        }
+        // El chip recorta Por hacer: el pie de «hay más» sería de otra lista.
+        if (!hayMas || (this.tabActiva === 'accion' && this.chipActivo !== '')) {
             return;
         }
         const li = document.createElement('li');
         li.className = 'notif-hay-mas';
-        li.textContent =
-            'Se muestran las 20 más recientes. El número de la pestaña cuenta todas.';
+        li.textContent = this.tabActiva === 'cumplidas'
+            ? 'Se muestran las 20 más recientes.'
+            : 'Se muestran las 20 más recientes. El número de la pestaña cuenta todas.';
         this.lista.appendChild(li);
     }
 
@@ -672,7 +694,7 @@ class PanelNotificaciones {
      * Actualiza el número rojo (badge) en la campanita.
      *
      * EXPLICACIÓN:
-     * - Solo cuenta «Por hacer» no leídas: el ruido de Celery no enciende el punto.
+     * - Cuenta el trabajo que falta. Equipo listo sigue contando hasta el correo.
      * - Si hay más de 99, muestra "99+" para que el badge no se deforme.
      */
     private renderBadge(cantidad: number): void {
@@ -709,6 +731,8 @@ class PanelNotificaciones {
                 mensajeVacio = 'Sin avisos de equipo disponible';
             } else if (this.tabActiva === 'accion') {
                 mensajeVacio = 'Nada pendiente por hacer';
+            } else if (this.tabActiva === 'cumplidas') {
+                mensajeVacio = 'Aún no hay tareas cumplidas';
             }
             this.lista.innerHTML = `
                 <li class="notif-vacia">
@@ -720,7 +744,9 @@ class PanelNotificaciones {
 
         this.lista.innerHTML = notificaciones.map((n: NotificacionItem) => {
             const cfg: TipoConfig = TIPO_CONFIG[n.tipo] ?? TIPO_CONFIG['info'];
-            const claseLeida: string = n.leida ? 'notif-leida' : 'notif-nueva';
+            const claseLeida: string = n.cumplida
+                ? 'notif-cumplida'
+                : (n.leida ? 'notif-leida' : 'notif-nueva');
 
             /*
              * Si la notificación tiene URL, envolvemos el contenido en un <a>
@@ -874,10 +900,10 @@ class PanelNotificaciones {
     }
 
     /**
-     * Elimina TODAS las notificaciones del usuario.
+     * Limpia avisos y tareas cumplidas. Por hacer pendiente se queda.
      *
-     * EXPLICACIÓN: Botón "Limpiar todas" en el header del dropdown.
-     * Borra todo del servidor y limpia la UI de una vez.
+     * EXPLICACIÓN: El servidor decide qué borrar. Aquí solo volvemos a
+     * pedir la lista, para no vaciar en pantalla un pendiente que sigue.
      */
     private async eliminarTodas(): Promise<void> {
         try {
@@ -890,12 +916,8 @@ class PanelNotificaciones {
 
             const data = await response.json() as ContadoresNotif;
             this.listarSeq += 1;
-            this.cacheAccion = [];
-            this.cacheAvisos = [];
-            this.hayMasAccion = false;
-            this.hayMasAvisos = false;
             this.aplicarContadores(data);
-            this.renderListaFiltrada();
+            await this.actualizarNotificaciones();
         } catch (error: unknown) {
             void error;
         }

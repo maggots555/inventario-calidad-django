@@ -2370,24 +2370,17 @@ def enviar_notificacion_equipo_disponible_task(
             es_sistema=False,
         )
 
+        # El aviso original de «equipo listo» pasa a Cumplidas (verde).
+        # No se crea otro aviso de éxito: esa fila es la confirmación.
         try:
-            _usuario_notif = None
-            if usuario_id:
-                User = get_user_model()
-                try:
-                    _usuario_notif = User.objects.get(pk=usuario_id)
-                except User.DoesNotExist:
-                    pass
-            notificar_exito(
-                titulo='Equipo disponible notificado',
-                mensaje=f'Orden {folio} — Correo enviado a {email_cliente}.',
-                usuario=_usuario_notif,
-                task_id=self.request.id,
-                app_origen='servicio_tecnico',
-                categoria='equipo_disponible',
+            from notificaciones.utils import marcar_equipo_listo_cumplido
+            marcar_equipo_listo_cumplido(orden.pk)
+        except Exception as exc_cumplida:
+            logger.warning(
+                '[EQUIPO-DISPONIBLE] No se pudo marcar cumplida la orden %s: %s',
+                orden.pk,
+                exc_cumplida,
             )
-        except Exception:
-            pass
 
         return {
             'success': True,

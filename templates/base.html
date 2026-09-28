@@ -502,12 +502,12 @@
                                     <button id="notif-marcar-todas" class="btn btn-link btn-sm p-0 text-decoration-none" title="Marcar como leídas">
                                         <i class="bi bi-check2-all"></i>
                                     </button>
-                                    <button id="notif-limpiar-todas" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" title="Eliminar todas">
+                                    <button id="notif-limpiar-todas" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" title="Limpiar avisos y tareas cumplidas">
                                         <i class="bi bi-trash3"></i>
                                     </button>
                                 </div>
                             </div>
-                            {# Pestañas: Por hacer (acción) | Avisos (informativas) #}
+                            {# Pestañas: Por hacer | Cumplidas (tarea hecha) | Avisos #}
                             <div class="notif-tabs" role="tablist" aria-label="Filtrar notificaciones">
                                 <button type="button"
                                         class="notif-tab active"
@@ -518,6 +518,16 @@
                                     <i class="bi bi-list-check" aria-hidden="true"></i>
                                     Por hacer
                                     <span id="notif-tab-accion-count" class="notif-tab-count d-none">0</span>
+                                </button>
+                                <button type="button"
+                                        class="notif-tab"
+                                        id="notif-tab-cumplidas"
+                                        data-tab="cumplidas"
+                                        role="tab"
+                                        aria-selected="false"
+                                        title="Tareas cumplidas">
+                                    <i class="bi bi-check-circle" aria-hidden="true"></i>
+                                    Cumplidas
                                 </button>
                                 <button type="button"
                                         class="notif-tab"

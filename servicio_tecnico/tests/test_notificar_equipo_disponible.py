@@ -911,6 +911,39 @@ class EquipoDisponibleEmailCcTest(TestCase):
         self.assertTrue(resultado['success'])
         self.assertEqual(mail.outbox[0].cc, ['quien.envia@test.local'])
 
+    def test_correo_exitoso_pasa_el_aviso_a_cumplidas(self):
+        """El correo al cliente cierra el aviso original; no crea otro de éxito."""
+        from django.urls import reverse
+
+        url = reverse(
+            'servicio_tecnico:detalle_orden',
+            kwargs={'orden_id': self.orden.pk},
+        ) + '#notificar-equipo-disponible'
+        aviso = Notificacion.objects.create(
+            titulo='Equipo listo para avisar al cliente',
+            mensaje='Pendiente de correo',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+            url=url,
+        )
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+
+        self.assertTrue(resultado['success'])
+        aviso.refresh_from_db()
+        self.assertTrue(aviso.cumplida)
+        self.assertIsNotNone(aviso.fecha_cumplida)
+        self.assertTrue(aviso.leida)
+        self.assertFalse(
+            Notificacion.objects.filter(titulo='Equipo disponible notificado').exists()
+        )
+
 
 @override_settings(
     EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
