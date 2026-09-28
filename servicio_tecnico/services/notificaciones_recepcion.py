@@ -22,6 +22,12 @@ Canales:
   - Campanita in-app (`notificar_info`)
   - Web Push (`enviar_push_a_usuario`)
 
+Categoría de la campanita (filtro):
+  - Fuera de garantía: equipo_disponible (recepción).
+  - Garantía en Drop Off: equipo_disponible_dropoff.
+  - Garantía en Satélite: equipo_disponible_satelite.
+  - Garantía en otra sede: equipo_disponible (sigue en el filtro general).
+
 Efectos secundarios:
   - Crea Notificacion(es) + push
   - Marca aviso_recepcion_listo_enviado=True
@@ -31,10 +37,17 @@ Efectos secundarios:
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Literal
 
 from django.db import transaction
 from django.urls import reverse
+
+from notificaciones.utils import (
+    CATEGORIA_EQUIPO_DISPONIBLE,
+    CATEGORIA_EQUIPO_DROPOFF,
+    CATEGORIA_EQUIPO_SATELITE,
+)
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -111,6 +124,8 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
     titulo = f'Equipo listo para avisar al cliente — {etiqueta}'
     # Campanita y push comparten este texto. En garantía se nombra la sede.
     mensaje = _mensaje_equipo_listo(orden, etiqueta, service_tag)
+    # Paso: la sede solo parte el filtro en garantía (Drop Off / Satélite).
+    categoria = categoria_equipo_listo(orden)
 
     enviados = 0
     user_ids_notificados: list[int] = []
@@ -131,7 +146,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
                 usuario=usuario,
                 url=url_orden,
                 app_origen='servicio_tecnico',
-                categoria='equipo_disponible',
+                categoria=categoria,
                 requiere_accion=True,
                 copiar_a_superusers=False,
             )
@@ -166,7 +181,7 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
         mensaje=mensaje,
         url=url_orden,
         app_origen='servicio_tecnico',
-        categoria='equipo_disponible',
+        categoria=categoria,
         requiere_accion=True,
     )
 
@@ -271,6 +286,70 @@ def _marca_normalizada(orden) -> str:
     except Exception:
         marca = ''
     return marca.strip().lower()
+
+
+def _sin_acentos(texto: str) -> str:
+    """
+    Quita acentos para comparar «Satélite» y «Satelite» igual.
+
+    Args:
+        texto: Nombre de sucursal u otro texto corto.
+
+    Returns:
+        El mismo texto sin tildes (é → e). No cambia mayúsculas.
+    """
+    # NFD parte «é» en «e» + tilde. La tilde es categoría Mn y se descarta.
+    descompuesto = unicodedata.normalize('NFD', texto or '')
+    return ''.join(
+        caracter
+        for caracter in descompuesto
+        if unicodedata.category(caracter) != 'Mn'
+    )
+
+
+def categoria_por_nombre_sucursal(nombre: str) -> str:
+    """
+    Elige el filtro de la campanita a partir del nombre de la sucursal.
+
+    Objetivo: la misma idea que el concentrado semanal. Si el nombre
+    contiene «drop» es Drop Off; si contiene «satelit» (con o sin acento)
+    es Satélite. Guadalajara, Monterrey y el resto se quedan en el
+    filtro general de equipo disponible.
+
+    Args:
+        nombre: Nombre de la sucursal, tal como está en la base.
+
+    Returns:
+        categoria de Notificacion (equipo_disponible, …_dropoff o …_satelite).
+    """
+    texto = _sin_acentos((nombre or '').lower())
+    # Paso 1: Drop Off gana si el nombre trae las dos palabras (no debería).
+    if 'drop' in texto:
+        return CATEGORIA_EQUIPO_DROPOFF
+    # Paso 2: Satelite y Satélite caen en el mismo chip del dispatcher.
+    if 'satelit' in texto:
+        return CATEGORIA_EQUIPO_SATELITE
+    return CATEGORIA_EQUIPO_DISPONIBLE
+
+
+def categoria_equipo_listo(orden) -> str:
+    """
+    Categoría del aviso «equipo listo» según garantía y sucursal.
+
+    Objetivo: recepción (fuera de garantía) sigue en un solo filtro,
+    aunque la orden esté en Satélite. En garantía el dispatcher
+    necesita separar Drop Off y Satélite.
+
+    Args:
+        orden: OrdenServicio.
+
+    Returns:
+        categoria que se guarda en Notificacion.
+    """
+    # Paso: OOW no se parte por sede; el chip de recepción las junta todas.
+    if getattr(orden, 'es_fuera_garantia', False):
+        return CATEGORIA_EQUIPO_DISPONIBLE
+    return categoria_por_nombre_sucursal(_nombre_sucursal(orden))
 
 
 def _nombre_sucursal(orden) -> str:

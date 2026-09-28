@@ -13,7 +13,8 @@ Campos principales:
 - titulo   : Texto corto que describe la notificación (ej: "Correo RHITSO enviado")
 - mensaje  : Texto largo con detalles (ej: "Orden ST-001, enviado a 3 destinatarios")
 - tipo     : Categoría visual (exito=verde, error=rojo, warning=amarillo, info=azul)
-- categoria: Agrupación de dominio (general, equipo_disponible, …)
+- categoria: Agrupación de dominio (general, equipo_disponible,
+  equipo_disponible_satelite, equipo_disponible_dropoff, …)
 - requiere_accion: True = pestaña «Por hacer»; False = pestaña «Avisos»
 - leida    : Si el usuario ya la vio (True) o no (False)
 - usuario  : Quién debe ver esta notificación (el que disparó la tarea)
@@ -66,7 +67,8 @@ class Notificacion(models.Model):
         verbose_name="Categoría",
         help_text=(
             "Agrupación de dominio para filtros de la campanita "
-            "(ej. general, equipo_disponible)"
+            "(ej. general, equipo_disponible, equipo_disponible_satelite, "
+            "equipo_disponible_dropoff)"
         ),
     )
     requiere_accion = models.BooleanField(

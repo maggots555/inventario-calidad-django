@@ -169,3 +169,196 @@ class AvisoRecepcionCategoriaTest(TestCase):
         self.assertIsNotNone(notif)
         self.assertIn('Equipo listo', notif.titulo)
         self.assertTrue(notif.requiere_accion)
+
+
+class OrdenPendientesYContadoresSedeTest(TestCase):
+    """
+    «Por hacer» pone lo no leído arriba y cuenta Satélite / Drop Off aparte.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Si una notificación ya se abrió, baja debajo de las que siguen
+    pendientes, aunque sea más nueva. El numerito de Equipo disponible
+    suma las tres categorías; cada sede tiene el suyo.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='api_sede',
+            password='testpass123',
+        )
+        self.factory = RequestFactory()
+
+    def _listar(self) -> dict:
+        import json
+        request = self.factory.get('/notificaciones/api/listar/')
+        request.user = self.user
+        response = notif_views.obtener_notificaciones(request)
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.content.decode())
+
+    def test_no_leidas_van_antes_que_una_vista_mas_nueva(self):
+        """La más nueva, si ya se vio, queda al final del corte."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        ahora = timezone.now()
+        pendiente_vieja = Notificacion.objects.create(
+            titulo='Pendiente vieja',
+            mensaje='Sigue abierta',
+            tipo='info',
+            usuario=self.user,
+            requiere_accion=True,
+        )
+        pendiente_nueva = Notificacion.objects.create(
+            titulo='Pendiente nueva',
+            mensaje='También abierta',
+            tipo='info',
+            usuario=self.user,
+            requiere_accion=True,
+        )
+        vista_reciente = Notificacion.objects.create(
+            titulo='Ya vista',
+            mensaje='Se abrió',
+            tipo='info',
+            usuario=self.user,
+            requiere_accion=True,
+            leida=True,
+        )
+        # Paso: las fechas se fijan a mano para no depender del orden de alta.
+        pendiente_vieja.fecha_creacion = ahora - timedelta(hours=5)
+        pendiente_vieja.save(update_fields=['fecha_creacion'])
+        pendiente_nueva.fecha_creacion = ahora - timedelta(hours=1)
+        pendiente_nueva.save(update_fields=['fecha_creacion'])
+        vista_reciente.fecha_creacion = ahora
+        vista_reciente.save(update_fields=['fecha_creacion'])
+
+        ids = [item['id'] for item in self._listar()['accion']]
+        self.assertEqual(
+            ids,
+            [pendiente_nueva.pk, pendiente_vieja.pk, vista_reciente.pk],
+        )
+
+    def test_contadores_separan_satelite_y_dropoff(self):
+        """El chip general suma las tres; cada sede cuenta solo la suya."""
+        Notificacion.objects.create(
+            titulo='General',
+            mensaje='Otra sede',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+        )
+        Notificacion.objects.create(
+            titulo='Satélite',
+            mensaje='Lista en Satélite',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_satelite',
+            requiere_accion=True,
+        )
+        Notificacion.objects.create(
+            titulo='Drop Off',
+            mensaje='Lista en Drop Off',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_dropoff',
+            requiere_accion=True,
+        )
+        # Ya vista: no debe sumar en ningún chip.
+        Notificacion.objects.create(
+            titulo='Satélite vista',
+            mensaje='Ya se abrió',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_satelite',
+            requiere_accion=True,
+            leida=True,
+        )
+        data = self._listar()
+        self.assertEqual(data['no_leidas_equipo'], 3)
+        self.assertEqual(data['no_leidas_equipo_satelite'], 1)
+        self.assertEqual(data['no_leidas_equipo_dropoff'], 1)
+
+
+class ReclasificarAvisosExistentesTest(TestCase):
+    """La migración mueve avisos viejos según el nombre que ya trae el mensaje."""
+
+    databases = {'default', 'mexico'}
+
+    def test_mensaje_con_sede_cambia_categoria(self):
+        from django.apps import apps
+        from django.db import connections
+        import importlib
+
+        migracion = importlib.import_module(
+            'notificaciones.migrations.0009_reclasificar_equipo_por_sucursal'
+        )
+
+        user = User.objects.create_user(
+            username='mig_sede',
+            password='testpass123',
+        )
+        satelite = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje=(
+                'La orden SIC-1 (S/T: ABC) está lista en Satélite. '
+                'Notifica al cliente que puede recolectar el equipo.'
+            ),
+            tipo='info',
+            usuario=user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+        )
+        dropoff = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje=(
+                'La orden SIC-2 (S/T: DEF) está lista en Drop Off Sur. '
+                'Notifica al cliente que puede recolectar el equipo.'
+            ),
+            tipo='info',
+            usuario=user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+        )
+        otra = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje=(
+                'La orden SIC-3 (S/T: GHI) está lista en Guadalajara. '
+                'Notifica al cliente que puede recolectar el equipo.'
+            ),
+            tipo='info',
+            usuario=user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+        )
+        oow = Notificacion.objects.create(
+            titulo='Equipo listo',
+            mensaje=(
+                'La orden OOW-1 (S/T: JKL) está lista. '
+                'Notifica al cliente que puede recolectar el equipo.'
+            ),
+            tipo='info',
+            usuario=user,
+            categoria='equipo_disponible',
+            requiere_accion=True,
+        )
+
+        class _Editor:
+            """Imita el schema_editor: solo nos importa el alias de la base."""
+
+            connection = connections['default']
+
+        migracion.reclasificar_equipo_por_sucursal(apps, _Editor())
+        satelite.refresh_from_db()
+        dropoff.refresh_from_db()
+        otra.refresh_from_db()
+        oow.refresh_from_db()
+        self.assertEqual(satelite.categoria, 'equipo_disponible_satelite')
+        self.assertEqual(dropoff.categoria, 'equipo_disponible_dropoff')
+        self.assertEqual(otra.categoria, 'equipo_disponible')
+        self.assertEqual(oow.categoria, 'equipo_disponible')

@@ -363,6 +363,143 @@ class DestinatariosGarantiaOowTest(TestCase):
         )
 
 
+class CategoriaEquipoPorSucursalTest(TestCase):
+    """
+    El filtro de la campanita separa Satélite y Drop Off solo en garantía.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Fuera de garantía el aviso sigue en «equipo_disponible», aunque la
+    orden esté en Satélite. En garantía, el nombre de la sucursal decide
+    el chip del dispatcher.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal_staff = Sucursal.objects.create(
+            nombre='Oficina Filtro',
+            ciudad='CDMX',
+        )
+        self.user_recep = User.objects.create_user(
+            username='recep_sede',
+            password='testpass123',
+        )
+        self.recepcionista = Empleado.objects.create(
+            nombre_completo='Recepcion Sede',
+            cargo='Recepcionista',
+            area='Recepción',
+            email='recep.sede@test.local',
+            sucursal=self.sucursal_staff,
+            user=self.user_recep,
+            rol='recepcionista',
+        )
+        self.user_dell = User.objects.create_user(
+            username='disp_sede',
+            password='testpass123',
+        )
+        Empleado.objects.create(
+            nombre_completo='Dispatcher Sede',
+            cargo='Dispatcher',
+            area='Operaciones',
+            email='disp.sede@test.local',
+            sucursal=self.sucursal_staff,
+            user=self.user_dell,
+            rol='dispatcher',
+            atiende_garantias_dell=True,
+        )
+        self.user_tec = User.objects.create_user(
+            username='tec_sede',
+            password='testpass123',
+        )
+        self.tecnico = Empleado.objects.create(
+            nombre_completo='Tecnico Sede',
+            cargo='Técnico',
+            area='Laboratorio',
+            email='tec.sede@test.local',
+            sucursal=self.sucursal_staff,
+            user=self.user_tec,
+            rol='tecnico',
+        )
+
+    def _aviso(self, nombre_sucursal: str, folio: str):
+        """Crea la orden en esa sede y devuelve la campanita del destinatario."""
+        sucursal = Sucursal.objects.create(
+            nombre=nombre_sucursal,
+            ciudad='CDMX',
+        )
+        # OOW lleva responsable de recepción; garantía no lo usa para el aviso.
+        responsable = self.recepcionista if folio.startswith('OOW') else None
+        orden = OrdenServicio.objects.create(
+            sucursal=sucursal,
+            tipo_servicio='diagnostico',
+            estado='control_calidad',
+            tecnico_asignado_actual=self.tecnico,
+            responsable_seguimiento=responsable,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=folio,
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='XPS',
+            numero_serie=f'ST-{folio}',
+            email_cliente='cliente.sede@test.local',
+            nombre_cliente='Cliente Sede',
+            falla_principal='Falla test',
+            gama='media',
+        )
+        orden.refresh_from_db()
+        return orden
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_satelite_usa_categoria_satelite(self, _mock_push):
+        """Satélite (sin acento) abre el chip del dispatcher."""
+        orden = self._aviso('Satelite', 'SIC-SEDE-SAT')
+        self.assertFalse(orden.es_fuera_garantia)
+        self.assertTrue(notificar_recepcion_equipo_listo(orden, motivo='finalizado'))
+        aviso = Notificacion.objects.get(usuario=self.user_dell)
+        self.assertEqual(aviso.categoria, 'equipo_disponible_satelite')
+        self.assertIn('está lista en Satelite', aviso.mensaje)
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_satelite_con_acento(self, _mock_push):
+        """«Satélite» con tilde cae en el mismo filtro."""
+        orden = self._aviso('Satélite', 'SIC-SEDE-TILDE')
+        self.assertTrue(notificar_recepcion_equipo_listo(orden, motivo='finalizado'))
+        aviso = Notificacion.objects.get(usuario=self.user_dell)
+        self.assertEqual(aviso.categoria, 'equipo_disponible_satelite')
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_drop_off_usa_categoria_dropoff(self, _mock_push):
+        """Drop Off abre el otro chip del dispatcher."""
+        orden = self._aviso('Drop Off', 'SIC-SEDE-DROP')
+        self.assertTrue(notificar_recepcion_equipo_listo(orden, motivo='finalizado'))
+        aviso = Notificacion.objects.get(usuario=self.user_dell)
+        self.assertEqual(aviso.categoria, 'equipo_disponible_dropoff')
+        self.assertIn('está lista en Drop Off', aviso.mensaje)
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_garantia_otra_sede_sigue_en_filtro_general(self, _mock_push):
+        """Guadalajara no tiene chip propio: se queda en Equipo disponible."""
+        orden = self._aviso('Guadalajara', 'SIC-SEDE-GDL')
+        self.assertTrue(notificar_recepcion_equipo_listo(orden, motivo='finalizado'))
+        aviso = Notificacion.objects.get(usuario=self.user_dell)
+        self.assertEqual(aviso.categoria, 'equipo_disponible')
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_oow_en_satelite_no_se_parte_por_sede(self, _mock_push):
+        """Fuera de garantía, aunque esté en Satélite, recepción ve el filtro general."""
+        orden = self._aviso('Satelite', 'OOW-SEDE-01')
+        self.assertTrue(orden.es_fuera_garantia)
+        self.assertTrue(notificar_recepcion_equipo_listo(orden, motivo='finalizado'))
+        aviso = Notificacion.objects.get(usuario=self.user_recep)
+        self.assertEqual(aviso.categoria, 'equipo_disponible')
+        self.assertEqual(
+            Notificacion.objects.filter(usuario=self.user_dell).count(),
+            0,
+        )
+
+
 class NotificarEquipoDisponibleVistaTest(TestCase):
     """POST notificar_equipo_disponible vía RequestFactory (sin Axes/login)."""
 

@@ -36,9 +36,18 @@ from django.contrib.auth.models import User
 
 logger = logging.getLogger('notificaciones')
 
-# Prefijo de cache Redis del panel. El "v2" evita servir 10 s el JSON viejo
-# (una sola lista de 20) cuando el cliente ya espera dos cortes.
-CACHE_KEY_PREFIX = 'notif:v2'
+# Prefijo de cache Redis del panel. El "v3" evita servir 10 s el JSON viejo
+# (sin contadores de Satélite / Drop Off) cuando el cliente ya los espera.
+CACHE_KEY_PREFIX = 'notif:v3'
+
+
+# Filtros de la campanita para «equipo listo».
+# El chip general usa el prefijo (incluye Satélite y Drop Off).
+# Las otras dos categorías son los chips que solo ve el dispatcher.
+CATEGORIA_EQUIPO_DISPONIBLE = 'equipo_disponible'
+CATEGORIA_EQUIPO_DROPOFF = 'equipo_disponible_dropoff'
+CATEGORIA_EQUIPO_SATELITE = 'equipo_disponible_satelite'
+PREFIJO_CATEGORIA_EQUIPO = 'equipo_disponible'
 
 
 def clave_cache_notificaciones(user_id: int) -> str:
@@ -48,7 +57,7 @@ def clave_cache_notificaciones(user_id: int) -> str:
         user_id: PK del usuario destinatario.
 
     Returns:
-        str: ej. ``notif:v2:42``.
+        str: ej. ``notif:v3:42``.
     """
     return f'{CACHE_KEY_PREFIX}:{user_id}'
 

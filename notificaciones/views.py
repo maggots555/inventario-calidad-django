@@ -39,7 +39,13 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_GET
 
 from .models import Notificacion, PushSubscription
-from .utils import clave_cache_notificaciones, invalidar_cache_notificaciones
+from .utils import (
+    CATEGORIA_EQUIPO_DROPOFF,
+    CATEGORIA_EQUIPO_SATELITE,
+    PREFIJO_CATEGORIA_EQUIPO,
+    clave_cache_notificaciones,
+    invalidar_cache_notificaciones,
+)
 
 logger = logging.getLogger('notificaciones')
 
@@ -62,7 +68,7 @@ def _cache_key(user_id: int) -> str:
         user_id: PK del usuario.
 
     Returns:
-        str: ``notif:v2:{id}``.
+        str: ``notif:v3:{id}``.
     """
     return clave_cache_notificaciones(user_id)
 
@@ -87,7 +93,8 @@ def _contadores_usuario(user) -> dict:
         user: Usuario autenticado dueño de las notificaciones.
 
     Returns:
-        dict: no_leidas, no_leidas_accion, no_leidas_avisos, no_leidas_equipo.
+        dict: no_leidas, no_leidas_accion, no_leidas_avisos, no_leidas_equipo,
+        no_leidas_equipo_satelite, no_leidas_equipo_dropoff.
     """
     agg = Notificacion.objects.filter(usuario=user).aggregate(
         no_leidas_accion=Count(
@@ -101,18 +108,39 @@ def _contadores_usuario(user) -> dict:
             filter=Q(
                 requiere_accion=True,
                 leida=False,
-                categoria='equipo_disponible',
+                categoria__startswith=PREFIJO_CATEGORIA_EQUIPO,
+            ),
+        ),
+        # Paso: chips del dispatcher. No entran en el conteo si ya se vieron.
+        no_leidas_equipo_satelite=Count(
+            'pk',
+            filter=Q(
+                requiere_accion=True,
+                leida=False,
+                categoria=CATEGORIA_EQUIPO_SATELITE,
+            ),
+        ),
+        no_leidas_equipo_dropoff=Count(
+            'pk',
+            filter=Q(
+                requiere_accion=True,
+                leida=False,
+                categoria=CATEGORIA_EQUIPO_DROPOFF,
             ),
         ),
     )
     accion = int(agg['no_leidas_accion'] or 0)
     avisos = int(agg['no_leidas_avisos'] or 0)
     equipo = int(agg['no_leidas_equipo'] or 0)
+    satelite = int(agg['no_leidas_equipo_satelite'] or 0)
+    dropoff = int(agg['no_leidas_equipo_dropoff'] or 0)
     return {
         'no_leidas': accion,
         'no_leidas_accion': accion,
         'no_leidas_avisos': avisos,
         'no_leidas_equipo': equipo,
+        'no_leidas_equipo_satelite': satelite,
+        'no_leidas_equipo_dropoff': dropoff,
     }
 
 
@@ -187,9 +215,10 @@ def obtener_notificaciones(request):
     La respuesta incluye:
     - no_leidas / no_leidas_accion: pendientes de acción (badge de la campanita)
     - no_leidas_avisos: informativas sin leer
-    - no_leidas_equipo: acción + categoria equipo_disponible (chip)
+    - no_leidas_equipo: acción sin leer cuya categoria empieza por equipo_disponible
+    - no_leidas_equipo_satelite / no_leidas_equipo_dropoff: chips del dispatcher
     - hay_mas_accion / hay_mas_avisos: True si hay más de 20 en ese corte
-    - accion / avisos: listas (leídas y no leídas, más recientes primero)
+    - accion / avisos: listas. En «Por hacer», las no leídas van primero.
 
     Optimización con cache:
     El resultado se guarda en Redis por 10 segundos. Si TypeScript
@@ -208,9 +237,10 @@ def obtener_notificaciones(request):
     if data is None:
         # Cache vacío o expirado → consultar la BD (un queryset base).
         qs = Notificacion.objects.filter(usuario=user)
-        # Paso 1: dos cortes; limite+1 detecta si hay más sin un COUNT extra.
+        # Paso 1: «Por hacer» pone pendientes arriba (leida=False primero)
+        # y las ya vistas debajo. Así, al marcar una, baja en la siguiente carga.
         accion, hay_mas_accion = _cortar_lista(
-            qs.filter(requiere_accion=True).order_by('-fecha_creacion'),
+            qs.filter(requiere_accion=True).order_by('leida', '-fecha_creacion'),
             LIMITE_LISTA_NOTIF,
         )
         avisos, hay_mas_avisos = _cortar_lista(

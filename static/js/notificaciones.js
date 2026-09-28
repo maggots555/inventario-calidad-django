@@ -25,6 +25,10 @@
  * - Record<string, T>: Un objeto donde las claves son strings y los valores son T
  * - HTMLElement | null: El elemento puede existir o no en el HTML
  */
+/** Categorías que arma el servidor al avisar equipo listo. */
+const CATEGORIA_EQUIPO = 'equipo_disponible';
+const CATEGORIA_SATELITE = 'equipo_disponible_satelite';
+const CATEGORIA_DROPOFF = 'equipo_disponible_dropoff';
 // ============================================================================
 // CONFIGURACIÓN DE TIPOS — Iconos y colores por tipo de notificación
 // ============================================================================
@@ -94,6 +98,8 @@ class PanelNotificaciones {
         this.noLeidasAccion = 0;
         this.noLeidasAvisos = 0;
         this.noLeidasEquipo = 0;
+        this.noLeidasSatelite = 0;
+        this.noLeidasDropoff = 0;
         this.hayMasAccion = false;
         this.hayMasAvisos = false;
         /**
@@ -103,8 +109,8 @@ class PanelNotificaciones {
         this.listarSeq = 0;
         /** Pestaña activa: 'accion' = Por hacer; 'avisos' = informativas. */
         this.tabActiva = 'accion';
-        /** Chip Equipo disponible (solo filtra dentro de Por hacer). */
-        this.chipEquipoActivo = false;
+        /** Chip activo dentro de Por hacer. Vacío = se ve todo. */
+        this.chipActivo = '';
         this.badge = document.getElementById('notif-badge');
         this.lista = document.getElementById('notif-lista');
         this.btnTodas = document.getElementById('notif-marcar-todas');
@@ -116,6 +122,11 @@ class PanelNotificaciones {
         this.chipsAccion = document.getElementById('notif-chips-accion');
         this.chipEquipo = document.getElementById('notif-chip-equipo');
         this.chipEquipoCount = document.getElementById('notif-chip-equipo-count');
+        // Estos dos solo existen en el HTML si el rol es dispatcher.
+        this.chipSatelite = document.getElementById('notif-chip-satelite');
+        this.chipSateliteCount = document.getElementById('notif-chip-satelite-count');
+        this.chipDropoff = document.getElementById('notif-chip-dropoff');
+        this.chipDropoffCount = document.getElementById('notif-chip-dropoff-count');
         // Solo iniciar si los elementos existen en el HTML
         // (no existen si el usuario no está logueado)
         if (this.badge && this.lista) {
@@ -182,7 +193,7 @@ class PanelNotificaciones {
             });
         }
         this.registrarClicksTabs();
-        this.registrarClickChipEquipo();
+        this.registrarClicksChips();
     }
     /**
      * Clic en la lista: eliminar o marcar una de «Por hacer» como leída.
@@ -249,19 +260,30 @@ class PanelNotificaciones {
         }
     }
     /**
-     * Chip «Equipo disponible»: atajo de Recepción dentro de Por hacer.
+     * Chips de equipo: uno a la vez. Pulsar el activo lo apaga.
+     *
+     * EXPLICACIÓN: «Equipo disponible» junta todas las sedes.
+     * Satélite y Drop Off solo están en el HTML del dispatcher.
      */
-    registrarClickChipEquipo() {
-        if (!this.chipEquipo) {
-            return;
+    registrarClicksChips() {
+        const chips = [
+            { el: this.chipEquipo, chip: 'equipo' },
+            { el: this.chipSatelite, chip: 'satelite' },
+            { el: this.chipDropoff, chip: 'dropoff' },
+        ];
+        for (const { el, chip } of chips) {
+            if (!el) {
+                continue;
+            }
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Paso: el mismo chip otra vez vuelve a mostrar todo Por hacer.
+                this.chipActivo = this.chipActivo === chip ? '' : chip;
+                this.actualizarEstadoVisualTabs();
+                this.renderListaFiltrada();
+            });
         }
-        this.chipEquipo.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.chipEquipoActivo = !this.chipEquipoActivo;
-            this.actualizarEstadoVisualTabs();
-            this.renderListaFiltrada();
-        });
     }
     /**
      * Cambia la pestaña activa y vuelve a dibujar la lista filtrada.
@@ -291,10 +313,19 @@ class PanelNotificaciones {
         if (this.chipsAccion) {
             this.chipsAccion.classList.toggle('d-none', this.tabActiva !== 'accion');
         }
-        if (this.chipEquipo) {
-            this.chipEquipo.classList.toggle('active', this.chipEquipoActivo);
-            this.chipEquipo.setAttribute('aria-pressed', this.chipEquipoActivo ? 'true' : 'false');
+        this.marcarChipActivo(this.chipEquipo, this.chipActivo === 'equipo');
+        this.marcarChipActivo(this.chipSatelite, this.chipActivo === 'satelite');
+        this.marcarChipActivo(this.chipDropoff, this.chipActivo === 'dropoff');
+    }
+    /**
+     * Pinta un chip como pulsado o no. Si el botón no está en el HTML, no hace nada.
+     */
+    marcarChipActivo(el, activo) {
+        if (!el) {
+            return;
         }
+        el.classList.toggle('active', activo);
+        el.setAttribute('aria-pressed', activo ? 'true' : 'false');
     }
     /**
      * Actualiza los numeritos de pestañas y del chip Equipo.
@@ -303,6 +334,8 @@ class PanelNotificaciones {
         this.pintarContador(this.tabAccionCount, this.noLeidasAccion);
         this.pintarContador(this.tabAvisosCount, this.noLeidasAvisos);
         this.pintarContador(this.chipEquipoCount, this.noLeidasEquipo);
+        this.pintarContador(this.chipSateliteCount, this.noLeidasSatelite);
+        this.pintarContador(this.chipDropoffCount, this.noLeidasDropoff);
     }
     /**
      * Muestra u oculta un badge numérico (0 → d-none).
@@ -327,8 +360,8 @@ class PanelNotificaciones {
         if (this.tabActiva === 'avisos') {
             items = this.cacheAvisos;
         }
-        else if (this.chipEquipoActivo) {
-            items = this.cacheAccion.filter((n) => (n.categoria || 'general') === 'equipo_disponible');
+        else if (this.chipActivo !== '') {
+            items = this.filtrarAccionPorChip(this.cacheAccion);
         }
         else {
             items = this.cacheAccion;
@@ -448,14 +481,35 @@ class PanelNotificaciones {
      * pendientes, el badge debe decir 25, no 19.
      */
     aplicarContadores(data) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f;
         const accion = (_b = (_a = data.no_leidas_accion) !== null && _a !== void 0 ? _a : data.no_leidas) !== null && _b !== void 0 ? _b : 0;
         this.noLeidasAccion = accion;
         this.noLeidasAvisos = (_c = data.no_leidas_avisos) !== null && _c !== void 0 ? _c : this.noLeidasAvisos;
         this.noLeidasEquipo = (_d = data.no_leidas_equipo) !== null && _d !== void 0 ? _d : this.noLeidasEquipo;
+        this.noLeidasSatelite = (_e = data.no_leidas_equipo_satelite) !== null && _e !== void 0 ? _e : this.noLeidasSatelite;
+        this.noLeidasDropoff = (_f = data.no_leidas_equipo_dropoff) !== null && _f !== void 0 ? _f : this.noLeidasDropoff;
         this.ultimoNoLeidas = accion;
         this.renderBadge(accion);
         this.actualizarContadoresTabs();
+    }
+    /**
+     * Recorta «Por hacer» según el chip activo.
+     *
+     * EXPLICACIÓN: El chip general junta Satélite, Drop Off y el resto
+     * (la categoría empieza por equipo_disponible). Los otros dos
+     * piden la categoría exacta de esa sede.
+     */
+    filtrarAccionPorChip(items) {
+        if (this.chipActivo === 'equipo') {
+            return items.filter((n) => (n.categoria || 'general').startsWith(CATEGORIA_EQUIPO));
+        }
+        if (this.chipActivo === 'satelite') {
+            return items.filter((n) => n.categoria === CATEGORIA_SATELITE);
+        }
+        if (this.chipActivo === 'dropoff') {
+            return items.filter((n) => n.categoria === CATEGORIA_DROPOFF);
+        }
+        return items;
     }
     /**
      * Pie de lista si hay más de 20 en esa pestaña.
@@ -465,7 +519,7 @@ class PanelNotificaciones {
             return;
         }
         const hayMas = this.tabActiva === 'avisos' ? this.hayMasAvisos : this.hayMasAccion;
-        if (!hayMas || this.chipEquipoActivo) {
+        if (!hayMas || this.chipActivo !== '') {
             return;
         }
         const li = document.createElement('li');
@@ -507,7 +561,13 @@ class PanelNotificaciones {
             return;
         if (notificaciones.length === 0) {
             let mensajeVacio = 'Sin avisos recientes';
-            if (this.tabActiva === 'accion' && this.chipEquipoActivo) {
+            if (this.tabActiva === 'accion' && this.chipActivo === 'satelite') {
+                mensajeVacio = 'Sin equipos en Satélite';
+            }
+            else if (this.tabActiva === 'accion' && this.chipActivo === 'dropoff') {
+                mensajeVacio = 'Sin equipos en Drop Off';
+            }
+            else if (this.tabActiva === 'accion' && this.chipActivo === 'equipo') {
                 mensajeVacio = 'Sin avisos de equipo disponible';
             }
             else if (this.tabActiva === 'accion') {
