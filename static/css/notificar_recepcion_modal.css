@@ -1,0 +1,258 @@
+/*
+ * Modal Notificar a Recepción — layout compacto (verde, como el de diagnóstico)
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Misma idea que el modal de imágenes de ingreso: dos columnas, etiquetas
+ * chicas y lista de personas con scroll. El color sigue siendo verde porque
+ * el botón de enviar ya era verde (éxito), no el azul de las fotos.
+ *
+ * Las clases empiezan con "rec-" y viven solo dentro de #notificarFrontModal.
+ */
+
+#notificarFrontModal .rec-modal-header {
+    background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+}
+
+#notificarFrontModal .rec-modal-folio-hint {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+    align-self: center;
+    margin-left: 0.5rem;
+}
+
+#notificarFrontModal .rec-modal-split {
+    min-height: 480px;
+}
+
+#notificarFrontModal .rec-section-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-600, #64748b);
+    margin-bottom: 0.35rem;
+}
+
+#notificarFrontModal .rec-section-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.35;
+}
+
+/* Aviso que el JS recolorea al cambiar Cotización lista / PNC */
+#notificarFrontModal #alertTipoPlantillaNotificar {
+    font-size: 0.8rem;
+}
+
+#notificarFrontModal #alertTipoPlantillaNotificar .alert-heading {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Dos tarjetas de plantilla. El JS les pone border-success o border-warning. */
+#notificarFrontModal .rec-plantilla-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+#notificarFrontModal .rec-plantilla-card {
+    cursor: pointer;
+    border: 2px solid var(--gray-200, #e2e8f0);
+    border-radius: 8px;
+    padding: 0.65rem 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+    text-align: center;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    min-height: 44px;
+}
+
+#notificarFrontModal .rec-plantilla-card > .form-check-input {
+    margin: 0 0 0.15rem 0;
+    float: none;
+}
+
+#notificarFrontModal .rec-plantilla-icon {
+    font-size: 1.1rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1;
+}
+
+#notificarFrontModal .rec-plantilla-titulo {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-700, #334155);
+    line-height: 1.2;
+}
+
+#notificarFrontModal .rec-plantilla-desc {
+    font-size: 0.65rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.2;
+}
+
+#notificarFrontModal .rec-plantilla-card.border-success {
+    border-color: #16a34a !important;
+    background-color: rgba(34, 197, 94, 0.12);
+}
+
+#notificarFrontModal .rec-plantilla-card.border-warning {
+    border-color: #f59e0b !important;
+    background-color: rgba(245, 158, 11, 0.14);
+}
+
+#notificarFrontModal .rec-cc-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+    padding: 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+#notificarFrontModal .rec-cc-item {
+    padding: 0.45rem 0.55rem !important;
+    background-color: var(--white, #fff);
+}
+
+#notificarFrontModal .rec-cc-item:hover {
+    background-color: rgba(22, 163, 74, 0.06);
+}
+
+#notificarFrontModal .rec-cc-avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border: 2px solid #16a34a;
+}
+
+#notificarFrontModal .rec-cc-avatar-tu {
+    border-color: #1f6391;
+}
+
+#notificarFrontModal .rec-badge-area,
+#notificarFrontModal .rec-badge-tu {
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.12em 0.4em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+#notificarFrontModal .rec-tabla-wrap {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+}
+
+/*
+  La tabla vive en media columna, así que el texto normal de Bootstrap
+  la hacía muy alta (el encabezado "Costo Unit." se partía en dos líneas).
+  Aquí bajamos letra y relleno para que quepan más piezas sin scroll enorme.
+*/
+#notificarFrontModal .rec-tabla-wrap .table {
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
+
+#notificarFrontModal .rec-tabla-wrap .table > :not(caption) > * > * {
+    padding: 0.22rem 0.4rem;
+}
+
+#notificarFrontModal .rec-tabla-wrap th {
+    font-size: 0.68rem;
+    white-space: nowrap;
+}
+
+#notificarFrontModal .rec-tabla-wrap small {
+    font-size: 0.65rem;
+}
+
+#notificarFrontModal .rec-tabla-wrap .badge {
+    font-size: 0.62rem;
+    padding: 0.12em 0.35em;
+}
+
+#notificarFrontModal .rec-tabla-wrap .fs-5 {
+    font-size: 0.8rem !important;
+}
+
+@media (max-width: 575.98px) {
+    #notificarFrontModal .rec-plantilla-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-modal-header {
+    background: linear-gradient(135deg, #052e16 0%, #052e16 100%);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-section-label {
+    color: var(--text-secondary, #94a3b8);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-section-hint {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-modal-col-izq.border-end {
+    border-color: var(--border-color, #334155) !important;
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-plantilla-card {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-plantilla-titulo {
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-plantilla-card.border-success {
+    border-color: #22c55e !important;
+    background-color: rgba(34, 197, 94, 0.18);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-plantilla-card.border-warning {
+    border-color: #fbbf24 !important;
+    background-color: rgba(251, 191, 36, 0.16);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-cc-scroll,
+[data-bs-theme="dark"] #notificarFrontModal .rec-tabla-wrap {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-cc-item {
+    background-color: #0f172a !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-cc-item:hover {
+    background-color: rgba(22, 163, 74, 0.16) !important;
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-tabla-wrap .table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-primary, #e2e8f0);
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #notificarFrontModal .rec-tabla-wrap .table-light,
+[data-bs-theme="dark"] #notificarFrontModal .rec-tabla-wrap tfoot.table-success {
+    --bs-table-bg: #1e293b;
+    --bs-table-color: #e2e8f0;
+    color: #e2e8f0;
+}
