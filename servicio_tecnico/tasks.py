@@ -2251,19 +2251,23 @@ def enviar_notificacion_equipo_disponible_task(
         asunto = f'Equipo listo para recolección — {folio}'
 
         # ------------------------------------------------------------------
-        # CC: quien envió → recepcionistas de la sucursal → JEFE_CALIDAD → JEFE_2
+        # CC: quien envió → jefe directo (solo garantía) → recepción de la sucursal
         # EXPLICACIÓN PARA PRINCIPIANTES:
-        # El cliente va en "Para" (To). En copia van quien avisó, todos los
-        # recepcionistas activos de la misma sucursal de la orden (para que
-        # el mostrador sepa que ya se avisó al cliente) y los jefes de
-        # calidad configurados en .env (settings).
+        # El cliente va en "Para" (To). En copia van quien avisó y los
+        # recepcionistas activos de la sucursal de la orden (Satélite o Drop,
+        # según la sede de esa orden). El jefe NO sale del .env: es el campo
+        # Jefe directo de quien pulsó el botón, y solo si el equipo está
+        # dentro de garantía.
         # ------------------------------------------------------------------
         from django.db.models import Q
 
         empleado = None
         if empleado_id:
             try:
-                empleado = Empleado.objects.get(pk=empleado_id)
+                # select_related evita una consulta extra al leer jefe_directo.
+                empleado = Empleado.objects.select_related('jefe_directo').get(
+                    pk=empleado_id
+                )
             except Empleado.DoesNotExist:
                 empleado = None
 
@@ -2286,6 +2290,13 @@ def enviar_notificacion_equipo_disponible_task(
         if empleado and empleado.email:
             _agregar_cc(empleado.email)
 
+        # Dentro de garantía: copia al jefe directo de quien envió.
+        # OOW/FL no lo incluyen aunque el jefe esté cargado en la ficha.
+        if empleado and not orden.es_fuera_garantia:
+            jefe = empleado.jefe_directo
+            if jefe and jefe.activo and jefe.email:
+                _agregar_cc(jefe.email)
+
         # Recepcionistas de la misma sucursal (activos + email válido).
         # Sin user o con user activo: así no perdemos a quien solo recibe correo.
         if orden.sucursal_id:
@@ -2298,9 +2309,6 @@ def enviar_notificacion_equipo_disponible_task(
             )
             for recepcionista in recepcionistas_sucursal:
                 _agregar_cc(recepcionista.email)
-
-        _agregar_cc(getattr(settings, 'JEFE_CALIDAD_EMAIL', None) or None)
-        _agregar_cc(getattr(settings, 'JEFE_CALIDAD_2_EMAIL', None) or None)
 
         # EXPLICACIÓN PARA PRINCIPIANTES:
         # HTML + texto plano. El aviso de recolección (y la cláusula 6 en OOW)

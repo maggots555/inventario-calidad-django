@@ -6,8 +6,8 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 1) Helper anti-dup: egreso vs cambio a finalizado (viceversa).
 2) Vista POST: solo en estado finalizado; segundo clic = ya notificado.
 3) URL / reexport de humo.
-4) Correo al cliente: CC (quien envió + recepcionistas sucursal + jefes)
-   y nota de almacenaje solo en OOW.
+4) Correo al cliente: CC (quien envió + jefe directo solo en garantía
+   + recepcionistas de la sucursal) y nota de almacenaje solo en OOW.
 """
 
 from unittest.mock import MagicMock, patch
@@ -470,7 +470,8 @@ class EquipoDisponibleEmailCcTest(TestCase):
     EXPLICACIÓN PARA PRINCIPIANTES:
     Usamos EMAIL_BACKEND=locmem: Django guarda el correo en mail.outbox
     en memoria (no sale a Internet). Así comprobamos To y CC sin SMTP.
-    Orden del CC: quien envió → recepcionistas de la sucursal → jefes .env.
+    Orden del CC: quien envió → jefe directo (solo garantía) → recepción.
+    Los correos JEFE_CALIDAD_* del .env no entran en este aviso.
     """
 
     databases = {'default', 'mexico'}
@@ -515,7 +516,8 @@ class EquipoDisponibleEmailCcTest(TestCase):
             gama='media',
         )
 
-    def test_correo_incluye_cc_remitente_y_jefes(self):
+    def test_correo_oow_cc_solo_quien_envia(self):
+        """Fuera de garantía: CC es quien envió. No van jefes del .env."""
         resultado = enviar_notificacion_equipo_disponible_task(
             orden_id=self.orden.pk,
             empleado_id=self.empleado.pk,
@@ -526,16 +528,10 @@ class EquipoDisponibleEmailCcTest(TestCase):
 
         mensaje = mail.outbox[0]
         self.assertEqual(mensaje.to, ['cliente.cc@test.local'])
-        # Orden: quien envió → (otros recepcionistas de sucursal) → jefe 1 → jefe 2
-        # Aquí quien envía es el único recepcionista; no se duplica.
-        self.assertEqual(
-            mensaje.cc,
-            [
-                'quien.envia@test.local',
-                'jefe1@test.local',
-                'jefe2@test.local',
-            ],
-        )
+        # Quien envía es el único recepcionista; no se duplica.
+        self.assertEqual(mensaje.cc, ['quien.envia@test.local'])
+        self.assertNotIn('jefe1@test.local', mensaje.cc)
+        self.assertNotIn('jefe2@test.local', mensaje.cc)
 
         historial = HistorialOrden.objects.filter(
             orden=self.orden,
@@ -544,8 +540,8 @@ class EquipoDisponibleEmailCcTest(TestCase):
         ).first()
         self.assertIsNotNone(historial)
         self.assertIn('quien.envia@test.local', historial.comentario)
-        self.assertIn('jefe1@test.local', historial.comentario)
-        self.assertIn('jefe2@test.local', historial.comentario)
+        self.assertNotIn('jefe1@test.local', historial.comentario)
+        self.assertNotIn('jefe2@test.local', historial.comentario)
 
     def test_cc_incluye_recepcionistas_misma_sucursal(self):
         """
@@ -584,7 +580,8 @@ class EquipoDisponibleEmailCcTest(TestCase):
         self.assertEqual(cc[0], 'quien.envia@test.local')
         self.assertIn('recep2@test.local', cc)
         self.assertIn('recep.sin.user@test.local', cc)
-        self.assertEqual(cc[-2:], ['jefe1@test.local', 'jefe2@test.local'])
+        self.assertNotIn('jefe1@test.local', cc)
+        self.assertNotIn('jefe2@test.local', cc)
 
     def test_cc_omite_recepcionista_otra_sucursal(self):
         """Borde: recepcionista de otra sucursal NO entra en CC."""
@@ -644,14 +641,100 @@ class EquipoDisponibleEmailCcTest(TestCase):
         self.assertTrue(resultado['success'])
         cc = mail.outbox[0].cc
         self.assertNotIn('recep.inactivo@test.local', cc)
+        self.assertEqual(cc, ['quien.envia@test.local'])
+
+    def _orden_garantia(self) -> OrdenServicio:
+        """
+        Orden dentro de garantía (folio SIC) en la misma sucursal de prueba.
+
+        Returns:
+            OrdenServicio con es_fuera_garantia=False.
+        """
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='finalizado',
+            tecnico_asignado_actual=self.empleado,
+            responsable_seguimiento=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente='SIC-CC-GAR',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Latitude',
+            numero_serie='STCCGAR',
+            email_cliente='cliente.gar@test.local',
+            nombre_cliente='Cliente Garantia',
+            falla_principal='Falla',
+            gama='media',
+        )
+        orden.refresh_from_db(fields=['es_fuera_garantia'])
+        return orden
+
+    def test_garantia_copia_jefe_directo_de_quien_envia(self):
+        """Dentro de garantía: el jefe directo de quien envía entra en CC."""
+        jefe = Empleado.objects.create(
+            nombre_completo='Jefe Directo CC',
+            cargo='Supervisor',
+            area='Operaciones',
+            email='jefe.directo@test.local',
+            sucursal=self.sucursal,
+            rol='supervisor',
+            activo=True,
+        )
+        self.empleado.jefe_directo = jefe
+        self.empleado.save(update_fields=['jefe_directo'])
+        orden = self._orden_garantia()
+        self.assertFalse(orden.es_fuera_garantia)
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        cc = mail.outbox[0].cc
         self.assertEqual(
             cc,
-            [
-                'quien.envia@test.local',
-                'jefe1@test.local',
-                'jefe2@test.local',
-            ],
+            ['quien.envia@test.local', 'jefe.directo@test.local'],
         )
+        self.assertNotIn('jefe1@test.local', cc)
+        self.assertNotIn('jefe2@test.local', cc)
+
+    def test_oow_no_copia_jefe_directo(self):
+        """Fuera de garantía: el jefe directo cargado en la ficha no entra en CC."""
+        jefe = Empleado.objects.create(
+            nombre_completo='Jefe Directo OOW',
+            cargo='Supervisor',
+            area='Operaciones',
+            email='jefe.oow@test.local',
+            sucursal=self.sucursal,
+            rol='supervisor',
+            activo=True,
+        )
+        self.empleado.jefe_directo = jefe
+        self.empleado.save(update_fields=['jefe_directo'])
+        self.assertTrue(self.orden.es_fuera_garantia)
+
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=self.orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertNotIn('jefe.oow@test.local', mail.outbox[0].cc)
+
+    def test_garantia_sin_jefe_no_agrega_copia(self):
+        """Dentro de garantía y sin jefe directo: el CC no inventa un destinatario."""
+        orden = self._orden_garantia()
+        resultado = enviar_notificacion_equipo_disponible_task(
+            orden_id=orden.pk,
+            empleado_id=self.empleado.pk,
+            usuario_id=self.user.pk,
+        )
+        self.assertTrue(resultado['success'])
+        self.assertEqual(mail.outbox[0].cc, ['quien.envia@test.local'])
 
 
 @override_settings(
