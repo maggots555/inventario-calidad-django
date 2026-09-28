@@ -63,6 +63,15 @@ class ModalEnviarImagenesDisenoTest(SimpleTestCase):
         ):
             self.assertIn(gancho, texto, f'Falta en el partial: {gancho}')
 
+        # El HTML va en el orden visual: destinatarios y luego fotos.
+        # No debe cruzarse con clases order-1 / order-2.
+        self.assertLess(
+            texto.find('Para: (Destinatario)'),
+            texto.find('id="galeriaImagenesModal"'),
+        )
+        self.assertNotIn(' order-1', texto)
+        self.assertNotIn(' order-2', texto)
+
     def test_css_azul_esta_enlazado_en_detalle_orden(self):
         """
         Objetivo: la hoja nueva se carga en la página de la orden.

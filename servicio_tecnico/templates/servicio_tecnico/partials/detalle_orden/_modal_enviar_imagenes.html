@@ -11,8 +11,8 @@
   Este archivo solo cambia cómo se VE el modal. El correo, los nombres de
   los campos y los id los sigue usando detalle_orden_enviar_imagenes.ts.
   No cambies esos id ni los name="..." o el botón Enviar deja de funcionar.
-  Orden visual: primero destinatarios (izquierda), después fotos (derecha).
-  Eso lo hacen las clases order-1 y order-2, sin mover los campos.
+  El HTML va en el orden en que se ve: primero destinatarios, después fotos.
+  En celular se apilan igual, sin clases que los crucen.
 {% endcomment %}
 <!-- MODAL: ENVIAR IMÁGENES DE INGRESO AL CLIENTE -->
 <div class="modal fade" id="modalEnviarImagenesCliente" tabindex="-1" aria-labelledby="modalEnviarImagenesClienteLabel" aria-hidden="true">
@@ -47,106 +47,10 @@
                     <div class="row g-0 ing-modal-split">
 
                         <!--
-                          Fotos a la DERECHA. order-2 las manda al segundo lugar
-                          (en celular quedan debajo de los destinatarios).
+                          Columna izquierda: destinatario, copias, mensaje y vista previa.
+                          border-end es la línea entre esta columna y las fotos.
                         -->
-                        <div class="col-lg-6 p-3 p-lg-4 ing-modal-col-der order-2">
-
-                            <div class="mb-3">
-                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                                    <div class="ing-section-label mb-0">
-                                        <i class="bi bi-images me-1"></i>Imágenes a enviar
-                                        <span class="badge bg-primary ms-1" id="contadorImagenesSeleccionadas">0 seleccionadas</span>
-                                    </div>
-                                </div>
-
-                                {% if imagenes_por_tipo.ingreso %}
-                                <div class="mb-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenes" checked>
-                                        <label class="form-check-label small fw-semibold" for="seleccionarTodasImagenes">
-                                            <i class="bi bi-check-all"></i> Seleccionar / desmarcar todas
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="row g-2" id="galeriaImagenesModal">
-                                    {% for imagen in imagenes_por_tipo.ingreso %}
-                                    <div class="col-4 col-md-3">
-                                        <label class="card h-100 hover-shadow cursor-pointer imagen-selectable ing-img-thumb border-primary border-3 shadow" for="img_{{ imagen.id }}">
-                                            <div class="position-relative">
-                                                <img src="{{ imagen.imagen.url }}"
-                                                     class="card-img-top"
-                                                     alt="Imagen {{ forloop.counter }}">
-                                                <div class="position-absolute top-0 start-0 m-1">
-                                                    <input class="form-check-input checkbox-imagen"
-                                                           type="checkbox"
-                                                           name="imagenes_seleccionadas"
-                                                           value="{{ imagen.id }}"
-                                                           id="img_{{ imagen.id }}"
-                                                           checked>
-                                                </div>
-                                                <div class="position-absolute bottom-0 end-0 m-1">
-                                                    <span class="badge bg-dark bg-opacity-75 ing-img-fecha">
-                                                        <i class="bi bi-calendar3"></i> {{ imagen.fecha_subida|date:"d/m/Y" }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div class="card-body p-1">
-                                                <small class="text-muted d-block text-truncate ing-img-desc">
-                                                    {% if imagen.descripcion %}
-                                                        {{ imagen.descripcion }}
-                                                    {% else %}
-                                                        Imagen de ingreso
-                                                    {% endif %}
-                                                </small>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                <small class="text-muted d-block mt-1 ing-section-hint">
-                                    <i class="bi bi-info-circle"></i>
-                                    Se comprimen al enviar. Elige solo las que el cliente debe ver.
-                                </small>
-                                {% else %}
-                                <div class="alert alert-warning py-2 mb-0 small">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <strong>Sin imágenes disponibles:</strong> No hay imágenes de tipo "Ingreso" para enviar.
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            {% if ollama_enabled %}
-                            <div class="mb-2">
-                                <label for="modeloIaInspeccionIngreso" class="ing-section-label">
-                                    <i class="bi bi-robot me-1"></i>Inspector visual con IA
-                                </label>
-                                <select name="modelo_ia_inspeccion"
-                                        id="modeloIaInspeccionIngreso"
-                                        class="form-select form-select-sm">
-                                    <option value="">Automático — cadena completa de fallback (recomendado)</option>
-                                    {% for modelo in ollama_models %}
-                                    <option value="{{ modelo }}">{{ modelo }}</option>
-                                    {% endfor %}
-                                </select>
-                                <small class="text-muted d-block mt-1 ing-section-hint">
-                                    <i class="bi bi-shield-check text-success me-1"></i>
-                                    Automático recorre Gemini y, si fallan, Ollama.
-                                    Si eliges uno, ese va primero y el resto queda de respaldo.
-                                    Si ninguno responde, el correo se envía igual.
-                                </small>
-                            </div>
-                            {% endif %}
-
-                        </div>{# /col fotos #}
-
-                        <!--
-                          Destinatarios a la IZQUIERDA. order-1 los pone primero.
-                          border-end dibuja la línea divisoria del lado derecho
-                          de esta columna, entre destinatarios y fotos.
-                        -->
-                        <div class="col-lg-6 p-3 p-lg-4 border-end ing-modal-col-izq order-1">
+                        <div class="col-lg-6 p-3 p-lg-4 border-end ing-modal-col-izq">
 
                             <!-- SECCIÓN: PARA (cliente). Sin editor inline: si falta el email, se abre el modal de equipo. -->
                             <div class="mb-3">
@@ -494,6 +398,99 @@
                             </div>
 
                         </div>{# /col destinatarios #}
+
+
+                        <!-- Columna derecha: fotos de ingreso e inspector de IA. -->
+                        <div class="col-lg-6 p-3 p-lg-4 ing-modal-col-der">
+
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                    <div class="ing-section-label mb-0">
+                                        <i class="bi bi-images me-1"></i>Imágenes a enviar
+                                        <span class="badge bg-primary ms-1" id="contadorImagenesSeleccionadas">0 seleccionadas</span>
+                                    </div>
+                                </div>
+
+                                {% if imagenes_por_tipo.ingreso %}
+                                <div class="mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenes" checked>
+                                        <label class="form-check-label small fw-semibold" for="seleccionarTodasImagenes">
+                                            <i class="bi bi-check-all"></i> Seleccionar / desmarcar todas
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2" id="galeriaImagenesModal">
+                                    {% for imagen in imagenes_por_tipo.ingreso %}
+                                    <div class="col-4 col-md-3">
+                                        <label class="card h-100 hover-shadow cursor-pointer imagen-selectable ing-img-thumb border-primary border-3 shadow" for="img_{{ imagen.id }}">
+                                            <div class="position-relative">
+                                                <img src="{{ imagen.imagen.url }}"
+                                                     class="card-img-top"
+                                                     alt="Imagen {{ forloop.counter }}">
+                                                <div class="position-absolute top-0 start-0 m-1">
+                                                    <input class="form-check-input checkbox-imagen"
+                                                           type="checkbox"
+                                                           name="imagenes_seleccionadas"
+                                                           value="{{ imagen.id }}"
+                                                           id="img_{{ imagen.id }}"
+                                                           checked>
+                                                </div>
+                                                <div class="position-absolute bottom-0 end-0 m-1">
+                                                    <span class="badge bg-dark bg-opacity-75 ing-img-fecha">
+                                                        <i class="bi bi-calendar3"></i> {{ imagen.fecha_subida|date:"d/m/Y" }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-1">
+                                                <small class="text-muted d-block text-truncate ing-img-desc">
+                                                    {% if imagen.descripcion %}
+                                                        {{ imagen.descripcion }}
+                                                    {% else %}
+                                                        Imagen de ingreso
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <small class="text-muted d-block mt-1 ing-section-hint">
+                                    <i class="bi bi-info-circle"></i>
+                                    Se comprimen al enviar. Elige solo las que el cliente debe ver.
+                                </small>
+                                {% else %}
+                                <div class="alert alert-warning py-2 mb-0 small">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>Sin imágenes disponibles:</strong> No hay imágenes de tipo "Ingreso" para enviar.
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            {% if ollama_enabled %}
+                            <div class="mb-2">
+                                <label for="modeloIaInspeccionIngreso" class="ing-section-label">
+                                    <i class="bi bi-robot me-1"></i>Inspector visual con IA
+                                </label>
+                                <select name="modelo_ia_inspeccion"
+                                        id="modeloIaInspeccionIngreso"
+                                        class="form-select form-select-sm">
+                                    <option value="">Automático — cadena completa de fallback (recomendado)</option>
+                                    {% for modelo in ollama_models %}
+                                    <option value="{{ modelo }}">{{ modelo }}</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted d-block mt-1 ing-section-hint">
+                                    <i class="bi bi-shield-check text-success me-1"></i>
+                                    Automático recorre Gemini y, si fallan, Ollama.
+                                    Si eliges uno, ese va primero y el resto queda de respaldo.
+                                    Si ninguno responde, el correo se envía igual.
+                                </small>
+                            </div>
+                            {% endif %}
+
+                        </div>{# /col fotos #}
 
                     </div>{# /row split #}
                 </form>

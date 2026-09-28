@@ -64,10 +64,19 @@ class ModalNotificarRecepcionDisenoTest(SimpleTestCase):
             'id="mensaje_personalizado"',
             'name="mensaje_personalizado"',
             'rec-modal-split',
-            'order-1',
-            'order-2',
+            'rec-modal-col-izq',
+            'rec-modal-col-der',
         ):
             self.assertIn(gancho, texto, f'Falta en el modal: {gancho}')
+
+        # Destinatarios escritos antes que la tabla, sin cruzar columnas con order-*.
+        self.assertLess(
+            texto.find('>Destinatarios<'),
+            texto.find('id="tituloResumenNotificar"'),
+        )
+        modal = texto[texto.find('id="notificarFrontModal"'):texto.find('id="modalNotificarClientePnc"')]
+        self.assertNotIn(' order-1', modal)
+        self.assertNotIn(' order-2', modal)
 
     def test_css_verde_esta_enlazado(self):
         """
