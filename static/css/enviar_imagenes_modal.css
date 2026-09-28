@@ -1,0 +1,214 @@
+/*
+ * Modal Enviar imágenes de ingreso — layout compacto (azul SIC)
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Copia la densidad del modal de diagnóstico (dos columnas, etiquetas
+ * chicas, lista de CC con scroll, miniaturas) pero el color es el azul
+ * de SIC (#1f6391), no el verde del diagnóstico. Así los dos modales
+ * no se confunden.
+ *
+ * Las clases empiezan con "ing-" para no pisar las del modal de diagnóstico.
+ * Todo va acotado a #modalEnviarImagenesCliente.
+ */
+
+/* ============================================================
+   1. LAYOUT SPLIT + TIPOGRAFÍA
+   ============================================================ */
+
+#modalEnviarImagenesCliente .ing-modal-split {
+    min-height: 480px;
+}
+
+#modalEnviarImagenesCliente .ing-modal-folio-hint {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+}
+
+#modalEnviarImagenesCliente .ing-section-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-600, #64748b);
+    margin-bottom: 0.35rem;
+}
+
+#modalEnviarImagenesCliente .ing-section-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.35;
+}
+
+/* ============================================================
+   2. CC COMPACTO
+   ============================================================ */
+
+#modalEnviarImagenesCliente .ing-cc-scroll {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+    padding: 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+#modalEnviarImagenesCliente .ing-cc-grupo-titulo {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-500, #94a3b8);
+    margin: 0.15rem 0 0.35rem;
+}
+
+#modalEnviarImagenesCliente .ing-cc-item {
+    padding: 0.45rem 0.55rem !important;
+    background-color: var(--white, #fff);
+}
+
+#modalEnviarImagenesCliente .ing-cc-item:hover {
+    background-color: rgba(31, 99, 145, 0.06);
+}
+
+#modalEnviarImagenesCliente .ing-cc-avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border: 2px solid #1f6391;
+}
+
+#modalEnviarImagenesCliente .ing-cc-avatar-tecnico {
+    border-color: #198754;
+}
+
+#modalEnviarImagenesCliente .ing-badge-area,
+#modalEnviarImagenesCliente .ing-badge-tu {
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.12em 0.4em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+/* Aviso de email inválido: compacto, sin el bloque enorme anterior */
+#modalEnviarImagenesCliente .ing-aviso-email {
+    background-color: rgba(255, 193, 7, 0.12);
+    border-color: #f59e0b !important;
+}
+
+/* ============================================================
+   3. MINIATURAS + VISTA PREVIA DEL CORREO
+   Las fotos de ingreso son lo que se envía: 120px (el diagnóstico
+   usa ~88px porque ahí las fotos son opcionales).
+   El TS sigue poniendo .border-primary; aquí solo afinamos el grosor.
+   ============================================================ */
+
+#modalEnviarImagenesCliente .ing-img-thumb .card-img-top {
+    height: 120px;
+    object-fit: cover;
+}
+
+#modalEnviarImagenesCliente .ing-img-thumb .checkbox-imagen {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+#modalEnviarImagenesCliente .ing-img-fecha {
+    font-size: 0.6rem;
+}
+
+#modalEnviarImagenesCliente .ing-img-desc {
+    font-size: 0.65rem;
+    line-height: 1.2;
+}
+
+/* border-3 de Bootstrap es 3px !important; lo bajamos a 2px en este modal */
+#modalEnviarImagenesCliente .ing-img-thumb.border-3 {
+    border-width: 2px !important;
+}
+
+#modalEnviarImagenesCliente .ing-img-thumb.border-primary,
+#modalEnviarImagenesCliente .ing-img-thumb:has(.checkbox-imagen:checked) {
+    border-color: #1f6391 !important;
+}
+
+#modalEnviarImagenesCliente .ing-preview-frame {
+    max-height: 320px;
+    overflow-y: auto;
+    background-color: var(--gray-50, #f8fafc);
+    font-size: 0.85rem;
+}
+
+#modalEnviarImagenesCliente .ing-preview-frame p {
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================================
+   4. MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-section-label {
+    color: var(--text-secondary, #94a3b8);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-section-hint {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-modal-col-izq.border-end {
+    border-color: var(--border-color, #334155) !important;
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-cc-scroll {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-cc-item {
+    background-color: #0f172a !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-cc-item:hover {
+    background-color: rgba(31, 99, 145, 0.22) !important;
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-aviso-email {
+    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-aviso-email code {
+    color: #fde68a;
+    background-color: #0f172a;
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-img-thumb {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame {
+    background-color: #0f172a;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+/* bg-white / bg-light del preview no cambian solos en oscuro */
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .bg-white,
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .bg-light {
+    background-color: var(--card-bg, #1e293b) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .text-muted {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .border,
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .border-bottom,
+[data-bs-theme="dark"] #modalEnviarImagenesCliente .ing-preview-frame .border-top {
+    border-color: var(--border-color, #334155) !important;
+}

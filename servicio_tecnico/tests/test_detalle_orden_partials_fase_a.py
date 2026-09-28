@@ -255,6 +255,39 @@ class DetalleOrdenPartialsRenderTest(TestCase):
                 f'Falta ID crítico en HTML renderizado: {needle}',
             )
 
+    def test_modal_imagenes_conserva_ganchos_de_envio(self):
+        """
+        Objetivo: el rediseño visual del modal de ingreso no borra los
+        id y name que usa detalle_orden_enviar_imagenes.ts.
+
+        La orden de prueba tiene email válido y técnico con correo, así
+        que se renderiza la rama "listo para enviar", no el aviso de email.
+
+        Efectos: solo lee el HTML de un GET de prueba.
+        """
+        html = self._get_detalle().content.decode('utf-8')
+
+        ganchos = (
+            'id="modalEnviarImagenesCliente"',
+            'id="formEnviarImagenesCliente"',
+            'id="btnEnviarImagenes"',
+            'form="formEnviarImagenesCliente"',
+            'name="enviar_a_cliente"',
+            'name="copia_tecnico"',
+            'id="mensaje_personalizado"',
+            'name="mensaje_personalizado"',
+            'id="previsualizacionArchivos"',
+            'id="previsualizacionMensajePersonalizado"',
+            'id="textoMensajePersonalizado"',
+            'ing-modal-split',
+            'enviar_imagenes_modal.css',
+        )
+        for gancho in ganchos:
+            self.assertIn(gancho, html, f'Falta gancho del modal de ingreso: {gancho}')
+
+        # Email de la orden de prueba es válido: el botón no nace bloqueado.
+        self.assertNotIn('data-email-invalido', html)
+
     def test_prellena_folio_cis_en_modal_diagnostico(self):
         """
         Objetivo: si la importación SICSER guardó un folio CIS, el modal
