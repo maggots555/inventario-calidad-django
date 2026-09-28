@@ -421,8 +421,8 @@ class CategoriaEquipoPorSucursalTest(TestCase):
             rol='tecnico',
         )
 
-    def _aviso(self, nombre_sucursal: str, folio: str):
-        """Crea la orden en esa sede y devuelve la campanita del destinatario."""
+    def _aviso(self, nombre_sucursal: str, folio: str, es_mis: bool = False):
+        """Crea la orden en esa sede y devuelve la orden (aún sin avisar)."""
         sucursal = Sucursal.objects.create(
             nombre=nombre_sucursal,
             ciudad='CDMX',
@@ -447,6 +447,7 @@ class CategoriaEquipoPorSucursalTest(TestCase):
             nombre_cliente='Cliente Sede',
             falla_principal='Falla test',
             gama='media',
+            es_mis=es_mis,
         )
         orden.refresh_from_db()
         return orden
@@ -498,6 +499,43 @@ class CategoriaEquipoPorSucursalTest(TestCase):
             Notificacion.objects.filter(usuario=self.user_dell).count(),
             0,
         )
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_mis_en_garantia_no_avisa_al_dispatcher(self, mock_push):
+        """¿Es MIS? en garantía: ni campanita ni push al dispatcher."""
+        orden = self._aviso('Satelite', 'SIC-SEDE-MIS', es_mis=True)
+        self.assertTrue(orden.detalle_equipo.es_mis)
+        # Crear la orden ya avisa «nueva orden». Aquí solo medimos el aviso de equipo listo.
+        mock_push.reset_mock()
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
+
+        self.assertFalse(ok)
+        self.assertEqual(Notificacion.objects.count(), 0)
+        mock_push.assert_not_called()
+        orden.refresh_from_db()
+        # El candado queda libre: si quitan MIS, un finalizado posterior sí avisa.
+        self.assertFalse(orden.aviso_recepcion_listo_enviado)
+        self.assertEqual(
+            HistorialOrden.objects.filter(
+                orden=orden,
+                comentario__icontains='marcado como MIS',
+            ).count(),
+            1,
+        )
+
+    @patch('notificaciones.push_service.enviar_push_a_usuario', return_value=True)
+    def test_mis_fuera_de_garantia_no_avisa_a_recepcion(self, mock_push):
+        """¿Es MIS? fuera de garantía: recepción tampoco recibe el aviso."""
+        orden = self._aviso('Drop Off', 'OOW-SEDE-MIS', es_mis=True)
+        self.assertTrue(orden.es_fuera_garantia)
+        mock_push.reset_mock()
+
+        ok = notificar_recepcion_equipo_listo(orden, motivo='finalizado')
+
+        self.assertFalse(ok)
+        self.assertEqual(Notificacion.objects.count(), 0)
+        mock_push.assert_not_called()
 
 
 class NotificarEquipoDisponibleVistaTest(TestCase):

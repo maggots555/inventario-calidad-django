@@ -13,6 +13,8 @@ para poder avisar al cliente (botón "Notificar equipo disponible").
       dispatchers con la casilla de la marca del equipo.
       Dell → atiende_garantias_dell. Lenovo → atiende_garantias_lenovo.
       Otra marca no debería existir en garantía: no se avisa a nadie.
+  - Si el equipo tiene marcada «¿Es MIS?» (llegó por paquetería),
+    no se avisa a nadie: ni dispatcher ni recepción.
 
 El aviso sale una sola vez, cuando la orden pasa a "finalizado".
 El flag `orden.aviso_recepcion_listo_enviado` evita repetirlo si el estado
@@ -68,8 +70,8 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
             cambio de estado. Solo afecta el texto del historial.
 
     Returns:
-        True si se envió el aviso; False si ya estaba avisado o no hay
-        destinatarios / falló de forma controlada.
+        True si se envió el aviso; False si ya estaba avisado, el equipo
+        es MIS, no hay destinatarios o falló de forma controlada.
     """
     # Import local: evita ciclos al cargar apps (models ↔ services ↔ notificaciones).
     from notificaciones.push_service import enviar_push_a_usuario
@@ -80,6 +82,17 @@ def notificar_recepcion_equipo_listo(orden, motivo: MotivoAviso = 'finalizado') 
     from servicio_tecnico.models import OrdenServicio
 
     if not orden or not getattr(orden, 'pk', None):
+        return False
+
+    # MIS (Mail-In Service) no se recolecta en sucursal: no entra a la campanita.
+    # El flag de "ya avisado" se deja en False por si después quitan la casilla.
+    if _orden_es_mis(orden):
+        logger.info(
+            '[AVISO-EQUIPO-LISTO] Orden %s es MIS — no se avisa (motivo=%s)',
+            orden.pk,
+            motivo,
+        )
+        _registrar_historial_omitido_mis(orden, motivo)
         return False
 
     # ------------------------------------------------------------------
@@ -271,6 +284,29 @@ def _resolver_destinatarios_aviso(orden) -> list:
     )
 
 
+def _orden_es_mis(orden) -> bool:
+    """
+    Dice si el equipo de la orden está marcado como MIS.
+
+    Objetivo: Mail-In Service llega por paquetería. Esos equipos no deben
+    salir en la campanita de «equipo listo» (ni dispatcher ni recepción).
+
+    Args:
+        orden: OrdenServicio, con o sin detalle_equipo cargado.
+
+    Returns:
+        True solo cuando la casilla ¿Es MIS? está activa.
+    """
+    from django.core.exceptions import ObjectDoesNotExist
+
+    try:
+        detalle = orden.detalle_equipo
+    except ObjectDoesNotExist:
+        # Sin ficha de equipo no hay casilla: se avisa como siempre.
+        return False
+    return bool(getattr(detalle, 'es_mis', False))
+
+
 def _marca_normalizada(orden) -> str:
     """
     Marca del equipo en minúsculas, para comparar Dell/DELL igual.
@@ -409,6 +445,48 @@ def _etiqueta_orden(orden) -> tuple[str, str]:
         etiqueta = orden.numero_orden_interno
         service_tag = 'S/N no registrado'
     return etiqueta, service_tag
+
+
+def _registrar_historial_omitido_mis(orden, motivo: MotivoAviso) -> None:
+    """
+    Anota en el timeline que no hubo aviso porque el equipo es MIS.
+
+    Args:
+        orden: OrdenServicio.
+        motivo: 'egreso' o 'finalizado'. Solo cambia el texto del disparador.
+
+    Efectos secundarios:
+        Crea un HistorialOrden de sistema. No crea campanita ni push.
+    """
+    from servicio_tecnico.models import HistorialOrden
+
+    etiqueta_motivo = (
+        'imágenes de egreso'
+        if motivo == 'egreso'
+        else 'cambio a Finalizado / Listo para Entrega'
+    )
+    comentario = (
+        'Aviso de equipo listo omitido: el equipo está marcado como MIS '
+        f'(Mail-In Service). Disparador: {etiqueta_motivo}.'
+    )
+    # La transacción va en la misma base que la orden (México, Argentina, etc.).
+    db_alias = getattr(orden._state, 'db', None) or 'default'
+
+    try:
+        with transaction.atomic(using=db_alias):
+            HistorialOrden.objects.using(db_alias).create(
+                orden=orden,
+                tipo_evento='sistema',
+                comentario=comentario,
+                usuario=None,
+                es_sistema=True,
+            )
+    except Exception as exc:
+        logger.warning(
+            '[AVISO-EQUIPO-LISTO] No se pudo escribir historial MIS orden %s: %s',
+            orden.pk,
+            exc,
+        )
 
 
 def _registrar_historial_aviso(

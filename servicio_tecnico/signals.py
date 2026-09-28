@@ -573,6 +573,7 @@ def notificar_recepcion_al_finalizar(sender, instance: OrdenServicio, created: b
 
     Garantía: dispatcher de Dell o de Lenovo.
     Fuera de garantía: responsable de seguimiento o recepcionistas.
+    MIS (¿Es MIS?): no se avisa; el equipo llegó por paquetería.
     """
     if created:
         return
