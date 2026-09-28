@@ -747,3 +747,84 @@
 [data-bs-theme="dark"] .desglose-val {
     color: var(--text-primary);
 }
+
+/* ----------------------------------------------------------
+   Copia (CC): tarjetas con foto, igual que Recepción y PNC.
+   Solo aplican dentro del modal de cotización al cliente.
+   ---------------------------------------------------------- */
+#modalEnviarCotizacionCliente .cot-cc-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.35;
+}
+
+#modalEnviarCotizacionCliente .cot-cc-scroll {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+    padding: 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+#modalEnviarCotizacionCliente .cot-cc-item {
+    padding: 0.45rem 0.55rem !important;
+    background-color: var(--white, #fff);
+}
+
+#modalEnviarCotizacionCliente .cot-cc-item:hover {
+    background-color: rgba(31, 99, 145, 0.08);
+}
+
+#modalEnviarCotizacionCliente .cot-cc-item-tu {
+    cursor: default;
+}
+
+#modalEnviarCotizacionCliente .cot-cc-item-tu:hover {
+    background-color: var(--white, #fff);
+}
+
+#modalEnviarCotizacionCliente .cot-cc-avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border: 2px solid #003366;
+}
+
+#modalEnviarCotizacionCliente .cot-cc-avatar-tu {
+    border-color: #1f6391;
+}
+
+#modalEnviarCotizacionCliente .cot-cc-badge-area,
+#modalEnviarCotizacionCliente .cot-cc-badge-tu {
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.12em 0.4em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-hint {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-scroll {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-item {
+    background-color: #0f172a !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-item:hover {
+    background-color: rgba(31, 99, 145, 0.22) !important;
+}
+
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-item-tu,
+[data-bs-theme="dark"] #modalEnviarCotizacionCliente .cot-cc-item-tu:hover {
+    border-color: #60a5fa !important;
+    background-color: #0f172a !important;
+}

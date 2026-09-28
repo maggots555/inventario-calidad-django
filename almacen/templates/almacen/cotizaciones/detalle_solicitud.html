@@ -1633,29 +1633,103 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
 
-                        <!-- --- 7. CC (copia a empleados) --- -->
+                        <!-- --- 7. CC (copia a empleados) ---
+                             Misma lista que Recepción y PNC: foto, área y «TÚ» bloqueado.
+                             El id ccEmp{{ emp.pk }} se conserva. El script de este modal
+                             lee los checkbox :checked de #modalEnviarCotizacionCliente,
+                             así que una casilla disabled y marcada SÍ se envía.
+                             No hace falta un input hidden (ese script no lee hidden). -->
                         <div class="mb-3">
-                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;">
+                            <div class="form-label fw-semibold mb-1" style="font-size: 0.85rem;">
                                 <i class="bi bi-people me-1"></i>Copia (CC) a empleados
-                            </label>
-                            <div style="max-height: 130px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: 6px; padding: 8px;">
+                            </div>
+                            <p class="cot-cc-hint mb-2">
+                                Tú siempre vas en copia. Aquí marcas quién más lo recibe.
+                            </p>
+                            <div class="cot-cc-scroll" id="cotCcListaScroll">
                                 {% for emp in empleados_copia %}
-                                <div class="form-check form-check-sm mb-1">
-                                    <input class="form-check-input" type="checkbox"
-                                           name="copia_empleados" value="{{ emp.email }}"
-                                           id="ccEmp{{ emp.pk }}"
-                                           {% if emp.email == request.user.email %}checked{% endif %}>
-                                    <label class="form-check-label" for="ccEmp{{ emp.pk }}"
-                                           style="font-size: 0.8rem;">
-                                        {{ emp.nombre_completo }}
-                                        <span style="color: var(--gray-400); font-size: 0.72rem;">
-                                            ({{ emp.area }})
-                                        </span>
-                                    </label>
-                                </div>
+                                <label class="destinatario-card cot-cc-item border rounded d-block mb-1 {% if request.user.empleado and emp.id == request.user.empleado.id %}border-primary border-2 cot-cc-item-tu{% else %}cursor-pointer{% endif %}"
+                                       for="ccEmp{{ emp.pk }}">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 flex-shrink-0"
+                                               type="checkbox"
+                                               name="copia_empleados"
+                                               value="{{ emp.email }}"
+                                               id="ccEmp{{ emp.pk }}"
+                                               {% if request.user.empleado and emp.id == request.user.empleado.id %}
+                                                   checked disabled
+                                               {% endif %}>
+                                        {% if emp.foto_perfil %}
+                                            <img src="{{ emp.foto_perfil.url }}"
+                                                 alt="{{ emp.nombre_completo }}"
+                                                 class="rounded-circle me-2 flex-shrink-0 cot-cc-avatar {% if request.user.empleado and emp.id == request.user.empleado.id %}cot-cc-avatar-tu{% endif %}">
+                                        {% else %}
+                                            <i class="bi bi-person-badge {% if request.user.empleado and emp.id == request.user.empleado.id %}text-primary{% else %}text-info{% endif %} me-2 flex-shrink-0"></i>
+                                        {% endif %}
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-semibold text-truncate small">
+                                                {{ emp.nombre_completo }}
+                                                {% if request.user.empleado and emp.id == request.user.empleado.id %}
+                                                <span class="badge bg-primary ms-1 cot-cc-badge-tu">
+                                                    <i class="bi bi-person-fill"></i> TÚ
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            <small class="text-muted text-truncate d-block">
+                                                <span class="badge cot-cc-badge-area me-1"
+                                                      style="background-color: {{ emp.area|color_area }};
+                                                             color: {{ emp.area|color_area|text_color_for_bg }};">
+                                                    {{ emp.area }}
+                                                </span>
+                                                {{ emp.email }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
                                 {% empty %}
-                                <div style="font-size: 0.8rem; color: var(--gray-400);">No hay empleados disponibles</div>
+                                <div class="alert alert-info py-1 px-2 mb-1 small">
+                                    <i class="bi bi-info-circle"></i>
+                                    No hay empleados con email para copia.
+                                </div>
                                 {% endfor %}
+
+                                {# Quien envía y no está en CALIDAD / FRONTDESK / CARRY IN igual va en copia. #}
+                                {% if not usuario_en_lista_cc and request.user.empleado and request.user.empleado.email %}
+                                <label class="destinatario-card cot-cc-item border rounded border-primary border-2 cot-cc-item-tu d-block mb-1"
+                                       for="ccEmpCurrentUser">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 flex-shrink-0"
+                                               type="checkbox"
+                                               name="copia_empleados"
+                                               value="{{ request.user.empleado.email }}"
+                                               id="ccEmpCurrentUser"
+                                               checked disabled>
+                                        {% if request.user.empleado.foto_perfil %}
+                                            <img src="{{ request.user.empleado.foto_perfil.url }}"
+                                                 alt="{{ request.user.empleado.nombre_completo }}"
+                                                 class="rounded-circle me-2 flex-shrink-0 cot-cc-avatar cot-cc-avatar-tu">
+                                        {% else %}
+                                            <i class="bi bi-person-badge text-primary me-2 flex-shrink-0"></i>
+                                        {% endif %}
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-semibold text-truncate small">
+                                                {{ request.user.empleado.nombre_completo }}
+                                                <span class="badge bg-primary ms-1 cot-cc-badge-tu">
+                                                    <i class="bi bi-person-fill"></i> TÚ
+                                                </span>
+                                            </div>
+                                            <small class="text-muted text-truncate d-block">
+                                                <span class="badge cot-cc-badge-area me-1"
+                                                      style="background-color: {{ request.user.empleado.area|color_area }};
+                                                             color: {{ request.user.empleado.area|color_area|text_color_for_bg }};">
+                                                    {{ request.user.empleado.area }}
+                                                </span>
+                                                {{ request.user.empleado.email }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                                {% endif %}
                             </div>
                         </div>
 

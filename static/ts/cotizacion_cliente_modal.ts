@@ -902,10 +902,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('modo_agrupacion', radioAgrupacion?.value ?? 'todo_junto');
             }
 
-            // CC de empleados (checkboxes marcados)
-            const checksCopia = document.querySelectorAll<HTMLInputElement>('input[name="copia_empleados"]:checked');
-            checksCopia.forEach(chk => {
-                formData.append('copia_empleados', chk.value);
+            // CC de empleados. Solo las casillas de ESTE modal.
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // En la misma página, Recepción y el aviso PNC también tienen
+            // name="copia_empleados", con «TÚ» marcado. Si buscáramos en
+            // todo el documento, ese correo se mandaría repetido.
+            // Una casilla disabled y checked SÍ entra en :checked, por eso
+            // este modal no usa un input hidden.
+            const modalCotizacion = document.getElementById('modalEnviarCotizacionCliente');
+            const checksCopia = modalCotizacion
+                ? modalCotizacion.querySelectorAll<HTMLInputElement>('input[name="copia_empleados"]:checked')
+                : [];
+            const correosYaAgregados = new Set<string>();
+            checksCopia.forEach((chk) => {
+                const correo = chk.value.trim();
+                if (!correo || correosYaAgregados.has(correo)) {
+                    return;
+                }
+                correosYaAgregados.add(correo);
+                formData.append('copia_empleados', correo);
             });
 
             // Enviar la petición al endpoint API
