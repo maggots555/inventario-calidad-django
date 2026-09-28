@@ -13,6 +13,7 @@ Muestra toda la información y acciones según el estado
 <link rel="stylesheet" href="{% static 'css/detalle_solicitud.css' %}">
 <link rel="stylesheet" href="{% static 'css/cotizacion_cliente.css' %}">
 <link rel="stylesheet" href="{% static 'css/notificar_recepcion_modal.css' %}">
+<link rel="stylesheet" href="{% static 'css/notificar_cliente_pnc_modal.css' %}">
 {% endblock extra_css %}
 
 {% block almacen_content %}
@@ -486,10 +487,10 @@ Muestra toda la información y acciones según el estado
 </div>
 
 <!-- Modal: Notificar a Front (Recepción) -->
-{# EXPLICACIÓN PARA PRINCIPIANTES:
+<!-- EXPLICACIÓN PARA PRINCIPIANTES:
    Solo cambia el aspecto. Los id y name los usa detalle_solicitud.ts
    para cambiar textos, colores y enviar el correo. No los renombres.
-   Izquierda = a quién. Derecha = qué se notifica (plantilla y tabla). #}
+   Izquierda = a quién. Derecha = qué se notifica (plantilla y tabla). -->
 <div class="modal fade" id="notificarFrontModal" tabindex="-1" aria-labelledby="notificarFrontModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -772,12 +773,20 @@ Muestra toda la información y acciones según el estado
 </div>
 
 {% if mostrar_modal_notificar_cliente_pnc %}
+<!-- EXPLICACIÓN PARA PRINCIPIANTES:
+   Solo cambia el aspecto y deja a «TÚ» siempre en copia, igual que
+   «Notificar a Recepción». notificar_cliente_pnc.ts sigue usando los mismos
+   id (email_cliente_pnc, formNotificarClientePnc, btnNotificarClientePnc).
+   El HTML va en el orden visual: contactos a la izquierda, aviso y nota a la derecha.
+   Un checkbox disabled NO se envía en el POST: por eso «TÚ» lleva además
+   un input hidden con el mismo name y el mismo email.
+-->
 <!-- Modal: Notificar / reenviar aviso PNC al cliente -->
 <div class="modal fade" id="modalNotificarClientePnc" tabindex="-1"
      aria-labelledby="modalNotificarClientePncLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header pnc-cli-header">
                 <h5 class="modal-title" id="modalNotificarClientePncLabel">
                     <i class="bi bi-exclamation-triangle me-2"></i>
                     {% if mostrar_reenviar_aviso_pnc %}
@@ -786,80 +795,182 @@ Muestra toda la información y acciones según el estado
                     Notificar al cliente: sin piezas (PNC)
                     {% endif %}
                 </h5>
+                <small class="pnc-cli-folio">{{ solicitud.numero_solicitud }}</small>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-0">
                 <form id="formNotificarClientePnc" method="post">
                     {% csrf_token %}
 
-                    <div class="alert alert-warning border-warning mb-3">
-                        <strong>{% if mostrar_reenviar_aviso_pnc %}¿Qué hace el reenvío?{% else %}¿Qué hace este aviso?{% endif %}</strong>
-                        <ul class="mb-0 small mt-2">
-                            {% if mostrar_reenviar_aviso_pnc %}
-                            <li>Vuelve a enviar el correo PNC al cliente (sin PDF de precios).</li>
-                            <li>No cambia el estado de la solicitud (sigue en <em>Enviada al Cliente</em>).</li>
-                            {% if solicitud.orden_servicio_id %}
-                            <li>Si la orden ya está en PNC, solo deja un comentario en el historial de ST.</li>
-                            {% endif %}
-                            {% else %}
-                            <li>Envía un correo al cliente indicando que no hay refacciones disponibles.</li>
-                            <li>Pasa la solicitud a <em>Enviada al Cliente</em> para que puedas rechazar las líneas y tipificar el motivo.</li>
-                            {% if solicitud.orden_servicio_id %}
-                            <li>La orden en Servicio Técnico queda / se pone en <em>PNC - Parte No Disponible</em>.</li>
-                            {% endif %}
-                            {% endif %}
-                        </ul>
-                    </div>
+                    <div class="row g-0 pnc-cli-split">
 
-                    <div class="mb-3">
-                        <label for="email_cliente_pnc" class="form-label fw-semibold">
-                            Email del cliente <span class="text-danger">*</span>
-                        </label>
-                        <input type="email"
-                               class="form-control"
-                               id="email_cliente_pnc"
-                               name="email_cliente"
-                               required
-                               value="{{ email_cliente_modal|default:'' }}"
-                               placeholder="cliente@ejemplo.com">
-                    </div>
+                        <!-- Columna izquierda: a quién se le avisa. -->
+                        <div class="col-lg-6 p-3 p-lg-4 border-end pnc-cli-col-izq">
 
-                    <div class="mb-3">
-                        <label for="mensaje_personalizado_pnc_cliente" class="form-label fw-semibold">
-                            Mensaje personalizado (opcional)
-                        </label>
-                        <textarea class="form-control"
-                                  id="mensaje_personalizado_pnc_cliente"
-                                  name="mensaje_personalizado"
-                                  rows="3"
-                                  placeholder="Nota adicional para el cliente"></textarea>
-                    </div>
-
-                    {% if empleados_copia %}
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold">Copia (CC) — opcional</label>
-                        <div class="row g-2">
-                            {% for empleado in empleados_copia %}
-                            <div class="col-md-6">
-                                <label class="destinatario-card p-2 border rounded bg-light d-block mb-0 cursor-pointer"
-                                       for="pnc_cli_emp_{{ empleado.id }}">
-                                    <div class="d-flex align-items-center">
-                                        <input class="form-check-input me-2 flex-shrink-0"
-                                               type="checkbox"
-                                               name="copia_empleados"
-                                               value="{{ empleado.email }}"
-                                               id="pnc_cli_emp_{{ empleado.id }}">
-                                        <div class="flex-grow-1" style="min-width: 0;">
-                                            <div class="fw-bold text-truncate small">{{ empleado.nombre_completo }}</div>
-                                            <small class="text-muted text-truncate d-block">{{ empleado.email }}</small>
-                                        </div>
-                                    </div>
+                            <div class="mb-3">
+                                <label for="email_cliente_pnc" class="pnc-cli-label">
+                                    <i class="bi bi-person-fill me-1"></i>Email del cliente <span class="text-danger">*</span>
                                 </label>
+                                <input type="email"
+                                       class="form-control form-control-sm"
+                                       id="email_cliente_pnc"
+                                       name="email_cliente"
+                                       required
+                                       value="{{ email_cliente_modal|default:'' }}"
+                                       placeholder="cliente@ejemplo.com">
                             </div>
-                            {% endfor %}
+
+                            <div class="mb-2">
+                                <div class="pnc-cli-label mb-2">
+                                    <i class="bi bi-people-fill me-1"></i>Copia (opcional)
+                                </div>
+                                <p class="pnc-cli-hint mb-2">
+                                    El correo principal va al cliente. Tú siempre vas en copia.
+                                    Aquí marcas quién más lo recibe.
+                                </p>
+
+                                <div class="pnc-cli-scroll" id="pncCliCcScroll">
+                                    {% if empleados_copia %}
+                                        {% for empleado in empleados_copia %}
+                                        {# Si este renglón es quien tiene la sesión, queda marcado y bloqueado. #}
+                                        <label class="destinatario-card pnc-cli-item border rounded d-block mb-1 {% if request.user.empleado and empleado.id == request.user.empleado.id %}border-warning border-2 pnc-cli-item-tu{% else %}cursor-pointer{% endif %}"
+                                               for="pnc_cli_emp_{{ empleado.id }}">
+                                            <div class="d-flex align-items-center">
+                                                <input class="form-check-input me-2 flex-shrink-0"
+                                                       type="checkbox"
+                                                       name="copia_empleados"
+                                                       value="{{ empleado.email }}"
+                                                       id="pnc_cli_emp_{{ empleado.id }}"
+                                                       {% if request.user.empleado and empleado.id == request.user.empleado.id %}
+                                                           checked disabled
+                                                       {% endif %}>
+                                                {% if request.user.empleado and empleado.id == request.user.empleado.id %}
+                                                {# El checkbox disabled no viaja en FormData; este hidden sí. #}
+                                                <input type="hidden"
+                                                       name="copia_empleados"
+                                                       value="{{ empleado.email }}">
+                                                {% endif %}
+                                                {% if empleado.foto_perfil %}
+                                                    <img src="{{ empleado.foto_perfil.url }}"
+                                                         alt="{{ empleado.nombre_completo }}"
+                                                         class="rounded-circle me-2 flex-shrink-0 pnc-cli-avatar {% if request.user.empleado and empleado.id == request.user.empleado.id %}pnc-cli-avatar-tu{% endif %}">
+                                                {% else %}
+                                                    <i class="bi bi-person-badge {% if request.user.empleado and empleado.id == request.user.empleado.id %}text-primary{% else %}text-warning{% endif %} me-2 flex-shrink-0"></i>
+                                                {% endif %}
+                                                <div class="flex-grow-1" style="min-width: 0;">
+                                                    <div class="fw-semibold text-truncate small">
+                                                        {{ empleado.nombre_completo }}
+                                                        {% if request.user.empleado and empleado.id == request.user.empleado.id %}
+                                                        <span class="badge bg-primary ms-1 pnc-cli-badge-tu">
+                                                            <i class="bi bi-person-fill"></i> TÚ
+                                                        </span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <small class="text-muted text-truncate d-block">
+                                                        <span class="badge pnc-cli-badge-area me-1"
+                                                              style="background-color: {{ empleado.area|color_area }};
+                                                                     color: {{ empleado.area|color_area|text_color_for_bg }};">
+                                                            {{ empleado.area }}
+                                                        </span>
+                                                        {{ empleado.email }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        {% endfor %}
+                                    {% else %}
+                                    <div class="alert alert-info py-1 px-2 mb-1 small">
+                                        <i class="bi bi-info-circle"></i>
+                                        No hay empleados con email para copia.
+                                    </div>
+                                    {% endif %}
+
+                                    {# Si quien envía no está en CALIDAD / FRONTDESK / CARRY IN, igual va en copia. #}
+                                    {% if not usuario_en_lista_cc and request.user.empleado and request.user.empleado.email %}
+                                    <label class="destinatario-card pnc-cli-item border rounded border-warning border-2 pnc-cli-item-tu d-block mb-1"
+                                           for="pnc_cli_emp_current_user">
+                                        <div class="d-flex align-items-center">
+                                            <input class="form-check-input me-2 flex-shrink-0"
+                                                   type="checkbox"
+                                                   name="copia_empleados"
+                                                   value="{{ request.user.empleado.email }}"
+                                                   id="pnc_cli_emp_current_user"
+                                                   checked disabled>
+                                            <input type="hidden"
+                                                   name="copia_empleados"
+                                                   value="{{ request.user.empleado.email }}">
+                                            {% if request.user.empleado.foto_perfil %}
+                                                <img src="{{ request.user.empleado.foto_perfil.url }}"
+                                                     alt="{{ request.user.empleado.nombre_completo }}"
+                                                     class="rounded-circle me-2 flex-shrink-0 pnc-cli-avatar pnc-cli-avatar-tu">
+                                            {% else %}
+                                                <i class="bi bi-person-badge text-primary me-2 flex-shrink-0"></i>
+                                            {% endif %}
+                                            <div class="flex-grow-1" style="min-width: 0;">
+                                                <div class="fw-semibold text-truncate small">
+                                                    {{ request.user.empleado.nombre_completo }}
+                                                    <span class="badge bg-primary ms-1 pnc-cli-badge-tu">
+                                                        <i class="bi bi-person-fill"></i> TÚ
+                                                    </span>
+                                                </div>
+                                                <small class="text-muted text-truncate d-block">
+                                                    <span class="badge pnc-cli-badge-area me-1"
+                                                          style="background-color: {{ request.user.empleado.area|color_area }};
+                                                                 color: {{ request.user.empleado.area|color_area|text_color_for_bg }};">
+                                                        {{ request.user.empleado.area }}
+                                                    </span>
+                                                    {{ request.user.empleado.email }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </label>
+                                    {% endif %}
+                                </div>
+                            </div>
+
                         </div>
+
+                        <!-- Columna derecha: qué va a pasar y la nota para el cliente. -->
+                        <div class="col-lg-6 p-3 p-lg-4 pnc-cli-col-der">
+
+                            <div class="mb-3">
+                                <div class="pnc-cli-label mb-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    {% if mostrar_reenviar_aviso_pnc %}Qué hace el reenvío{% else %}Qué hace este aviso{% endif %}
+                                </div>
+                                <div class="alert alert-warning border-warning py-2 px-3 mb-0">
+                                    <ul class="mb-0 small">
+                                        {% if mostrar_reenviar_aviso_pnc %}
+                                        <li>Vuelve a enviar el correo PNC al cliente (sin PDF de precios).</li>
+                                        <li>No cambia el estado de la solicitud (sigue en <em>Enviada al Cliente</em>).</li>
+                                        {% if solicitud.orden_servicio_id %}
+                                        <li>Si la orden ya está en PNC, solo deja un comentario en el historial de ST.</li>
+                                        {% endif %}
+                                        {% else %}
+                                        <li>Envía un correo al cliente indicando que no hay refacciones disponibles.</li>
+                                        <li>Pasa la solicitud a <em>Enviada al Cliente</em> para que puedas rechazar las líneas y tipificar el motivo.</li>
+                                        {% if solicitud.orden_servicio_id %}
+                                        <li>La orden en Servicio Técnico queda / se pone en <em>PNC - Parte No Disponible</em>.</li>
+                                        {% endif %}
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label for="mensaje_personalizado_pnc_cliente" class="pnc-cli-label">
+                                    <i class="bi bi-chat-left-text me-1"></i>Mensaje personalizado (opcional)
+                                </label>
+                                <textarea class="form-control form-control-sm"
+                                          id="mensaje_personalizado_pnc_cliente"
+                                          name="mensaje_personalizado"
+                                          rows="4"
+                                          placeholder="Nota adicional para el cliente"></textarea>
+                            </div>
+
+                        </div>
+
                     </div>
-                    {% endif %}
                 </form>
             </div>
             <div class="modal-footer">

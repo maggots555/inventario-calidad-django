@@ -1,0 +1,140 @@
+/*
+ * Modal «Notificar al cliente: sin piezas (PNC)»
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Mismo esquema de dos columnas que «Notificar a Recepción», pero el color
+ * sigue siendo ámbar (advertencia): este aviso le dice al cliente que no
+ * hay piezas. Las clases empiezan con "pnc-cli-" y solo aplican a
+ * #modalNotificarClientePnc.
+ */
+
+#modalNotificarClientePnc .pnc-cli-header {
+    background: #f59e0b;
+    color: #1c1917;
+}
+
+#modalNotificarClientePnc .pnc-cli-folio {
+    color: rgba(28, 25, 23, 0.7);
+    font-size: 0.85rem;
+    align-self: center;
+    margin-left: 0.5rem;
+}
+
+#modalNotificarClientePnc .pnc-cli-split {
+    min-height: 360px;
+}
+
+#modalNotificarClientePnc .pnc-cli-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--gray-600, #64748b);
+    margin-bottom: 0.35rem;
+}
+
+#modalNotificarClientePnc .pnc-cli-hint {
+    font-size: 0.75rem;
+    color: var(--gray-500, #94a3b8);
+    line-height: 1.35;
+}
+
+#modalNotificarClientePnc .pnc-cli-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-200, #e2e8f0);
+    border-radius: 6px;
+    padding: 0.5rem;
+    background-color: var(--gray-50, #f8fafc);
+}
+
+#modalNotificarClientePnc .pnc-cli-item {
+    padding: 0.45rem 0.55rem !important;
+    background-color: var(--white, #fff);
+}
+
+#modalNotificarClientePnc .pnc-cli-item:hover {
+    background-color: rgba(245, 158, 11, 0.08);
+}
+
+/* La fila «TÚ» está bloqueada: no parece un botón que se pueda desmarcar. */
+#modalNotificarClientePnc .pnc-cli-item-tu {
+    cursor: default;
+}
+
+#modalNotificarClientePnc .pnc-cli-item-tu:hover {
+    background-color: var(--white, #fff);
+}
+
+#modalNotificarClientePnc .pnc-cli-avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border: 2px solid #f59e0b;
+}
+
+/* El anillo azul marca la foto de quien envía; el resto sigue en ámbar. */
+#modalNotificarClientePnc .pnc-cli-avatar-tu {
+    border-color: #1f6391;
+}
+
+#modalNotificarClientePnc .pnc-cli-badge-area,
+#modalNotificarClientePnc .pnc-cli-badge-tu {
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 0.12em 0.4em;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-header {
+    background: #78350f;
+    color: #fef3c7;
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-folio {
+    color: rgba(254, 243, 199, 0.75);
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .btn-close {
+    filter: invert(1);
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-label {
+    color: var(--text-secondary, #94a3b8);
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-hint {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-col-izq.border-end {
+    border-color: var(--border-color, #334155) !important;
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-scroll {
+    background-color: var(--card-bg, #1e293b);
+    border-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-item {
+    background-color: #0f172a !important;
+    border-color: var(--border-color, #334155) !important;
+    color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-item:hover {
+    background-color: rgba(245, 158, 11, 0.16) !important;
+}
+
+/* El borde ámbar de «TÚ» gana al borde gris del modo oscuro. */
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-item-tu,
+[data-bs-theme="dark"] #modalNotificarClientePnc .pnc-cli-item-tu:hover {
+    border-color: #f59e0b !important;
+    background-color: #0f172a !important;
+}
