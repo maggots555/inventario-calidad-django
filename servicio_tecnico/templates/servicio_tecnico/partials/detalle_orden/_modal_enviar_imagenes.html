@@ -11,6 +11,8 @@
   Este archivo solo cambia cómo se VE el modal. El correo, los nombres de
   los campos y los id los sigue usando detalle_orden_enviar_imagenes.ts.
   No cambies esos id ni los name="..." o el botón Enviar deja de funcionar.
+  Orden visual: primero destinatarios (izquierda), después fotos (derecha).
+  Eso lo hacen las clases order-1 y order-2, sin mover los campos.
 {% endcomment %}
 <!-- MODAL: ENVIAR IMÁGENES DE INGRESO AL CLIENTE -->
 <div class="modal fade" id="modalEnviarImagenesCliente" tabindex="-1" aria-labelledby="modalEnviarImagenesClienteLabel" aria-hidden="true">
@@ -44,10 +46,11 @@
 
                     <div class="row g-0 ing-modal-split">
 
-                        <!-- ============================================================
-                           COLUMNA IZQUIERDA: fotos de ingreso + inspector IA
-                           ============================================================ -->
-                        <div class="col-lg-6 p-3 p-lg-4 border-end ing-modal-col-izq">
+                        <!--
+                          Fotos a la DERECHA. order-2 las manda al segundo lugar
+                          (en celular quedan debajo de los destinatarios).
+                        -->
+                        <div class="col-lg-6 p-3 p-lg-4 ing-modal-col-der order-2">
 
                             <div class="mb-3">
                                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
@@ -136,12 +139,14 @@
                             </div>
                             {% endif %}
 
-                        </div>{# /col izquierda #}
+                        </div>{# /col fotos #}
 
-                        <!-- ============================================================
-                           COLUMNA DERECHA: destinatario + CC + mensaje + preview
-                           ============================================================ -->
-                        <div class="col-lg-6 p-3 p-lg-4 ing-modal-col-der">
+                        <!--
+                          Destinatarios a la IZQUIERDA. order-1 los pone primero.
+                          border-end dibuja la línea divisoria del lado derecho
+                          de esta columna, entre destinatarios y fotos.
+                        -->
+                        <div class="col-lg-6 p-3 p-lg-4 border-end ing-modal-col-izq order-1">
 
                             <!-- SECCIÓN: PARA (cliente). Sin editor inline: si falta el email, se abre el modal de equipo. -->
                             <div class="mb-3">
@@ -488,7 +493,7 @@
                                 </div>
                             </div>
 
-                        </div>{# /col derecha #}
+                        </div>{# /col destinatarios #}
 
                     </div>{# /row split #}
                 </form>
