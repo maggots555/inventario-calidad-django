@@ -112,8 +112,8 @@ class ApiListarDosCortesTest(TestCase):
 
     def test_avisos_recientes_no_ocultan_accion_vieja(self):
         """
-        El tope de 20 era mezclado: 20 correos nuevos escondían un pago viejo.
-        Ahora cada corte tiene su propio tope.
+        Los avisos nuevos no esconden un pendiente viejo: cada pestaña
+        es su propia lista. Los avisos sí se recortan a 20.
         """
         accion = Notificacion.objects.create(
             titulo='Pago por validar viejo',
@@ -139,6 +139,38 @@ class ApiListarDosCortesTest(TestCase):
         self.assertEqual(data['no_leidas_accion'], 1)
         self.assertTrue(data.get('hay_mas_avisos'))
         self.assertFalse(data.get('hay_mas_accion'))
+
+    def test_por_hacer_muestra_todas_aunque_pasen_de_20(self):
+        """
+        Si hay 23 pendientes, las 23 viajan. Antes el tope dejaba fuera
+        al más viejo y el chip de sede podía salir vacío.
+        """
+        # Se crea primero: queda al final del orden (las nuevas van arriba).
+        satelite = Notificacion.objects.create(
+            titulo='Equipo Satélite viejo',
+            mensaje='Sigue pendiente',
+            tipo='info',
+            usuario=self.user,
+            categoria='equipo_disponible_satelite',
+            requiere_accion=True,
+        )
+        for i in range(22):
+            Notificacion.objects.create(
+                titulo=f'Pendiente {i}',
+                mensaje='Trabajo',
+                tipo='warning',
+                usuario=self.user,
+                categoria='general',
+                requiere_accion=True,
+            )
+
+        data = self._listar()
+        ids_accion = [item['id'] for item in data['accion']]
+        self.assertEqual(len(data['accion']), 23)
+        self.assertIn(satelite.pk, ids_accion)
+        self.assertFalse(data.get('hay_mas_accion'))
+        self.assertEqual(data['no_leidas_accion'], 23)
+        self.assertEqual(data['no_leidas_equipo_satelite'], 1)
 
     def test_contador_equipo_solo_accion_no_leida(self):
         Notificacion.objects.create(

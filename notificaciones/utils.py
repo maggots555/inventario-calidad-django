@@ -36,9 +36,9 @@ from django.contrib.auth.models import User
 
 logger = logging.getLogger('notificaciones')
 
-# Prefijo de cache Redis del panel. El "v4" evita servir 10 s el JSON viejo
-# (sin la pestaña Cumplidas) cuando el cliente ya la espera.
-CACHE_KEY_PREFIX = 'notif:v4'
+# Prefijo de cache Redis del panel. El "v5" evita servir 10 s la lista
+# vieja de Por hacer recortada a 20, cuando el cliente ya espera todas.
+CACHE_KEY_PREFIX = 'notif:v5'
 
 
 # Filtros de la campanita para «equipo listo».
@@ -57,7 +57,7 @@ def clave_cache_notificaciones(user_id: int) -> str:
         user_id: PK del usuario destinatario.
 
     Returns:
-        str: ej. ``notif:v4:42``.
+        str: ej. ``notif:v5:42``.
     """
     return f'{CACHE_KEY_PREFIX}:{user_id}'
 

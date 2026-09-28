@@ -57,7 +57,8 @@ logger = logging.getLogger('notificaciones')
 # Con cache: solo 6 consultas SQL por minuto (1 cada 10s por usuario).
 # En un intervalo de 60s (modo idle), la mejora es aún mayor.
 CACHE_TTL_NOTIF: int = 10  # segundos
-# Tope por pestaña: 20 de «Por hacer» y 20 de «Avisos», independientes.
+# Tope solo de Avisos y Cumplidas (historial). «Por hacer» no se recorta:
+# el chip filtra esa lista en el navegador y un tope escondía pendientes.
 LIMITE_LISTA_NOTIF: int = 20
 
 
@@ -68,7 +69,7 @@ def _cache_key(user_id: int) -> str:
         user_id: PK del usuario.
 
     Returns:
-        str: ``notif:v4:{id}``.
+        str: ``notif:v5:{id}``.
     """
     return clave_cache_notificaciones(user_id)
 
@@ -83,7 +84,7 @@ def _invalidar_cache(user_id: int) -> None:
 
 
 def _contadores_usuario(user) -> dict:
-    """Cuenta no leídas reales en BD (no el tope de 20 de la lista).
+    """Cuenta en toda la BD del usuario, no solo las filas que se pintan.
 
     EXPLICACIÓN: El badge y los numeritos de pestaña deben reflejar TODAS
     las pendientes, aunque la lista solo muestre las 20 más recientes.
@@ -224,7 +225,8 @@ def obtener_notificaciones(request):
     - no_leidas_avisos: informativas sin leer
     - no_leidas_equipo: equipo listo aún no cumplido (aunque ya se haya abierto)
     - no_leidas_equipo_satelite / no_leidas_equipo_dropoff: chips del dispatcher
-    - hay_mas_accion / hay_mas_cumplidas / hay_mas_avisos: True si hay más de 20
+    - hay_mas_accion: siempre False. Por hacer llega completo.
+    - hay_mas_cumplidas / hay_mas_avisos: True si hay más de 20 en esa pestaña
     - accion / cumplidas / avisos: listas. En «Por hacer», las no leídas van primero.
 
     Optimización con cache:
@@ -244,13 +246,14 @@ def obtener_notificaciones(request):
     if data is None:
         # Cache vacío o expirado → consultar la BD (un queryset base).
         qs = Notificacion.objects.filter(usuario=user)
-        # Paso 1: «Por hacer» es lo no cumplido. Pendientes arriba, abiertas abajo.
-        accion, hay_mas_accion = _cortar_lista(
+        # Paso 1: «Por hacer» va completo. Si hay 23, viajan las 23.
+        # Pendientes sin abrir arriba; las ya consultadas, abajo.
+        accion = list(
             qs.filter(requiere_accion=True, cumplida=False).order_by(
                 'leida', '-fecha_creacion'
-            ),
-            LIMITE_LISTA_NOTIF,
+            )
         )
+        hay_mas_accion = False
         # Paso 2: «Cumplidas» es la tarea hecha. La más reciente arriba.
         cumplidas, hay_mas_cumplidas = _cortar_lista(
             qs.filter(cumplida=True).order_by('-fecha_cumplida', '-fecha_creacion'),

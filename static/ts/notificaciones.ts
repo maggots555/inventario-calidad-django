@@ -646,9 +646,10 @@ class PanelNotificaciones {
     /**
      * Recorta «Por hacer» según el chip activo.
      *
-     * EXPLICACIÓN: El chip general junta Satélite, Drop Off y el resto
-     * (la categoría empieza por equipo_disponible). Los otros dos
-     * piden la categoría exacta de esa sede.
+     * EXPLICACIÓN: El servidor manda todas las de Por hacer, no solo 20.
+     * Por eso el chip ve también las que quedarían al final de la lista.
+     * El general junta Satélite, Drop Off y el resto (la categoría
+     * empieza por equipo_disponible). Los otros dos piden la sede exacta.
      */
     private filtrarAccionPorChip(items: NotificacionItem[]): NotificacionItem[] {
         if (this.chipActivo === 'equipo') {
