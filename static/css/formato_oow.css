@@ -184,6 +184,95 @@
   white-space: pre-wrap;
 }
 
+/*
+ * Ficha de solo lectura (OOW y Garantía Dell).
+ * En el teléfono Cliente y Equipo van uno bajo el otro.
+ * Desde tablet van lado a lado, con la falla a todo el ancho.
+ */
+.formato-oow-ficha {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+.formato-oow-ficha-titulo {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.formato-oow-ficha-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem 1rem;
+}
+
+.formato-oow-ficha-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.formato-oow-ficha-valor {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--text-primary, #0f172a);
+  overflow-wrap: anywhere;
+}
+
+.formato-oow-ficha-falla {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--gray-50, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 0.4rem;
+}
+
+.formato-oow-ficha-falla .formato-oow-falla {
+  line-height: 1.45;
+}
+
+@media (min-width: 576px) {
+  .formato-oow-ficha-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .formato-oow-ficha-item--ancho {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 768px) {
+  .formato-oow-ficha {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.5rem;
+  }
+
+  .formato-oow-ficha-col + .formato-oow-ficha-col {
+    border-left: 1px solid var(--border-color, #dee2e6);
+    padding-left: 1.5rem;
+  }
+}
+
+[data-bs-theme="dark"] .formato-oow-ficha-valor {
+  color: var(--text-primary, #e2e8f0);
+}
+
+[data-bs-theme="dark"] .formato-oow-ficha-col + .formato-oow-ficha-col {
+  border-left-color: var(--border-color, #334155);
+}
+
+[data-bs-theme="dark"] .formato-oow-ficha-falla {
+  background: #0f172a;
+  border-color: var(--border-color, #334155);
+}
+
 .formato-oow-check,
 .formato-oow-radio {
   display: flex;

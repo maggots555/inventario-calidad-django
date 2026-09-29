@@ -77,28 +77,54 @@
     <section class="card formato-oow-card mb-3" id="seccion-datos">
         <div class="card-header formato-oow-section-header">1 · Datos de la orden</div>
         <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <h2 class="h6 text-uppercase text-muted">Cliente</h2>
-                    <dl class="row mb-0 formato-oow-dl">
-                        <dt class="col-5">Nombre</dt><dd class="col-7">{{ orden.detalle_equipo.nombre_cliente|default:"—" }}</dd>
-                        <dt class="col-5">Razón social</dt><dd class="col-7">{{ orden.detalle_equipo.razon_social_cliente|default:"—" }}</dd>
-                        <dt class="col-5">RFC</dt><dd class="col-7">{{ orden.detalle_equipo.rfc_cliente|default:"—" }}</dd>
-                        <dt class="col-5">Email</dt><dd class="col-7">{{ orden.detalle_equipo.email_cliente|default:"—" }}</dd>
-                        <dt class="col-5">Teléfono</dt><dd class="col-7">{{ orden.detalle_equipo.telefono_cliente|default:"—" }}</dd>
-                        <dt class="col-5">Dirección</dt><dd class="col-7">{{ orden.detalle_equipo.direccion_cliente|default:"—" }}</dd>
-                    </dl>
+            {# Etiqueta arriba y valor abajo: el texto largo ya no pelea con el nombre del dato. #}
+            <div class="formato-oow-ficha">
+                <div class="formato-oow-ficha-col">
+                    <h2 class="formato-oow-ficha-titulo">Cliente</h2>
+                    <div class="formato-oow-ficha-grid">
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">Nombre</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.nombre_cliente|default:"—" }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">Razón social</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.razon_social_cliente|default:"—" }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">RFC</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.rfc_cliente|default:"—" }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">Email</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.email_cliente|default:"—" }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">Teléfono</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.telefono_cliente|default:"—" }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item formato-oow-ficha-item--ancho">
+                            <span class="formato-oow-ficha-label">Dirección</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.direccion_cliente|default:"—" }}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <h2 class="h6 text-uppercase text-muted">Equipo</h2>
-                    <dl class="row mb-0 formato-oow-dl">
-                        <dt class="col-5">Marca / Modelo</dt>
-                        <dd class="col-7">{{ orden.detalle_equipo.marca }} {{ orden.detalle_equipo.modelo }}</dd>
-                        <dt class="col-5">Service Tag</dt><dd class="col-7">{{ orden.detalle_equipo.numero_serie }}</dd>
-                        <dt class="col-5">Falla</dt>
-                        <dd class="col-7 formato-oow-falla">{{ orden.detalle_equipo.falla_principal|truncatechars:180 }}</dd>
-                    </dl>
+                <div class="formato-oow-ficha-col">
+                    <h2 class="formato-oow-ficha-titulo">Equipo</h2>
+                    <div class="formato-oow-ficha-grid">
+                        <div class="formato-oow-ficha-item formato-oow-ficha-item--ancho">
+                            <span class="formato-oow-ficha-label">Marca / Modelo</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.marca }} {{ orden.detalle_equipo.modelo }}</span>
+                        </div>
+                        <div class="formato-oow-ficha-item">
+                            <span class="formato-oow-ficha-label">Service Tag</span>
+                            <span class="formato-oow-ficha-valor">{{ orden.detalle_equipo.numero_serie }}</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+            <div class="formato-oow-ficha-falla">
+                <span class="formato-oow-ficha-label">Falla</span>
+                <p class="formato-oow-ficha-valor formato-oow-falla mb-0">{{ orden.detalle_equipo.falla_principal|truncatechars:180 }}</p>
             </div>
         </div>
     </section>

@@ -646,6 +646,9 @@ class FormatoGarantiaWizardViewTest(TestCase):
         self.assertRegex(html, r'id="numeroCargador"[^>]*\bdisabled\b')
         self.assertRegex(html, r'id="btnEscanearCargador"[^>]*\bdisabled\b')
         self.assertIn('id="checkItemDanos"', html)
+        self.assertIn('formato-oow-ficha', html)
+        self.assertIn('formato-oow-ficha-falla', html)
+        self.assertIn('Falla inicial', html)
         self.assertTrue(
             FormatoServicioGarantia.objects.filter(orden=self.orden).exists()
         )

@@ -1486,6 +1486,8 @@ class FormatoOowVistaTest(TestCase):
         self.assertIn('INE / IFE u otra', html)
         self.assertIn('Razón social', html)
         self.assertIn('Dirección', html)
+        self.assertIn('formato-oow-ficha', html)
+        self.assertIn('formato-oow-ficha-falla', html)
         self.assertTrue(
             FormatoServicioOOW.objects.filter(orden=self.orden).exists()
         )
