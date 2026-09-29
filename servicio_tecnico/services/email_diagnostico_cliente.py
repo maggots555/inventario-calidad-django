@@ -189,6 +189,34 @@ def _lineas_footer(context: dict, sitio_web: str) -> list[str]:
     return lineas
 
 
+def _saludo_diagnostico(context: dict) -> str:
+    """
+    Saludo del correo de diagnóstico: nombre del cliente o frase genérica.
+
+    Objetivo de negocio:
+        Si la orden ya tiene el nombre del cliente, el correo lo saluda
+        por su nombre. Si no está capturado, se queda "estimado usuario"
+        para no inventar un nombre.
+
+    Args:
+        context: El mismo diccionario del HTML. El nombre vive en
+            `detalle.nombre_cliente` (objeto DetalleEquipo).
+
+    Returns:
+        str: "Buen día estimado Ana Pérez" o "Buen día estimado usuario".
+
+    Efectos secundarios:
+        Ninguno. No toca BD ni envía correo.
+    """
+    detalle = context.get('detalle')
+    # EXPLICACIÓN: el nombre es opcional; espacios solos cuentan como vacío,
+    # igual que el texto plano del correo de ingreso.
+    nombre_cliente = (getattr(detalle, 'nombre_cliente', '') or '').strip()
+    if nombre_cliente:
+        return f'Buen día estimado {nombre_cliente}'
+    return 'Buen día estimado usuario'
+
+
 def _texto_estandar(context: dict) -> str:
     """
     Cuerpo plano de diagnostico_cliente.html.
@@ -204,7 +232,7 @@ def _texto_estandar(context: dict) -> str:
         'Diagnóstico de equipo',
         f"Folio: {context.get('folio') or ''}",
         '',
-        'Buen día estimado usuario',
+        _saludo_diagnostico(context),
         '',
         (
             f'Me dirijo de {empresa}, para hacer de su conocimiento el diagnóstico '
@@ -258,7 +286,7 @@ def _texto_nivel_componente(context: dict) -> str:
         'Diagnóstico — Reparación a nivel componente',
         f"Folio: {context.get('folio') or ''}",
         '',
-        'Buen día estimado usuario',
+        _saludo_diagnostico(context),
         '',
         (
             f'Me dirijo de {empresa}, para hacer de su conocimiento el diagnóstico '

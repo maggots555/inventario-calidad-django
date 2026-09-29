@@ -111,7 +111,9 @@ class DiagnosticoEstandarEmailTemplateTests(SimpleTestCase):
         _assert_layout_correo(self, html)
 
         self.assertIn('Diagnóstico de equipo', html)
-        self.assertIn('Buen día estimado usuario', html)
+        # El contexto de prueba trae nombre: el saludo lo usa.
+        self.assertIn('Buen día estimado Ana Pérez', html)
+        self.assertNotIn('Buen día estimado usuario', html)
         self.assertIn('DX-3003', html)
         self.assertIn('FL-3003', html)
         self.assertIn('Laptop Dell Latitude 5520', html)
@@ -121,6 +123,14 @@ class DiagnosticoEstandarEmailTemplateTests(SimpleTestCase):
         # 2 fotos + 1 PDF = 3 adjuntos
         self.assertIn('3', html)
         self.assertNotIn('Ver seguimiento de mi equipo', html)
+
+    def test_sin_nombre_usa_saludo_generico(self):
+        """Si no hay nombre_cliente, se mantiene «estimado usuario»."""
+        contexto = _contexto()
+        contexto['detalle'].nombre_cliente = ''
+        html = render_to_string(PLANTILLA_ESTANDAR, contexto)
+        self.assertIn('Buen día estimado usuario', html)
+        self.assertNotIn('Buen día estimado Ana', html)
 
     def test_con_seguimiento_muestra_boton(self):
         """El CTA HTML lleva la URL pública."""
@@ -152,6 +162,8 @@ class DiagnosticoNivelComponenteEmailTemplateTests(SimpleTestCase):
         _assert_layout_correo(self, html)
 
         self.assertIn('Diagnóstico — Reparación a nivel componente', html)
+        self.assertIn('Buen día estimado Ana Pérez', html)
+        self.assertNotIn('Buen día estimado usuario', html)
         self.assertIn('Preguntas frecuentes', html)
         self.assertIn('cid:rhitso_reballing', html)
         self.assertIn('cid:rhitso_pistas', html)
@@ -163,6 +175,14 @@ class DiagnosticoNivelComponenteEmailTemplateTests(SimpleTestCase):
         self.assertIn('https://sic.com.mx/', html)
         self.assertIn('https://wa.me/525512345678', html)
         self.assertNotIn('diagrama', html.lower())
+
+    def test_sin_nombre_usa_saludo_generico(self):
+        """Nivel componente sin nombre: el mismo fallback que el estándar."""
+        contexto = _contexto()
+        contexto['detalle'].nombre_cliente = ''
+        html = render_to_string(PLANTILLA_NIVEL, contexto)
+        self.assertIn('Buen día estimado usuario', html)
+        self.assertNotIn('Buen día estimado Ana', html)
 
 
 class DiagnosticoValidacionEmailTemplateTests(SimpleTestCase):
@@ -213,6 +233,8 @@ class DiagnosticoClienteTextoPlanoTests(SimpleTestCase):
         """Feliz estándar: folio, cotización, pie sicfix, sin seguimiento."""
         texto = construir_texto_plano_diagnostico('estandar', _contexto())
         self.assertIn('Diagnóstico de equipo', texto)
+        self.assertIn('Buen día estimado Ana Pérez', texto)
+        self.assertNotIn('Buen día estimado usuario', texto)
         self.assertIn('DX-3003', texto)
         self.assertIn('FL-3003', texto)
         self.assertIn('3 archivo', texto)
@@ -220,6 +242,14 @@ class DiagnosticoClienteTextoPlanoTests(SimpleTestCase):
         self.assertIn('https://sicfix.mx/', texto)
         self.assertIn('NO RESPONDA', texto)
         self.assertNotIn('https://app.sigmasystem.work/seguimiento/', texto)
+
+    def test_estandar_sin_nombre_usa_saludo_generico(self):
+        """Texto plano estándar: sin nombre, «estimado usuario»."""
+        contexto = _contexto()
+        contexto['detalle'].nombre_cliente = '   '
+        texto = construir_texto_plano_diagnostico('estandar', contexto)
+        self.assertIn('Buen día estimado usuario', texto)
+        self.assertNotIn('Ana Pérez', texto)
 
     def test_estandar_con_seguimiento_lleva_la_misma_url(self):
         """Borde: la URL pública viaja también en texto plano."""
@@ -238,10 +268,19 @@ class DiagnosticoClienteTextoPlanoTests(SimpleTestCase):
             _contexto(),
         )
         self.assertIn('Reparación a nivel componente', texto)
+        self.assertIn('Buen día estimado Ana Pérez', texto)
         self.assertIn('PREGUNTAS FRECUENTES', texto)
         self.assertIn('https://sicfix.mx/reparacion-tarjeta-madre/', texto)
         self.assertIn('https://sic.com.mx/', texto)
         self.assertIn('https://wa.me/525512345678', texto)
+
+    def test_nivel_componente_sin_nombre_usa_saludo_generico(self):
+        """Texto plano nivel componente: sin nombre, «estimado usuario»."""
+        contexto = _contexto()
+        contexto['detalle'].nombre_cliente = ''
+        texto = construir_texto_plano_diagnostico('nivel_componente', contexto)
+        self.assertIn('Buen día estimado usuario', texto)
+        self.assertNotIn('Ana Pérez', texto)
 
     def test_validacion_drop_off_omite_recoleccion(self):
         """Drop Off en plano: esperar aviso, sin cláusula 6."""

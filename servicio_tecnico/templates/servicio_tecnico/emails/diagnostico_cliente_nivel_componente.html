@@ -70,8 +70,13 @@
 
                     <tr>
                         <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            {# Mismo criterio que el diagnóstico estándar y que el correo de ingreso. #}
                             <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:24px;color:#1e293b;font-weight:600;">
-                                Buen día estimado usuario
+                                {% if detalle.nombre_cliente %}
+                                    Buen día estimado {{ detalle.nombre_cliente }}
+                                {% else %}
+                                    Buen día estimado usuario
+                                {% endif %}
                             </p>
                             <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:26px;color:#334155;">
                                 Me dirijo de <strong>{{ empresa_nombre }}</strong>, para hacer de su conocimiento el diagnóstico
