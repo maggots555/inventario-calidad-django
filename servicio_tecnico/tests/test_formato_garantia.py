@@ -629,6 +629,10 @@ class FormatoGarantiaWizardViewTest(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Formato Digital Garant', resp.content)
+        # Atrás / Adelante del lienzo de daños estéticos
+        self.assertIn(b'id="btnDeshacerTrazo"', resp.content)
+        self.assertIn(b'id="btnRehacerTrazo"', resp.content)
+        self.assertIn(b'formato_historial_canvas.js', resp.content)
         # Aviso Dell informativo (sin guardar aceptación): debe verse en el wizard
         self.assertIn(b'ACTIVIDADES NO INCLUIDAS EN EL SERVICIO DE GARANTIA', resp.content)
         self.assertIn(b'modalActividadesDell', resp.content)

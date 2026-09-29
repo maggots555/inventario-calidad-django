@@ -407,6 +407,12 @@ function inicializarFormatoVm(): void {
   const padDano = crearPad(canvasDano);
   const padFirmaCis = crearPad(canvasFirmaCis);
   const padFirmaCli = crearPad(canvasFirmaCli);
+  // Atrás / Adelante solo en daños. Las firmas siguen con su botón de limpiar.
+  const historialDano = new HistorialTrazosDano(padDano.ctx);
+  vigilarTrazosDelLienzo(canvasDano, historialDano, () => padDano.dibujando);
+  engancharControlesHistorialTrazos(historialDano);
+  // Sube cada vez que se redibuja el diagrama. Una foto vieja no pisa la vista nueva.
+  let generacionDiagrama = 0;
   padFirmaCis.ctx.strokeStyle = '#111827';
   padFirmaCli.ctx.strokeStyle = '#111827';
 
@@ -482,35 +488,40 @@ function inicializarFormatoVm(): void {
     pintarMiniaturas();
   };
 
-  const refrescarDiagrama = (): void => {
+  const refrescarDiagrama = (esLimpieza: boolean = false): void => {
+    generacionDiagrama += 1;
+    const generacion = generacionDiagrama;
     const vistaSel = byId('vistaActiva') as HTMLSelectElement | null;
     const clave = vistaSel ? vistaSel.value : 'pantalla';
     const label = vistaSel && vistaSel.selectedOptions[0]
       ? vistaSel.selectedOptions[0].text
       : clave;
     dibujarMarcoDiagrama(padDano.ctx, canvasDano.width, canvasDano.height, label, clave);
-    padDano.ctx.strokeStyle = '#c00000';
-    padDano.ctx.lineWidth = 3;
     padDano.tieneTrazos = false;
 
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // La foto guardada llega un instante después. El historial se ancla
+    // cuando el lienzo ya muestra el dibujo final, no el cuadro en blanco.
     const previa = vistasGuardadas.get(clave);
     const src = previa?.imagen_data || previa?.imagen_url || '';
-    if (src) {
-      const img = new Image();
-      img.onload = (): void => {
-        padDano.ctx.drawImage(img, 0, 0, canvasDano.width, canvasDano.height);
-        padDano.ctx.strokeStyle = '#c00000';
-        padDano.ctx.lineWidth = 3;
-      };
-      img.src = src;
-    }
+    cerrarBaseDelLienzo(
+      historialDano,
+      padDano.ctx,
+      src,
+      generacion,
+      () => generacionDiagrama,
+      esLimpieza,
+    );
   };
 
   byId('tipoDiagrama')?.addEventListener('change', filtrarVistasPorTipo);
-  byId('vistaActiva')?.addEventListener('change', refrescarDiagrama);
+  byId('vistaActiva')?.addEventListener('change', () => {
+    refrescarDiagrama();
+  });
 
   byId('btnLimpiarVista')?.addEventListener('click', () => {
-    refrescarDiagrama();
+    // true = limpieza: Atrás puede recuperar los trazos de justo antes.
+    refrescarDiagrama(true);
   });
 
   byId('btnGuardarVista')?.addEventListener('click', () => {

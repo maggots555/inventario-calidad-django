@@ -266,6 +266,14 @@
                 <button type="button" class="btn btn-primary" id="btnGuardarVista">
                     <i class="bi bi-check2" aria-hidden="true"></i> Guardar vista
                 </button>
+                <button type="button" class="btn btn-outline-secondary formato-oow-btn-trazo" id="btnDeshacerTrazo" disabled
+                        title="Deshacer el último trazo (Ctrl+Z)">
+                    <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Atrás
+                </button>
+                <button type="button" class="btn btn-outline-secondary formato-oow-btn-trazo" id="btnRehacerTrazo" disabled
+                        title="Rehacer el trazo (Ctrl+Y)">
+                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Adelante
+                </button>
                 <button type="button" class="btn btn-outline-danger" id="btnLimpiarVista">
                     <i class="bi bi-eraser" aria-hidden="true"></i> Limpiar trazos
                 </button>
@@ -560,5 +568,6 @@
 {# Motor único: zxing-wasm (zxing-cpp) — Data Matrix, QR y barras 1D #}
 <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.2/dist/iife/reader/index.js"></script>
 <script src="{% static 'js/scanner_codigo.js' %}" defer></script>
+<script src="{% static 'js/formato_historial_canvas.js' %}" defer></script>
 <script src="{% static 'js/formato_garantia.js' %}" defer></script>
 {% endblock %}

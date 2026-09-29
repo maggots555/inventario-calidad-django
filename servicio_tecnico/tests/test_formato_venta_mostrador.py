@@ -367,6 +367,10 @@ class FormatoVmVistasTest(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Nota de Venta Directa', resp.content)
+        # Atrás / Adelante del lienzo de daños estéticos
+        self.assertIn(b'id="btnDeshacerTrazo"', resp.content)
+        self.assertIn(b'id="btnRehacerTrazo"', resp.content)
+        self.assertIn(b'formato_historial_canvas.js', resp.content)
         self.assertTrue(
             FormatoServicioVentaMostrador.objects.filter(orden=self.orden).exists()
         )

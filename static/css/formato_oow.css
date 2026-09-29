@@ -242,6 +242,18 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Atrás / Adelante del lienzo de daños: el dedo necesita al menos 44px. */
+.formato-oow-btn-trazo {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+[data-bs-theme="dark"] .formato-oow-btn-trazo:disabled {
+  color: #94a3b8;
+  border-color: #475569;
+  opacity: 1;
+}
+
 .formato-oow-canvas-wrap canvas,
 .formato-oow-firma-wrap canvas {
   display: block;

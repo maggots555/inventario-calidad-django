@@ -1466,6 +1466,10 @@ class FormatoOowVistaTest(TestCase):
         resp = views_formato_oow.formato_oow_wizard(request, orden_id=self.orden.pk)
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'Formato Digital OOW', resp.content)
+        # Atrás / Adelante del lienzo de daños estéticos
+        self.assertIn(b'id="btnDeshacerTrazo"', resp.content)
+        self.assertIn(b'id="btnRehacerTrazo"', resp.content)
+        self.assertIn(b'formato_historial_canvas.js', resp.content)
         # Scanner QR/barras junto al número de cargador (igual que Dell)
         self.assertIn(b'id="numeroCargador"', resp.content)
         self.assertIn(b'id="btnEscanearCargador"', resp.content)

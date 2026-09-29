@@ -677,6 +677,12 @@ function inicializarFormatoOow() {
     }
     const padDano = crearPad(canvasDano);
     const padFirmaCli = crearPad(canvasFirmaCli);
+    // Atrás / Adelante solo en daños. La firma sigue con "Limpiar firma".
+    const historialDano = new HistorialTrazosDano(padDano.ctx);
+    vigilarTrazosDelLienzo(canvasDano, historialDano, () => padDano.dibujando);
+    engancharControlesHistorialTrazos(historialDano);
+    // Sube cada vez que se redibuja el diagrama. Una foto vieja no pisa la vista nueva.
+    let generacionDiagrama = 0;
     // Firma cliente: trazo negro un poco más grueso
     padFirmaCli.ctx.strokeStyle = '#111827';
     padFirmaCli.ctx.lineWidth = 2.2;
@@ -810,36 +816,22 @@ function inicializarFormatoOow() {
     if (formatoInicial.firma_cliente_url) {
         cargarFirmaEnCanvas(formatoInicial.firma_cliente_url);
     }
-    const refrescarDiagrama = () => {
+    const refrescarDiagrama = (esLimpieza = false) => {
+        generacionDiagrama += 1;
+        const generacion = generacionDiagrama;
         const vistaSel = byId('vistaActiva');
         const clave = vistaSel ? vistaSel.value : 'pantalla';
         const label = vistaSel && vistaSel.selectedOptions[0]
             ? vistaSel.selectedOptions[0].text
             : clave;
         dibujarMarcoDiagrama(padDano.ctx, canvasDano.width, canvasDano.height, label, clave);
-        padDano.ctx.strokeStyle = '#c00000';
-        padDano.ctx.lineWidth = 3;
         padDano.tieneTrazos = false;
-        // Si hay imagen previa de la vista, mostrarla de fondo
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // La foto guardada llega un instante después. El historial se ancla
+        // cuando el lienzo ya muestra el dibujo final, no el cuadro en blanco.
         const previa = vistasGuardadas.get(clave);
-        if (previa && previa.imagen_url) {
-            const img = new Image();
-            img.onload = () => {
-                padDano.ctx.drawImage(img, 0, 0, canvasDano.width, canvasDano.height);
-                padDano.ctx.strokeStyle = '#c00000';
-                padDano.ctx.lineWidth = 3;
-            };
-            img.src = previa.imagen_url;
-        }
-        else if (previa && previa.imagen_data) {
-            const img = new Image();
-            img.onload = () => {
-                padDano.ctx.drawImage(img, 0, 0, canvasDano.width, canvasDano.height);
-                padDano.ctx.strokeStyle = '#c00000';
-                padDano.ctx.lineWidth = 3;
-            };
-            img.src = previa.imagen_data;
-        }
+        const src = (previa && (previa.imagen_data || previa.imagen_url)) || '';
+        cerrarBaseDelLienzo(historialDano, padDano.ctx, src, generacion, () => generacionDiagrama, esLimpieza);
     };
     const filtrarVistasPorTipo = () => {
         const tipo = valorInput('tipoDiagrama');
@@ -909,9 +901,12 @@ function inicializarFormatoOow() {
     };
     filtrarVistasPorTipo();
     (_b = byId('tipoDiagrama')) === null || _b === void 0 ? void 0 : _b.addEventListener('change', filtrarVistasPorTipo);
-    (_c = byId('vistaActiva')) === null || _c === void 0 ? void 0 : _c.addEventListener('change', refrescarDiagrama);
-    (_d = byId('btnLimpiarVista')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+    (_c = byId('vistaActiva')) === null || _c === void 0 ? void 0 : _c.addEventListener('change', () => {
         refrescarDiagrama();
+    });
+    (_d = byId('btnLimpiarVista')) === null || _d === void 0 ? void 0 : _d.addEventListener('click', () => {
+        // true = limpieza: Atrás puede recuperar los trazos de justo antes.
+        refrescarDiagrama(true);
     });
     (_e = byId('btnGuardarVista')) === null || _e === void 0 ? void 0 : _e.addEventListener('click', () => {
         const clave = valorInput('vistaActiva');
