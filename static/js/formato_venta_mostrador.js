@@ -97,13 +97,14 @@ const MAX_EMAILS_ENVIO_VM = 3;
         canvas.addEventListener('contextmenu', bloquearGesto);
         canvas.addEventListener('touchstart', bloquearGesto, { passive: false });
         canvas.addEventListener('touchmove', bloquearGesto, { passive: false });
+        // Una curva por lienzo. Las firmas y los daños no comparten el mismo trazo.
+        const trazo = new TrazoSuave();
         canvas.addEventListener('pointerdown', (ev) => {
             ev.preventDefault();
             pad.dibujando = true;
             canvas.setPointerCapture(ev.pointerId);
             const p = pos(ev);
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
+            trazo.empezar(ctx, p.x, p.y);
         });
         canvas.addEventListener('pointermove', (ev) => {
             if (!pad.dibujando) {
@@ -111,8 +112,7 @@ const MAX_EMAILS_ENVIO_VM = 3;
             }
             ev.preventDefault();
             const p = pos(ev);
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
+            trazo.mover(ctx, p.x, p.y);
             pad.tieneTrazos = true;
         });
         const fin = (ev) => {
@@ -120,6 +120,8 @@ const MAX_EMAILS_ENVIO_VM = 3;
                 return;
             }
             ev.preventDefault();
+            // La cola se pinta antes de soltar: Atrás fotografía el trazo ya cerrado.
+            trazo.terminar(ctx);
             pad.dibujando = false;
             try {
                 canvas.releasePointerCapture(ev.pointerId);

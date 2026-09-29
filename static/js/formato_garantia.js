@@ -111,13 +111,14 @@
         // touchstart con passive:false permite preventDefault en Safari/iPadOS
         canvas.addEventListener('touchstart', bloquearGesto, { passive: false });
         canvas.addEventListener('touchmove', bloquearGesto, { passive: false });
+        // Una curva por lienzo. La firma y los daños no comparten el mismo trazo.
+        const trazo = new TrazoSuave();
         canvas.addEventListener('pointerdown', (ev) => {
             ev.preventDefault();
             pad.dibujando = true;
             canvas.setPointerCapture(ev.pointerId);
             const p = pos(ev);
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
+            trazo.empezar(ctx, p.x, p.y);
         });
         canvas.addEventListener('pointermove', (ev) => {
             if (!pad.dibujando) {
@@ -125,8 +126,7 @@
             }
             ev.preventDefault();
             const p = pos(ev);
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
+            trazo.mover(ctx, p.x, p.y);
             pad.tieneTrazos = true;
         });
         const fin = (ev) => {
@@ -134,6 +134,8 @@
                 return;
             }
             ev.preventDefault();
+            // La cola se pinta antes de soltar: Atrás fotografía el trazo ya cerrado.
+            trazo.terminar(ctx);
             pad.dibujando = false;
             try {
                 canvas.releasePointerCapture(ev.pointerId);

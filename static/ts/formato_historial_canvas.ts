@@ -5,8 +5,9 @@
  * todo el diagrama. Cada paso es una foto de los pixeles al soltar el
  * dedo o el stylus. El PDF y la base de datos siguen recibiendo un PNG.
  *
+ * También vive aquí TrazoSuave: la curva que redondea el dedo o el stylus.
  * Este archivo no usa import/export: se carga como <script> antes del
- * wizard (OOW, Garantía Dell o Venta Mostrador) y deja la clase en el
+ * wizard (OOW, Garantía Dell o Venta Mostrador) y deja las clases en el
  * ámbito global de la página.
  *
  * Efectos secundarios: lee y escribe pixeles del canvas. No toca la red
@@ -250,6 +251,75 @@ class HistorialTrazosDano {
     if (this.alCambiar) {
       this.alCambiar();
     }
+  }
+}
+
+/** Un punto del dedo o del stylus, en pixeles del lienzo. */
+interface PuntoLienzo {
+  x: number;
+  y: number;
+}
+
+/**
+ * Curva de un trazo, al estilo de un bloc de firmas.
+ *
+ * Objetivo: que la raya no salga en zigzag. El dedo tiembla y unir
+ * esos puntos con rectas se ve quebrado. Aquí cada tramo termina en
+ * el punto medio y el punto anterior solo jala la curva.
+ *
+ * El grosor no cambia: daños en rojo y firma en negro siguen igual.
+ * Efectos: pinta sobre el contexto que le pasen. No toca el historial.
+ */
+class TrazoSuave {
+  private ultimo: PuntoLienzo | null = null;
+  private tieneCurva = false;
+
+  /**
+   * Objetivo: apoyar el dedo y dejar el lápiz en ese punto.
+   * Argumentos: ctx del lienzo, y la posición x/y ya escalada al canvas.
+   * Efectos: abre un trazo nuevo. No pinta todavía.
+   */
+  empezar(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    this.ultimo = { x: x, y: y };
+    this.tieneCurva = false;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+
+  /**
+   * Objetivo: alargar la raya con una curva, no con una recta.
+   * Argumentos: ctx, y el punto nuevo del dedo.
+   * Efectos: pinta solo el tramo nuevo. El diagrama de abajo no se borra.
+   */
+  mover(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    if (!this.ultimo) {
+      this.empezar(ctx, x, y);
+      return;
+    }
+    // El final visible es el punto medio. El punto anterior jala la curva.
+    const medioX = (this.ultimo.x + x) / 2;
+    const medioY = (this.ultimo.y + y) / 2;
+    ctx.quadraticCurveTo(this.ultimo.x, this.ultimo.y, medioX, medioY);
+    ctx.stroke();
+    // stroke() repetiría todo el camino. Se abre otro tramo desde el medio.
+    ctx.beginPath();
+    ctx.moveTo(medioX, medioY);
+    this.ultimo = { x: x, y: y };
+    this.tieneCurva = true;
+  }
+
+  /**
+   * Objetivo: al soltar, llegar hasta el dedo. Si no, la raya se queda corta.
+   * Argumentos: ctx del mismo lienzo.
+   * Efectos: pinta la cola y olvida el trazo. Un toque sin arrastrar no pinta.
+   */
+  terminar(ctx: CanvasRenderingContext2D): void {
+    if (this.ultimo && this.tieneCurva) {
+      ctx.lineTo(this.ultimo.x, this.ultimo.y);
+      ctx.stroke();
+    }
+    this.ultimo = null;
+    this.tieneCurva = false;
   }
 }
 
