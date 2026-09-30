@@ -37,6 +37,9 @@
                                  Reemplaza el antiguo <select> de Django.
                                  El usuario DEBE elegir uno antes de poder subir.
                                  ════════════════════════════════════════════════════════ -->
+                            {# En escritorio: captura a la izquierda y avisos en columna. En teléfono se apilan igual que antes. #}
+                            <div class="galeria-layout">
+                            <div class="galeria-layout-main">
                             <div class="row mb-3">
                                 <div class="col-12">
                                     <label class="form-label fw-semibold mb-2">
@@ -90,91 +93,98 @@
                                 </div>
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-9 mb-3">
-                                    {{ form_imagenes.imagenes.errors }}
-                                    <label class="form-label">
-                                        Seleccionar Imágenes
-                                    </label>
-                                    
-                                    <!-- Contenedor de botones dual: Galería y Cámara -->
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-6">
-                                            <label for="inputGaleria" class="btn btn-outline-primary w-100 btn-upload-dual" style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;">
-                                                <i class="bi bi-folder2-open" style="font-size: 1.8rem; line-height: 1;"></i>
-                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar de<br>Galería</span>
+                            {# En teléfono los botones ocupan media fila (dedo). En escritorio el CSS los achica a una barra. #}
+                            <div class="galeria-captura mb-3">
+                                {{ form_imagenes.imagenes.errors }}
+                                <label class="form-label" id="labelSeleccionarImagenes">
+                                    Seleccionar Imágenes
+                                </label>
+
+                                <div class="galeria-barra">
+                                    <div class="galeria-fuentes" role="group" aria-labelledby="labelSeleccionarImagenes">
+                                        <div class="galeria-fuente">
+                                            <label for="inputGaleria" class="btn btn-outline-primary btn-upload-dual">
+                                                <i class="bi bi-folder2-open" aria-hidden="true"></i>
+                                                <span>Seleccionar de <span class="galeria-btn-tail">Galería</span></span>
                                             </label>
-                                            <input type="file" 
-                                                   name="imagenes_galeria" 
-                                                   class="d-none" 
+                                            <input type="file"
+                                                   name="imagenes_galeria"
+                                                   class="d-none"
                                                    id="inputGaleria"
                                                    accept="image/jpeg,image/jpg,image/png,image/gif"
                                                    multiple>
                                         </div>
-                                        <div class="col-6">
-                                            <label for="inputCamara" class="btn btn-outline-success w-100 btn-upload-dual" style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;">
-                                                <i class="bi bi-camera-fill" style="font-size: 1.8rem; line-height: 1;"></i>
-                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Capturar con<br>Cámara</span>
+                                        <div class="galeria-fuente">
+                                            <label for="inputCamara" class="btn btn-outline-success btn-upload-dual">
+                                                <i class="bi bi-camera-fill" aria-hidden="true"></i>
+                                                <span>Capturar con <span class="galeria-btn-tail">Cámara</span></span>
                                             </label>
-                                            <input type="file" 
-                                                   name="imagenes_camara" 
-                                                   class="d-none" 
+                                            <input type="file"
+                                                   name="imagenes_camara"
+                                                   class="d-none"
                                                    id="inputCamara"
                                                    accept="image/*"
                                                    capture="environment"
                                                    multiple>
                                         </div>
-                                    </div>
-                                    
-                                    <!-- Preview de imágenes seleccionadas -->
-                                    <div id="previewImagenes" class="preview-container" style="display: none;">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <small class="text-muted">
-                                                <i class="bi bi-images"></i> <span id="cantidadImagenes">0</span> imagen(es) seleccionada(s)
-                                            </small>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarTodo">
-                                                <i class="bi bi-x-circle"></i> Limpiar todo
+                                        <div class="galeria-fuente galeria-fuente-submit">
+                                            <button type="submit" class="btn btn-success" id="btnSubirImagenes" disabled>
+                                                <i class="bi bi-cloud-upload" aria-hidden="true"></i> Subir Imágenes
                                             </button>
                                         </div>
-                                        <div id="contenedorMiniaturas" class="row g-2">
-                                            <!-- Miniaturas se insertarán aquí dinámicamente -->
-                                        </div>
                                     </div>
-                                    
-                                    <small class="text-muted d-block mt-2">
-                                        <i class="bi bi-info-circle"></i> Máximo 30 imágenes por carga, 50MB cada una. Formatos: JPG, PNG, GIF
+                                    <small class="text-muted galeria-hint">
+                                        <i class="bi bi-info-circle" aria-hidden="true"></i> Máximo 30 imágenes por carga, 50MB cada una. Formatos: JPG, PNG, GIF
                                     </small>
                                 </div>
-                                
-                                <div class="col-md-3 mb-3">
-                                    <label class="form-label d-block">&nbsp;</label>
-                                    <button type="submit" class="btn btn-success w-100" id="btnSubirImagenes" style="height: 45px; font-size: 0.95rem;" disabled>
-                                        <i class="bi bi-cloud-upload"></i> Subir Imágenes
-                                    </button>
+
+                                <!-- Preview de imágenes seleccionadas -->
+                                <div id="previewImagenes" class="preview-container" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small class="text-muted">
+                                            <i class="bi bi-images"></i> <span id="cantidadImagenes">0</span> imagen(es) seleccionada(s)
+                                        </small>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarTodo">
+                                            <i class="bi bi-x-circle"></i> Limpiar todo
+                                        </button>
+                                    </div>
+                                    <div id="contenedorMiniaturas" class="row g-2">
+                                        <!-- Miniaturas se insertarán aquí dinámicamente -->
+                                    </div>
                                 </div>
                             </div>
-                            
-                             {# Panel de envíos al cliente: en móvil ancho completo; en desktop se limita con CSS #}
+                            </div>
+
+                             {# Envíos al cliente: en móvil ancho completo; en escritorio, columna derecha de botones iguales. #}
                              <div class="galeria-acciones-cliente">
+                             <p class="galeria-zona-titulo">Avisos al cliente</p>
                              <!-- Botón para enviar imágenes de ingreso al cliente -->
                              <div class="row mb-3">
                                  <div class="col-12">
-                                     <button type="button"
-                                             class="btn w-100 {% if ingreso_correo_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
-                                             data-bs-toggle="modal"
-                                             data-bs-target="#modalEnviarImagenesCliente"
-                                             {% if not imagenes_por_tipo.ingreso %}disabled{% endif %}
-                                             title="{% if not imagenes_por_tipo.ingreso %}Debe subir al menos una imagen de ingreso{% elif ingreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías del equipo al cliente por correo{% endif %}">
-                                         {% if ingreso_correo_ya_enviado %}
-                                             <i class="bi bi-check-circle-fill me-1"></i> Imágenes de ingreso ya enviadas
-                                             <span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>
-                                         {% else %}
-                                             <i class="bi bi-envelope-paper me-1"></i> Envío de imágenes al cliente
-                                             {% if imagenes_por_tipo.ingreso %}
-                                                 <span class="badge bg-light text-primary ms-2">{{ imagenes_por_tipo.ingreso.count }} disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}</span>
-                                             {% endif %}
-                                         {% endif %}
-                                     </button>
+                                      <button type="button"
+                                              class="btn w-100 galeria-aviso galeria-aviso-ingreso {% if ingreso_correo_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
+                                              data-bs-toggle="modal"
+                                              data-bs-target="#modalEnviarImagenesCliente"
+                                              {% if not imagenes_por_tipo.ingreso %}disabled{% endif %}
+                                              title="{% if not imagenes_por_tipo.ingreso %}Debe subir al menos una imagen de ingreso{% elif ingreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías del equipo al cliente por correo{% endif %}">
+                                          {% if ingreso_correo_ya_enviado %}
+                                              <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Imágenes de ingreso ya enviadas</span>
+                                                  <span class="d-none d-lg-inline">Ingreso enviado</span>
+                                              </span>
+                                              <span class="badge galeria-aviso-meta">reenviar</span>
+                                          {% else %}
+                                              <i class="bi bi-envelope-paper" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Envío de imágenes al cliente</span>
+                                                  <span class="d-none d-lg-inline">Ingreso al cliente</span>
+                                              </span>
+                                              {% if imagenes_por_tipo.ingreso %}
+                                                  <span class="badge galeria-aviso-meta" aria-label="{{ imagenes_por_tipo.ingreso.count }} disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}">{{ imagenes_por_tipo.ingreso.count }}<span class="d-lg-none"> disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}</span></span>
+                                              {% endif %}
+                                          {% endif %}
+                                      </button>
                                      {% if not imagenes_por_tipo.ingreso %}
                                      <small class="text-muted d-block mt-2 text-center">
                                          <i class="bi bi-info-circle"></i> Sube al menos una imagen de ingreso para habilitar el envío
@@ -186,21 +196,29 @@
                              <!-- Botón para enviar imágenes de egreso al cliente -->
                              <div class="row mb-3">
                                  <div class="col-12">
-                                     <button type="button"
-                                             class="btn w-100 {% if egreso_correo_ya_enviado %}btn-outline-warning{% else %}btn-warning text-white{% endif %}"
-                                             id="btnEnviarImagenesEgreso"
-                                             {% if not imagenes_por_tipo.egreso %}disabled{% endif %}
-                                             title="{% if not imagenes_por_tipo.egreso %}Debe subir al menos una imagen de egreso{% elif egreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías de egreso al cliente por correo{% endif %}">
-                                         {% if egreso_correo_ya_enviado %}
-                                             <i class="bi bi-check-circle-fill me-1"></i> Imágenes de egreso ya enviadas
-                                             <span class="badge bg-warning bg-opacity-25 text-warning ms-2">reenviar</span>
-                                         {% else %}
-                                             <i class="bi bi-envelope-paper-fill me-1"></i> Enviar imágenes de egreso al cliente
-                                             {% if imagenes_por_tipo.egreso %}
-                                                 <span class="badge bg-light text-warning ms-2">{{ imagenes_por_tipo.egreso.count }} disponible{{ imagenes_por_tipo.egreso.count|pluralize:"s" }}</span>
-                                             {% endif %}
-                                         {% endif %}
-                                     </button>
+                                      <button type="button"
+                                              class="btn w-100 galeria-aviso galeria-aviso-egreso {% if egreso_correo_ya_enviado %}btn-outline-warning{% else %}btn-warning text-white{% endif %}"
+                                              id="btnEnviarImagenesEgreso"
+                                              {% if not imagenes_por_tipo.egreso %}disabled{% endif %}
+                                              title="{% if not imagenes_por_tipo.egreso %}Debe subir al menos una imagen de egreso{% elif egreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías de egreso al cliente por correo{% endif %}">
+                                          {% if egreso_correo_ya_enviado %}
+                                              <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Imágenes de egreso ya enviadas</span>
+                                                  <span class="d-none d-lg-inline">Egreso enviado</span>
+                                              </span>
+                                              <span class="badge galeria-aviso-meta">reenviar</span>
+                                          {% else %}
+                                              <i class="bi bi-envelope-paper-fill" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Enviar imágenes de egreso al cliente</span>
+                                                  <span class="d-none d-lg-inline">Egreso al cliente</span>
+                                              </span>
+                                              {% if imagenes_por_tipo.egreso %}
+                                                  <span class="badge galeria-aviso-meta" aria-label="{{ imagenes_por_tipo.egreso.count }} disponible{{ imagenes_por_tipo.egreso.count|pluralize:"s" }}">{{ imagenes_por_tipo.egreso.count }}<span class="d-lg-none"> disponible{{ imagenes_por_tipo.egreso.count|pluralize:"s" }}</span></span>
+                                              {% endif %}
+                                          {% endif %}
+                                      </button>
                                      {% if not imagenes_por_tipo.egreso %}
                                      <small class="text-muted d-block mt-2 text-center">
                                          <i class="bi bi-info-circle"></i> Sube al menos una imagen de egreso para habilitar el envío
@@ -213,19 +231,24 @@
                              {% if orden.estado == 'finalizado' %}
                              <div class="row mb-3" id="notificar-equipo-disponible">
                                  <div class="col-12">
-                                     <button type="button"
-                                             class="btn w-100 {% if equipo_disponible_ya_notificado %}btn-outline-success{% else %}btn-success{% endif %}"
-                                             id="btnNotificarEquipoDisponible"
+                                      <button type="button"
+                                              class="btn w-100 galeria-aviso galeria-aviso-notificar {% if equipo_disponible_ya_notificado %}btn-outline-success{% else %}btn-success{% endif %}"
+                                              id="btnNotificarEquipoDisponible"
                                              data-url="{% url 'servicio_tecnico:notificar_equipo_disponible' orden.id %}"
                                              data-email="{{ orden.detalle_equipo.email_cliente|default:'' }}"
                                              data-folio="{{ orden.detalle_equipo.orden_cliente|default:orden.numero_orden_interno }}"
                                              {% if equipo_disponible_ya_notificado or not email_cliente_valido_notificar %}disabled{% endif %}
                                              title="{% if equipo_disponible_ya_notificado %}Ya se notificó al cliente{% elif not email_cliente_valido_notificar %}Configura el email del cliente{% else %}Enviar correo: equipo listo para recolección{% endif %}">
-                                         {% if equipo_disponible_ya_notificado %}
-                                             <i class="bi bi-check-circle-fill me-1"></i> Equipo notificado
-                                         {% else %}
-                                             <i class="bi bi-bell-fill me-1"></i> Notificar equipo disponible
-                                         {% endif %}
+                                          {% if equipo_disponible_ya_notificado %}
+                                              <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">Equipo notificado</span>
+                                          {% else %}
+                                              <i class="bi bi-bell-fill" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Notificar equipo disponible</span>
+                                                  <span class="d-none d-lg-inline">Equipo disponible</span>
+                                              </span>
+                                          {% endif %}
                                      </button>
                                      {% if not email_cliente_valido_notificar and not equipo_disponible_ya_notificado %}
                                      <small class="text-muted d-block mt-2 text-center">
@@ -249,22 +272,34 @@
                              {% if tiene_4_tipos_fotos or tiene_3_tipos_fotos %}
                              <div class="row mb-3">
                                  <div class="col-12">
-                                     <button type="button"
-                                             class="btn w-100 {% if rewind_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
-                                             id="btnEnviarRewindEgreso"
-                                             title="{% if rewind_ya_enviado %}Video rewind ya enviado — click para reenviar{% else %}Genera un video resumen rewind del servicio completo y lo envía al cliente{% endif %}">
-                                         {% if rewind_ya_enviado %}
-                                             <i class="bi bi-film me-1"></i> Video rewind ya enviado
-                                             <span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>
-                                         {% else %}
-                                             <i class="bi bi-film me-1"></i> Enviar video rewind al cliente
-                                             {% if tiene_3_tipos_fotos %}
-                                                 <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 3 tipos · automático</span>
-                                             {% else %}
-                                                 <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 4 tipos · automático</span>
-                                             {% endif %}
-                                         {% endif %}
-                                     </button>
+                                      <button type="button"
+                                              class="btn w-100 galeria-aviso galeria-aviso-rewind {% if rewind_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
+                                              id="btnEnviarRewindEgreso"
+                                              title="{% if rewind_ya_enviado %}Video rewind ya enviado — click para reenviar{% else %}Genera un video resumen rewind del servicio completo y lo envía al cliente{% endif %}">
+                                          {% if rewind_ya_enviado %}
+                                              <i class="bi bi-film" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Video rewind ya enviado</span>
+                                                  <span class="d-none d-lg-inline">Rewind enviado</span>
+                                              </span>
+                                              <span class="badge galeria-aviso-meta">reenviar</span>
+                                          {% else %}
+                                              <i class="bi bi-film" aria-hidden="true"></i>
+                                              <span class="galeria-aviso-label">
+                                                  <span class="d-lg-none">Enviar video rewind al cliente</span>
+                                                  <span class="d-none d-lg-inline">Video rewind</span>
+                                              </span>
+                                              <span class="badge galeria-aviso-meta" aria-label="{% if tiene_3_tipos_fotos %}3 tipos, automático{% else %}4 tipos, automático{% endif %}">
+                                                  {% if tiene_3_tipos_fotos %}
+                                                      <span class="d-lg-none">3 tipos · automático</span>
+                                                      <span class="d-none d-lg-inline">3 tipos</span>
+                                                  {% else %}
+                                                      <span class="d-lg-none">4 tipos · automático</span>
+                                                      <span class="d-none d-lg-inline">4 tipos</span>
+                                                  {% endif %}
+                                              </span>
+                                          {% endif %}
+                                      </button>
                                      <small class="text-muted d-block mt-2 text-center">
                                          {% if tiene_3_tipos_fotos %}
                                              <i class="bi bi-info-circle"></i> Genera un video resumen del servicio (ingreso → reparación → egreso)
@@ -274,10 +309,11 @@
                                      </small>
                                  </div>
                              </div>
-                             {% endif %}
-                             </div>
-                            
-                            <!-- Barra de progreso (oculta por defecto) -->
+                              {% endif %}
+                              </div>
+                            </div>
+                             
+                             <!-- Barra de progreso (oculta por defecto) -->
                             <div class="row mb-3" id="progresoUpload" style="display: none;">
                                 <div class="col-12">
                                     <div class="d-flex align-items-center">

@@ -260,8 +260,13 @@
                         if (btnIngreso) {
                             btnIngreso.classList.remove('btn-primary');
                             btnIngreso.classList.add('btn-outline-primary');
-                            btnIngreso.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imágenes de ingreso ya enviadas'
-                                + '<span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>';
+                            // Mismo markup que _seccion_galeria_imagenes.html (fila de escritorio).
+                            btnIngreso.innerHTML = '<i class="bi bi-check-circle-fill" aria-hidden="true"></i>'
+                                + '<span class="galeria-aviso-label">'
+                                + '<span class="d-lg-none">Imágenes de ingreso ya enviadas</span>'
+                                + '<span class="d-none d-lg-inline">Ingreso enviado</span>'
+                                + '</span>'
+                                + '<span class="badge galeria-aviso-meta">reenviar</span>';
                         }
                     }
                     else {

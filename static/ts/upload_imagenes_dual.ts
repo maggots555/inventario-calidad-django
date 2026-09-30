@@ -1730,8 +1730,13 @@ class UploadImagenesDual {
                     if (btnEgreso) {
                         btnEgreso.classList.remove('btn-warning', 'text-white');
                         btnEgreso.classList.add('btn-outline-warning');
-                        btnEgreso.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imágenes de egreso ya enviadas'
-                            + '<span class="badge bg-warning bg-opacity-25 text-warning ms-2">reenviar</span>';
+                        // Mismo markup que el partial: si no, la fila de escritorio se rompe hasta el reload.
+                        btnEgreso.innerHTML = '<i class="bi bi-check-circle-fill" aria-hidden="true"></i>'
+                            + '<span class="galeria-aviso-label">'
+                            + '<span class="d-lg-none">Imágenes de egreso ya enviadas</span>'
+                            + '<span class="d-none d-lg-inline">Egreso enviado</span>'
+                            + '</span>'
+                            + '<span class="badge galeria-aviso-meta">reenviar</span>';
                     }
                     // Esperar un momento para que el usuario vea el feedback
                     setTimeout(() => {
@@ -1952,8 +1957,13 @@ class UploadImagenesDual {
                     if (btnRewind) {
                         btnRewind.classList.remove('btn-primary');
                         btnRewind.classList.add('btn-outline-primary');
-                        btnRewind.innerHTML = '<i class="bi bi-film me-1"></i> Video rewind ya enviado'
-                            + '<span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>';
+                        // Mismo markup que el partial: el botón no se recarga solo si el modal se cancela.
+                        btnRewind.innerHTML = '<i class="bi bi-film" aria-hidden="true"></i>'
+                            + '<span class="galeria-aviso-label">'
+                            + '<span class="d-lg-none">Video rewind ya enviado</span>'
+                            + '<span class="d-none d-lg-inline">Rewind enviado</span>'
+                            + '</span>'
+                            + '<span class="badge galeria-aviso-meta">reenviar</span>';
                     }
                     enviado = true; // marcar como completado para que hidden.bs.modal recargue en vez de llamar onCancelar
                     setTimeout(() => { modal.hide(); }, 1400);

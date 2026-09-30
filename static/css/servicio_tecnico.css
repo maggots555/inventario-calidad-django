@@ -2693,18 +2693,29 @@ thead.sticky-top {
    ============================================================================= */
 
 /* EXPLICACIÓN PARA PRINCIPIANTES:
-   Estos estilos hacen que los botones de Galería y Cámara sean grandes,
-   táctiles y fáciles de usar en dispositivos móviles. También incluyen
-   el diseño del preview de imágenes antes de subirlas.
+   En el teléfono los botones de Galería y Cámara son grandes (el dedo
+   necesita área). En escritorio esa misma caja se estiraba y dejaba
+   huecos: por eso desde 768px se vuelven una barra chica, ícono al lado
+   del texto. El preview de archivos vive más abajo y no cambia.
 */
 
-/* Botones de subida dual (Galería y Cámara) */
+/* Botones de subida dual (Galería y Cámara) — tamaño móvil por defecto */
 .btn-upload-dual {
-    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 70px;
+    padding: 0.5rem;
+    cursor: pointer;
     font-weight: 500;
+    font-size: 0.85rem;
+    line-height: 1.2;
     border-width: 2px;
     position: relative;
     overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .btn-upload-dual:hover {
@@ -2719,23 +2730,318 @@ thead.sticky-top {
 
 .btn-upload-dual i {
     display: block;
-    transition: transform 0.3s ease;
+    font-size: 1.8rem;
+    line-height: 1;
+    transition: transform 0.2s ease;
 }
 
 .btn-upload-dual:hover i {
     transform: scale(1.15);
 }
 
+/* La segunda palabra baja de renglón solo en teléfono */
+.galeria-btn-tail {
+    display: block;
+}
+
+/* Barra de captura: en móvil es una columna; en escritorio, botones + pista */
+.galeria-barra {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.galeria-fuentes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.galeria-fuente-submit,
+.galeria-fuente-extra {
+    grid-column: 1 / -1;
+}
+
+.galeria-fuente-submit .btn,
+.galeria-fuente-extra .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    min-height: 45px;
+    font-size: 0.95rem;
+}
+
+.galeria-hint {
+    display: block;
+    margin-top: 0.35rem;
+    margin-bottom: 0;
+}
+
+/* En teléfono el botón sigue sólido: la pastilla necesita texto claro */
+.btn-primary > .galeria-aviso-meta,
+.btn-success > .galeria-aviso-meta,
+.btn-warning > .galeria-aviso-meta {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    font-weight: 600;
+}
+
+.btn-outline-primary > .galeria-aviso-meta,
+.btn-outline-success > .galeria-aviso-meta,
+.btn-outline-warning > .galeria-aviso-meta {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    font-weight: 600;
+}
+
+.galeria-aviso > i {
+    margin-right: 0.35rem;
+}
+
+/* El título de avisos solo aparece en la columna de escritorio */
+.galeria-zona-titulo {
+    display: none;
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-muted, #6c757d);
+}
+
 /* EXPLICACIÓN PARA PRINCIPIANTES:
-   Los botones de envío al cliente usan w-100 (ancho completo).
-   En teléfono está bien; en desktop se ven demasiado largos.
-   Este contenedor solo en md+ limita el ancho (~448px) y los centra.
-   En móvil la media query no aplica → siguen a todo el ancho. */
+   En escritorio los botones de origen se agrupan en una bandeja (no flotan
+   sueltos) y la pista queda debajo, a la izquierda. Los avisos al cliente
+   dejan de ser botones de anchos distintos: en pantalla ancha van en una
+   columna derecha, todos del mismo ancho. El teléfono no entra aquí. */
 @media (min-width: 768px) {
+    .galeria-barra {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+
+    .galeria-fuentes {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        width: auto;
+        max-width: 100%;
+        padding: 0.4rem;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        background: var(--body-bg);
+    }
+
+    .galeria-fuentes > .galeria-fuente,
+    .galeria-fuente-submit,
+    .galeria-fuente-extra {
+        flex: 0 0 auto;
+        grid-column: auto;
+    }
+
+    .galeria-fuentes .btn-upload-dual,
+    .galeria-fuente-submit .btn,
+    .galeria-fuente-extra .btn {
+        flex-direction: row;
+        justify-content: center;
+        width: auto;
+        min-height: 42px;
+        height: 42px;
+        padding: 0.35rem 0.75rem;
+        white-space: nowrap;
+        font-size: 0.875rem;
+    }
+
+    .galeria-fuentes .btn-upload-dual {
+        gap: 0.45rem;
+    }
+
+    .galeria-fuentes .btn-upload-dual i {
+        font-size: 1.05rem;
+    }
+
+    .galeria-fuentes .btn-upload-dual:hover,
+    .galeria-fuentes .btn-upload-dual:hover i,
+    .galeria-fuente-submit .btn:hover {
+        transform: none;
+    }
+
+    .galeria-btn-tail {
+        display: inline;
+    }
+
+    .galeria-hint {
+        margin-top: 0;
+        text-align: left;
+    }
+
+    /* La explicación larga solo estorba si el botón ya se puede usar.
+       Si está deshabilitado, la leyenda es el motivo: no se esconde. */
+    .galeria-acciones-cliente small {
+        display: none !important;
+    }
+
+    .galeria-acciones-cliente .btn:disabled + small {
+        display: block !important;
+        margin: 0.25rem 0 0;
+        max-width: none;
+        text-align: left !important;
+        font-size: 0.75rem;
+        line-height: 1.35;
+    }
+
+    .galeria-acciones-cliente > .row {
+        margin: 0 !important;
+        --bs-gutter-x: 0;
+        --bs-gutter-y: 0;
+    }
+
+    .galeria-acciones-cliente > .row > .col-12 {
+        padding: 0;
+    }
+}
+
+@media (min-width: 992px) {
+    .galeria-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+        gap: 0 1.25rem;
+        align-items: start;
+        margin-bottom: 1rem;
+    }
+
+    /* Los chips llenan la columna, pero se parten antes de salirse de la tarjeta */
+    .galeria-layout-main .tipo-imagen-cards {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .galeria-layout-main .tipo-imagen-card {
+        flex: 1 1 5.5rem;
+        min-width: 5.5rem;
+        max-width: 100%;
+    }
+
+    .galeria-zona-titulo {
+        display: block;
+    }
+
     .galeria-acciones-cliente {
-        max-width: 28rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0.85rem;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        background: var(--body-bg);
+    }
+
+    .galeria-acciones-cliente > .row,
+    .galeria-acciones-cliente > .row > .col-12 {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .galeria-acciones-cliente .btn {
+        width: 100% !important;
+        min-height: 42px;
+    }
+
+    /* EXPLICACIÓN PARA PRINCIPIANTES:
+       En escritorio el botón disponible ya no es un bloque de color.
+       Queda como fila: borde suave, acento a la izquierda (el color del
+       aviso) e ícono. El número va a la derecha, no empuja el texto. */
+    .galeria-acciones-cliente .galeria-aviso {
+        display: flex !important;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.7rem;
+        text-align: left;
+        font-weight: 500;
+        font-size: 0.84rem;
+        line-height: 1.25;
+        white-space: nowrap;
+        background: transparent !important;
+        background-image: none !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-left-width: 3px !important;
+        box-shadow: none !important;
+    }
+
+    .galeria-acciones-cliente .galeria-aviso > i {
+        flex: 0 0 auto;
+        margin-right: 0;
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .galeria-acciones-cliente .galeria-aviso-label {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+
+    .galeria-acciones-cliente .galeria-aviso-meta {
+        flex: 0 0 auto;
         margin-left: auto;
-        margin-right: auto;
+        background: transparent !important;
+        color: var(--text-muted) !important;
+        border: 1px solid var(--border-color);
+        font-weight: 600;
+        font-size: 0.68rem;
+        letter-spacing: 0.01em;
+        text-transform: none;
+    }
+
+    .galeria-acciones-cliente .galeria-aviso-ingreso {
+        border-left-color: #6ea8fe !important;
+    }
+    .galeria-acciones-cliente .galeria-aviso-ingreso > i { color: #6ea8fe; }
+
+    .galeria-acciones-cliente .galeria-aviso-egreso {
+        border-left-color: #fd7e14 !important;
+    }
+    .galeria-acciones-cliente .galeria-aviso-egreso > i { color: #fd7e14; }
+
+    .galeria-acciones-cliente .galeria-aviso-notificar {
+        border-left-color: #20c997 !important;
+    }
+    .galeria-acciones-cliente .galeria-aviso-notificar > i { color: #20c997; }
+
+    .galeria-acciones-cliente .galeria-aviso-rewind {
+        border-left-color: #6ea8fe !important;
+    }
+    .galeria-acciones-cliente .galeria-aviso-rewind > i { color: #6ea8fe; }
+
+    .galeria-acciones-cliente .galeria-aviso:hover:not(:disabled) {
+        background: var(--hover-bg) !important;
+        transform: none;
+    }
+
+    .galeria-acciones-cliente .galeria-aviso:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.5);
+        outline-offset: 2px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-upload-dual,
+    .btn-upload-dual i {
+        transition: none;
+    }
+
+    .btn-upload-dual:hover,
+    .btn-upload-dual:hover i {
+        transform: none;
     }
 }
 
@@ -2869,17 +3175,7 @@ thead.sticky-top {
 }
 
 /* Responsive - Ajustes para móviles */
-@media (max-width: 768px) {
-    /* Botones más grandes en móviles para mejor UX táctil */
-    .btn-upload-dual {
-        font-size: 0.9rem;
-        min-height: 70px !important;
-    }
-    
-    .btn-upload-dual i {
-        font-size: 1.8rem !important;
-    }
-    
+@media (max-width: 767.98px) {
     /* Preview ocupa más espacio vertical en móvil */
     #contenedorMiniaturas {
         max-height: 250px;
@@ -2920,8 +3216,10 @@ thead.sticky-top {
 }
 
 /* Mejora de accesibilidad - Focus visible */
-.btn-upload-dual:focus,
-.btn-eliminar-preview:focus {
+.btn-upload-dual:focus-visible,
+.btn-eliminar-preview:focus-visible,
+.galeria-fuente-submit .btn:focus-visible,
+.galeria-fuente-extra .btn:focus-visible {
     outline: 3px solid rgba(37, 99, 235, 0.5);
     outline-offset: 2px;
 }

@@ -82,17 +82,16 @@
                                 </div>
                             </div>
 
-                            <div class="row align-items-start">
-                                <div class="col-md-9 mb-3">
-                                    <!-- Botones dual: Seleccionar archivo + Grabar con cámara -->
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-6">
+                            {# Misma barra que las fotos: grande en teléfono, compacta en escritorio. #}
+                            <div class="galeria-captura mb-3">
+                                <div class="galeria-barra">
+                                    <div class="galeria-fuentes" role="group" aria-label="Subir video de evidencia">
+                                        <div class="galeria-fuente">
                                             <label for="inputVideo"
-                                                   class="btn btn-outline-primary w-100 btn-upload-dual"
-                                                   style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;"
+                                                   class="btn btn-outline-primary btn-upload-dual"
                                                    id="labelInputVideo">
-                                                <i class="bi bi-folder2-open" style="font-size: 1.8rem; line-height: 1;"></i>
-                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar<br>Video</span>
+                                                <i class="bi bi-folder2-open" aria-hidden="true"></i>
+                                                <span>Seleccionar <span class="galeria-btn-tail">Video</span></span>
                                             </label>
                                             <input type="file"
                                                    name="video"
@@ -100,60 +99,57 @@
                                                    class="d-none"
                                                    accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/mpeg,video/3gpp,video/x-ms-wmv">
                                         </div>
-                                        <div class="col-6">
+                                        <div class="galeria-fuente">
                                             <button type="button"
                                                     id="btnAbrirCamaraVideo"
-                                                    class="btn btn-outline-danger w-100 btn-upload-dual"
-                                                    style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0.5rem;"
+                                                    class="btn btn-outline-danger btn-upload-dual"
                                                     title="Grabar video directamente desde la cámara">
-                                                <i class="bi bi-record-circle-fill" style="font-size: 1.8rem; line-height: 1;"></i>
-                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Grabar con<br>Cámara</span>
+                                                <i class="bi bi-record-circle-fill" aria-hidden="true"></i>
+                                                <span>Grabar con <span class="galeria-btn-tail">Cámara</span></span>
                                             </button>
                                         </div>
-                                    </div>
-
-                                    <!-- Preview del archivo seleccionado -->
-                                    <div id="previewVideo" class="preview-container mt-2" style="display: none;">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="text-muted">
-                                                <i class="bi bi-camera-video"></i>
-                                                <span id="nombreArchivoVideo">—</span>
-                                            </small>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnQuitarVideo">
-                                                <i class="bi bi-x-circle"></i> Quitar
+                                        <div class="galeria-fuente galeria-fuente-submit">
+                                            <button type="submit"
+                                                    class="btn btn-success"
+                                                    id="btnSubirVideo"
+                                                    disabled>
+                                                <i class="bi bi-cloud-upload" aria-hidden="true"></i> Subir Video
                                             </button>
                                         </div>
-                                        <div class="d-flex gap-2 align-items-center">
-                                            <span class="badge bg-secondary" id="tamanoArchivoVideo"></span>
-                                            <small class="text-muted">Listo para comprimir con FFmpeg</small>
+                                        {% if total_videos > 0 %}
+                                        <div class="galeria-fuente galeria-fuente-extra">
+                                            <button type="button"
+                                                    class="btn btn-primary"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalCompartirEvidencia"
+                                                    title="Compartir evidencia en video con el cliente">
+                                                <i class="bi bi-share-fill" aria-hidden="true"></i> Compartir videos
+                                                <span class="badge bg-light text-primary">{{ total_videos }}</span>
+                                            </button>
                                         </div>
+                                        {% endif %}
                                     </div>
-
-                                    <small class="text-muted d-block mt-2">
-                                        <i class="bi bi-info-circle"></i>
+                                    <small class="text-muted galeria-hint">
+                                        <i class="bi bi-info-circle" aria-hidden="true"></i>
                                         Máximo 90 MB · Formatos: MP4, MOV, AVI, MKV, WebM
                                     </small>
                                 </div>
 
-                                <div class="col-md-3 mb-3">
-                                    <button type="submit"
-                                            class="btn btn-success w-100"
-                                            id="btnSubirVideo"
-                                            style="height: 45px; font-size: 0.95rem;"
-                                            disabled>
-                                        <i class="bi bi-cloud-upload"></i> Subir Video
-                                    </button>
-
-                                    {% if total_videos > 0 %}
-                                    <button type="button"
-                                            class="btn w-100 btn-primary mt-2"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#modalCompartirEvidencia"
-                                            title="Compartir evidencia en video con el cliente">
-                                        <i class="bi bi-share-fill me-1"></i> Compartir videos
-                                        <span class="badge bg-light text-primary ms-1">{{ total_videos }}</span>
-                                    </button>
-                                    {% endif %}
+                                <!-- Preview del archivo seleccionado -->
+                                <div id="previewVideo" class="preview-container mt-2" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">
+                                            <i class="bi bi-camera-video"></i>
+                                            <span id="nombreArchivoVideo">—</span>
+                                        </small>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="btnQuitarVideo">
+                                            <i class="bi bi-x-circle"></i> Quitar
+                                        </button>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span class="badge bg-secondary" id="tamanoArchivoVideo"></span>
+                                        <small class="text-muted">Listo para comprimir con FFmpeg</small>
+                                    </div>
                                 </div>
                             </div>
 

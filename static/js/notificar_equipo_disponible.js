@@ -15,8 +15,10 @@
         btn.disabled = true;
         btn.classList.remove('btn-success');
         btn.classList.add('btn-outline-success');
+        // Este botón no recarga la página: el HTML tiene que coincidir con el partial.
         btn.innerHTML =
-            '<i class="bi bi-check-circle-fill me-1"></i> Equipo notificado';
+            '<i class="bi bi-check-circle-fill" aria-hidden="true"></i>' +
+                '<span class="galeria-aviso-label">Equipo notificado</span>';
         btn.title = 'Ya se notificó al cliente';
     }
     async function enviarNotificacion(btn) {
