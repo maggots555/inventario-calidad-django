@@ -752,6 +752,36 @@ class GaleriaLightbox {
         this.setZoom(1);
     }
     /**
+     * Convierte un desplazamiento de pantalla al espacio local de la foto,
+     * el que usa translate() antes de que CSS la rote.
+     *
+     * Objetivo: arrastrar a la derecha mueve la imagen a la derecha aunque
+     * ya esté girada 90°, 180° o 270°.
+     *
+     * @param dx - píxeles horizontales en pantalla (derecha = positivo)
+     * @param dy - píxeles verticales en pantalla (abajo = positivo)
+     * @returns el mismo vector, girado al revés de rotationDeg, listo para panX/panY
+     *
+     * Efectos secundarios: ninguno. Solo calcula; no toca el DOM ni el zoom.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El CSS aplica translate() y después rotate(). Si guardamos el arrastre
+     * tal cual, a 90° "derecha" se ve como "abajo". Aquí deshacemos esa
+     * rotación: el CSS la vuelve a aplicar y el movimiento queda derecho.
+     * A 0° el giro inverso no cambia nada, así que el zoom sin rotar sigue igual.
+     */
+    desplazamientoPantallaALocal(dx, dy) {
+        // Ángulo inverso: si la foto está a +90°, el arrastre se guarda a -90°.
+        const radianes = (-this.rotationDeg * Math.PI) / 180;
+        const coseno = Math.cos(radianes);
+        const seno = Math.sin(radianes);
+        // Misma matriz que rotate() de CSS (Y hacia abajo). No hay que invertir el seno.
+        return {
+            x: dx * coseno - dy * seno,
+            y: dx * seno + dy * coseno,
+        };
+    }
+    /**
      * Aplica la transformación CSS completa a la imagen:
      * rotate (siempre activo) + scale + translate (solo en modo zoom).
      *
@@ -760,12 +790,14 @@ class GaleriaLightbox {
      * ejecutan en la tarjeta gráfica, por eso son tan fluidos.
      *
      * El orden de las funciones importa (se aplican de derecha a izquierda):
-     *   1. translate — mueve la imagen (pan en modo zoom)
+     *   1. translate — mueve la imagen (pan en modo zoom), en ejes de la foto
      *   2. scale     — la escala (zoom)
      *   3. rotate    — la gira alrededor de su centro original
      *
-     * Separamos rotate del resto para que la rotación siempre gire alrededor
-     * del centro visual de la imagen, independientemente del pan/zoom activo.
+     * panX/panY viven en ese espacio previo a la rotación. El arrastre del
+     * mouse llega en ejes de pantalla, así que desplazamientoPantallaALocal()
+     * lo gira al revés antes de sumarlo. No cambiamos este orden: si translate
+     * fuera después de rotate, también habría que quitar el / zoomLevel del drag.
      *
      * Si no hay zoom ni pan activos (modo normal), solo aplicamos rotate().
      * Así los botones de rotar funcionan incluso fuera del modo inspección.
@@ -826,13 +858,15 @@ class GaleriaLightbox {
                 const rect = imgElement.getBoundingClientRect();
                 const centerX = rect.left + rect.width / 2;
                 const centerY = rect.top + rect.height / 2;
-                // Posición del cursor relativa al centro de la imagen
+                // Posición del cursor relativa al centro de la imagen (ejes de pantalla)
                 const offsetX = (e.clientX - centerX) / this.zoomLevel;
                 const offsetY = (e.clientY - centerY) / this.zoomLevel;
+                // El pan está en ejes de la foto; si está rotada, el cursor también se gira.
+                const local = this.desplazamientoPantallaALocal(offsetX, offsetY);
                 // Ajustar pan para que el zoom se centre en el cursor
                 const zoomRatio = newZoom / this.zoomLevel;
-                this.panX -= offsetX * (zoomRatio - 1) / newZoom;
-                this.panY -= offsetY * (zoomRatio - 1) / newZoom;
+                this.panX -= local.x * (zoomRatio - 1) / newZoom;
+                this.panY -= local.y * (zoomRatio - 1) / newZoom;
             }
         }
         this.setZoom(newZoom);
@@ -861,9 +895,11 @@ class GaleriaLightbox {
     }
     /**
      * Mueve la imagen mientras se arrastra con el mouse.
-     * EXPLICACIÓN: La traslación se divide entre el zoomLevel para que
-     * el movimiento sea proporcional al nivel de zoom (a más zoom,
-     * se necesita más arrastre para mover la misma distancia visual).
+     *
+     * EXPLICACIÓN: Dividimos entre zoomLevel porque translate() se aplica
+     * antes de scale(): si no, a 2x la foto se movería el doble de lo que
+     * arrastra el mouse. Después giramos ese delta al revés de la rotación
+     * para que derecha siga siendo derecha aunque la imagen esté girada.
      */
     handleMouseMove(e) {
         if (!this.isDragging || !this.isZoomMode)
@@ -871,8 +907,9 @@ class GaleriaLightbox {
         e.preventDefault();
         const deltaX = (e.clientX - this.dragStartX) / this.zoomLevel;
         const deltaY = (e.clientY - this.dragStartY) / this.zoomLevel;
-        this.panX = this.lastPanX + deltaX;
-        this.panY = this.lastPanY + deltaY;
+        const local = this.desplazamientoPantallaALocal(deltaX, deltaY);
+        this.panX = this.lastPanX + local.x;
+        this.panY = this.lastPanY + local.y;
         this.applyTransform();
     }
     /**
@@ -934,8 +971,10 @@ class GaleriaLightbox {
             const touch = e.touches[0];
             const deltaX = (touch.clientX - this.dragStartX) / this.zoomLevel;
             const deltaY = (touch.clientY - this.dragStartY) / this.zoomLevel;
-            this.panX = this.lastPanX + deltaX;
-            this.panY = this.lastPanY + deltaY;
+            // Misma corrección que el mouse: el dedo va en pantalla, el pan en ejes de la foto.
+            const local = this.desplazamientoPantallaALocal(deltaX, deltaY);
+            this.panX = this.lastPanX + local.x;
+            this.panY = this.lastPanY + local.y;
             this.applyTransform();
         }
         else if (e.touches.length === 2) {
