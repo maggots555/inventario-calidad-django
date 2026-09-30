@@ -108,6 +108,8 @@ class CamaraIntegrada {
         this.btnFinalizar = document.getElementById('btnFinalizarCaptura');
         this.tiraFotos = document.getElementById('tiraFotosCapturadas');
         this.anuncioTiraFotos = document.getElementById('tiraFotosAnuncio');
+        this.contadorFotos = document.getElementById('contadorFotos');
+        this.badgeFotosTomadas = document.getElementById('badgeFotosTomadas');
         this.cameraError = document.getElementById('cameraError');
         this.mensajeError = document.getElementById('mensajeError');
         this.detalleError = document.getElementById('detalleError');
@@ -2084,11 +2086,32 @@ class CamaraIntegrada {
         if (this.anuncioTiraFotos) {
             this.anuncioTiraFotos.textContent = '';
         }
+        this.actualizarContador();
     }
     /**
-     * Avisa a lectores de pantalla cuántas fotos hay, sin pintar un número en el visor.
+     * Pinta el círculo verde con las fotos que sí se van a guardar.
+     * Desmarcar baja el número: si no, el contador mentiría.
+     */
+    actualizarContador() {
+        const marcadas = this.tiraFotos
+            ? this.tiraFotos.querySelectorAll('.camera-mini:not(.camera-mini--off)').length
+            : 0;
+        if (this.contadorFotos) {
+            this.contadorFotos.textContent = String(marcadas);
+        }
+        if (!this.badgeFotosTomadas) {
+            return;
+        }
+        this.badgeFotosTomadas.classList.toggle('badge-active', marcadas > 0);
+        this.badgeFotosTomadas.title = marcadas === 1
+            ? '1 foto seleccionada'
+            : `${marcadas} fotos seleccionadas`;
+    }
+    /**
+     * Avisa a lectores de pantalla cuántas fotos hay y refresca el contador visual.
      */
     anunciarTira() {
+        this.actualizarContador();
         if (!this.anuncioTiraFotos || !this.tiraFotos) {
             return;
         }

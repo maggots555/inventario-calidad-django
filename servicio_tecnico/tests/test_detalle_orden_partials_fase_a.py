@@ -86,6 +86,7 @@ _IDS_EN_PARTIALS = (
     ('id="tablaPiezas"', '_seccion_cotizacion.html'),
     ('id="modalConfirmarFeedback"', '_modal_confirmar_feedback.html'),
     ('id="tiraFotosCapturadas"', '_modal_camara_integrada.html'),
+    ('id="contadorFotos"', '_modal_camara_integrada.html'),
     ('id="avisoTiraFotos"', '_modal_camara_integrada.html'),
 )
 
