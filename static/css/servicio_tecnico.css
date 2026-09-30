@@ -3726,35 +3726,46 @@ thead.sticky-top {
     -webkit-user-drag: none;
 }
 
-.camera-mini-estado,
-.camera-mini-quitar {
+.camera-mini-estado {
     position: absolute;
+    left: 2px;
+    bottom: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    pointer-events: none;
-    line-height: 1;
-}
-
-.camera-mini-estado {
-    left: 2px;
-    bottom: 2px;
     width: 18px;
     height: 18px;
     border-radius: 50%;
     background: rgba(34, 197, 94, 0.92);
+    color: #fff;
     font-size: 0.75rem;
+    line-height: 1;
+    pointer-events: none;
 }
 
-.camera-mini-quitar {
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: rgba(15, 23, 42, 0.72);
-    font-size: 0.65rem;
+/* Desmarcada: sigue en la tira, pero no se sube al dar Listo */
+.camera-mini--off {
+    opacity: 0.4;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.camera-mini--lista.camera-mini--off .camera-mini-estado {
+    display: none;
+}
+
+.camera-tira-aviso {
+    margin: 0;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: center;
+}
+
+.camera-tira-aviso[hidden] {
+    display: none !important;
 }
 
 .camera-mini--pendiente .camera-mini-img {
@@ -3773,8 +3784,13 @@ thead.sticky-top {
     background: rgba(15, 23, 42, 0.75);
 }
 
-[data-bs-theme="dark"] .camera-mini-quitar {
-    background: rgba(15, 23, 42, 0.85);
+[data-bs-theme="dark"] .camera-mini--off {
+    border-color: rgba(226, 232, 240, 0.35);
+    opacity: 0.45;
+}
+
+[data-bs-theme="dark"] .camera-tira-aviso {
+    background: rgba(15, 23, 42, 0.92);
     color: #e2e8f0;
 }
 

@@ -19,6 +19,8 @@ interface FotoCapturada {
     id: string;
     blob: Blob;
     timestamp: number;
+    /** true = entra al guardado; false = se ve en la tira pero no se sube */
+    seleccionada: boolean;
 }
 
 interface DispositivoCamara {
@@ -101,9 +103,12 @@ class CamaraIntegrada {
     private siguienteMiniaturaId: number = 1;
     // Sube al abrir el modal: un JPEG tardío de la sesión anterior no se cuela
     private sesionCaptura: number = 0;
-    // Ids que el usuario quitó antes de que terminara el JPEG
+    // Ids que el usuario quitó antes de que terminara el JPEG (cerrar/descartar sesión)
     private fotosDescartadas: Set<string> = new Set();
-    // Gesto de la tira: distingue un tap (quitar) de un arrastre horizontal
+    // Desmarcada antes de que exista el Blob: el JPEG igual se guarda, pero no se sube
+    private fotosDesmarcadas: Set<string> = new Set();
+    private avisoTiraTimer: number | null = null;
+    // Gesto de la tira: distingue un tap (marcar) de un arrastre horizontal
     private inicioToqueTira: { x: number; y: number } | null = null;
     private tiraEnScroll: boolean = false;
     private ignorarProximoClicTira: boolean = false;
@@ -618,7 +623,7 @@ class CamaraIntegrada {
                 event.preventDefault();
                 
                 // Verificar si hay fotos capturadas sin finalizar
-                if (this.fotosCapturadas.length > 0) {
+                if (this.cantidadFotosEnTanda() > 0) {
                     // Restaurar estado para que el modal permanezca
                     history.pushState(newState, '');
                     
@@ -660,7 +665,7 @@ class CamaraIntegrada {
     private mostrarConfirmacionSalida(): void {
         if (!this.modalConfirmacion || !this.cantidadFotosPendientesSpan) {
             // Fallback a confirm() nativo si el modal no está disponible
-            const mensaje = `Tienes ${this.fotosCapturadas.length} foto(s) capturada(s) sin finalizar.\n\n¿Deseas salir y descartar las fotos?`;
+            const mensaje = `Tienes ${this.cantidadFotosEnTanda()} foto(s) capturada(s) sin finalizar.\n\n¿Deseas salir y descartar las fotos?`;
             if (confirm(mensaje)) {
                 console.log('✅ Usuario confirmó salida, descartando fotos');
                 this.aceptaResultadosEncode = false;
@@ -673,10 +678,11 @@ class CamaraIntegrada {
             return;
         }
         
-        console.log(`⚠️ Mostrando confirmación de salida: ${this.fotosCapturadas.length} foto(s) pendientes`);
+        const cantidad = this.cantidadFotosEnTanda();
+        console.log(`⚠️ Mostrando confirmación de salida: ${cantidad} foto(s) pendientes`);
         
         // Actualizar cantidad de fotos en el modal de confirmación
-        this.cantidadFotosPendientesSpan.textContent = String(this.fotosCapturadas.length);
+        this.cantidadFotosPendientesSpan.textContent = String(cantidad);
         
         // Mostrar modal de confirmación usando Bootstrap
         const bsModalConfirmacion = new bootstrap.Modal(this.modalConfirmacion);
@@ -712,7 +718,7 @@ class CamaraIntegrada {
      * MODIFICADO: Ahora verifica si hay fotos antes de cerrar
      */
     private cerrarConConfirmacion(): void {
-        if (this.fotosCapturadas.length > 0) {
+        if (this.cantidadFotosEnTanda() > 0) {
             this.mostrarConfirmacionSalida();
         } else {
             this.cerrarModal();
@@ -1761,10 +1767,12 @@ class CamaraIntegrada {
 
                 this.aplicarDeteccionDispositivoLento(tiempoBlob);
 
+                const seleccionada = !this.fotosDesmarcadas.has(fotoId);
                 this.fotosCapturadas.push({
                     id: fotoId,
                     blob: blob,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    seleccionada: seleccionada
                 });
                 this.marcarMiniaturaLista(fotoId);
 
@@ -2173,7 +2181,7 @@ class CamaraIntegrada {
     }
 
     /**
-     * Quita la foto cuyo botón se tocó, salvo que el gesto haya sido scroll.
+     * Marca o desmarca la foto tocada. Un arrastre no cambia la marca.
      *
      * @param event Click del botón miniatura (o de un hijo)
      */
@@ -2199,18 +2207,44 @@ class CamaraIntegrada {
             return;
         }
         event.preventDefault();
-        this.quitarFotoCapturada(fotoId);
+        this.alternarSeleccionFoto(fotoId);
     }
 
     /**
-     * Saca una foto de la tanda. Si el JPEG aún no termina, no se vuelve a agregar.
+     * Cambia la marca de una foto sin borrarla.
+     * Si el JPEG aún no termina, la marca se recuerda y se aplica al guardar el Blob.
      *
      * @param fotoId Id de la miniatura (data-foto-id)
      */
-    private quitarFotoCapturada(fotoId: string): void {
-        this.fotosDescartadas.add(fotoId);
-        this.fotosCapturadas = this.fotosCapturadas.filter((foto) => foto.id !== fotoId);
-        this.quitarMiniaturaDom(fotoId);
+    private alternarSeleccionFoto(fotoId: string): void {
+        const foto = this.fotosCapturadas.find((item) => item.id === fotoId);
+        const seleccionadaAhora = foto
+            ? foto.seleccionada
+            : !this.fotosDesmarcadas.has(fotoId);
+        const siguiente = !seleccionadaAhora;
+
+        if (foto) {
+            foto.seleccionada = siguiente;
+        }
+        // El set cubre el hueco entre el tap y el fin del JPEG
+        if (siguiente) {
+            this.fotosDesmarcadas.delete(fotoId);
+        } else {
+            this.fotosDesmarcadas.add(fotoId);
+        }
+
+        this.pintarSeleccionMiniatura(fotoId, siguiente);
+        this.ocultarAvisoTira();
+        this.anunciarTira();
+    }
+
+    /**
+     * Fotos visibles en la tira, aunque el JPEG grande aún no haya terminado.
+     * Sirve para el aviso de salida: desmarcar no las borra.
+     */
+    private cantidadFotosEnTanda(): number {
+        const enDom = this.tiraFotos ? this.tiraFotos.children.length : 0;
+        return Math.max(this.fotosCapturadas.length, enDom);
     }
 
     /**
@@ -2264,9 +2298,10 @@ class CamaraIntegrada {
             ? 'camera-mini camera-mini--pendiente'
             : 'camera-mini camera-mini--lista';
         boton.dataset.fotoId = fotoId;
+        boton.setAttribute('aria-pressed', 'true');
         boton.setAttribute(
             'aria-label',
-            pendiente ? 'Quitar foto que se está guardando' : 'Quitar foto'
+            pendiente ? 'Desmarcar foto que se está guardando' : 'Desmarcar foto'
         );
 
         const img = document.createElement('img');
@@ -2284,14 +2319,7 @@ class CamaraIntegrada {
         iconoEstado.className = pendiente ? 'bi bi-hourglass-split' : 'bi bi-check-lg';
         estado.appendChild(iconoEstado);
 
-        const quitar = document.createElement('span');
-        quitar.className = 'camera-mini-quitar';
-        quitar.setAttribute('aria-hidden', 'true');
-        const iconoQuitar = document.createElement('i');
-        iconoQuitar.className = 'bi bi-x-lg';
-        quitar.appendChild(iconoQuitar);
-
-        boton.append(img, estado, quitar);
+        boton.append(img, estado);
         tira.appendChild(boton);
         tira.hidden = false;
         this.anunciarTira();
@@ -2302,7 +2330,7 @@ class CamaraIntegrada {
     }
 
     /**
-     * La miniatura deja de estar "guardando" y pasa a lista para quitar.
+     * La miniatura deja de estar "guardando". Conserva si el usuario ya la desmarcó.
      *
      * @param fotoId Id de la captura cuyo JPEG ya terminó
      */
@@ -2313,12 +2341,51 @@ class CamaraIntegrada {
         }
         boton.classList.remove('camera-mini--pendiente');
         boton.classList.add('camera-mini--lista');
-        boton.setAttribute('aria-label', 'Quitar foto');
         const icono = boton.querySelector('.camera-mini-estado i');
         if (icono) {
             icono.className = 'bi bi-check-lg';
         }
+        this.pintarSeleccionMiniatura(fotoId, this.estaSeleccionada(fotoId));
         this.anunciarTira();
+    }
+
+    /**
+     * ¿Esta foto entra al guardado? Si el Blob aún no existe, manda el set de desmarcadas.
+     *
+     * @param fotoId Id de la miniatura
+     */
+    private estaSeleccionada(fotoId: string): boolean {
+        const foto = this.fotosCapturadas.find((item) => item.id === fotoId);
+        if (foto) {
+            return foto.seleccionada;
+        }
+        return !this.fotosDesmarcadas.has(fotoId);
+    }
+
+    /**
+     * Pinta palomita o miniatura atenuada. No borra el nodo.
+     *
+     * @param fotoId Id de la miniatura
+     * @param seleccionada true = se va a guardar
+     */
+    private pintarSeleccionMiniatura(fotoId: string, seleccionada: boolean): void {
+        const boton = this.buscarMiniatura(fotoId);
+        if (!boton) {
+            return;
+        }
+        boton.classList.toggle('camera-mini--off', !seleccionada);
+        boton.setAttribute('aria-pressed', seleccionada ? 'true' : 'false');
+        const pendiente = boton.classList.contains('camera-mini--pendiente');
+        if (pendiente) {
+            boton.setAttribute(
+                'aria-label',
+                seleccionada
+                    ? 'Desmarcar foto que se está guardando'
+                    : 'Marcar foto que se está guardando'
+            );
+            return;
+        }
+        boton.setAttribute('aria-label', seleccionada ? 'Desmarcar foto' : 'Marcar foto');
     }
 
     /**
@@ -2352,6 +2419,8 @@ class CamaraIntegrada {
      */
     private vaciarTira(): void {
         this.fotosDescartadas.clear();
+        this.fotosDesmarcadas.clear();
+        this.ocultarAvisoTira();
         this.tiraEnScroll = false;
         this.ignorarProximoClicTira = false;
         this.inicioToqueTira = null;
@@ -2377,9 +2446,43 @@ class CamaraIntegrada {
             this.anuncioTiraFotos.textContent = '';
             return;
         }
-        this.anuncioTiraFotos.textContent = total === 1
-            ? '1 foto en la tanda'
-            : `${total} fotos en la tanda`;
+        const marcadas = this.tiraFotos.querySelectorAll('.camera-mini:not(.camera-mini--off)').length;
+        this.anuncioTiraFotos.textContent = `${marcadas} de ${total} marcadas`;
+    }
+
+    /**
+     * Aviso corto dentro del modal. No cierra la cámara: el usuario puede volver a marcar.
+     *
+     * @param texto Mensaje en español, una frase
+     */
+    private mostrarAvisoTira(texto: string): void {
+        const aviso = document.getElementById('avisoTiraFotos');
+        if (!aviso) {
+            return;
+        }
+        aviso.textContent = texto;
+        aviso.hidden = false;
+        if (this.avisoTiraTimer !== null) {
+            window.clearTimeout(this.avisoTiraTimer);
+        }
+        this.avisoTiraTimer = window.setTimeout(() => {
+            this.ocultarAvisoTira();
+        }, 4000);
+    }
+
+    /**
+     * Esconde el aviso de "ninguna marcada" y cancela su temporizador.
+     */
+    private ocultarAvisoTira(): void {
+        if (this.avisoTiraTimer !== null) {
+            window.clearTimeout(this.avisoTiraTimer);
+            this.avisoTiraTimer = null;
+        }
+        const aviso = document.getElementById('avisoTiraFotos');
+        if (aviso) {
+            aviso.hidden = true;
+            aviso.textContent = '';
+        }
     }
     
     /**
@@ -2430,10 +2533,19 @@ class CamaraIntegrada {
         try {
             await this.esperarEncodesPendientes();
 
-            console.log(`🎬 Entregando ${this.fotosCapturadas.length} foto(s) al upload`);
+            const elegidas = this.fotosCapturadas.filter((foto) => foto.seleccionada);
+            console.log(
+                `🎬 Marcadas: ${elegidas.length} de ${this.fotosCapturadas.length}`
+            );
 
-            if (this.onFotosCapturadas && this.fotosCapturadas.length > 0) {
-                const blobs = this.fotosCapturadas.map(f => f.blob);
+            // Hay fotos, pero ninguna marcada: no subir y no cerrar, para poder remarcar
+            if (this.fotosCapturadas.length > 0 && elegidas.length === 0) {
+                this.mostrarAvisoTira('Ninguna foto está marcada. Toca una miniatura para incluirla.');
+                return;
+            }
+
+            if (this.onFotosCapturadas && elegidas.length > 0) {
+                const blobs = elegidas.map((foto) => foto.blob);
                 this.onFotosCapturadas(blobs);
             }
 
