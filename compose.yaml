@@ -1,0 +1,158 @@
+# SIGMA en Docker.
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Cada bloque "services" es un programa separado (contenedor) que se
+# habla con los demás por el nombre (postgres, redis, web). Solo Nginx
+# abre un puerto en tu computadora. La base y Redis se quedan adentro.
+#
+# Cómo levantarlo (no uses el .env de la laptop: ese es de SQLite):
+#   sh docker/levantar.sh
+# Ese script crea docker/.env si no existe y llama a:
+#   docker compose --env-file docker/.env up -d --build
+#
+# En el servidor la misma receta vive en /srv/sic/apps/sigma.
+# Ahí SIGMA_DATA_ROOT=/srv/sic/data/sigma y el .env lleva secretos reales.
+
+name: sigma
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-sigma}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sigma_local_solo_pruebas}
+      POSTGRES_DB: ${DB_NAME:-inventario_mexico}
+    volumes:
+      - ${SIGMA_DATA_ROOT:-./docker-data}/postgres:/var/lib/postgresql/data
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-bases-pais.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-sigma} -d ${DB_NAME:-inventario_mexico}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - sigma_interna
+
+  redis:
+    image: redis:7-bookworm
+    restart: unless-stopped
+    # Misma idea que producción: si la memoria se llena, borrar lo menos usado.
+    # 512 MB alcanza para pruebas. En el servidor se puede subir a 1 GB.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - ${SIGMA_DATA_ROOT:-./docker-data}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - sigma_interna
+
+  web:
+    build: .
+    image: sigma-web:local
+    restart: unless-stopped
+    env_file:
+      - docker/.env
+    environment:
+      # Estos valores pisan el env_file a propósito: dentro de Docker
+      # la base y Redis NO están en localhost, están en los otros servicios.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_ENGINE: django.db.backends.postgresql
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      REDIS_CACHE_URL: redis://redis:6379/2
+      CELERY_TASK_ALWAYS_EAGER: "False"
+      SIGMA_MIGRAR: "1"
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+    volumes:
+      - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
+      - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles
+      - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "/app/docker/healthcheck.py"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    networks:
+      - sigma_interna
+
+  nginx:
+    image: nginx:1.28-bookworm
+    restart: unless-stopped
+    ports:
+      - "${SIGMA_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media:ro
+      - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - sigma_interna
+
+  celery:
+    image: sigma-web:local
+    restart: unless-stopped
+    env_file:
+      - docker/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_ENGINE: django.db.backends.postgresql
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      REDIS_CACHE_URL: redis://redis:6379/2
+      CELERY_TASK_ALWAYS_EAGER: "False"
+      SIGMA_MIGRAR: "0"
+    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2", "--max-tasks-per-child=100"]
+    volumes:
+      - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
+      - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sigma_interna
+
+  celery-beat:
+    image: sigma-web:local
+    restart: unless-stopped
+    env_file:
+      - docker/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_ENGINE: django.db.backends.postgresql
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      REDIS_CACHE_URL: redis://redis:6379/2
+      CELERY_TASK_ALWAYS_EAGER: "False"
+      SIGMA_MIGRAR: "0"
+    command: ["celery", "-A", "config", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    volumes:
+      - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sigma_interna
+
+networks:
+  sigma_interna:
+    name: sigma_interna

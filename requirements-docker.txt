@@ -1,0 +1,10 @@
+# Dependencias de la imagen Docker de SIGMA.
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# requirements.lock fija las mismas versiones que ya se probaron en el
+# proyecto. Gunicorn (el servidor web) y psycopg2-binary (el enchufe a
+# PostgreSQL) ya vienen dentro de ese lock. En la laptop a veces no se
+# instalan; dentro del contenedor sí hacen falta, por eso este archivo
+# existe y el Dockerfile instala desde aquí.
+
+-r requirements.lock

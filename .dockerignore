@@ -1,0 +1,43 @@
+# Lo que NO entra a la imagen.
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Docker copia el proyecto para construir la imagen. Si metemos la base
+# de datos, las fotos o el .env, la imagen se vuelve enorme y puede
+# llevarse secretos. Esos datos viven fuera, en volúmenes.
+
+.git
+.github
+.cursor
+.agents
+.venv
+venv
+env
+ENV
+**/__pycache__
+**/*.pyc
+**/*.pyo
+*.log
+
+# Secretos y bases locales: nunca van dentro de la imagen
+.env
+.env.*
+docker/.env
+docker/.env.example
+*.sqlite3
+db.sqlite3*
+
+# Datos que se montan aparte (volúmenes), no se hornean en la imagen
+media
+staticfiles
+docker-data
+logs
+node_modules
+
+# Modelos ML pesados (cada país tiene los suyos; no son parte del código)
+ml_models/*.pkl
+ml_models/backup_v1
+
+# Respaldos y dumps
+*.dump
+*.sql.gz
+backup_*/
+BD backup/

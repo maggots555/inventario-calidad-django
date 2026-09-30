@@ -69,6 +69,11 @@ Thumbs.db
 .env.local
 .env.production
 .env.staging
+# Copia local de docker/.env.example (puede llevar clave de prueba)
+docker/.env
+
+# Datos que crea Docker en la laptop (Postgres, Redis, fotos, logs)
+docker-data/
 
 # SSL certificates (for your project)
 ssl_certs/
