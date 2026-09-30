@@ -54,6 +54,9 @@ services:
   web:
     build: .
     image: sigma-web:local
+    # pull_policy build: esta imagen se arma aquí. No existe en Docker Hub.
+    # Sin esta línea, Compose intenta descargarla y muestra "pull access denied".
+    pull_policy: build
     restart: unless-stopped
     env_file:
       - docker/.env
@@ -103,7 +106,10 @@ services:
       - sigma_interna
 
   celery:
+    # Misma imagen que web. build + pull_policy evitan buscarla en internet.
+    build: .
     image: sigma-web:local
+    pull_policy: build
     restart: unless-stopped
     env_file:
       - docker/.env
@@ -129,7 +135,9 @@ services:
       - sigma_interna
 
   celery-beat:
+    build: .
     image: sigma-web:local
+    pull_policy: build
     restart: unless-stopped
     env_file:
       - docker/.env

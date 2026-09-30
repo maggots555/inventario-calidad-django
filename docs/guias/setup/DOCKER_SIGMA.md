@@ -33,8 +33,14 @@ sh docker/levantar.sh
 ```
 
 Ese script copia `docker/.env.example` a `docker/.env` si todavía no existe,
-y levanta los contenedores. La primera vez tarda: descarga imágenes, instala
-librerías de Python y aplica las migraciones en las cuatro bases.
+y levanta los contenedores. La primera vez tarda: descarga Postgres, Redis y
+Nginx, construye la imagen de SIGMA en tu PC y aplica las migraciones en las
+cuatro bases.
+
+Esa imagen se llama `sigma-web:local` y solo vive en tu computadora. Compose
+no la busca en internet (`pull_policy: build`). Si en un arranque anterior
+viste `pull access denied for sigma-web`, era ese intento de descarga: la
+página podía abrir igual porque después la imagen se construyó aquí.
 
 Cuando termine, abre [http://localhost:8080/login/](http://localhost:8080/login/). La base está vacía: todavía no hay usuarios. Para crear uno de prueba:
 
