@@ -105,8 +105,6 @@ class CamaraIntegrada {
     private siguienteMiniaturaId: number = 1;
     // Sube al abrir el modal: un JPEG tardío de la sesión anterior no se cuela
     private sesionCaptura: number = 0;
-    // Ids que el usuario quitó antes de que terminara el JPEG (cerrar/descartar sesión)
-    private fotosDescartadas: Set<string> = new Set();
     // Desmarcada antes de que exista el Blob: el JPEG igual se guarda, pero no se sube
     private fotosDesmarcadas: Set<string> = new Set();
     private avisoTiraTimer: number | null = null;
@@ -364,7 +362,14 @@ class CamaraIntegrada {
         // NOTA: debe ser { passive: false } para poder llamar preventDefault()
         this.preventTouchMoveHandler = (event: TouchEvent) => {
             // Solo bloquear si el toque viene del modal de cámara (no de otros elementos)
-            const target = event.target as Element | null;
+            // El target a veces es un nodo de texto, no un elemento. closest() ahí truena
+            // y se cae el bloqueo de bounce para el resto de la sesión.
+            const crudo = event.target;
+            const target = crudo instanceof Element
+                ? crudo
+                : crudo instanceof Node
+                    ? crudo.parentElement
+                    : null;
             if (!target) {
                 return;
             }
@@ -1760,10 +1765,9 @@ class CamaraIntegrada {
                 );
                 const tiempoBlob = Date.now() - t0;
 
-                // Cerrado, descartado o el usuario ya quitó esta miniatura
+                // Modal cerrado o esta foto es de una sesión anterior: no se guarda
                 const sesionVigente = sesionDeEstaFoto === this.sesionCaptura;
-                if (!this.aceptaResultadosEncode || !sesionVigente || this.fotosDescartadas.has(fotoId)) {
-                    this.fotosDescartadas.delete(fotoId);
+                if (!this.aceptaResultadosEncode || !sesionVigente) {
                     this.quitarMiniaturaDom(fotoId);
                     console.log(`🗑️ Encode pendiente #${pendienteId} descartado`);
                     return;
@@ -2089,11 +2093,11 @@ class CamaraIntegrada {
     }
     
     /**
-     * Engancha la tira de miniaturas: scroll horizontal y quitar al tocar.
+     * Engancha la tira: scroll horizontal y marcar/desmarcar al tocar.
      *
      * El listener de touchmove del documento cancela el bounce de iOS.
      * Aquí solo recordamos dónde empezó el dedo, para saber después si
-     * el gesto fue un tap (quitar) o un arrastre (desplazar la tira).
+     * el gesto fue un tap (cambiar la marca) o un arrastre (desplazar la tira).
      */
     private configurarTiraFotos(): void {
         const tira = this.tiraFotos;
@@ -2148,11 +2152,6 @@ class CamaraIntegrada {
             return false;
         }
 
-        // Sin desborde no hay scroll: cancelar evita que el modal baile.
-        if (tira.scrollWidth <= tira.clientWidth + 1) {
-            return false;
-        }
-
         const dx = touch.clientX - inicio.x;
         const dy = touch.clientY - inicio.y;
 
@@ -2163,13 +2162,8 @@ class CamaraIntegrada {
             return true;
         }
 
-        // Vertical: ahora sí cancelamos, para que no haya bounce del modal.
-        if (Math.abs(dx) <= Math.abs(dy)) {
-            return false;
-        }
-
-        // Sin desborde no hay scroll real: a partir de aquí el arrastre se corta.
-        if (tira.scrollWidth <= tira.clientWidth + 1) {
+        // Vertical, o tira sin desborde: se cancela para que el modal no baile.
+        if (Math.abs(dx) <= Math.abs(dy) || tira.scrollWidth <= tira.clientWidth + 1) {
             return false;
         }
 
@@ -2422,7 +2416,6 @@ class CamaraIntegrada {
      * Vacía la tira y olvida gestos a medias. No revoca Blobs: eso lo hace quien limpia el arreglo.
      */
     private vaciarTira(): void {
-        this.fotosDescartadas.clear();
         this.fotosDesmarcadas.clear();
         this.ocultarAvisoTira();
         this.tiraEnScroll = false;
