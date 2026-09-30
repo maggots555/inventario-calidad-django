@@ -2801,6 +2801,11 @@ thead.sticky-top {
     margin-right: 0.35rem;
 }
 
+/* En video, la columna de avisos solo existe en escritorio */
+.galeria-acciones-solo-escritorio {
+    display: none;
+}
+
 /* El título de avisos solo aparece en la columna de escritorio */
 .galeria-zona-titulo {
     display: none;
@@ -3017,10 +3022,17 @@ thead.sticky-top {
     }
     .galeria-acciones-cliente .galeria-aviso-notificar > i { color: #20c997; }
 
-    .galeria-acciones-cliente .galeria-aviso-rewind {
+    .galeria-acciones-cliente .galeria-aviso-rewind,
+    .galeria-acciones-cliente .galeria-aviso-compartir {
         border-left-color: #6ea8fe !important;
     }
-    .galeria-acciones-cliente .galeria-aviso-rewind > i { color: #6ea8fe; }
+    .galeria-acciones-cliente .galeria-aviso-rewind > i,
+    .galeria-acciones-cliente .galeria-aviso-compartir > i { color: #6ea8fe; }
+
+    /* La columna de video no existe en teléfono: ahí el botón sigue en la barra. */
+    .galeria-acciones-cliente.galeria-acciones-solo-escritorio {
+        display: flex;
+    }
 
     .galeria-acciones-cliente .galeria-aviso:hover:not(:disabled) {
         background: var(--hover-bg) !important;

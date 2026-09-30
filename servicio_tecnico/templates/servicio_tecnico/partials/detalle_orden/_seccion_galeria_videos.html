@@ -36,6 +36,9 @@
                                  SELECTOR DE TIPO DE VIDEO — Radio cards con colores
                                  Mismo patrón que las imágenes.
                                  ════════════════════════════════════════════════════════ -->
+                            {# Escritorio: captura a la izquierda y compartir en columna. Teléfono: se apilan como antes. #}
+                            <div class="galeria-layout">
+                            <div class="galeria-layout-main">
                             <div class="row mb-3">
                                 <div class="col-12">
                                     <label class="form-label fw-semibold mb-2">
@@ -116,18 +119,6 @@
                                                 <i class="bi bi-cloud-upload" aria-hidden="true"></i> Subir Video
                                             </button>
                                         </div>
-                                        {% if total_videos > 0 %}
-                                        <div class="galeria-fuente galeria-fuente-extra">
-                                            <button type="button"
-                                                    class="btn btn-primary"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#modalCompartirEvidencia"
-                                                    title="Compartir evidencia en video con el cliente">
-                                                <i class="bi bi-share-fill" aria-hidden="true"></i> Compartir videos
-                                                <span class="badge bg-light text-primary">{{ total_videos }}</span>
-                                            </button>
-                                        </div>
-                                        {% endif %}
                                     </div>
                                     <small class="text-muted galeria-hint">
                                         <i class="bi bi-info-circle" aria-hidden="true"></i>
@@ -151,6 +142,39 @@
                                         <small class="text-muted">Listo para comprimir con FFmpeg</small>
                                     </div>
                                 </div>
+                            </div>
+                            </div>
+
+                            {# Un solo botón: en teléfono es ancho completo; en escritorio la columna lo convierte en fila. #}
+                            <div class="galeria-acciones-cliente{% if not total_videos %} galeria-acciones-solo-escritorio{% endif %}">
+                                <p class="galeria-zona-titulo">Avisos al cliente</p>
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <button type="button"
+                                                class="btn w-100 galeria-aviso galeria-aviso-compartir btn-primary"
+                                                id="btnCompartirVideos"
+                                                {% if total_videos > 0 %}
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalCompartirEvidencia"
+                                                {% else %}
+                                                disabled
+                                                aria-describedby="avisoCompartirVideos"
+                                                {% endif %}
+                                                title="{% if total_videos > 0 %}Compartir evidencia en video con el cliente{% else %}Sube al menos un video para compartir{% endif %}">
+                                            <i class="bi bi-share-fill" aria-hidden="true"></i>
+                                            <span class="galeria-aviso-label">Compartir videos</span>
+                                            {% if total_videos > 0 %}
+                                            <span class="badge galeria-aviso-meta" aria-label="{{ total_videos }} video{{ total_videos|pluralize:'s' }}">{{ total_videos }}<span class="d-lg-none"> video{{ total_videos|pluralize:"s" }}</span></span>
+                                            {% endif %}
+                                        </button>
+                                        {% if not total_videos %}
+                                        <small class="text-muted d-block mt-2" id="avisoCompartirVideos">
+                                            <i class="bi bi-info-circle" aria-hidden="true"></i> Sube al menos un video para compartir la evidencia
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
                             </div>
 
                             <!-- Barra de progreso de subida (oculta por defecto) -->
