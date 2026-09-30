@@ -401,11 +401,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================================
 
 /**
+ * Aviso de la galería de video, con el mismo toast que el resto del sistema.
+ *
+ * @param mensaje - Texto que devolvió el servidor o un fallback local
+ * @param tipo - success | error | warning | info (también "danger")
+ * Efectos: pinta una tarjeta en #sigma-toast-stack. No recarga la página.
+ */
+function avisarGaleriaVideo(mensaje: string, tipo: string): void {
+    if (typeof window.mostrarNotificacion !== 'function') {
+        console.error(mensaje);
+        return;
+    }
+    window.mostrarNotificacion(mensaje, tipo);
+}
+
+/**
  * Elimina un video vía AJAX y remueve su tarjeta del DOM con animación.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El botón de la galería llama esta función. Pide confirmación, borra en
+ * el servidor y, si salió bien, quita la tarjeta y muestra el toast del
+ * sistema (el mismo que los avisos de Django). Si falla, el toast es de error.
  *
  * @param videoId   ID del VideoOrden en la base de datos
  * @param url       URL de la vista eliminar_video (generada con {% url %})
  * @param csrfToken Token CSRF del formulario
+ * Efectos: POST al servidor, quita el nodo del video y muestra un toast.
  */
 function eliminarVideo(videoId: number, url: string, csrfToken: string): void {
     if (!confirm('¿Estás seguro de que deseas eliminar este video? Esta acción no se puede deshacer.')) {
@@ -421,19 +442,30 @@ function eliminarVideo(videoId: number, url: string, csrfToken: string): void {
         body,
     })
         .then(r => r.json())
-        .then((data: { success: boolean; error?: string }) => {
+        .then((data: { success: boolean; message?: string; error?: string }) => {
             if (data.success) {
+                // El servidor ya arma el texto ("Video X eliminado...").
+                avisarGaleriaVideo(
+                    data.message || 'Video eliminado correctamente',
+                    'success',
+                );
                 const tarjeta = document.querySelector<HTMLElement>(`[data-video-id="${videoId}"]`);
                 if (tarjeta) {
                     tarjeta.style.transition = 'opacity 0.3s ease';
                     tarjeta.style.opacity = '0';
                     setTimeout(() => tarjeta.remove(), 320);
                 }
-            } else {
-                alert(`Error al eliminar el video: ${data.error || 'Error desconocido'}`);
+                return;
             }
+            avisarGaleriaVideo(
+                data.error || 'Error al eliminar el video',
+                'danger',
+            );
         })
         .catch(() => {
-            alert('Error de conexión al intentar eliminar el video. Intenta de nuevo.');
+            avisarGaleriaVideo(
+                'Error de conexión al intentar eliminar el video. Intenta de nuevo.',
+                'danger',
+            );
         });
 }

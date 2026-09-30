@@ -1183,24 +1183,25 @@ async function marcarDanado(seguimientoId: number) {
 }
 
 /**
- * Función helper para mostrar notificaciones toast
+ * Aviso flotante de la orden (galería, piezas, seguimiento, estado).
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Antes esta función armaba una barra verde de Bootstrap (.alert).
+ * En el celular se veía como un aviso viejo de Django, no como el toast
+ * del sistema. Ahora solo reenvía el texto a mostrarNotificacion(),
+ * que ya vive en base.ts y pinta la misma tarjeta (ícono, título, X, barra).
+ *
+ * @param mensaje - Texto del aviso. Puede traer ✅ o ❌ al inicio.
+ * @param tipo - success | error | warning | info. También acepta "danger".
+ * Efectos: agrega un toast a #sigma-toast-stack. No recarga la página.
  */
-function mostrarToast(mensaje: string, tipo: string = 'info') {
-    // Crear elemento de alerta temporal
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alertDiv.innerHTML = `
-        ${mensaje}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    // Auto-ocultar después de 3 segundos
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 3000);
+function mostrarToast(mensaje: string, tipo: string = 'info'): void {
+    if (typeof window.mostrarNotificacion !== 'function') {
+        console.error('mostrarNotificacion no está disponible');
+        return;
+    }
+    // El recorte del emoji y el look los resuelve el toast del sistema.
+    window.mostrarNotificacion(mensaje, tipo);
 }
 
 // ============================================================================

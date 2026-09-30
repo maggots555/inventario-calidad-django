@@ -313,21 +313,39 @@ function inicializarToastsSistema() {
     });
 }
 /**
+ * Quita un emoji de estado al inicio del texto.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * El toast ya pinta su propio ícono (palomita, tache, etc.).
+ * Si el mensaje empieza con ✅ o ❌, se ven dos íconos. Esta función
+ * solo recorta ese prefijo; un 📧 o 📝 de más adelante se queda.
+ *
+ * @param mensaje - Texto crudo que mandó la vista o el JS de la página
+ * @returns El mismo texto, sin el emoji de estado del principio
+ */
+function quitarEmojiDeEstado(mensaje) {
+    // ⚠ puede venir solo o con el selector de emoji (U+FE0F)
+    return mensaje.replace(/^(?:✅|❌|✓|✗|\u26A0\uFE0F?)\s*/, '');
+}
+/**
  * Muestra un toast desde JavaScript (mismo look que los de Django).
  *
  * @param mensaje - Texto a mostrar (se escapa; no uses HTML)
  * @param tipo - success | error | warning | info (también acepta "danger")
+ * Efectos: agrega una tarjeta a #sigma-toast-stack. No toca la base de datos.
  */
 function mostrarNotificacion(mensaje, tipo = 'info') {
     const tipoNormalizado = normalizarTipoToast(tipo);
     const stack = obtenerStackToasts();
+    // Paso 0: el ícono del toast ya dice el tipo; no repetir ✅/❌ en el texto
+    const mensajeLimpio = quitarEmojiDeEstado(mensaje);
     const toast = document.createElement('div');
     toast.className = 'sigma-toast sigma-toast--' + tipoNormalizado;
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', tipoNormalizado === 'error' ? 'assertive' : 'polite');
     toast.dataset.toastTipo = tipoNormalizado;
     // Paso 1: escapar el texto (el usuario/API puede mandar <script>)
-    const textoSeguro = escaparHtmlToast(mensaje);
+    const textoSeguro = escaparHtmlToast(mensajeLimpio);
     const titulo = tituloDeTipoToast(tipoNormalizado);
     const icono = iconoDeTipoToast(tipoNormalizado);
     // Paso 2: mismo markup que pinta Django en base.html

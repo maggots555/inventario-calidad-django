@@ -133,6 +133,33 @@ class DetalleOrdenFaseCAssetsTest(SimpleTestCase):
         self.assertIn('btnEditarInfoDesdeEmailInvalido', fuente)
         self.assertIn('btnEditarInfoDesdeEmailInvalido', compilado)
 
+    def test_avisos_de_galeria_usan_toast_del_sistema(self):
+        """
+        Objetivo: borrar imagen/video no debe pintar la barra .alert vieja.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El toast oficial es mostrarNotificacion() (base.ts). Si la galería
+        vuelve a armar un alert de Bootstrap, en el celular se ve distinto
+        al resto de los avisos del sistema.
+
+        Efectos: ninguno (solo lee archivos).
+        """
+        pagina_ts = (_TS_DIR / 'detalle_orden_page.ts').read_text(encoding='utf-8')
+        pagina_js = (_JS_DIR / 'detalle_orden_page.js').read_text(encoding='utf-8')
+        video_ts = (_TS_DIR / 'upload_video.ts').read_text(encoding='utf-8')
+        video_js = (_JS_DIR / 'upload_video.js').read_text(encoding='utf-8')
+        base_ts = (_TS_DIR / 'base.ts').read_text(encoding='utf-8')
+
+        for blob in (pagina_ts, pagina_js):
+            self.assertIn('mostrarNotificacion', blob)
+            self.assertNotIn('alert-dismissible fade show position-fixed', blob)
+
+        for blob in (video_ts, video_js):
+            self.assertIn('mostrarNotificacion', blob)
+            self.assertNotIn('alert(', blob)
+
+        self.assertIn('quitarEmojiDeEstado', base_ts)
+
 
 @override_settings(
     STORAGES={
