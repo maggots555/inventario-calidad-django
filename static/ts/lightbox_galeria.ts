@@ -157,20 +157,27 @@ class GaleriaLightbox {
                 </div>
                 
                 <!-- CONTROLES DE ZOOM (visibles solo en modo inspección) -->
+                <!-- Dos grupos: en escritorio van en una sola barra; en teléfono, en dos filas. -->
                 <div class="lightbox-zoom-controls" style="display: none;">
-                    <button type="button" class="btn btn-sm btn-outline-light zoom-out-btn" title="Alejar (-)">
-                        <i class="bi bi-dash-lg"></i>
-                    </button>
-                    <span class="zoom-level-indicator">100%</span>
-                    <button type="button" class="btn btn-sm btn-outline-light zoom-in-btn" title="Acercar (+)">
-                        <i class="bi bi-plus-lg"></i>
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-light zoom-reset-btn" title="Restablecer zoom">
-                        <i class="bi bi-arrows-angle-contract"></i> Reset
-                    </button>
-                    <button type="button" class="btn btn-sm btn-danger zoom-exit-btn" title="Salir de inspección">
-                        <i class="bi bi-x-lg"></i> Cerrar Zoom
-                    </button>
+                    <div class="zoom-controls-level">
+                        <button type="button" class="btn btn-sm btn-outline-light zoom-out-btn" title="Alejar (-)">
+                            <i class="bi bi-dash-lg"></i>
+                        </button>
+                        <span class="zoom-level-indicator">100%</span>
+                        <button type="button" class="btn btn-sm btn-outline-light zoom-in-btn" title="Acercar (+)">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    <div class="zoom-controls-actions">
+                        <button type="button" class="btn btn-sm btn-outline-light zoom-reset-btn" title="Restablecer zoom">
+                            <i class="bi bi-arrows-angle-contract"></i> Reset
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger zoom-exit-btn" title="Salir de inspección" aria-label="Cerrar zoom">
+                            <i class="bi bi-x-lg"></i>
+                            <span class="zoom-exit-label-full">Cerrar Zoom</span>
+                            <span class="zoom-exit-label-short">Cerrar</span>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="lightbox-info">

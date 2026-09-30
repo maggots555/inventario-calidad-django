@@ -348,6 +348,19 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+/* En escritorio los dos grupos siguen en la misma fila, con el mismo espacio. */
+.zoom-controls-level,
+.zoom-controls-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* En teléfono se muestra "Cerrar"; en escritorio, "Cerrar Zoom". */
+.zoom-exit-label-short {
+    display: none;
+}
+
 /* Indicador de porcentaje de zoom */
 .zoom-level-indicator {
     color: white;
@@ -439,33 +452,70 @@
         font-size: 0.9rem;
     }
     
-    /* Controles de zoom en móvil: más compactos */
+    /* Tablet: un poco más compacto, pero sin encoger ni partir los botones. */
     .lightbox-zoom-controls {
-        bottom: max(10px, env(safe-area-inset-bottom, 10px));
+        bottom: max(12px, env(safe-area-inset-bottom, 12px));
         padding: 8px 12px;
-        gap: 6px;
+        gap: 8px;
         border-radius: 10px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: center;
-        max-width: 95%;
+        max-width: calc(100% - 24px);
     }
-    
+
     .lightbox-zoom-controls .btn {
-        min-width: 40px;
-        min-height: 40px;
-        font-size: 0.8rem;
-        padding: 6px 10px;
+        min-width: 44px;
+        min-height: 44px;
+        flex-shrink: 0;
     }
-    
-    .zoom-level-indicator {
+}
+
+/* Teléfono: dos filas a propósito. El wrap anterior cortaba Reset y amontonaba Cerrar. */
+@media (max-width: 576px) {
+    .lightbox-zoom-controls {
+        flex-direction: column;
+        align-items: stretch;
+        width: calc(100% - 32px);
+        max-width: 400px;
+        gap: 10px;
+        padding: 12px;
+        bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    }
+
+    .zoom-controls-level,
+    .zoom-controls-actions {
+        justify-content: center;
+        width: 100%;
+        gap: 10px;
+    }
+
+    .zoom-controls-actions .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        white-space: nowrap;
+    }
+
+    .lightbox-zoom-controls .btn {
+        min-width: 44px;
+        min-height: 44px;
         font-size: 0.85rem;
-        min-width: 42px;
+        padding: 8px 12px;
     }
-    
+
     .zoom-reset-btn,
     .zoom-exit-btn {
-        margin-left: 2px;
-        padding-left: 10px !important;
+        margin-left: 0;
+        border-left: none;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .zoom-exit-label-full {
+        display: none;
+    }
+
+    .zoom-exit-label-short {
+        display: inline;
     }
 }
 
