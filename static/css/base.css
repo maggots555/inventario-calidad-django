@@ -2306,36 +2306,56 @@ footer::after {
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transform: translateY(100px);
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    z-index: 1000;
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-        0 0 0 0 rgba(52, 152, 219, 0.4);
+    /* Solo estas tres: si entra box-shadow, el blur se interpola y Chrome lo pinta cuadrado. */
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+        transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+        visibility 0s linear 0.4s;
+    z-index: 999;
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    outline: none;
+    overflow: visible;
+    -webkit-tap-highlight-color: transparent;
+    isolation: isolate;
 }
 
-/* Estado visible */
+/* Halo circular fijo. Se anima la opacidad, no el blur: el glow no se vuelve un cuadrado. */
+.scroll-to-top::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Estado visible: la visibilidad entra al instante para que se vea el fade. */
 .scroll-to-top.visible {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
     transform: translateY(0);
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+        transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+        visibility 0s linear 0s;
 }
 
 /* Efecto hover */
 .scroll-to-top:hover {
     background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
     transform: translateY(-5px) scale(1.1);
-    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
-        0 0 20px rgba(52, 152, 219, 0.6);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7);
     border-color: rgba(52, 152, 219, 0.5);
 }
 
 /* Efecto activo (click) */
 .scroll-to-top:active {
     transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
 }
 
 /* Animación del ícono al hover */
@@ -2355,8 +2375,8 @@ footer::after {
     }
 }
 
-/* Efecto de pulso sutil cuando aparece */
-.scroll-to-top.visible {
+/* El pulso vive en el halo, no en el botón: así no pelea con el translateY de entrada. */
+.scroll-to-top.visible::after {
     animation: pulseGlow 2s ease-in-out infinite;
 }
 
@@ -2364,13 +2384,26 @@ footer::after {
 
     0%,
     100% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-            0 0 0 0 rgba(52, 152, 219, 0.4);
+        opacity: 0;
+        transform: scale(1);
     }
 
     50% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-            0 0 15px rgba(52, 152, 219, 0.6);
+        opacity: 1;
+        transform: scale(1.06);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top,
+    .scroll-to-top.visible {
+        transition: none;
+    }
+
+    .scroll-to-top.visible::after {
+        animation: none;
+        opacity: 0.65;
+        transform: none;
     }
 }
 
@@ -2396,15 +2429,11 @@ footer::after {
     }
 }
 
-/* Asegurar que el botón esté sobre el footer pero debajo de modales */
-.scroll-to-top {
-    z-index: 999;
-}
-
-/* Efecto focus para accesibilidad */
-.scroll-to-top:focus {
-    outline: 3px solid rgba(52, 152, 219, 0.5);
-    outline-offset: 3px;
+/* Anillo redondo: el outline con offset se dibuja cuadrado en varios WebView. */
+.scroll-to-top:focus-visible {
+    outline: none;
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+        0 0 0 3px rgba(52, 152, 219, 0.55);
 }
 
 /* =============================================================================

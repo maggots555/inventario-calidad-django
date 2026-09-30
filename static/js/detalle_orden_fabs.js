@@ -10,26 +10,55 @@
     document.addEventListener('DOMContentLoaded', function () {
         const btnIrGaleria = document.getElementById('btnIrGaleria');
         const seccionGaleria = document.getElementById('galeria-imagenes');
-        if (btnIrGaleria && seccionGaleria) {
-            const btnImg = btnIrGaleria;
-            const secImg = seccionGaleria;
-            function verificarVisibilidadGaleria() {
-                const galeriaRect = secImg.getBoundingClientRect();
-                const windowHeight = window.innerHeight;
-                const galeriaVisible = galeriaRect.top < windowHeight && galeriaRect.bottom > 0;
-                if (galeriaVisible) {
-                    btnImg.classList.remove('visible');
-                }
-                else if (window.scrollY > 300) {
-                    btnImg.classList.add('visible');
-                }
-                else {
-                    btnImg.classList.remove('visible');
-                }
+        const btnIrGaleriaVideo = document.getElementById('btnIrGaleriaVideo');
+        const seccionGaleriaVideo = document.getElementById('galeria-videos');
+        /**
+         * Pone o quita .visible solo si el estado cambió.
+         * Quitar y volver a poner la clase reinicia el glow y provoca el flash.
+         */
+        function fijarVisible(boton, visible) {
+            const yaVisible = boton.classList.contains('visible');
+            if (visible === yaVisible) {
+                return;
             }
-            window.addEventListener('scroll', verificarVisibilidadGaleria);
-            setTimeout(verificarVisibilidadGaleria, 100);
-            btnImg.addEventListener('click', function () {
+            boton.classList.toggle('visible', visible);
+        }
+        /**
+         * El botón se muestra si ya bajamos 300px y la sección no está en pantalla.
+         * El margen evita que un borde del viewport encienda y apague el botón en cada frame.
+         */
+        function debeMostrar(boton, seccion) {
+            const rect = seccion.getBoundingClientRect();
+            const yaVisible = boton.classList.contains('visible');
+            const margen = yaVisible ? 24 : 0;
+            const umbralScroll = yaVisible ? 260 : 300;
+            const enPantalla = rect.top < window.innerHeight - margen && rect.bottom > margen;
+            return !enPantalla && window.scrollY > umbralScroll;
+        }
+        let framePendiente = 0;
+        function sincronizarFabs() {
+            framePendiente = 0;
+            if (btnIrGaleria && seccionGaleria) {
+                fijarVisible(btnIrGaleria, debeMostrar(btnIrGaleria, seccionGaleria));
+            }
+            if (btnIrGaleriaVideo && seccionGaleriaVideo) {
+                fijarVisible(btnIrGaleriaVideo, debeMostrar(btnIrGaleriaVideo, seccionGaleriaVideo));
+            }
+        }
+        function pedirSincronizacion() {
+            if (framePendiente !== 0) {
+                return;
+            }
+            framePendiente = window.requestAnimationFrame(sincronizarFabs);
+        }
+        const hayGaleria = Boolean((btnIrGaleria && seccionGaleria) || (btnIrGaleriaVideo && seccionGaleriaVideo));
+        if (hayGaleria) {
+            window.addEventListener('scroll', pedirSincronizacion, { passive: true });
+            window.setTimeout(sincronizarFabs, 100);
+        }
+        if (btnIrGaleria && seccionGaleria) {
+            const secImg = seccionGaleria;
+            btnIrGaleria.addEventListener('click', function () {
                 secImg.scrollIntoView({
                     behavior: 'smooth',
                     block: 'start',
@@ -43,27 +72,9 @@
                 }, 500);
             });
         }
-        const btnIrGaleriaVideo = document.getElementById('btnIrGaleriaVideo');
-        const seccionGaleriaVideo = document.getElementById('galeria-videos');
         if (btnIrGaleriaVideo && seccionGaleriaVideo) {
-            const btnVid = btnIrGaleriaVideo;
             const secVid = seccionGaleriaVideo;
-            function verificarVisibilidadGaleriaVideo() {
-                const rect = secVid.getBoundingClientRect();
-                const galeriaVisible = rect.top < window.innerHeight && rect.bottom > 0;
-                if (galeriaVisible) {
-                    btnVid.classList.remove('visible');
-                }
-                else if (window.scrollY > 300) {
-                    btnVid.classList.add('visible');
-                }
-                else {
-                    btnVid.classList.remove('visible');
-                }
-            }
-            window.addEventListener('scroll', verificarVisibilidadGaleriaVideo);
-            setTimeout(verificarVisibilidadGaleriaVideo, 100);
-            btnVid.addEventListener('click', function () {
+            btnIrGaleriaVideo.addEventListener('click', function () {
                 secVid.scrollIntoView({
                     behavior: 'smooth',
                     block: 'start',

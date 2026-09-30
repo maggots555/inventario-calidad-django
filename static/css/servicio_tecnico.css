@@ -2426,36 +2426,56 @@ thead.sticky-top {
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transform: translateY(100px);
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    /* Solo estas tres: animar el blur del box-shadow lo rasteriza como cuadrado. */
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                visibility 0s linear 0.4s;
     z-index: 998; /* Uno menos que scroll-to-top (999) */
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                0 0 0 0 rgba(52, 152, 219, 0.4);
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    outline: none;
+    overflow: visible;
+    -webkit-tap-highlight-color: transparent;
+    isolation: isolate;
+}
+
+/* Halo circular con sombra fija. El pulso solo cambia opacidad y escala. */
+.btn-ir-galeria::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Estado visible */
 .btn-ir-galeria.visible {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
     transform: translateY(0);
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                visibility 0s linear 0s;
 }
 
 /* Efecto hover */
 .btn-ir-galeria:hover {
     background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
     transform: translateY(-5px) scale(1.1);
-    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
-                0 0 20px rgba(52, 152, 219, 0.6);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7);
     border-color: rgba(52, 152, 219, 0.5);
 }
 
 /* Efecto activo (click) */
 .btn-ir-galeria:active {
     transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
 }
 
 /* Animación del ícono al hover - efecto de cámara sacudiendo */
@@ -2475,19 +2495,19 @@ thead.sticky-top {
     }
 }
 
-/* Efecto de pulso sutil cuando aparece - matching con scroll-to-top */
-.btn-ir-galeria.visible {
+/* Pulso en el halo, no en el botón, para no pelear con el translateY de entrada. */
+.btn-ir-galeria.visible::after {
     animation: pulseGlowGaleria 2s ease-in-out infinite;
 }
 
 @keyframes pulseGlowGaleria {
     0%, 100% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                    0 0 0 0 rgba(52, 152, 219, 0.4);
+        opacity: 0;
+        transform: scale(1);
     }
     50% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                    0 0 15px rgba(52, 152, 219, 0.6);
+        opacity: 1;
+        transform: scale(1.06);
     }
 }
 
@@ -2529,10 +2549,11 @@ thead.sticky-top {
     }
 }
 
-/* Efecto focus para accesibilidad */
-.btn-ir-galeria:focus {
-    outline: 3px solid rgba(52, 152, 219, 0.5);
-    outline-offset: 3px;
+/* Anillo redondo: outline + offset se ve cuadrado en varios WebView. */
+.btn-ir-galeria:focus-visible {
+    outline: none;
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                0 0 0 3px rgba(52, 152, 219, 0.55);
 }
 
 /* =============================================================================
@@ -2555,37 +2576,58 @@ thead.sticky-top {
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transform: translateY(100px);
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                visibility 0s linear 0.4s;
     z-index: 997; /* Un nivel debajo del botón de fotos (998) */
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                0 0 0 0 rgba(52, 152, 219, 0.4);
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    outline: none;
+    overflow: visible;
+    -webkit-tap-highlight-color: transparent;
+    isolation: isolate;
+}
+
+.btn-ir-galeria-video::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Estado visible */
 .btn-ir-galeria-video.visible {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
     transform: translateY(0);
-    animation: pulseGlowGaleriaVideo 2s ease-in-out infinite;
+    transition: opacity 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                visibility 0s linear 0s;
+}
+
+.btn-ir-galeria-video.visible::after {
+    animation: pulseGlowGaleria 2s ease-in-out infinite;
 }
 
 /* Efecto hover */
 .btn-ir-galeria-video:hover {
     background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
     transform: translateY(-5px) scale(1.1);
-    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
-                0 0 20px rgba(52, 152, 219, 0.6);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7);
     border-color: rgba(52, 152, 219, 0.5);
 }
 
 /* Efecto activo (click) */
 .btn-ir-galeria-video:active {
     transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
 }
 
 /* Animación del ícono al hover — oscilación vertical suave */
@@ -2602,22 +2644,26 @@ thead.sticky-top {
     }
 }
 
-/* Pulso sutil mientras es visible — matching con los otros botones */
-@keyframes pulseGlowGaleriaVideo {
-    0%, 100% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                    0 0 0 0 rgba(52, 152, 219, 0.4);
-    }
-    50% {
-        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
-                    0 0 15px rgba(52, 152, 219, 0.6);
-    }
+.btn-ir-galeria-video:focus-visible {
+    outline: none;
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                0 0 0 3px rgba(52, 152, 219, 0.55);
 }
 
-/* Efecto focus para accesibilidad */
-.btn-ir-galeria-video:focus {
-    outline: 3px solid rgba(52, 152, 219, 0.5);
-    outline-offset: 3px;
+@media (prefers-reduced-motion: reduce) {
+    .btn-ir-galeria,
+    .btn-ir-galeria.visible,
+    .btn-ir-galeria-video,
+    .btn-ir-galeria-video.visible {
+        transition: none;
+    }
+
+    .btn-ir-galeria.visible::after,
+    .btn-ir-galeria-video.visible::after {
+        animation: none;
+        opacity: 0.65;
+        transform: none;
+    }
 }
 
 /* Responsive — móviles medianos */
