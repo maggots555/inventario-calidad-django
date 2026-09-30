@@ -85,6 +85,7 @@ _IDS_SIEMPRE_EN_RENDER = (
 _IDS_EN_PARTIALS = (
     ('id="tablaPiezas"', '_seccion_cotizacion.html'),
     ('id="modalConfirmarFeedback"', '_modal_confirmar_feedback.html'),
+    ('id="tiraFotosCapturadas"', '_modal_camara_integrada.html'),
 )
 
 

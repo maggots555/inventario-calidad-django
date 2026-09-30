@@ -16,8 +16,8 @@
  */
 
 interface FotoCapturada {
+    id: string;
     blob: Blob;
-    // dataUrl: string; // ❌ ELIMINADO v6.0: No se usa, solo generaba overhead
     timestamp: number;
 }
 
@@ -67,8 +67,8 @@ class CamaraIntegrada {
     private btnCambiarCamara: HTMLButtonElement | null;
     private btnCerrar: HTMLButtonElement | null;
     private btnFinalizar: HTMLButtonElement | null;
-    private contadorFotos: HTMLElement | null;
-    private badgeFotosTomadas: HTMLElement | null; // NUEVO v6.0: Badge del contador para feedback verde
+    private tiraFotos: HTMLElement | null;
+    private anuncioTiraFotos: HTMLElement | null;
     private cameraError: HTMLElement | null;
     private mensajeError: HTMLElement | null;
     private detalleError: HTMLElement | null;
@@ -96,8 +96,17 @@ class CamaraIntegrada {
     // Cache de botones del selector de lentes (BUG FIX: evitar recrear DOM)
     private botonesLenteCache: Map<string, HTMLButtonElement> = new Map();
     
-    // Fotos capturadas
+    // Fotos capturadas (el Blob es el JPEG final; la miniatura es aparte)
     private fotosCapturadas: FotoCapturada[] = [];
+    private siguienteMiniaturaId: number = 1;
+    // Sube al abrir el modal: un JPEG tardío de la sesión anterior no se cuela
+    private sesionCaptura: number = 0;
+    // Ids que el usuario quitó antes de que terminara el JPEG
+    private fotosDescartadas: Set<string> = new Set();
+    // Gesto de la tira: distingue un tap (quitar) de un arrastre horizontal
+    private inicioToqueTira: { x: number; y: number } | null = null;
+    private tiraEnScroll: boolean = false;
+    private ignorarProximoClicTira: boolean = false;
     
     // Flag para prevenir capturas simultáneas (BUG FIX)
     private estáCapturando: boolean = false;
@@ -188,8 +197,8 @@ class CamaraIntegrada {
         this.btnCambiarCamara = document.getElementById('btnCambiarCamara') as HTMLButtonElement;
         this.btnCerrar = document.getElementById('btnCerrarCamara') as HTMLButtonElement;
         this.btnFinalizar = document.getElementById('btnFinalizarCaptura') as HTMLButtonElement;
-        this.contadorFotos = document.getElementById('contadorFotos');
-        this.badgeFotosTomadas = document.getElementById('badgeFotosTomadas'); // NUEVO v6.0: Badge para feedback verde
+        this.tiraFotos = document.getElementById('tiraFotosCapturadas');
+        this.anuncioTiraFotos = document.getElementById('tiraFotosAnuncio');
         this.cameraError = document.getElementById('cameraError');
         this.mensajeError = document.getElementById('mensajeError');
         this.detalleError = document.getElementById('detalleError');
@@ -247,6 +256,8 @@ class CamaraIntegrada {
                 this.toggleOrientacionManual();
             });
         }
+
+        this.configurarTiraFotos();
         
         console.log('✅ Cámara integrada inicializada');
     }
@@ -259,6 +270,9 @@ class CamaraIntegrada {
     private onModalAbierto(): void {
         this.modalAbierto = true;
         this.aceptaResultadosEncode = true;
+        this.sesionCaptura += 1;
+        this.fotosCapturadas = [];
+        this.vaciarTira();
         this.agregarProteccionBotonAtras();
         this.iniciarMonitoreoOrientacion(); // v7.0: async, se ejecuta en paralelo (sin await)
 
@@ -282,6 +296,7 @@ class CamaraIntegrada {
         this.modalAbierto = false;
         // v9.0: al cerrar (X / atrás / dismiss) descartamos encodes en curso
         this.aceptaResultadosEncode = false;
+        this.vaciarTira();
         this.terminarJpegWorker();
         this.removerProteccionBotonAtras();
         this.detenerMonitoreoOrientacion();
@@ -340,19 +355,30 @@ class CamaraIntegrada {
         // NOTA: debe ser { passive: false } para poder llamar preventDefault()
         this.preventTouchMoveHandler = (event: TouchEvent) => {
             // Solo bloquear si el toque viene del modal de cámara (no de otros elementos)
-            const target = event.target as Element;
+            const target = event.target as Element | null;
+            if (!target) {
+                return;
+            }
             const esDentroDelModal = this.modal?.contains(target) ?? false;
             
-            if (esDentroDelModal) {
-                // Permitir el toque en los botones de control (no bloquear clicks)
-                // pero sí bloquear el gesto de arrastre/scroll
-                const esBoton = target.closest('button, .btn') !== null;
-                
-                if (!esBoton) {
-                    event.preventDefault();
-                }
-                // Los botones tienen touch-action:manipulation en CSS, así que
-                // los gestos en ellos ya están manejados correctamente
+            if (!esDentroDelModal || !event.cancelable) {
+                return;
+            }
+
+            // La tira es la ÚNICA zona que puede desplazarse, y solo en horizontal.
+            // Un arrastre vertical o en el borde sigue cancelado: si no, iOS
+            // encadena el gesto al body y el modal "se mueve" (bounce).
+            const tira = target.closest('#tiraFotosCapturadas');
+            if (tira instanceof HTMLElement && this.gestoPermiteScrollTira(tira, event)) {
+                return;
+            }
+
+            // Botones de control (obturador, listo, cambiar cámara): no cancelar,
+            // para que el click llegue. Los de la tira NO entran aquí.
+            const esBoton = target.closest('button, .btn') !== null;
+            const esBotonDeTira = tira !== null;
+            if (!esBoton || esBotonDeTira) {
+                event.preventDefault();
             }
         };
         
@@ -637,7 +663,9 @@ class CamaraIntegrada {
             const mensaje = `Tienes ${this.fotosCapturadas.length} foto(s) capturada(s) sin finalizar.\n\n¿Deseas salir y descartar las fotos?`;
             if (confirm(mensaje)) {
                 console.log('✅ Usuario confirmó salida, descartando fotos');
+                this.aceptaResultadosEncode = false;
                 this.fotosCapturadas = [];
+                this.vaciarTira();
                 this.cerrarModal();
             } else {
                 console.log('❌ Usuario canceló salida, manteniendo modal abierto');
@@ -661,10 +689,11 @@ class CamaraIntegrada {
      */
     private confirmarSalidaConDescarte(): void {
         console.log('✅ Usuario confirmó salida, descartando fotos');
-        
-        // Descartar fotos capturadas
+
+        // Antes de borrar la tira: un JPEG en curso no debe volver a pintarla
+        this.aceptaResultadosEncode = false;
         this.fotosCapturadas = [];
-        this.actualizarContador();
+        this.vaciarTira();
         
         // Cerrar modal de confirmación
         if (this.modalConfirmacion) {
@@ -1698,6 +1727,13 @@ class CamaraIntegrada {
             return;
         }
 
+        // Miniatura al instante (canvas chico). El JPEG grande sigue en segundo plano.
+        const fotoId = `foto-${this.siguienteMiniaturaId}`;
+        this.siguienteMiniaturaId += 1;
+        const sesionDeEstaFoto = this.sesionCaptura;
+        const urlMiniatura = this.crearUrlMiniatura(canvasClon);
+        this.mostrarMiniatura(fotoId, urlMiniatura, true);
+
         // ── Encode en segundo plano (Worker o toBlob sobre el clon) ───────────
         const pendienteId = Date.now() + Math.floor(Math.random() * 1000);
         const canvasParaEncode = canvasClon;
@@ -1714,19 +1750,23 @@ class CamaraIntegrada {
                 );
                 const tiempoBlob = Date.now() - t0;
 
-                // Si el usuario cerró el modal, descartamos el resultado
-                if (!this.aceptaResultadosEncode) {
-                    console.log(`🗑️ Encode pendiente #${pendienteId} descartado (modal cerrado)`);
+                // Cerrado, descartado o el usuario ya quitó esta miniatura
+                const sesionVigente = sesionDeEstaFoto === this.sesionCaptura;
+                if (!this.aceptaResultadosEncode || !sesionVigente || this.fotosDescartadas.has(fotoId)) {
+                    this.fotosDescartadas.delete(fotoId);
+                    this.quitarMiniaturaDom(fotoId);
+                    console.log(`🗑️ Encode pendiente #${pendienteId} descartado`);
                     return;
                 }
 
                 this.aplicarDeteccionDispositivoLento(tiempoBlob);
 
                 this.fotosCapturadas.push({
+                    id: fotoId,
                     blob: blob,
                     timestamp: Date.now()
                 });
-                this.actualizarContador();
+                this.marcarMiniaturaLista(fotoId);
 
                 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                 console.log(`✅ FOTO LISTA #${this.fotosCapturadas.length}`);
@@ -1741,6 +1781,7 @@ class CamaraIntegrada {
                 );
                 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             } catch (error) {
+                this.quitarMiniaturaDom(fotoId);
                 if (!this.aceptaResultadosEncode) {
                     return;
                 }
@@ -2036,24 +2077,309 @@ class CamaraIntegrada {
     }
     
     /**
-     * Actualiza el contador de fotos tomadas
-     * NUEVO v6.0: Activa feedback verde cuando hay fotos capturadas
+     * Engancha la tira de miniaturas: scroll horizontal y quitar al tocar.
+     *
+     * El listener de touchmove del documento cancela el bounce de iOS.
+     * Aquí solo recordamos dónde empezó el dedo, para saber después si
+     * el gesto fue un tap (quitar) o un arrastre (desplazar la tira).
      */
-    private actualizarContador(): void {
-        if (this.contadorFotos) {
-            this.contadorFotos.textContent = String(this.fotosCapturadas.length);
+    private configurarTiraFotos(): void {
+        const tira = this.tiraFotos;
+        if (!tira) {
+            return;
         }
-        
-        // NUEVO v6.0: Activar feedback verde cuando hay fotos
-        if (this.badgeFotosTomadas) {
-            if (this.fotosCapturadas.length > 0) {
-                // Activar estado verde
-                this.badgeFotosTomadas.classList.add('badge-active');
-            } else {
-                // Volver a estado normal (gris)
-                this.badgeFotosTomadas.classList.remove('badge-active');
+
+        tira.addEventListener('touchstart', (event: TouchEvent) => {
+            const touch = event.touches[0];
+            if (!touch) {
+                return;
             }
+            this.inicioToqueTira = { x: touch.clientX, y: touch.clientY };
+            this.tiraEnScroll = false;
+        }, { passive: true });
+
+        // El click puede llegar hasta ~300 ms después en Safari viejo.
+        // Guardamos la bandera y la consumimos en el click, con tope de seguridad.
+        tira.addEventListener('touchend', () => {
+            this.ignorarProximoClicTira = this.tiraEnScroll;
+            window.setTimeout(() => {
+                this.ignorarProximoClicTira = false;
+                this.inicioToqueTira = null;
+            }, 400);
+        }, { passive: true });
+
+        tira.addEventListener('touchcancel', () => {
+            this.tiraEnScroll = false;
+            this.inicioToqueTira = null;
+            this.ignorarProximoClicTira = false;
+        }, { passive: true });
+
+        tira.addEventListener('click', (event: MouseEvent) => {
+            this.alClicMiniatura(event);
+        });
+    }
+
+    /**
+     * ¿Este touchmove puede desplazar la tira sin soltar el bounce de iOS?
+     *
+     * Sí en los primeros píxeles (si se cancela antes, iOS no arranca el scroll)
+     * y sí si el gesto ya es horizontal, hay overflow y no estamos en el borde.
+     *
+     * @param tira Contenedor #tiraFotosCapturadas
+     * @param event touchmove del documento
+     * @returns true = no llamar preventDefault (el navegador scrollea la tira)
+     */
+    private gestoPermiteScrollTira(tira: HTMLElement, event: TouchEvent): boolean {
+        const inicio = this.inicioToqueTira;
+        const touch = event.touches[0];
+        if (!inicio || !touch || event.touches.length !== 1) {
+            return false;
         }
+
+        // Sin desborde no hay scroll: cancelar evita que el modal baile.
+        if (tira.scrollWidth <= tira.clientWidth + 1) {
+            return false;
+        }
+
+        const dx = touch.clientX - inicio.x;
+        const dy = touch.clientY - inicio.y;
+
+        // Los primeros píxeles NO se cancelan. Si preventDefault llega antes de
+        // que iOS clasifique el gesto, el scroll horizontal no arranca nunca.
+        // touch-action: pan-x ya impide el pan vertical nativo en ese hueco.
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
+            return true;
+        }
+
+        // Vertical: ahora sí cancelamos, para que no haya bounce del modal.
+        if (Math.abs(dx) <= Math.abs(dy)) {
+            return false;
+        }
+
+        // Sin desborde no hay scroll real: a partir de aquí el arrastre se corta.
+        if (tira.scrollWidth <= tira.clientWidth + 1) {
+            return false;
+        }
+
+        const enInicio = tira.scrollLeft <= 0;
+        const enFinal = tira.scrollLeft + tira.clientWidth >= tira.scrollWidth - 1;
+        // En el borde el gesto sobrante se lo come el body. Lo cortamos.
+        if ((dx > 0 && enInicio) || (dx < 0 && enFinal)) {
+            return false;
+        }
+
+        this.tiraEnScroll = true;
+        return true;
+    }
+
+    /**
+     * Quita la foto cuyo botón se tocó, salvo que el gesto haya sido scroll.
+     *
+     * @param event Click del botón miniatura (o de un hijo)
+     */
+    private alClicMiniatura(event: MouseEvent): void {
+        if (this.ignorarProximoClicTira || this.tiraEnScroll) {
+            this.ignorarProximoClicTira = false;
+            this.tiraEnScroll = false;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        const objetivo = event.target;
+        if (!(objetivo instanceof Element)) {
+            return;
+        }
+        const boton = objetivo.closest('.camera-mini');
+        if (!(boton instanceof HTMLButtonElement) || !this.tiraFotos?.contains(boton)) {
+            return;
+        }
+        const fotoId = boton.dataset.fotoId;
+        if (!fotoId) {
+            return;
+        }
+        event.preventDefault();
+        this.quitarFotoCapturada(fotoId);
+    }
+
+    /**
+     * Saca una foto de la tanda. Si el JPEG aún no termina, no se vuelve a agregar.
+     *
+     * @param fotoId Id de la miniatura (data-foto-id)
+     */
+    private quitarFotoCapturada(fotoId: string): void {
+        this.fotosDescartadas.add(fotoId);
+        this.fotosCapturadas = this.fotosCapturadas.filter((foto) => foto.id !== fotoId);
+        this.quitarMiniaturaDom(fotoId);
+    }
+
+    /**
+     * JPEG chico para la tira. No es el archivo que se sube: ese sigue en el Worker.
+     * 160 px cabe en un toDataURL rápido y no congela el obturador.
+     *
+     * @param canvas Frame ya rotado, tamaño Full HD
+     * @returns data URL JPEG, o cadena vacía si el canvas no sirve
+     */
+    private crearUrlMiniatura(canvas: HTMLCanvasElement): string {
+        const ladoMax = 160;
+        if (canvas.width < 1 || canvas.height < 1) {
+            return '';
+        }
+
+        const escala = Math.min(ladoMax / canvas.width, ladoMax / canvas.height, 1);
+        const mini = document.createElement('canvas');
+        mini.width = Math.max(1, Math.round(canvas.width * escala));
+        mini.height = Math.max(1, Math.round(canvas.height * escala));
+        const ctx = mini.getContext('2d');
+        if (!ctx) {
+            return '';
+        }
+
+        ctx.drawImage(canvas, 0, 0, mini.width, mini.height);
+        try {
+            return mini.toDataURL('image/jpeg', 0.7);
+        } catch (error) {
+            console.warn('⚠️ No se pudo crear la miniatura:', error);
+            return '';
+        }
+    }
+
+    /**
+     * Pinta una miniatura al final de la tira y la desplaza para que se vea.
+     * No usa scrollIntoView: en iOS eso mueve la página, no solo la tira.
+     *
+     * @param fotoId Id estable de esta captura
+     * @param urlMiniatura data URL chica, o '' si falló
+     * @param pendiente true mientras el JPEG grande sigue comprimiéndose
+     */
+    private mostrarMiniatura(fotoId: string, urlMiniatura: string, pendiente: boolean): void {
+        const tira = this.tiraFotos;
+        if (!tira) {
+            return;
+        }
+
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = pendiente
+            ? 'camera-mini camera-mini--pendiente'
+            : 'camera-mini camera-mini--lista';
+        boton.dataset.fotoId = fotoId;
+        boton.setAttribute(
+            'aria-label',
+            pendiente ? 'Quitar foto que se está guardando' : 'Quitar foto'
+        );
+
+        const img = document.createElement('img');
+        img.className = 'camera-mini-img';
+        img.alt = '';
+        img.draggable = false;
+        if (urlMiniatura) {
+            img.src = urlMiniatura;
+        }
+
+        const estado = document.createElement('span');
+        estado.className = 'camera-mini-estado';
+        estado.setAttribute('aria-hidden', 'true');
+        const iconoEstado = document.createElement('i');
+        iconoEstado.className = pendiente ? 'bi bi-hourglass-split' : 'bi bi-check-lg';
+        estado.appendChild(iconoEstado);
+
+        const quitar = document.createElement('span');
+        quitar.className = 'camera-mini-quitar';
+        quitar.setAttribute('aria-hidden', 'true');
+        const iconoQuitar = document.createElement('i');
+        iconoQuitar.className = 'bi bi-x-lg';
+        quitar.appendChild(iconoQuitar);
+
+        boton.append(img, estado, quitar);
+        tira.appendChild(boton);
+        tira.hidden = false;
+        this.anunciarTira();
+
+        requestAnimationFrame(() => {
+            tira.scrollLeft = tira.scrollWidth;
+        });
+    }
+
+    /**
+     * La miniatura deja de estar "guardando" y pasa a lista para quitar.
+     *
+     * @param fotoId Id de la captura cuyo JPEG ya terminó
+     */
+    private marcarMiniaturaLista(fotoId: string): void {
+        const boton = this.buscarMiniatura(fotoId);
+        if (!boton) {
+            return;
+        }
+        boton.classList.remove('camera-mini--pendiente');
+        boton.classList.add('camera-mini--lista');
+        boton.setAttribute('aria-label', 'Quitar foto');
+        const icono = boton.querySelector('.camera-mini-estado i');
+        if (icono) {
+            icono.className = 'bi bi-check-lg';
+        }
+        this.anunciarTira();
+    }
+
+    /**
+     * @param fotoId data-foto-id de la miniatura
+     * @returns El botón, o null si ya se quitó
+     */
+    private buscarMiniatura(fotoId: string): HTMLButtonElement | null {
+        if (!this.tiraFotos) {
+            return null;
+        }
+        const nodo = this.tiraFotos.querySelector(`[data-foto-id="${CSS.escape(fotoId)}"]`);
+        return nodo instanceof HTMLButtonElement ? nodo : null;
+    }
+
+    /**
+     * Borra una miniatura del DOM. No toca el arreglo de Blobs.
+     *
+     * @param fotoId Id a quitar de la tira
+     */
+    private quitarMiniaturaDom(fotoId: string): void {
+        this.buscarMiniatura(fotoId)?.remove();
+        if (this.tiraFotos && this.tiraFotos.children.length === 0) {
+            this.tiraFotos.hidden = true;
+            this.tiraFotos.scrollLeft = 0;
+        }
+        this.anunciarTira();
+    }
+
+    /**
+     * Vacía la tira y olvida gestos a medias. No revoca Blobs: eso lo hace quien limpia el arreglo.
+     */
+    private vaciarTira(): void {
+        this.fotosDescartadas.clear();
+        this.tiraEnScroll = false;
+        this.ignorarProximoClicTira = false;
+        this.inicioToqueTira = null;
+        if (this.tiraFotos) {
+            this.tiraFotos.replaceChildren();
+            this.tiraFotos.hidden = true;
+            this.tiraFotos.scrollLeft = 0;
+        }
+        if (this.anuncioTiraFotos) {
+            this.anuncioTiraFotos.textContent = '';
+        }
+    }
+
+    /**
+     * Avisa a lectores de pantalla cuántas fotos hay, sin pintar un número en el visor.
+     */
+    private anunciarTira(): void {
+        if (!this.anuncioTiraFotos || !this.tiraFotos) {
+            return;
+        }
+        const total = this.tiraFotos.children.length;
+        if (total === 0) {
+            this.anuncioTiraFotos.textContent = '';
+            return;
+        }
+        this.anuncioTiraFotos.textContent = total === 1
+            ? '1 foto en la tanda'
+            : `${total} fotos en la tanda`;
     }
     
     /**
@@ -2112,7 +2438,7 @@ class CamaraIntegrada {
             }
 
             this.fotosCapturadas = [];
-            this.actualizarContador();
+            this.vaciarTira();
             this.cerrarModal();
         } finally {
             if (this.btnFinalizar) {
@@ -2146,7 +2472,7 @@ class CamaraIntegrada {
         if (this.fotosCapturadas.length > 0) {
             console.log(`🗑️ Descartando ${this.fotosCapturadas.length} foto(s) no confirmada(s)`);
             this.fotosCapturadas = [];
-            this.actualizarContador();
+            this.vaciarTira();
         }
     }
     
