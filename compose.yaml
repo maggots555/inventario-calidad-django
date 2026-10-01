@@ -143,6 +143,10 @@ services:
     command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2", "--max-tasks-per-child=100"]
     volumes:
       - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
+      # La página escribe aquí el manifest de CSS/JS (collectstatic).
+      # Con DEBUG=False, Celery también lo lee al arrancar. Sin este
+      # disco, busca el favicon dentro de la imagen y se cae.
+      - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles:ro
       - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
     depends_on:
       web:
@@ -170,6 +174,8 @@ services:
       SIGMA_MIGRAR: "0"
     command: ["celery", "-A", "config", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
     volumes:
+      # Mismo manifest que el worker. Beat carga las URLs al arrancar.
+      - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles:ro
       - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
     depends_on:
       web:
