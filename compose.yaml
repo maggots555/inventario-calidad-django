@@ -105,6 +105,24 @@ services:
     networks:
       - sigma_interna
 
+  # Túnel de salida hacia Cloudflare. No abre puertos en el servidor.
+  # Solo arranca con: docker compose --profile cloudflare up -d
+  # El token vive en docker/.env (CLOUDFLARE_TUNNEL_TOKEN). No va a git.
+  # En el panel de Cloudflare el hostname apunta a http://nginx:80
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    profiles:
+      - cloudflare
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      nginx:
+        condition: service_started
+    networks:
+      - sigma_interna
+
   celery:
     # Misma imagen que web. build + pull_policy evitan buscarla en internet.
     build: .

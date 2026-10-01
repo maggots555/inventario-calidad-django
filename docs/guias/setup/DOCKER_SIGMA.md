@@ -83,6 +83,38 @@ En el servidor, dentro de `docker/.env`:
 - `SECRET_KEY` y `DB_PASSWORD` nuevos (no los de esta guía)
 - `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` y `SITE_URL` con el dominio real
 
-PostgreSQL y Redis siguen sin publicarse a la red. El acceso público (Cloudflare) es un paso posterior: el servidor viejo se queda encendido hasta que esa prueba salga bien.
+PostgreSQL y Redis siguen sin publicarse a la red. El acceso de prueba de Argentina sale por un túnel de Cloudflare (contenedor `cloudflared`). No hace falta abrir el puerto 80. México y `sigmasystem.work` siguen en el túnel del servidor viejo.
+
+## Prueba pública: argentina.sigmasystem.work
+
+Ese dominio hoy está en el túnel viejo (`sigmasystem-tunnel`), aunque nadie lo use. Hay que quitarlo de ahí y publicarlo en un túnel nuevo que vive en `sic-sigma`. El contenedor no abre puertos: sale él hacia Cloudflare y entrega la página a Nginx por la red interna (`http://nginx:80`).
+
+En Zero Trust (Cloudflare):
+
+1. Networks → Tunnels → el túnel viejo `sigmasystem-tunnel` → Public Hostname → borrar solo `argentina.sigmasystem.work`. No borres México ni el dominio principal.
+2. Create a tunnel. Nombre sugerido: `sic-sigma`. Elige Docker y copia el token. No lo pegues en el chat ni en git.
+3. En ese túnel nuevo, Public Hostname:
+   - Subdomain: `argentina`
+   - Domain: `sigmasystem.work`
+   - Service type: HTTP
+   - URL: `nginx:80`
+
+En el servidor, dentro de `docker/.env`, agrega el token y el dominio:
+
+```text
+CLOUDFLARE_TUNNEL_TOKEN=el-token-del-tunel-nuevo
+ALLOWED_HOSTS=localhost,127.0.0.1,192.168.70.227,argentina.sigmasystem.work
+CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://192.168.70.227:8080,https://argentina.sigmasystem.work
+SITE_URL=https://argentina.sigmasystem.work
+```
+
+`DEBUG` puede quedarse en `True` durante esta prueba por HTTP del túnel SSH. Luego:
+
+```bash
+docker compose --env-file docker/.env --profile cloudflare up -d
+docker compose --env-file docker/.env restart nginx
+```
+
+La página de prueba queda en https://argentina.sigmasystem.work/login/ . SIGMA lee el subdominio `argentina` y usa la base de Argentina, que en este servidor está vacía.
 
 No subas `docker/.env` ni `docker-data/` a git.
