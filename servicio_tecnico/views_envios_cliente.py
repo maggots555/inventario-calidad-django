@@ -507,18 +507,20 @@ def enviar_rewind_egreso_cliente(request, orden_id):
         # ===================================================================
         # PASO 6: LANZAR CHAIN CELERY
         # ===================================================================
-        from celery import chain as celery_chain
-        from .tasks import generar_video_resumen_task, enviar_rewind_egreso_email_task
         from config.paises_config import get_pais_actual
+        from servicio_tecnico.services.rewind_egreso import _delay_chain_rewind
 
         usuario_id = request.user.pk if request.user.is_authenticated else None
         _db_alias_rewind = get_pais_actual()['db_alias']
 
-        cadena = celery_chain(
-            generar_video_resumen_task.s(orden_id, usuario_id, _db_alias_rewind),
-            enviar_rewind_egreso_email_task.s(orden_id, usuario_id, destinatarios_copia, _db_alias_rewind),
+        # Misma cadena que el envío masivo: el país va con nombre db_alias=
+        # para que el worker busque la orden en la base de este país.
+        tarea_raiz = _delay_chain_rewind(
+            orden_id,
+            usuario_id,
+            destinatarios_copia,
+            _db_alias_rewind,
         )
-        tarea_raiz = cadena.delay()
 
         # Registrar de inmediato que la generación fue iniciada, para que el botón
         # muestre "ya enviado / reenviar" en la recarga sin esperar a que

@@ -238,10 +238,16 @@ def _delay_chain_rewind(
         generar_video_resumen_task,
     )
 
+    # El país va CON NOMBRE (db_alias=), igual que los correos.
+    # Si viaja suelto en la posición 3, la señal de Celery no lo ve,
+    # el worker abre la base de México y la orden de otro país "no existe".
     cadena = celery_chain(
-        generar_video_resumen_task.s(orden_id, usuario_id, db_alias),
+        generar_video_resumen_task.s(orden_id, usuario_id, db_alias=db_alias),
         enviar_rewind_egreso_email_task.s(
-            orden_id, usuario_id, destinatarios_copia, db_alias
+            orden_id,
+            usuario_id,
+            destinatarios_copia,
+            db_alias=db_alias,
         ),
     )
     return cadena.delay()
