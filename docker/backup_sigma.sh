@@ -2,13 +2,15 @@
 # Respaldo nocturno de SIGMA en sic-sigma.
 #
 # EXPLICACIÓN PARA PRINCIPIANTES:
-# 1. Saca una copia de la base de México (y de las otras tres, hoy vacías)
+# 1. Saca una copia de las cuatro bases (México, Argentina, Chile y Colombia)
 #    desde el Postgres que vive dentro de Docker.
 # 2. Sube ese archivo .sql.gz a Drive, carpeta SIGMA-Backups/postgresql.
-# 3. Sube las fotos nuevas de media/mexico a Drive.
+# 3. Sube las fotos nuevas de media/{mexico,argentina,chile,colombia} a Drive.
 #
 # Usa "rclone copy", no "sync". Copy solo manda lo que falta o cambió.
 # No borra en Drive una foto que todavía no esté en este disco.
+# Las fotos de Argentina, Chile y Colombia ya están en Drive: esta noche
+# solo va a comparar y a subir lo que sea nuevo.
 #
 # El cron del servidor viejo queda apagado. Este script es el reemplazo.
 
@@ -16,7 +18,8 @@ set -euo pipefail
 
 APP_DIR="/srv/sic/apps/sigma"
 BACKUP_DIR="/srv/sic/backups/sigma"
-MEDIA_MEXICO="/srv/sic/data/sigma/media/mexico"
+# Carpeta de fotos en el disco del servidor. Cada país es una subcarpeta.
+MEDIA_ROOT="/srv/sic/data/sigma/media"
 RCLONE="/srv/sic/bin/rclone"
 LOG_DIR="/srv/sic/data/sigma/logs"
 LOG_FILE="${LOG_DIR}/backup_sigma.log"
@@ -24,6 +27,8 @@ DIAS_LOCALES=7
 
 # Nombres de las bases dentro del contenedor postgres.
 BASES="inventario_mexico inventario_argentina inventario_chile inventario_colombia"
+# Mismas carpetas de fotos que hay en Drive: gdrive:SIGMA-Backups/media/<pais>
+PAISES_MEDIA="mexico argentina chile colombia"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -67,16 +72,21 @@ log "Subiendo volcados nuevos a Drive (no borra los antiguos de la nube)"
     --stats-one-line \
     >> "$LOG_FILE" 2>&1
 
-if [ -d "$MEDIA_MEXICO" ]; then
-    log "Subiendo fotos nuevas de México (copy: no borra nada en Drive)"
-    "$RCLONE" copy "$MEDIA_MEXICO" "gdrive:SIGMA-Backups/media/mexico" \
+# México va primero: es la carpeta grande. Las otras tres son pocas fotos.
+# copy compara con Drive y no vuelve a subir un archivo que ya está igual.
+for pais in $PAISES_MEDIA; do
+    origen="${MEDIA_ROOT}/${pais}"
+    if [ ! -d "$origen" ]; then
+        log "No existe ${origen}. No se subieron fotos de ${pais}."
+        continue
+    fi
+    log "Subiendo fotos nuevas de ${pais} (copy: no borra nada en Drive)"
+    "$RCLONE" copy "$origen" "gdrive:SIGMA-Backups/media/${pais}" \
         --transfers 4 \
         --checkers 8 \
         --stats 1m \
         --stats-one-line \
         >> "$LOG_FILE" 2>&1
-else
-    log "No existe ${MEDIA_MEXICO}. No se subieron fotos."
-fi
+done
 
 log "=== Respaldo terminado ==="
