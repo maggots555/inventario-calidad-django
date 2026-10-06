@@ -3,7 +3,7 @@
 > **Project**: Sistema Integrado de Gestión Técnica y Control de Calidad (SIGMA)  
 > **Framework**: Django 5.2.14 | Python 3.12+ | TypeScript 5.9.3  
 > **Purpose**: Enterprise technical service management with ML analytics  
-> **Deployment**: PWA — instalable en móviles como app nativa
+> **Deployment**: Docker en sic-sigma (ver §12). PWA — instalable en móviles como app nativa
 
 ---
 
@@ -37,6 +37,8 @@
 
 ### Comandos frecuentes
 Ver también **§9 Quick Reference**.
+
+Estos comandos son la laptop **sin** Docker (SQLite). En sic-sigma el programa vive dentro de la imagen: no hay `venv` ni `systemctl` de Gunicorn. Ver §12.
 
 ```bash
 python manage.py runserver
@@ -136,6 +138,9 @@ inventario-calidad-django/
 ├── media/                  # por país
 ├── scripts/                # testing/, poblado/, verificacion/
 ├── ml_models/
+├── docker/                 # entrypoint, nginx, respaldo, .env.example (el .env real no va a git)
+├── compose.yaml            # postgres, redis, web, nginx, celery, beat, cloudflared
+├── Dockerfile              # imagen sigma-web:local (no existe en Docker Hub)
 ├── manage.py, requirements.txt, package.json
 ├── tsconfig.json, tsconfig.sw.json, tsconfig.jpeg_worker.json
 └── AGENTS.md
@@ -159,9 +164,11 @@ inventario-calidad-django/
 - ❌ NUNCA ignorar errores de `tsc`
 
 ### Database
-- Dev: SQLite (`DB_ENGINE=django.db.backends.sqlite3`)
-- Prod: PostgreSQL (pooling según settings)
-- Secrets solo vía `python-decouple` / `.env` (nunca commitear `.env`)
+- Laptop sin Docker: SQLite (`DB_ENGINE=django.db.backends.sqlite3`)
+- Laptop con Docker y producción sic-sigma: PostgreSQL 16. `default` y `mexico` apuntan a la misma base
+- Nombres en Docker: `inventario_mexico`, `inventario_argentina`, `inventario_chile`, `inventario_colombia`
+- En el servidor anterior, México sigue llamándose `inventario_django`. No usar ese nombre en sic-sigma
+- Secrets solo vía `python-decouple` / `.env` (nunca commitear `.env` ni `docker/.env`)
 
 ### Security
 - Django-Axes; CSRF activo (`CSRF_COOKIE_NAME = 'sigma_csrftoken'` en producción)
@@ -591,6 +598,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 25. No hinchar `models.py` grandes (`OrdenServicio`, `SolicitudCotizacion`, etc.) — §4 Fat models; lógica nueva en `services/`/`utils/`; extraer lo viejo solo si duele o de paso
 26. No hinchar `tasks.py` grandes — §4 Fat tasks; tarea nueva = `tasks_<dominio>.py` + reexport al final; no cambiar `name=`; no partir el gordo sin pedido explícito
 27. Correos HTML → tablas + CSS inline + paleta SIC; canónico `imagenes_cliente.html` — ver §5 Correos HTML; no rediseñar todos de un golpe
+28. Producción es Docker en sic-sigma — ver §12. No proponer `venv`, `collectstatic` a mano ni `systemctl restart gunicorn` en ese servidor
 
 ---
 
@@ -611,6 +619,10 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 | Seed | `python scripts/poblado/poblar_sistema.py` |
 | Deps Python (reproducible) | `pip install -r requirements.lock` |
 | Deps Python (intent / actualizar) | editar `requirements.txt` → install → `pip freeze > requirements.lock` |
+| Docker laptop | `sh docker/levantar.sh` |
+| Docker sic-sigma, código nuevo | `git pull` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
+| Docker sic-sigma, solo `.env` | `docker compose --env-file docker/.env --profile cloudflare up -d --force-recreate web celery celery-beat` |
+| Logs Docker | `docker compose --env-file docker/.env logs -f --tail 50 web` |
 
 ---
 
@@ -719,7 +731,51 @@ No “arreglar” quitando `select_for_update()`: eso elimina la protección con
 
 ---
 
-**Last Updated**: Septiembre 2026  
+## 12. DOCKER EN SIC-SIGMA
+
+Guía para personas: `docs/guias/setup/DOCKER_SIGMA.md`. Esta sección es la regla para agentes. Hasta que la rama `dockerizacion` se una a `master`, el servidor público sigue en `dockerizacion`. Un cambio que tenga que verse en producción se integra ahí.
+
+El código de Django va **dentro** de la imagen `sigma-web:local`. No está montado como carpeta. `pull_policy: build` solo evita buscar esa imagen en Docker Hub. Si el código cambió, hace falta `--build`. Compose reutiliza la imagen vieja si se omite.
+
+| Qué cambió | Comando, desde `/srv/sic/apps/sigma` |
+|---|---|
+| Python, plantillas, CSS/JS o `requirements-docker.txt` | `git pull` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
+| Solo `docker/.env` | `up -d --force-recreate` de esos tres servicios, sin `--build`. `restart` no vuelve a leer el `.env` |
+| Nada: solo reiniciar | `docker compose --env-file docker/.env restart web celery` |
+| `docker/backup_sigma.sh` | `git pull`. El cron lee el archivo del disco. No reconstruye la imagen |
+
+Al arrancar, `web` (`SIGMA_MIGRAR=1`) migra `default`, `argentina`, `chile` y `colombia`, y corre `collectstatic`. `mexico` no se migra otra vez: es la misma base que `default`. Celery y Beat llevan `SIGMA_MIGRAR=0`. Los dos montan `staticfiles` en solo lectura. Sin ese disco, con `DEBUG=False`, fallan al importar `urls.py` por el manifest del favicon.
+
+```
+❌ NUNCA omitir --env-file docker/.env (Compose leería el .env de SQLite de la laptop)
+❌ NUNCA publicar Postgres ni Redis a la red del host
+❌ NUNCA pegar SECRET_KEY, DB_PASSWORD, CLOUDFLARE_TUNNEL_TOKEN ni tokens de rclone en git, docs o el chat
+❌ NUNCA copiar PRIMARY_MEDIA_ROOT=/mnt/django_storage/media al docker/.env. Dentro del contenedor las fotos son /app/media
+❌ NUNCA usar rclone sync en el respaldo. El script usa copy: no borra en Drive lo que aún no está en este disco
+❌ NUNCA apuntar el cron de sic-sigma a scripts/backup_postgres.sh. Ese script es del servidor anterior y solo vuelca inventario_django
+❌ NUNCA hacer git pull ni reiniciar Gunicorn en el servidor anterior como si fuera el deploy. Ese equipo queda encendido durante la observación; su cron de respaldo está comentado a propósito
+❌ NUNCA quitar el volumen staticfiles de celery o celery-beat
+
+✅ Siempre --profile cloudflare en sic-sigma cuando el comando pueda recrear el proyecto. El túnel no abre puertos: Cloudflare entra a http://nginx:80
+✅ Hostnames públicos en el túnel sic-sigma: mexico, argentina, chile, colombia y el apex sigmasystem.work
+✅ Fotos en disco: ${SIGMA_DATA_ROOT}/media/{mexico,argentina,chile,colombia}. En el servidor, SIGMA_DATA_ROOT=/srv/sic/data/sigma
+✅ Respaldos locales: /srv/sic/backups/sigma. Log: /srv/sic/data/sigma/logs/backup_sigma.log
+✅ Cron del host: 03:00 hora del reloj de sic-sigma (CST), no UTC. Beat de Celery sí corre en UTC: un crontab hour=8 dentro de Django son las 02:00 en México
+✅ El script vuelca las cuatro bases y después hace rclone copy de media/mexico, argentina, chile y colombia hacia gdrive:SIGMA-Backups/
+✅ Logs de Gunicorn y Celery: docker compose --env-file docker/.env logs. Los de Django: /srv/sic/data/sigma/logs/
+✅ Guía de personas y valores de prueba: docs/guias/setup/DOCKER_SIGMA.md y docker/.env.example
+```
+
+| Ruta en sic-sigma | Qué es |
+|---|---|
+| `/srv/sic/apps/sigma` | Checkout de git, `compose.yaml`, `docker/` |
+| `/srv/sic/data/sigma` | Postgres, Redis, fotos, estáticos, logs |
+| `/srv/sic/backups/sigma` | Volcados `.sql.gz` |
+| `/srv/sic/bin/rclone` | Binario del respaldo. Su config no está en el repo |
+
+---
+
+**Last Updated**: Octubre 2026  
 **Django Version**: 5.2.14
 **Python Version**: 3.12+
 **TypeScript Version**: 5.9.3

@@ -1,120 +1,165 @@
-# SIGMA en Docker (rama `dockerizacion`)
+# SIGMA en Docker
 
-Esta guía es para **probar** SIGMA dentro de contenedores. No reemplaza al servidor que hoy está en producción. La rama `master` sigue siendo el proyecto sin Docker.
+SIGMA en producción corre en Docker, en el servidor **sic-sigma**. La misma receta sirve para probar en la laptop. Los secretos (claves, token del túnel, token de Drive) viven solo en `docker/.env` de cada máquina. Ese archivo no se sube a git.
 
-## Qué vas a levantar
+Hasta que la rama `dockerizacion` se una a `master`, sic-sigma sigue en `dockerizacion`.
 
-Seis programas, cada uno en su contenedor:
+## Qué se levanta
 
-| Servicio | Para qué sirve | ¿Se abre en tu PC? |
+Siete programas. Solo Nginx abre un puerto. Postgres y Redis se quedan en la red interna `sigma_interna`.
+
+| Servicio | Para qué sirve | ¿Se publica? |
 |---|---|---|
-| `nginx` | Recibe el navegador y entrega CSS, JS y fotos | Sí, puerto **8080** |
-| `web` | Django con Gunicorn | No (solo lo ve Nginx) |
-| `celery` | Tareas lentas (correos, videos, PDF) | No |
+| `nginx` | Recibe el navegador y entrega CSS, JS y fotos | Sí, puerto `SIGMA_HTTP_PORT` (8080 si no se cambia) |
+| `web` | Django con Gunicorn. Al arrancar migra y junta estáticos | No |
+| `celery` | Correos, videos, PDF | No |
 | `celery-beat` | Tareas con horario | No |
-| `postgres` | Cuatro bases: México, Argentina, Chile, Colombia | No |
-| `redis` | Cola de Celery y caché | No |
+| `postgres` | Cuatro bases, una por país | No |
+| `redis` | Cola `/0`, resultados `/1`, caché `/2` | No |
+| `cloudflared` | Túnel hacia Cloudflare. Solo con el perfil `cloudflare` | No abre puertos. Cloudflare entra a `http://nginx:80` |
 
-Los archivos de la base, las fotos y los logs quedan en la carpeta `docker-data/` de tu laptop. Esa carpeta no se sube a git. Si borras los contenedores, los datos siguen ahí.
+La imagen de la aplicación se llama `sigma-web:local`. Se construye en la máquina. No existe en Docker Hub. `web`, `celery` y `celery-beat` usan esa misma imagen.
 
-## Primer arranque en la laptop
+## Dónde está cada cosa
 
-Tu usuario de Linux tiene que poder hablar con Docker. Si `docker info` responde
-"permission denied", pide una vez (y vuelve a entrar a la sesión):
+| | Laptop | sic-sigma |
+|---|---|---|
+| Código y `compose.yaml` | carpeta del proyecto | `/srv/sic/apps/sigma` |
+| Base, fotos, estáticos, logs | `docker-data/` (no va a git) | `/srv/sic/data/sigma` |
+| Respaldos `.sql.gz` | no aplica | `/srv/sic/backups/sigma` |
+| Variables | `docker/.env`, copiado del ejemplo | `docker/.env` del servidor. `DEBUG=False` |
+
+`SIGMA_DATA_ROOT` en la laptop es `./docker-data`. En sic-sigma es `/srv/sic/data/sigma`.
+
+## Bases de datos
+
+Dentro de Docker los nombres son:
+
+| País | Base | Alias de Django |
+|---|---|---|
+| México | `inventario_mexico` | `default` y `mexico` (es la misma base) |
+| Argentina | `inventario_argentina` | `argentina` |
+| Chile | `inventario_chile` | `chile` |
+| Colombia | `inventario_colombia` | `colombia` |
+
+En el servidor anterior, la base de México se llama `inventario_django`. Ese nombre no se usa en sic-sigma.
+
+La primera vez que el disco de Postgres está vacío, `docker/postgres-init.sh` crea Argentina, Chile y Colombia. Si el disco ya tiene datos, ese script no vuelve a correr. Al arrancar, el contenedor `web` aplica migraciones en `default`, `argentina`, `chile` y `colombia`, y corre `collectstatic`. No migra `mexico` otra vez.
+
+## Probar en la laptop
+
+Tu usuario tiene que poder usar Docker. Si `docker info` dice "permission denied":
 
 ```bash
 sudo usermod -aG docker "$USER"
 ```
 
-Después, desde la raíz del proyecto, en la rama `dockerizacion`:
+Cierra la sesión y vuelve a entrar. Después, en la raíz del proyecto:
 
 ```bash
 sh docker/levantar.sh
 ```
 
-Ese script copia `docker/.env.example` a `docker/.env` si todavía no existe,
-y levanta los contenedores. La primera vez tarda: descarga Postgres, Redis y
-Nginx, construye la imagen de SIGMA en tu PC y aplica las migraciones en las
-cuatro bases.
+Ese script copia `docker/.env.example` a `docker/.env` si todavía no existe, y levanta los contenedores. La primera vez descarga Postgres, Redis y Nginx, construye la imagen y aplica las migraciones. La base queda vacía.
 
-Esa imagen se llama `sigma-web:local` y solo vive en tu computadora. Compose
-no la busca en internet (`pull_policy: build`). Si en un arranque anterior
-viste `pull access denied for sigma-web`, era ese intento de descarga: la
-página podía abrir igual porque después la imagen se construyó aquí.
-
-Cuando termine, abre [http://localhost:8080/login/](http://localhost:8080/login/). La base está vacía: todavía no hay usuarios. Para crear uno de prueba:
+Abre [http://localhost:8080/login/](http://localhost:8080/login/). Para crear un usuario de prueba:
 
 ```bash
 docker compose --env-file docker/.env exec web python manage.py createsuperuser
 ```
 
-## Comandos del día a día
+Usa siempre `--env-file docker/.env`. Si lo omites, Compose puede leer el `.env` de la raíz, que es el de SQLite, y la base no coincide.
 
 ```bash
-# Ver si están corriendo
 docker compose --env-file docker/.env ps
-
-# Ver el arranque de Django (migraciones, errores)
 docker compose --env-file docker/.env logs -f web
-
-# Ver el worker de Celery
 docker compose --env-file docker/.env logs -f celery
-
-# Apagar sin borrar datos
 docker compose --env-file docker/.env down
 ```
 
-Usa siempre `--env-file docker/.env`. Si omites esa bandera, Compose puede leer el `.env` de la laptop (SQLite) y la base de Docker no va a coincidir.
+`down` apaga los contenedores y no borra `docker-data/`.
 
-## Cuando se monte en el servidor `sic-sigma`
-
-IT dejó estas carpetas (no hace falta sudo; el usuario `sigma` ya puede usarlas):
-
-| Qué | Dónde |
-|---|---|
-| Este `compose.yaml`, el `Dockerfile` y `docker/` | `/srv/sic/apps/sigma` |
-| Base, fotos y Redis | `/srv/sic/data/sigma` |
-| Respaldos | `/srv/sic/backups/sigma` |
-
-En el servidor, dentro de `docker/.env`:
-
-- `SIGMA_DATA_ROOT=/srv/sic/data/sigma`
-- `DEBUG=False`
-- `SECRET_KEY` y `DB_PASSWORD` nuevos (no los de esta guía)
-- `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` y `SITE_URL` con el dominio real
-
-PostgreSQL y Redis siguen sin publicarse a la red. El acceso de prueba de Argentina sale por un túnel de Cloudflare (contenedor `cloudflared`). No hace falta abrir el puerto 80. México y `sigmasystem.work` siguen en el túnel del servidor viejo.
-
-## Prueba pública: argentina.sigmasystem.work
-
-Ese dominio hoy está en el túnel viejo (`sigmasystem-tunnel`), aunque nadie lo use. Hay que quitarlo de ahí y publicarlo en un túnel nuevo que vive en `sic-sigma`. El contenedor no abre puertos: sale él hacia Cloudflare y entrega la página a Nginx por la red interna (`http://nginx:80`).
-
-En Zero Trust (Cloudflare):
-
-1. Networks → Tunnels → el túnel viejo `sigmasystem-tunnel` → Public Hostname → borrar solo `argentina.sigmasystem.work`. No borres México ni el dominio principal.
-2. Create a tunnel. Nombre sugerido: `sic-sigma`. Elige Docker y copia el token. No lo pegues en el chat ni en git.
-3. En ese túnel nuevo, Public Hostname:
-   - Subdomain: `argentina`
-   - Domain: `sigmasystem.work`
-   - Service type: HTTP
-   - URL: `nginx:80`
-
-En el servidor, dentro de `docker/.env`, agrega el token y el dominio:
-
-```text
-CLOUDFLARE_TUNNEL_TOKEN=el-token-del-tunel-nuevo
-ALLOWED_HOSTS=localhost,127.0.0.1,192.168.70.227,argentina.sigmasystem.work
-CSRF_TRUSTED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://192.168.70.227:8080,https://argentina.sigmasystem.work
-SITE_URL=https://argentina.sigmasystem.work
-```
-
-`DEBUG` puede quedarse en `True` durante esta prueba por HTTP del túnel SSH. Luego:
+El túnel no se levanta en la laptop. Hace falta el perfil y un token, y el token solo está en el servidor:
 
 ```bash
 docker compose --env-file docker/.env --profile cloudflare up -d
-docker compose --env-file docker/.env restart nginx
 ```
 
-La página de prueba queda en https://argentina.sigmasystem.work/login/ . SIGMA lee el subdominio `argentina` y usa la base de Argentina, que en este servidor está vacía.
+## Cómo se actualiza sic-sigma
 
-No subas `docker/.env` ni `docker-data/` a git.
+El código de Django va dentro de la imagen. Un `git pull` no cambia lo que ya está corriendo hasta que se reconstruye.
+
+En `/srv/sic/apps/sigma`, si cambió Python, plantillas, CSS, JavaScript o `requirements-docker.txt`:
+
+```bash
+git pull
+docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat
+```
+
+`--build` vuelve a armar la imagen. Sin esa bandera, Compose reutiliza `sigma-web:local` aunque el código en disco sea nuevo. Al encender, `web` migra y junta los estáticos. No hace falta correr `collectstatic` a mano ni activar un entorno virtual: en este servidor no hay `venv`.
+
+Si solo cambió `docker/.env` (un host, una clave):
+
+```bash
+docker compose --env-file docker/.env --profile cloudflare up -d --force-recreate web celery celery-beat
+```
+
+Eso crea contenedores nuevos con las variables nuevas y no reconstruye la imagen. `restart` enciende el mismo contenedor y se queda con las variables viejas.
+
+Si no cambió nada y solo quieres reiniciar:
+
+```bash
+docker compose --env-file docker/.env restart web celery
+```
+
+`--profile cloudflare` mantiene el túnel en el mismo proyecto. Los comandos de arriba no llevan secretos: los leen de `docker/.env`.
+
+Logs de Gunicorn y Celery:
+
+```bash
+docker compose --env-file docker/.env logs -f --tail 50 web
+docker compose --env-file docker/.env logs -f --tail 50 celery
+```
+
+Los de Django están en `/srv/sic/data/sigma/logs/`.
+
+## Fotos
+
+En disco quedan en `media/mexico`, `media/argentina`, `media/chile` y `media/colombia`, dentro de `SIGMA_DATA_ROOT`. El contenedor las ve en `/app/media`.
+
+No pongas en `docker/.env` la ruta del servidor anterior (`/mnt/django_storage/media`). Esa carpeta no existe dentro del contenedor.
+
+Celery y Beat montan la carpeta de estáticos en solo lectura. Con `DEBUG=False` la necesitan para arrancar. Si se quita, fallan al buscar el favicon.
+
+## Respaldo de las 3:00
+
+El cron del servidor ejecuta `docker/backup_sigma.sh`. El reloj de sic-sigma es hora de México, así que `0 3 * * *` son las 3:00 de la mañana. No uses las 9:00 pensando que el host está en UTC.
+
+Ese script:
+
+1. Volcado de las cuatro bases a `/srv/sic/backups/sigma`.
+2. Sube esos `.sql.gz` a Drive, carpeta `SIGMA-Backups/postgresql`.
+3. Sube fotos nuevas de los cuatro países a `SIGMA-Backups/media/<país>`.
+
+Usa `rclone copy`. Copia lo que falta o cambió. No borra en Drive una foto que todavía no esté en este disco. El log queda en `/srv/sic/data/sigma/logs/backup_sigma.log` y cierra con `=== Respaldo terminado ===`.
+
+Un cambio en ese script llega con `git pull`. No hace falta `--build`: el cron lee el archivo del disco.
+
+No apuntes este cron a `scripts/backup_postgres.sh`. Ese script es del servidor anterior y solo vuelca `inventario_django`.
+
+Celery Beat es otra cosa. Corre dentro del contenedor, en UTC. Un horario `hour=8` en Django son las 02:00 en México.
+
+## Túnel
+
+Los hostnames públicos están en el túnel `sic-sigma`: `mexico`, `argentina`, `chile`, `colombia` y el dominio sin subdominio `sigmasystem.work`. En Cloudflare el servicio es HTTP hacia `nginx:80`.
+
+El token se llama `CLOUDFLARE_TUNNEL_TOKEN` y solo existe en el `docker/.env` del servidor. No se copia a la guía, al chat ni a git. El túnel del servidor anterior no se reutiliza.
+
+`ALLOWED_HOSTS` y `CSRF_TRUSTED_ORIGINS` del servidor incluyen esos dominios. Si falta uno, Django responde que el host no está permitido. Se agrega en `docker/.env` y se recrean `web`, `celery` y `celery-beat` sin `--build`.
+
+## Qué no hacer
+
+- No subir `docker/.env`, `docker-data/` ni la configuración de rclone.
+- No publicar el puerto de Postgres ni el de Redis.
+- No hacer `git pull` ni reiniciar Gunicorn en el servidor anterior como si ahí siguiera la página. Ese equipo queda encendido mientras se observa sic-sigma. Su cron de respaldo está comentado a propósito: si vuelve a correr, puede subir la base atrasada.
+- No mezclar esta guía con reglas de agentes. Esas viven en `AGENTS.md`, sección 12.
