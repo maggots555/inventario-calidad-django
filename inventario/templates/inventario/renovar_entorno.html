@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Renovar entorno Docker - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <h1 class="h3 mb-2">Candado del entorno Docker</h1>
+            <p class="text-body-secondary mb-4">
+                Esta clave no es la de tu usuario. Es aparte.
+                El cron del servidor sic-sigma la exige cada {{ dias_vigencia }} días.
+                Si nadie la escribe a tiempo, apaga SIGMA y borra
+                <code>docker/.env</code>. La base, las fotos y los respaldos se quedan.
+            </p>
+
+            {% if not armado %}
+            <div class="alert alert-info" role="status">
+                El candado todavía no está armado. Guardar la clave por primera
+                vez es lo que lo activa. Hasta entonces el cron no borra nada.
+            </div>
+            <form method="post" class="card border-0 shadow-sm">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="armar">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Definir la clave de renovación</h2>
+                    <div class="mb-3">
+                        <label for="clave" class="form-label">Clave nueva</label>
+                        <input type="password" name="clave" id="clave"
+                               class="form-control" minlength="8" required
+                               autocomplete="new-password">
+                        <div class="form-text">Mínimo 8 caracteres. Guárdala fuera de SIGMA: si la olvidas, el cron no la recupera.</div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="clave2" class="form-label">Repite la clave</label>
+                        <input type="password" name="clave2" id="clave2"
+                               class="form-control" minlength="8" required
+                               autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg"
+                            onclick="return confirm('Al guardar, si pasan 60 días sin esta clave el servidor se apaga y se borra docker/.env. ¿Continuar?');">
+                        Armar candado
+                    </button>
+                </div>
+            </form>
+            {% else %}
+
+            {% if dias_restantes is None %}
+            <div class="alert alert-warning" role="status">
+                Hay clave guardada, pero no pude leer la fecha de renovación.
+                Escribe la clave otra vez para dejar el sello en orden.
+            </div>
+            {% elif dias_restantes < 0 %}
+            <div class="alert alert-danger" role="alert">
+                El plazo ya venció ({{ dias_restantes }} días).
+                La próxima corrida del cron puede apagar el servidor y borrar
+                <code>docker/.env</code>. Renueva ahora.
+            </div>
+            {% elif urgente %}
+            <div class="alert alert-warning" role="status">
+                Quedan {{ dias_restantes }} días. Conviene renovar antes de que llegue a cero.
+            </div>
+            {% else %}
+            <div class="alert alert-success" role="status">
+                Quedan {{ dias_restantes }} días de {{ dias_vigencia }}.
+            </div>
+            {% endif %}
+
+            {% if ultima_renovacion %}
+            <p class="mb-4">
+                Última renovación:
+                <strong>{{ ultima_renovacion|date:"d/m/Y H:i" }}</strong>
+            </p>
+            {% endif %}
+
+            {% if bloqueado %}
+            <div class="alert alert-danger" role="alert">
+                Hay demasiados intentos fallidos. Espera 15 minutos.
+            </div>
+            {% endif %}
+
+            <form method="post" class="card border-0 shadow-sm mb-4">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="renovar">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Renovar otros {{ dias_vigencia }} días</h2>
+                    <div class="mb-3">
+                        <label for="clave-renovar" class="form-label">Clave de renovación</label>
+                        <input type="password" name="clave" id="clave-renovar"
+                               class="form-control" required autocomplete="current-password"
+                               {% if bloqueado %}disabled{% endif %}>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg"
+                            {% if bloqueado %}disabled{% endif %}>
+                        Renovar
+                    </button>
+                </div>
+            </form>
+
+            <form method="post" class="card border-0 shadow-sm">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="cambiar">
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Cambiar la clave</h2>
+                    <div class="mb-3">
+                        <label for="anterior" class="form-label">Clave actual</label>
+                        <input type="password" name="anterior" id="anterior"
+                               class="form-control" required autocomplete="current-password"
+                               {% if bloqueado %}disabled{% endif %}>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nueva" class="form-label">Clave nueva</label>
+                        <input type="password" name="nueva" id="nueva"
+                               class="form-control" minlength="8" required
+                               autocomplete="new-password"
+                               {% if bloqueado %}disabled{% endif %}>
+                    </div>
+                    <div class="mb-4">
+                        <label for="nueva2" class="form-label">Repite la clave nueva</label>
+                        <input type="password" name="nueva2" id="nueva2"
+                               class="form-control" minlength="8" required
+                               autocomplete="new-password"
+                               {% if bloqueado %}disabled{% endif %}>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary btn-lg"
+                            {% if bloqueado %}disabled{% endif %}
+                            onclick="return confirm('La clave anterior deja de servir. ¿Cambiarla?');">
+                        Cambiar clave
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

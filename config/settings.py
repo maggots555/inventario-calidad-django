@@ -688,6 +688,17 @@ CACHE_TTL_ML = 60 * 30          # 30 minutos — predicciones ML (cambian poco)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Candado de docker/.env (pantalla de renovación).
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Aquí solo vive el hash de una clave aparte y la fecha de la última
+# renovación. El cron del servidor lee esa fecha. En Docker, compose
+# pisa este valor con /app/renovacion, que es un disco del host.
+# No guardes la clave dentro de docker/.env: ese es el archivo que se borra.
+RENOVACION_ENV_DIR = config(
+    'RENOVACION_ENV_DIR',
+    default=str(BASE_DIR / 'docker-data' / 'renovacion'),
+)
+
 # Authentication settings
 # https://docs.djangoproject.com/en/5.2/topics/auth/default/
 LOGIN_URL = '/login/'

@@ -71,11 +71,16 @@ services:
       REDIS_CACHE_URL: redis://redis:6379/2
       CELERY_TASK_ALWAYS_EAGER: "False"
       SIGMA_MIGRAR: "1"
+      # La pantalla de renovación escribe el sello aquí, NO dentro de docker/.env.
+      # El cron del host lee el mismo disco: SIGMA_DATA_ROOT/renovacion.
+      RENOVACION_ENV_DIR: /app/renovacion
     command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
     volumes:
       - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
       - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles
       - ${SIGMA_DATA_ROOT:-./docker-data}/logs:/app/logs
+      # Hash y fecha de renovación. El cron los lee en el host; Django los escribe aquí.
+      - ${SIGMA_DATA_ROOT:-./docker-data}/renovacion:/app/renovacion
     depends_on:
       postgres:
         condition: service_healthy
