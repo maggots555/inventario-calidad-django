@@ -1224,21 +1224,33 @@ def editar_empleado(request, empleado_id):
 @staff_required
 def eliminar_empleado(request, empleado_id):
     """
-    Marcar empleado como inactivo (soft delete)
-    Solo accesible para usuarios staff/superusuario
+    Marca al empleado como inactivo. La ficha sigue en la base.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El nombre de la URL dice "eliminar", pero aquí no se borra a nadie.
+    Es un soft-delete: activo pasa a False y el historial se queda.
+    Solo staff o superusuario puede entrar.
+
+    Args:
+        request: petición HTTP. GET muestra la confirmación; POST desactiva.
+        empleado_id (int): id del empleado en la tabla Empleado.
+
+    Efectos secundarios:
+        GET no escribe en la base. POST guarda activo=False y redirige
+        a la lista de empleados con un mensaje de éxito.
     """
     empleado = get_object_or_404(Empleado, id=empleado_id)
-    
+
     if request.method == 'POST':
+        # Soft-delete: la fila sigue existiendo, solo deja de contar como activa.
         empleado.activo = False
         empleado.save()
         messages.success(request, f'Empleado {empleado.nombre_completo} marcado como inactivo.')
         return redirect('lista_empleados')
-    
-    return render(request, 'inventario/confirmar_eliminacion.html', {
-        'objeto': empleado,
-        'tipo': 'empleado',
-        'url_cancelar': 'lista_empleados'
+
+    # Pantalla propia del empleado. La de productos habla de borrado permanente.
+    return render(request, 'inventario/confirmar_desactivar_empleado.html', {
+        'empleado': empleado,
     })
 
 

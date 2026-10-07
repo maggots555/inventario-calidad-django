@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% comment %}
+  Confirmación al marcar un empleado como inactivo.
+  No borra la ficha: el POST de eliminar_empleado solo pone activo=False.
+  Es distinta de confirmar_eliminacion.html (esa sí borra un producto)
+  y de confirmar_revocar_acceso.html (esa apaga el inicio de sesión).
+{% endcomment %}
+
+{% block title %}Desactivar empleado - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-secondary">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-person-dash"></i> Confirmar desactivación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-secondary">
+                        <i class="bi bi-person-dash"></i>
+                        <strong>Atención:</strong> Vas a marcar a este empleado como inactivo en la empresa.
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Información del empleado</h5>
+                        <ul class="list-unstyled mb-0">
+                            <li><strong>Nombre:</strong> {{ empleado.nombre_completo }}</li>
+                            <li><strong>Cargo:</strong> {{ empleado.cargo }}</li>
+                            <li><strong>Área:</strong> {{ empleado.area }}</li>
+                            {% if empleado.sucursal %}
+                                <li><strong>Sucursal:</strong> {{ empleado.sucursal.nombre }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-info-circle"></i> ¿Qué sucederá?</h6>
+                        <ul class="mb-0">
+                            <li>El empleado queda <strong>inactivo</strong> en la empresa</li>
+                            <li>Su ficha y su historial <strong>se conservan</strong></li>
+                            <li>El inicio de sesión se cambia aparte, con <strong>Revocar acceso</strong></li>
+                        </ul>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="bi bi-person-dash"></i> Sí, desactivar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

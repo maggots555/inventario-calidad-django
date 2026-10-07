@@ -15,7 +15,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from inventario.models import Empleado
-from inventario.views import lista_empleados
+from inventario.views import eliminar_empleado, lista_empleados
 
 
 def _request_con_usuario(factory: RequestFactory, user: User, path: str, data=None):
@@ -34,6 +34,25 @@ def _request_con_usuario(factory: RequestFactory, user: User, path: str, data=No
     request = factory.get(path, data=data or {})
     request.user = user
     # login_required y templates pueden tocar sesión / messages
+    request.session = SessionStore()
+    request._messages = FallbackStorage(request)
+    return request
+
+
+def _request_post_con_usuario(factory: RequestFactory, user: User, path: str):
+    """
+    Arma un request POST listo para llamar la vista (sesión + messages).
+
+    Args:
+        factory: RequestFactory de Django
+        user: usuario autenticado
+        path: ruta URL de la vista
+
+    Returns:
+        HttpRequest POST con user, session y messages.
+    """
+    request = factory.post(path)
+    request.user = user
     request.session = SessionStore()
     request._messages = FallbackStorage(request)
     return request
@@ -232,3 +251,68 @@ class ListaEmpleadosTests(TestCase):
         self.assertEqual(self.emp_sin_acceso.get_estado_acceso_codigo(), 'sin_acceso')
         self.assertEqual(self.emp_pendiente.get_estado_acceso_codigo(), 'pendiente')
         self.assertEqual(self.emp_activo.get_estado_acceso_codigo(), 'activo')
+
+
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    },
+)
+class DesactivarEmpleadoTests(TestCase):
+    """
+    Objetivo: la confirmación habla de desactivar, y el POST no borra la ficha.
+
+    Efectos secundarios: crea un usuario staff y un empleado de prueba.
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self) -> None:
+        """Crea el staff que puede desactivar y un empleado todavía activo."""
+        self.factory = RequestFactory()
+        self.usuario_staff = User.objects.create_user(
+            username='admin_desactivar',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Rosa Inactiva',
+            cargo='Almacenista',
+            area='Almacén',
+            activo=True,
+        )
+        self.url = reverse('eliminar_empleado', args=[self.empleado.pk])
+
+    def test_get_muestra_desactivacion_y_no_borrado_de_producto(self) -> None:
+        """La pantalla nombra al empleado y no pide eliminar un producto."""
+        staff = User.objects.get(pk=self.usuario_staff.pk)
+        request = _request_con_usuario(self.factory, staff, self.url)
+        response = eliminar_empleado(request, empleado_id=self.empleado.pk)
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('Rosa Inactiva', content)
+        self.assertIn('Confirmar desactivación', content)
+        self.assertIn('Almacenista', content)
+        self.assertIn('Almacén', content)
+        self.assertNotIn('eliminar el producto', content)
+        # Sigue activo: el GET solo muestra la pantalla.
+        self.empleado.refresh_from_db()
+        self.assertTrue(self.empleado.activo)
+
+    def test_post_marca_inactivo_y_conserva_el_registro(self) -> None:
+        """Confirmar deja activo=False y la fila sigue en la base."""
+        staff = User.objects.get(pk=self.usuario_staff.pk)
+        request = _request_post_con_usuario(self.factory, staff, self.url)
+        response = eliminar_empleado(request, empleado_id=self.empleado.pk)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('lista_empleados'))
+        self.empleado.refresh_from_db()
+        self.assertFalse(self.empleado.activo)
+        self.assertTrue(Empleado.objects.filter(pk=self.empleado.pk).exists())
