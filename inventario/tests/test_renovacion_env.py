@@ -8,8 +8,10 @@ Comprobamos la regla (sin sello no vence) y la pantalla
 (solo el superusuario, clave mala no mueve la fecha, clave buena sí).
 """
 
+import os
 import tempfile
 from datetime import timedelta, timezone as tz_std
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.contrib.messages.storage.fallback import FallbackStorage
@@ -80,6 +82,22 @@ class RenovacionEnvReglaTests(SimpleTestCase):
         guardar_clave_inicial('clave-segura-1')
         self.assertFalse(esta_vencido())
         self.assertEqual(dias_restantes(), DIAS_VIGENCIA)
+
+    def test_el_cron_puede_leer_el_sello_y_no_el_hash(self) -> None:
+        """
+        El cron corre como otro usuario. La fecha se puede leer;
+        el hash de la clave no.
+        """
+        guardar_clave_inicial('clave-segura-1')
+        carpeta = Path(self.tmp.name)
+        modo_carpeta = os.stat(carpeta).st_mode & 0o777
+        modo_sello = os.stat(carpeta / 'ultima_ok').st_mode & 0o777
+        modo_hash = os.stat(carpeta / 'clave.hash').st_mode & 0o777
+        # Otros pueden entrar a la carpeta y leer la fecha.
+        self.assertEqual(modo_carpeta, 0o755)
+        self.assertEqual(modo_sello, 0o644)
+        # Otros no pueden leer el hash (ni el grupo).
+        self.assertEqual(modo_hash, 0o600)
 
     def test_sello_de_hace_61_dias_esta_vencido(self) -> None:
         """Pasados los 60 días, la regla dice que sí venció."""

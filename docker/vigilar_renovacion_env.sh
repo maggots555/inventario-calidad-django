@@ -54,6 +54,14 @@ if [ ! -f "$SELLO" ]; then
     exit 0
 fi
 
+# El contenedor escribe como root. Si el archivo no se puede leer, el cron
+# (usuario sigma) se detiene aquí y NO borra docker/.env.
+if [ ! -r "$SELLO" ]; then
+    log "No puedo leer ${SELLO} (permiso denegado). No se borra docker/.env."
+    log "Arreglo, desde /srv/sic/apps/sigma: docker compose --env-file docker/.env exec web chmod 755 /app/renovacion && docker compose --env-file docker/.env exec web chmod 644 /app/renovacion/ultima_ok"
+    exit 1
+fi
+
 contenido="$(tr -d '[:space:]' < "$SELLO")"
 if [ -z "$contenido" ]; then
     log "El sello está vacío. No se borra nada."

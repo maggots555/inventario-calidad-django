@@ -34,8 +34,12 @@ MIN_LARGO_CLAVE = 8
 
 _NOMBRE_HASH = 'clave.hash'
 _NOMBRE_SELLO = 'ultima_ok'
-# 0o640: el dueño escribe, el grupo lee. El cron del servidor corre como root.
-_MODO_ARCHIVO = 0o640
+# La carpeta la crea el contenedor (root). El cron corre como el usuario
+# sigma, así que tiene que poder entrar y leer la fecha. La fecha no es
+# un secreto. El hash de la clave sí se queda solo para el dueño.
+_MODO_CARPETA = 0o755
+_MODO_SELLO = 0o644
+_MODO_HASH = 0o600
 
 
 def carpeta_renovacion() -> Path:
@@ -94,7 +98,7 @@ def guardar_clave_inicial(clave: str) -> None:
         )
     # El hash no se puede revertir. Ni el cron ni un respaldo de texto
     # muestran la contraseña: solo sirven para comprobarla después.
-    _escribir_archivo(_NOMBRE_HASH, make_password(clave))
+    _escribir_archivo(_NOMBRE_HASH, make_password(clave), _MODO_HASH)
     _escribir_sello(timezone.now())
 
 
@@ -160,7 +164,7 @@ def cambiar_clave(anterior: str, nueva: str) -> bool:
     if not comprobar_clave(anterior):
         return False
     _exigir_largo(nueva)
-    _escribir_archivo(_NOMBRE_HASH, make_password(nueva))
+    _escribir_archivo(_NOMBRE_HASH, make_password(nueva), _MODO_HASH)
     # Quien acaba de demostrar la clave anterior también "renovó":
     # el cron vuelve a contar 60 días desde ahora.
     _escribir_sello(timezone.now())
@@ -262,27 +266,32 @@ def _escribir_sello(momento: datetime) -> None:
     # Pasamos a UTC para que el servidor y la laptop no peleen por el huso.
     utc = momento.astimezone(tz_std.utc)
     texto = utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    _escribir_archivo(_NOMBRE_SELLO, texto)
+    _escribir_archivo(_NOMBRE_SELLO, texto, _MODO_SELLO)
 
 
-def _escribir_archivo(nombre: str, contenido: str) -> None:
+def _escribir_archivo(nombre: str, contenido: str, modo: int) -> None:
     """
     Escribe un archivo de la carpeta de renovación de forma atómica.
 
     Args:
         nombre: clave.hash o ultima_ok.
         contenido: Texto completo, sin salto de línea extra.
+        modo: Permisos del archivo (por ejemplo 0o644 para el sello).
 
     Efectos secundarios:
-        Crea la carpeta si falta. Escribe un temporal y lo renombra,
-        para no dejar el archivo a la mitad si el proceso se corta.
+        Crea la carpeta si falta y la deja en 755, para que el usuario
+        sigma pueda entrar. Escribe un temporal y lo renombra, para no
+        dejar el archivo a la mitad si el proceso se corta.
     """
     carpeta = carpeta_renovacion()
     carpeta.mkdir(parents=True, exist_ok=True)
+    # El contenedor es root. Sin este chmod, la carpeta puede quedar
+    # cerrada y el cron (usuario sigma) no puede ni asomarse.
+    os.chmod(carpeta, _MODO_CARPETA)
     destino = carpeta / nombre
     temporal = carpeta / f'.{nombre}.tmp'
     # Paso 1: el temporal. Si falla aquí, el archivo bueno sigue intacto.
     temporal.write_text(contenido, encoding='utf-8')
-    os.chmod(temporal, _MODO_ARCHIVO)
+    os.chmod(temporal, modo)
     # Paso 2: el renombre es el momento en que el cron ve el dato nuevo.
     temporal.replace(destino)
