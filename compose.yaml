@@ -15,10 +15,21 @@
 
 name: sigma
 
+# Tope de los logs que Docker guarda de cada contenedor.
+# Sin esto, Gunicorn y Celery pueden llenar el disco del servidor.
+# 10 MB por archivo y 3 archivos: cada contenedor se queda en unos 30 MB.
+# Los logs de Django siguen en el disco de datos, aparte de este tope.
+x-logging: &logs-acotados
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-bookworm
     restart: unless-stopped
+    logging: *logs-acotados
     environment:
       POSTGRES_USER: ${DB_USER:-sigma}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-sigma_local_solo_pruebas}
@@ -38,9 +49,12 @@ services:
   redis:
     image: redis:7-bookworm
     restart: unless-stopped
-    # Misma idea que producción: si la memoria se llena, borrar lo menos usado.
-    # 512 MB alcanza para pruebas. En el servidor se puede subir a 1 GB.
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    logging: *logs-acotados
+    # 512 MB alcanzan para la cola, los resultados y la caché.
+    # volatile-lru solo borra claves que tienen fecha de caducidad
+    # (caché y resultados de Celery). La cola de tareas no tiene caducidad:
+    # allkeys-lru podía borrarla cuando la memoria se llenaba y se perdían correos.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "volatile-lru"]
     volumes:
       - ${SIGMA_DATA_ROOT:-./docker-data}/redis:/data
     healthcheck:
@@ -58,6 +72,7 @@ services:
     # Sin esta línea, Compose intenta descargarla y muestra "pull access denied".
     pull_policy: build
     restart: unless-stopped
+    logging: *logs-acotados
     env_file:
       - docker/.env
     environment:
@@ -98,6 +113,7 @@ services:
   nginx:
     image: nginx:1.28-bookworm
     restart: unless-stopped
+    logging: *logs-acotados
     ports:
       - "${SIGMA_HTTP_PORT:-8080}:80"
     volumes:
@@ -115,8 +131,10 @@ services:
   # El token vive en docker/.env (CLOUDFLARE_TUNNEL_TOKEN). No va a git.
   # En el panel de Cloudflare el hostname apunta a http://nginx:80
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    # Versión fija. "latest" cambiaría el túnel el día que alguien haga pull.
+    image: cloudflare/cloudflared:2026.10.0
     restart: unless-stopped
+    logging: *logs-acotados
     command: tunnel --no-autoupdate run
     profiles:
       - cloudflare
@@ -134,6 +152,7 @@ services:
     image: sigma-web:local
     pull_policy: build
     restart: unless-stopped
+    logging: *logs-acotados
     env_file:
       - docker/.env
     environment:
@@ -146,6 +165,14 @@ services:
       CELERY_TASK_ALWAYS_EAGER: "False"
       SIGMA_MIGRAR: "0"
     command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2", "--max-tasks-per-child=100"]
+    # Si el worker arrancó pero no contesta, Docker lo marca unhealthy.
+    # El caso del favicon se veía como "Up" un instante y luego Restarting.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -t 10 | grep -q pong"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
     volumes:
       - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
       # La página escribe aquí el manifest de CSS/JS (collectstatic).
@@ -166,6 +193,7 @@ services:
     image: sigma-web:local
     pull_policy: build
     restart: unless-stopped
+    logging: *logs-acotados
     env_file:
       - docker/.env
     environment:
@@ -177,7 +205,15 @@ services:
       REDIS_CACHE_URL: redis://redis:6379/2
       CELERY_TASK_ALWAYS_EAGER: "False"
       SIGMA_MIGRAR: "0"
-    command: ["celery", "-A", "config", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    command: ["celery", "-A", "config", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler", "--pidfile", "/tmp/celerybeat.pid"]
+    # Beat no contesta el ping del worker. El pidfile dice si el proceso sigue vivo.
+    # Python, y no un $() de shell: Compose se come el signo de pesos.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,pathlib; pid=int(pathlib.Path('/tmp/celerybeat.pid').read_text()); os.kill(pid, 0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     volumes:
       # Mismo manifest que el worker. Beat carga las URLs al arrancar.
       - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles:ro

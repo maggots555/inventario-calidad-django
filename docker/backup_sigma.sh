@@ -53,13 +53,41 @@ for base in $BASES; do
     log "Volcando ${base} → ${destino}"
     # pg_dump corre DENTRO del contenedor. gzip corre en el servidor.
     # -T evita que Docker pida una terminal (en cron no hay pantalla).
+    # Si pg_dump falla a la mitad, gzip deja un archivo roto. Hay que
+    # borrarlo: si se queda, la subida de otra noche lo manda a Drive.
     if ! docker compose --env-file docker/.env exec -T postgres \
         pg_dump -U sigma -d "$base" | gzip > "$destino"; then
-        log "ERROR al volcar ${base}"
+        log "ERROR al volcar ${base}. Se borra el archivo incompleto."
+        rm -f "$destino"
+        exit 1
+    fi
+    if ! gzip -t "$destino"; then
+        log "ERROR: el volcado de ${base} no abre. Se borra."
+        rm -f "$destino"
+        exit 1
+    fi
+    # Un .gz válido de una base vacía pesa decenas de KB. Menos de 100
+    # bytes es un archivo vacío que gzip cerró bien, no un respaldo.
+    tamano="$(stat -c%s "$destino")"
+    if [ "$tamano" -lt 100 ]; then
+        log "ERROR: el volcado de ${base} pesa ${tamano} bytes. Se borra."
+        rm -f "$destino"
         exit 1
     fi
     log "Listo ${base} ($(du -h "$destino" | cut -f1))"
 done
+
+# Volcados viejos que hayan quedado rotos tampoco se suben.
+# copy no borra en Drive lo que ya estaba; solo evitamos mandar otro roto.
+log "Revisando volcados locales antes de subirlos"
+shopt -s nullglob
+for archivo in "$BACKUP_DIR"/postgres_inventario_*.sql.gz; do
+    if ! gzip -t "$archivo"; then
+        log "Volcado dañado, no se sube: ${archivo}"
+        rm -f "$archivo"
+    fi
+done
+shopt -u nullglob
 
 log "Borrando volcados locales de más de ${DIAS_LOCALES} días"
 find "$BACKUP_DIR" -name 'postgres_inventario_*.sql.gz' -type f -mtime +"$DIAS_LOCALES" -delete

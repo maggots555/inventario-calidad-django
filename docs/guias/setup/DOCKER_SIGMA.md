@@ -16,7 +16,7 @@ Siete programas. Solo Nginx abre un puerto. Postgres y Redis se quedan en la red
 | `celery-beat` | Tareas con horario | No |
 | `postgres` | Cuatro bases, una por país | No |
 | `redis` | Cola `/0`, resultados `/1`, caché `/2` | No |
-| `cloudflared` | Túnel hacia Cloudflare. Solo con el perfil `cloudflare` | No abre puertos. Cloudflare entra a `http://nginx:80` |
+| `cloudflared` | Túnel hacia Cloudflare, imagen `2026.10.0` (no `latest`). Solo con el perfil `cloudflare` | No abre puertos. Cloudflare entra a `http://nginx:80` |
 
 La imagen de la aplicación se llama `sigma-web:local`. Se construye en la máquina. No existe en Docker Hub. `web`, `celery` y `celery-beat` usan esa misma imagen.
 
@@ -129,7 +129,11 @@ En disco quedan en `media/mexico`, `media/argentina`, `media/chile` y `media/col
 
 No pongas en `docker/.env` la ruta del servidor anterior (`/mnt/django_storage/media`). Esa carpeta no existe dentro del contenedor.
 
-Celery y Beat montan la carpeta de estáticos en solo lectura. Con `DEBUG=False` la necesitan para arrancar. Si se quita, fallan al buscar el favicon.
+Celery y Beat montan la carpeta de estáticos en solo lectura. Con `DEBUG=False` la necesitan para arrancar. Si se quita, fallan al buscar el favicon. Docker les pregunta si siguen vivos: el worker contesta un ping y Beat deja un archivo con su número de proceso.
+
+Redis guarda la cola, los resultados y la caché en 512 MB. Si se llena, solo tira la caché y los resultados viejos. La cola de correos no se borra.
+
+Los logs de cada contenedor se quedan en unos 30 MB (3 archivos de 10 MB). Los de Django siguen en `/srv/sic/data/sigma/logs/`.
 
 ## Respaldo de las 3:00
 
@@ -137,8 +141,8 @@ El cron del servidor ejecuta `docker/backup_sigma.sh`. El reloj de sic-sigma es 
 
 Ese script:
 
-1. Volcado de las cuatro bases a `/srv/sic/backups/sigma`.
-2. Sube esos `.sql.gz` a Drive, carpeta `SIGMA-Backups/postgresql`.
+1. Volcado de las cuatro bases a `/srv/sic/backups/sigma`. Si un volcado queda a medias o no abre, lo borra y no lo sube.
+2. Sube los `.sql.gz` que sí abrieron a Drive, carpeta `SIGMA-Backups/postgresql`.
 3. Sube fotos nuevas de los cuatro países a `SIGMA-Backups/media/<país>`.
 
 Usa `rclone copy`. Copia lo que falta o cambió. No borra en Drive una foto que todavía no esté en este disco. El log queda en `/srv/sic/data/sigma/logs/backup_sigma.log` y cierra con `=== Respaldo terminado ===`.
@@ -161,5 +165,6 @@ El token se llama `CLOUDFLARE_TUNNEL_TOKEN` y solo existe en el `docker/.env` de
 
 - No subir `docker/.env`, `docker-data/` ni la configuración de rclone.
 - No publicar el puerto de Postgres ni el de Redis.
+- Si un valor de `docker/.env` lleva un `$`, Compose lo trata como variable y lo quita. Para conservarlo se escribe `$$`. No conviertas así una clave que ya usan los contenedores: la clave efectiva cambiaría y se cerrarían las sesiones.
 - No hacer `git pull` ni reiniciar Gunicorn en el servidor anterior como si ahí siguiera la página. Ese equipo queda encendido mientras se observa sic-sigma. Su cron de respaldo está comentado a propósito: si vuelve a correr, puede subir la base atrasada.
 - No mezclar esta guía con reglas de agentes. Esas viven en `AGENTS.md`, sección 12.
