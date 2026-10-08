@@ -357,7 +357,9 @@ def abrir_formato_oow_desde_sicser(request):
         q / tab: para mensajes de error / regreso
 
     Efectos secundarios:
-        Puede crear OrdenServicio vía sicser_import; redirige al wizard.
+        Puede crear OrdenServicio vía sicser_import. En esa creación el
+        empleado de la sesión queda como responsable de seguimiento y el
+        técnico queda sin asignar. Redirige al wizard.
     """
     from config.paises_config import get_pais_actual
     from .sicser_client import SicserAPIError, buscar_registro_oow_por_id
@@ -401,6 +403,8 @@ def abrir_formato_oow_desde_sicser(request):
             registro,
             request.user,
             sucursal_id=sucursal_id,
+            # El de la sesión queda como responsable; el técnico se asigna después.
+            asignar_seguimiento_sesion=True,
         )
         obtener_o_crear_borrador(resultado.orden, usuario=request.user)
         messages.success(

@@ -73,12 +73,20 @@
                         <div>
                             <h6 class="mb-2" style="color: #01579b;">Configuración Actual:</h6>
                             <p class="mb-1">
-                                <strong>Técnico:</strong> 
+                                <strong>Técnico:</strong>
+                                {% if orden.tecnico_asignado_actual %}
                                 <span class="badge bg-primary">{{ orden.tecnico_asignado_actual.nombre_completo }}</span>
+                                {% else %}
+                                <span class="badge bg-light text-muted">Sin asignar</span>
+                                {% endif %}
                             </p>
                             <p class="mb-0">
-                                <strong>Responsable:</strong> 
+                                <strong>Responsable:</strong>
+                                {% if orden.responsable_seguimiento %}
                                 <span class="badge bg-secondary">{{ orden.responsable_seguimiento.nombre_completo }}</span>
+                                {% else %}
+                                <span class="badge bg-light text-muted">Sin asignar</span>
+                                {% endif %}
                             </p>
                         </div>
                     </div>

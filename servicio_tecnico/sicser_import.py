@@ -183,6 +183,47 @@ def resolver_tecnico(usuario) -> Empleado:
     raise SicserImportError('No hay empleados activos para asignar a la orden importada.')
 
 
+def empleado_de_sesion(usuario) -> Empleado:
+    """
+    Devuelve la ficha de empleado del usuario que tiene la sesión abierta.
+
+    Objetivo de negocio:
+        Al crear el Formato Digital OOW, esa persona queda como
+        responsable de seguimiento. No se elige a otro empleado.
+
+    Args:
+        usuario: Usuario Django de la sesión (request.user).
+
+    Returns:
+        Empleado ligado a ese usuario.
+
+    Raises:
+        SicserImportError: Si el usuario no tiene ficha de empleado.
+
+    Efectos secundarios:
+        Ninguno. No crea ni modifica filas.
+    """
+    if not usuario:
+        raise SicserImportError(
+            'Tu usuario no tiene ficha de empleado. '
+            'No se puede asignar el responsable de seguimiento.'
+        )
+
+    # EXPLICACIÓN: si el usuario no tiene ficha, Django lanza DoesNotExist
+    # al leer usuario.empleado. Lo atrapamos para avisar en pantalla.
+    try:
+        empleado = usuario.empleado
+    except Empleado.DoesNotExist:
+        empleado = None
+
+    if not empleado:
+        raise SicserImportError(
+            'Tu usuario no tiene ficha de empleado. '
+            'No se puede asignar el responsable de seguimiento.'
+        )
+    return empleado
+
+
 def extraer_falla_garantia(instrucciones_dell: str) -> str:
     """
     Extrae el texto de falla desde instrucciones_dell de la API de garantías.
@@ -482,20 +523,32 @@ def importar_orden_oow_desde_sicser(
     registro: OrdenOOWSicser,
     usuario,
     sucursal_id: int | None = None,
+    asignar_seguimiento_sesion: bool = False,
 ) -> ResultadoImportacionSicser:
     """
     Crea una orden de diagnóstico OOW en SIGMA desde un registro SICSER.
+
+    Objetivo de negocio:
+        El botón azul «Importar a SIGMA» deja al de la sesión como técnico.
+        El botón del Formato Digital OOW (asignar_seguimiento_sesion=True)
+        lo deja como responsable de seguimiento y el técnico queda pendiente.
 
     Args:
         registro: Datos normalizados de la API OOW.
         usuario: Usuario que ejecuta la importación.
         sucursal_id: Sucursal opcional elegida en la UI.
+        asignar_seguimiento_sesion: True solo al abrir el formato OOW.
 
     Returns:
         ResultadoImportacionSicser: Orden creada y mensaje de éxito.
 
     Raises:
-        SicserImportError: Si ya existe o faltan datos obligatorios.
+        SicserImportError: Si ya existe, faltan datos, o (con el formato)
+        el usuario no tiene ficha de empleado.
+
+    Efectos secundarios:
+        Crea OrdenServicio y DetalleEquipo. Con el formato OOW, el técnico
+        queda vacío y el responsable es el empleado de la sesión.
     """
     id_externo = str(registro.id_orden)
     existente = buscar_orden_importada('oow', id_externo)
@@ -525,7 +578,14 @@ def importar_orden_oow_desde_sicser(
         raise SicserImportError('El registro SICSER no trae service tag; no se puede importar.')
 
     sucursal = resolver_sucursal_por_cis(registro.codigo_cis_url, sucursal_id)
-    tecnico = resolver_tecnico(usuario)
+    # EXPLICACIÓN: el formato OOW asigna seguimiento y deja el técnico
+    # pendiente. El botón azul de importar no entra a esta rama.
+    if asignar_seguimiento_sesion:
+        responsable = empleado_de_sesion(usuario)
+        tecnico = None
+    else:
+        responsable = None
+        tecnico = resolver_tecnico(usuario)
     marca = normalizar_marca_oow(registro.marca)
     tipo_equipo = normalizar_tipo_equipo(registro.tipo_equipo)
     modelo = (registro.modelo or '')[:100]
@@ -536,6 +596,7 @@ def importar_orden_oow_desde_sicser(
     orden = OrdenServicio(
         sucursal=sucursal,
         tecnico_asignado_actual=tecnico,
+        responsable_seguimiento=responsable,
         tipo_servicio='diagnostico',
         estado='espera',
     )

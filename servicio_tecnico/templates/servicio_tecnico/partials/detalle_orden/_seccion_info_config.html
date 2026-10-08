@@ -208,11 +208,23 @@
                             </div>
                             <div class="info-field">
                                 <span class="info-field__label">Técnico asignado</span>
-                                <span class="info-field__value">{{ orden.tecnico_asignado_actual.nombre_completo }}</span>
+                                <span class="info-field__value">
+                                    {% if orden.tecnico_asignado_actual %}
+                                        {{ orden.tecnico_asignado_actual.nombre_completo }}
+                                    {% else %}
+                                        Sin asignar
+                                    {% endif %}
+                                </span>
                             </div>
                             <div class="info-field info-field--full">
                                 <span class="info-field__label">Responsable de seguimiento</span>
-                                <span class="info-field__value">{{ orden.responsable_seguimiento.nombre_completo }}</span>
+                                <span class="info-field__value">
+                                    {% if orden.responsable_seguimiento %}
+                                        {{ orden.responsable_seguimiento.nombre_completo }}
+                                    {% else %}
+                                        Sin asignar
+                                    {% endif %}
+                                </span>
                             </div>
                         </div>
                     </section>

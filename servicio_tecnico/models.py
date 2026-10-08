@@ -154,7 +154,12 @@ class OrdenServicio(models.Model):
         Empleado,
         on_delete=models.PROTECT,
         related_name='ordenes_tecnico',
-        help_text="Técnico actualmente asignado a la orden"
+        null=True,
+        blank=True,
+        help_text=(
+            "Técnico actualmente asignado a la orden. "
+            "Vacío = sin asignar (se elige después)."
+        ),
     )
     
     # ESTADO Y WORKFLOW
@@ -410,15 +415,24 @@ class OrdenServicio(models.Model):
                     es_sistema=True
                 )
             
-            # Registrar cambio de técnico
+            # Registrar cambio de técnico.
+            # EXPLICACIÓN: el técnico puede quedar vacío (formato OOW).
+            # Si el nuevo es None, el texto dice "Sin asignar" y no truena.
             if tecnico_anterior and tecnico_anterior != self.tecnico_asignado_actual:
+                if self.tecnico_asignado_actual:
+                    nombre_tecnico_nuevo = self.tecnico_asignado_actual.nombre_completo
+                else:
+                    nombre_tecnico_nuevo = 'Sin asignar'
                 HistorialOrden.objects.create(
                     orden=self,
                     tipo_evento='cambio_tecnico',
                     tecnico_anterior=tecnico_anterior,
                     tecnico_nuevo=self.tecnico_asignado_actual,
-                    comentario=f"Técnico cambiado de '{tecnico_anterior.nombre_completo}' a '{self.tecnico_asignado_actual.nombre_completo}'",
-                    es_sistema=True
+                    comentario=(
+                        f"Técnico cambiado de '{tecnico_anterior.nombre_completo}' "
+                        f"a '{nombre_tecnico_nuevo}'"
+                    ),
+                    es_sistema=True,
                 )
     
     def clean(self):

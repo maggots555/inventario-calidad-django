@@ -574,7 +574,7 @@ class ImportarOrdenOowNombresTest(TestCase):
             username='oow_nombres',
             password='testpass123',
         )
-        Empleado.objects.create(
+        self.empleado = Empleado.objects.create(
             nombre_completo='Importador OOW Nombres',
             cargo='Técnico',
             area='Laboratorio',
@@ -616,4 +616,92 @@ class ImportarOrdenOowNombresTest(TestCase):
         self.assertEqual(len(filas), 1)
         self.assertEqual(filas[0]['razon_social_cliente'], 'EMPRESA SA DE CV')
         self.assertEqual(filas[0]['nombre_cliente'], 'Juan Perez')
+
+    def test_importar_normal_asigna_tecnico_de_sesion(self):
+        """
+        Botón azul: el de la sesión queda como técnico y el responsable vacío.
+        """
+        resultado = importar_orden_oow_desde_sicser(
+            _orden_oow_sicser(
+                id_orden=11956,
+                folio='MX_CIS_MX_DROPOFF_11956',
+                preview_orden_sigma='OOW-11956',
+            ),
+            self.user,
+        )
+        orden = resultado.orden
+        self.assertEqual(orden.tecnico_asignado_actual_id, self.empleado.pk)
+        self.assertIsNone(orden.responsable_seguimiento_id)
+
+    def test_formato_oow_asigna_responsable_y_deja_tecnico_vacio(self):
+        """
+        Formato OOW: el de la sesión es responsable de seguimiento.
+        El técnico queda pendiente para asignarse después.
+        """
+        resultado = importar_orden_oow_desde_sicser(
+            _orden_oow_sicser(
+                id_orden=11957,
+                folio='MX_CIS_MX_DROPOFF_11957',
+                preview_orden_sigma='OOW-11957',
+            ),
+            self.user,
+            asignar_seguimiento_sesion=True,
+        )
+        orden = resultado.orden
+        self.assertEqual(orden.responsable_seguimiento_id, self.empleado.pk)
+        self.assertIsNone(orden.tecnico_asignado_actual_id)
+
+    def test_quitar_tecnico_no_rompe_el_historial(self):
+        """
+        Si después se deja el técnico vacío, el historial dice Sin asignar.
+        """
+        from servicio_tecnico.models import HistorialOrden
+
+        orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tecnico_asignado_actual=self.empleado,
+            tipo_servicio='diagnostico',
+            estado='espera',
+        )
+        orden.tecnico_asignado_actual = None
+        orden.save()
+        historial = HistorialOrden.objects.get(
+            orden=orden,
+            tipo_evento='cambio_tecnico',
+        )
+        self.assertIn('Sin asignar', historial.comentario)
+        self.assertIsNone(historial.tecnico_nuevo_id)
+
+
+class ImportarFormatoOowSinEmpleadoTest(TestCase):
+    """Sin ficha de empleado, el formato OOW no crea la orden."""
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        """Usuario de sesión sin Empleado, y una sucursal para no fallar antes."""
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal OOW Sin Empleado',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='oow_sin_empleado',
+            password='testpass123',
+        )
+
+    def test_formato_sin_ficha_no_crea_orden(self):
+        """Borde: avisa y no deja una orden a medias."""
+        with self.assertRaises(SicserImportError):
+            importar_orden_oow_desde_sicser(
+                _orden_oow_sicser(
+                    id_orden=11958,
+                    folio='MX_CIS_MX_DROPOFF_11958',
+                    preview_orden_sigma='OOW-11958',
+                ),
+                self.user,
+                asignar_seguimiento_sesion=True,
+            )
+        self.assertFalse(
+            DetalleEquipo.objects.filter(orden_cliente='OOW-11958').exists()
+        )
 
