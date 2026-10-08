@@ -921,6 +921,9 @@ class FormatoGarantiaEmailTaskTest(TestCase):
         self.assertTrue(resultado.get('success'))
         self.assertEqual(len(capturados), 1)
         msg = capturados[0]
+        self.assertEqual(msg.to, ['cliente.gar@test.local'])
+        # EXPLICACIÓN: el empleado de la sesión (usuario_id) va en copia.
+        self.assertEqual(msg.cc, ['email.garantia@test.local'])
         # Asunto: prioridad orden_cliente (DPS) sobre folio_sicser.
         self.assertEqual(
             msg.subject,
@@ -937,11 +940,13 @@ class FormatoGarantiaEmailTaskTest(TestCase):
         self.assertIn('Formato de Servicio en Garantía Dell', body)
         self.assertIn('999888777', body)
         self.assertIn('GARSTAG01', body)
-        self.assertTrue(
-            HistorialOrden.objects.filter(
-                orden=self.orden,
-                tipo_evento='email',
-            ).exists()
+        historial = HistorialOrden.objects.get(
+            orden=self.orden,
+            tipo_evento='email',
+        )
+        self.assertIn(
+            'copia a email.garantia@test.local',
+            historial.comentario,
         )
 
 

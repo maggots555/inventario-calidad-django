@@ -1590,6 +1590,9 @@ class FormatoOowEmailTaskTest(TestCase):
         self.assertTrue(resultado.get('success'))
         self.assertEqual(len(capturados), 1)
         msg = capturados[0]
+        self.assertEqual(msg.to, ['cliente.email@test.local'])
+        # EXPLICACIÓN: el empleado de la sesión (usuario_id) va en copia.
+        self.assertEqual(msg.cc, ['email.oow@test.local'])
         self.assertEqual(
             msg.subject,
             'Formato de Servicio OOW — OOW-EMAIL01',
@@ -1605,12 +1608,11 @@ class FormatoOowEmailTaskTest(TestCase):
         self.assertIn('Formato de Servicio Fuera de Garantía (OOW)', body)
         self.assertIn('OOW-EMAIL01', body)
         self.assertIn('EMAILSTAG01', body)
-        self.assertTrue(
-            HistorialOrden.objects.filter(
-                orden=self.orden,
-                tipo_evento='email',
-            ).exists()
+        historial = HistorialOrden.objects.get(
+            orden=self.orden,
+            tipo_evento='email',
         )
+        self.assertIn('copia a email.oow@test.local', historial.comentario)
 
 
 class FormatoOowEliminarEvidenciaTest(TestCase):

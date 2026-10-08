@@ -5364,7 +5364,8 @@ def enviar_formato_oow_email_task(
 
     Efectos secundarios:
         Envía EmailMultiAlternatives (HTML + texto plano) con PDF adjunto
-        + logo/iconos CID; registra historial en la orden.
+        + logo/iconos CID. El empleado de la sesión va en Cc si tiene
+        correo y no está ya en Para. Registra historial en la orden.
     """
     from django.conf import settings
     from django.contrib.auth import get_user_model
@@ -5484,11 +5485,19 @@ def enviar_formato_oow_email_task(
         )
         texto_plano = construir_texto_plano_formato_oow(context_email)
 
+        # EXPLICACIÓN: el cliente va en Para. El empleado de la sesión
+        # va en Cc solo si tiene correo y no está ya en esa lista.
+        from servicio_tecnico.services.email_copia_empleado import (
+            copia_empleado_sesion,
+        )
+        cc_empleado = copia_empleado_sesion(email_empleado, destinatarios)
+
         email_msg = EmailMultiAlternatives(
             subject=asunto,
             body=texto_plano,
             from_email=from_email,
             to=destinatarios,
+            cc=cc_empleado,
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
@@ -5530,12 +5539,20 @@ def enviar_formato_oow_email_task(
         email_msg.send()
 
         destinarios_txt = ', '.join(destinatarios)
+        # EXPLICACIÓN: la bitácora debe mostrar si el empleado recibió copia.
+        if cc_empleado:
+            comentario_historial = (
+                f'Formato Digital OOW enviado a {destinarios_txt} '
+                f'(copia a {cc_empleado[0]})'
+            )
+        else:
+            comentario_historial = (
+                f'Formato Digital OOW enviado a {destinarios_txt}'
+            )
         HistorialOrden.objects.create(
             orden=orden,
             tipo_evento='email',
-            comentario=(
-                f'Formato Digital OOW enviado a {destinarios_txt}'
-            ),
+            comentario=comentario_historial,
             usuario=usuario_empleado,
             es_sistema=False,
         )
@@ -5579,7 +5596,8 @@ def enviar_formato_garantia_email_task(
 
     Efectos secundarios:
         Envía EmailMultiAlternatives (HTML + texto plano) con PDF adjunto
-        + logo/iconos CID; registra historial en la orden.
+        + logo/iconos CID. El empleado de la sesión va en Cc si tiene
+        correo y no está ya en Para. Registra historial en la orden.
     """
     from django.conf import settings
     from django.contrib.auth import get_user_model
@@ -5695,11 +5713,19 @@ def enviar_formato_garantia_email_task(
         )
         texto_plano = construir_texto_plano_formato_garantia(context_email)
 
+        # EXPLICACIÓN: el cliente va en Para. El empleado de la sesión
+        # va en Cc solo si tiene correo y no está ya en esa lista.
+        from servicio_tecnico.services.email_copia_empleado import (
+            copia_empleado_sesion,
+        )
+        cc_empleado = copia_empleado_sesion(email_empleado, destinatarios)
+
         email_msg = EmailMultiAlternatives(
             subject=asunto,
             body=texto_plano,
             from_email=from_email,
             to=destinatarios,
+            cc=cc_empleado,
         )
         email_msg.attach_alternative(html_content, 'text/html')
 
@@ -5741,12 +5767,20 @@ def enviar_formato_garantia_email_task(
         email_msg.send()
 
         destinarios_txt = ', '.join(destinatarios)
+        # EXPLICACIÓN: la bitácora debe mostrar si el empleado recibió copia.
+        if cc_empleado:
+            comentario_historial = (
+                f'Formato Digital Garantía Dell enviado a {destinarios_txt} '
+                f'(copia a {cc_empleado[0]})'
+            )
+        else:
+            comentario_historial = (
+                f'Formato Digital Garantía Dell enviado a {destinarios_txt}'
+            )
         HistorialOrden.objects.create(
             orden=orden,
             tipo_evento='email',
-            comentario=(
-                f'Formato Digital Garantía Dell enviado a {destinarios_txt}'
-            ),
+            comentario=comentario_historial,
             usuario=usuario_empleado,
             es_sistema=False,
         )

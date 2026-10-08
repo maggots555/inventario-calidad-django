@@ -11,6 +11,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
@@ -398,3 +399,106 @@ class FormatoVmVistasTest(TestCase):
         kwargs = mock_delay.call_args.kwargs
         self.assertIn('db_alias', kwargs)
         self.assertTrue(kwargs['db_alias'])
+
+
+class FormatoVmEmailTaskTest(TestCase):
+    """
+    La tarea Celery manda el PDF al cliente y copia al empleado de la sesión.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Mockeamos EmailMessage.send para no mandar correos reales. El empleado
+    se busca con usuario_id (quien pulsó Enviar).
+    """
+
+    databases = {'default', 'mexico'}
+
+    def setUp(self):
+        self.sucursal = Sucursal.objects.create(
+            nombre='Sucursal Email VM',
+            ciudad='CDMX',
+        )
+        self.user = User.objects.create_user(
+            username='email_vm',
+            password='testpass123',
+        )
+        self.empleado = Empleado.objects.create(
+            nombre_completo='Front Email VM',
+            cargo='Recepcion',
+            area='Front',
+            email='email.vm@test.local',
+            sucursal=self.sucursal,
+            user=self.user,
+        )
+        self.orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='venta_mostrador',
+            estado='recepcion',
+            tecnico_asignado_actual=self.empleado,
+        )
+        DetalleEquipo.objects.create(
+            orden=self.orden,
+            orden_cliente='FL-EMAIL01',
+            tipo_equipo='Laptop',
+            marca='ASUS',
+            modelo='X412',
+            numero_serie='VMEMAIL01',
+            email_cliente='cliente.vm.email@test.local',
+            nombre_cliente='Cliente Email VM',
+            gama='media',
+        )
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        },
+    )
+    def test_task_copia_al_empleado_de_sesion(self):
+        """El cliente va en Para y el empleado de la sesión en Cc."""
+        from servicio_tecnico.models import HistorialOrden
+        from servicio_tecnico.tasks import (
+            enviar_formato_venta_mostrador_email_task,
+        )
+
+        formato = obtener_o_crear_borrador(self.orden, usuario=self.user)
+        formato.pdf.save(
+            'NotaVenta_test.pdf',
+            ContentFile(b'%PDF-1.4 fake-vm-pdf'),
+            save=True,
+        )
+        formato.emails_envio = ['cliente.vm.email@test.local']
+        formato.email_envio = 'cliente.vm.email@test.local'
+        formato.save(update_fields=['emails_envio', 'email_envio'])
+
+        capturados = []
+
+        def _fake_send(self_msg):
+            capturados.append(self_msg)
+            return 1
+
+        with patch(
+            'django.core.mail.EmailMessage.send',
+            new=_fake_send,
+        ):
+            resultado = enviar_formato_venta_mostrador_email_task.run(
+                formato_id=formato.pk,
+                usuario_id=self.user.pk,
+                db_alias='default',
+            )
+
+        self.assertTrue(resultado.get('success'))
+        self.assertEqual(len(capturados), 1)
+        msg = capturados[0]
+        self.assertEqual(msg.to, ['cliente.vm.email@test.local'])
+        self.assertEqual(msg.cc, ['email.vm@test.local'])
+        self.assertEqual(msg.subject, 'Nota de Venta Directa — FL-EMAIL01')
+        historial = HistorialOrden.objects.get(
+            orden=self.orden,
+            tipo_evento='email',
+        )
+        self.assertIn('copia a email.vm@test.local', historial.comentario)
