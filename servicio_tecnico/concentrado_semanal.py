@@ -281,6 +281,10 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         dict: Diccionario completo con todos los datos del concentrado:
             - ingreso: tabla de ingresos por sitio/tipo/día
             - asignacion: tabla de asignaciones por ingeniero/día
+              (sin la fila de candidatos RHITSO)
+            - candidatos_rhitso: conteo aparte de órdenes marcadas como
+              candidatas a laboratorio externo. No entra al total de asignación,
+              porque es el mismo equipo que ya está en la fila del técnico.
             - egreso: tabla de egresos por sitio/tipo/día
             - resumen_ingreso: totales de carry-in, MIS, etc.
             - totales_ingreso: fila de totales generales
@@ -418,7 +422,10 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         datos_asignacion[tec.id][dia_nombre] += 1
         datos_asignacion[tec.id]['total'] += 1
 
-    # Agregar fila de "Candidatos RHITSO" (órdenes marcadas como candidatas a laboratorio externo)
+    # Candidatos RHITSO: es una marca del mismo equipo, no un ingreso nuevo.
+    # Si el técnico ya lo tiene en su fila y además está marcado como candidato,
+    # sumarlo aquí al total lo contaría dos veces. Por eso vive en su propio dict
+    # y NO se mete en lista_asignacion.
     rhitso_fila = {dia: 0 for dia in DIAS_SEMANA}
     rhitso_fila['nombre'] = 'Candidatos RHITSO'
     rhitso_fila['total'] = 0
@@ -431,15 +438,14 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         rhitso_fila[dia_nombre] += 1
         rhitso_fila['total'] += 1
 
-    # Convertir diccionario a lista ordenada por total (desc)
+    # Solo ingenieros, ordenados de quien más equipos tuvo a quien menos.
     lista_asignacion = sorted(
         datos_asignacion.values(),
         key=lambda x: x['total'],
         reverse=True
     )
-    lista_asignacion.append(rhitso_fila)
 
-    # Total general de asignación (total global y por día)
+    # El total es la suma de las filas de técnicos. RHITSO queda fuera a propósito.
     total_asignados = sum(row['total'] for row in lista_asignacion)
     totales_asignacion = {dia: sum(row[dia] for row in lista_asignacion) for dia in DIAS_SEMANA}
     totales_asignacion['total'] = total_asignados
@@ -503,6 +509,7 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
     return {
         'ingreso': datos_ingreso,
         'asignacion': lista_asignacion,
+        'candidatos_rhitso': rhitso_fila,
         'egreso': datos_egreso,
         'totales_ingreso': totales_ingreso,
         'totales_egreso': totales_egreso,

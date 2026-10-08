@@ -136,6 +136,22 @@ def _get_escalados_style():
     }
 
 
+def _get_rhitso_style():
+    """
+    Estilo de la fila Candidatos RHITSO.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El rosa marca que estos equipos NO se suman al total de ingenieros.
+    Es el mismo equipo que ya está en la fila del técnico.
+    """
+    return {
+        'font': Font(italic=True, size=10, color='842029'),
+        'fill': PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid'),
+        'alignment': Alignment(horizontal='center', vertical='center'),
+        'border': _get_thin_border(),
+    }
+
+
 def _get_quarter_header_style(color_hex):
     """Estilo para encabezados de quarter en la hoja trimestral."""
     return {
@@ -397,6 +413,47 @@ def _crear_hoja_concentrado(wb, datos_semana):
     celda_tot_val = ws.cell(row=fila_actual, column=7, value=datos_semana.get('total_asignados', 0))
     apply_cell_style(celda_tot_val, _get_total_row_style())
     ws.row_dimensions[fila_actual].height = 18
+    fila_actual += 2
+
+    # Candidatos RHITSO: tabla aparte. No se suma a total_asignados.
+    ws.merge_cells(
+        start_row=fila_actual, start_column=1,
+        end_row=fila_actual, end_column=7
+    )
+    celda_rhitso_titulo = ws.cell(
+        row=fila_actual,
+        column=1,
+        value='CANDIDATOS RHITSO (ya contados con su técnico; no se suman al total)',
+    )
+    apply_cell_style(celda_rhitso_titulo, {
+        'font': Font(bold=True, italic=True, color='842029', size=10),
+        'fill': PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid'),
+        'alignment': Alignment(horizontal='left', vertical='center'),
+        'border': _get_thin_border(),
+    })
+    ws.row_dimensions[fila_actual].height = 18
+    fila_actual += 1
+
+    fila_rhitso = datos_semana.get('candidatos_rhitso') or {}
+    estilo_rhitso = _get_rhitso_style()
+    celda_nombre_rhitso = ws.cell(
+        row=fila_actual,
+        column=1,
+        value=fila_rhitso.get('nombre', 'Candidatos RHITSO'),
+    )
+    apply_cell_style(celda_nombre_rhitso, {
+        **estilo_rhitso,
+        'alignment': Alignment(horizontal='left', vertical='center'),
+    })
+    for d_idx, dia in enumerate(DIAS_SEMANA):
+        celda = ws.cell(row=fila_actual, column=2 + d_idx, value=fila_rhitso.get(dia, 0))
+        apply_cell_style(celda, estilo_rhitso)
+    celda_tot_rhitso = ws.cell(row=fila_actual, column=7, value=fila_rhitso.get('total', 0))
+    apply_cell_style(celda_tot_rhitso, {
+        **estilo_rhitso,
+        'font': Font(bold=True, italic=True, size=10, color='842029'),
+    })
+    ws.row_dimensions[fila_actual].height = 16
     fila_actual += 2
 
     # ---- Sección 3: Egreso ----

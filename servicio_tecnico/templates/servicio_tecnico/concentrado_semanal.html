@@ -281,7 +281,7 @@
                     </thead>
                     <tbody>
                          {% for fila in asignacion %}
-                         <tr class="{% if fila.nombre == 'Candidatos RHITSO' %}concentrado-fila-rhitso{% endif %}">
+                         <tr>
                              <td class="celda-ingeniero ps-3">{{ fila.nombre }}</td>
                              {% for dia in dias_semana %}
                              <td class="celda-numero text-center {{ fila|get_item:dia|celda_clase }}">{{ fila|get_item:dia|zero_dash }}</td>
@@ -299,6 +299,46 @@
                             <td class="text-center fw-bold">{{ totales_asignacion|get_item:dia }}</td>
                             {% endfor %}
                             <td class="text-center fw-bold">{{ total_asignados }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         CANDIDATOS RHITSO (aparte del total de asignación)
+         El mismo equipo ya está en la fila del técnico. Esta tabla solo
+         muestra cuántos de esos equipos van a laboratorio externo.
+         ====================================================================== -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header concentrado-header-rhitso d-flex align-items-center gap-2">
+            <i class="bi bi-tools fs-5"></i>
+            <h5 class="mb-0">Candidatos RHITSO</h5>
+        </div>
+        <div class="card-body p-0">
+            <p class="concentrado-nota-rhitso small px-3 pt-3 mb-2">
+                Estos equipos ya est&aacute;n contados con el t&eacute;cnico que los tiene.
+                No son un ingreso extra y no se suman al total de la tabla de arriba.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-bordered concentrado-tabla mb-0">
+                    <thead>
+                        <tr class="concentrado-thead-rhitso">
+                            <th class="col-ingeniero">CONCEPTO</th>
+                            {% for dia in dias_semana %}
+                            <th class="col-dia text-center">{{ dia|upper }}</th>
+                            {% endfor %}
+                            <th class="col-total text-center">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="concentrado-fila-rhitso">
+                            <td class="celda-ingeniero ps-3">{{ candidatos_rhitso.nombre }}</td>
+                            {% for dia in dias_semana %}
+                            <td class="celda-numero text-center {{ candidatos_rhitso|get_item:dia|celda_clase }}">{{ candidatos_rhitso|get_item:dia|zero_dash }}</td>
+                            {% endfor %}
+                            <td class="celda-total text-center fw-bold">{{ candidatos_rhitso.total }}</td>
                         </tr>
                     </tbody>
                 </table>

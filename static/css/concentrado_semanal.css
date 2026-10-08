@@ -61,6 +61,31 @@ COLORES USADOS:
     font-weight: 600;
 }
 
+/* Candidatos RHITSO: tabla aparte, no entra al total de ingenieros */
+.concentrado-header-rhitso {
+    background-color: #842029;
+    color: #ffffff;
+    border-bottom: none;
+}
+
+.concentrado-header-rhitso h5,
+.concentrado-header-rhitso h6 {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.concentrado-nota-rhitso {
+    color: var(--gray-600, #6c757d);
+}
+
+.concentrado-thead-rhitso th {
+    background-color: #f8d7da;
+    color: #842029;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
 /* Sección 3 – Egreso: Verde */
 .concentrado-header-egreso {
     background: linear-gradient(135deg, #198754 0%, #146c43 100%);
@@ -774,6 +799,25 @@ tr.fila-sat-mis     td.celda-sitio { background-color: rgba(114, 194, 159, 0.40)
 }
 
 [data-bs-theme="dark"] .concentrado-fila-rhitso td {
+    color: #f5b7b1;
+}
+
+[data-bs-theme="dark"] .concentrado-header-rhitso {
+    background-color: #5c1a22;
+    color: #f8d7da;
+}
+
+[data-bs-theme="dark"] .concentrado-header-rhitso h5,
+[data-bs-theme="dark"] .concentrado-header-rhitso h6 {
+    color: #f8d7da;
+}
+
+[data-bs-theme="dark"] .concentrado-nota-rhitso {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .concentrado-thead-rhitso th {
+    background-color: #3d1519;
     color: #f5b7b1;
 }
 

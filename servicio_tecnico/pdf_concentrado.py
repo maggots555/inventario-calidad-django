@@ -56,6 +56,8 @@ COLOR_VERDE = colors.HexColor('#198754')      # Bootstrap success
 COLOR_GRIS_CLARO = colors.HexColor('#f8f9fa')
 COLOR_GRIS_THEAD = colors.HexColor('#e9ecef')
 COLOR_AMARILLO = colors.HexColor('#fff3cd')   # Fila escalados
+COLOR_RHITSO_BG = colors.HexColor('#f8d7da')  # Fila candidatos RHITSO
+COLOR_RHITSO_TEXTO = colors.HexColor('#842029')
 COLOR_AZUL_THEAD_ING = colors.HexColor('#cfe2ff')
 COLOR_INDIGO_THEAD = colors.HexColor('#e0cffc')
 COLOR_VERDE_THEAD = colors.HexColor('#d1e7dd')
@@ -341,6 +343,51 @@ def _tabla_asignacion(asignacion, total_asignados):
     return tabla
 
 
+def _tabla_candidatos_rhitso(candidatos_rhitso):
+    """
+    Tabla aparte de candidatos a laboratorio externo (RHITSO).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Un equipo candidato a RHITSO ya está en la fila del técnico.
+    Esta tabla solo muestra cuántos de esos equipos van a laboratorio
+    externo. No se suma al total de asignación.
+
+    Args:
+        candidatos_rhitso (dict): {nombre, Lunes..Viernes, total}
+
+    Returns:
+        Table: Una fila con el conteo por día.
+
+    Efectos secundarios:
+        Ninguno. Solo arma la tabla en memoria para el PDF.
+    """
+    fila = candidatos_rhitso or {}
+    encabezados = ['CONCEPTO'] + [d[:3].upper() for d in DIAS_SEMANA] + ['TOTAL']
+    datos = [fila.get('nombre', 'Candidatos RHITSO')]
+    for dia in DIAS_SEMANA:
+        datos.append(fila.get(dia, 0))
+    datos.append(fila.get('total', 0))
+
+    filas = [encabezados, datos]
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_RHITSO_BG),
+        ('TEXTCOLOR', (0, 0), (-1, 0), COLOR_RHITSO_TEXTO),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, 1), (-1, 1), COLOR_RHITSO_BG),
+        ('TEXTCOLOR', (0, 1), (-1, 1), COLOR_RHITSO_TEXTO),
+        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Oblique'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')),
+    ]
+    col_widths = [5.5 * cm] + [1.6 * cm] * len(DIAS_SEMANA) + [1.8 * cm]
+    tabla = Table(filas, colWidths=col_widths, repeatRows=1)
+    tabla.setStyle(TableStyle(style_cmds))
+    return tabla
+
+
 # ===========================================================================
 # FUNCIÓN PRINCIPAL EXPORTADA
 # ===========================================================================
@@ -351,8 +398,9 @@ def generar_pdf_concentrado(datos):
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función recibe el diccionario 'datos' tal como lo devuelve
-    obtener_concentrado_semanal() y construye un PDF con las 3 tablas
-    del reporte en orientación horizontal (landscape) usando ReportLab.
+    obtener_concentrado_semanal() y construye un PDF en orientación
+    horizontal (landscape) usando ReportLab: ingreso, asignación a
+    ingeniería, la tabla aparte de candidatos RHITSO y egreso.
 
     El PDF se guarda en un 'buffer' (archivo en memoria) que luego
     se envía directamente al navegador para descargar, sin guardar
@@ -493,6 +541,23 @@ def generar_pdf_concentrado(datos):
         total_asignados=datos.get('total_asignados', 0),
     )
     elementos.append(tabla_asig)
+    elementos.append(Spacer(1, 2 * mm))
+
+    # RHITSO no es un equipo extra: va en su propia tabla, fuera del total.
+    elementos.append(
+        Paragraph(
+            'Candidatos RHITSO (ya contados con su técnico; no se suman al total)',
+            ParagraphStyle(
+                'NotaRhitso',
+                fontSize=8,
+                fontName='Helvetica-Oblique',
+                textColor=COLOR_RHITSO_TEXTO,
+                spaceBefore=1,
+                spaceAfter=2,
+            ),
+        )
+    )
+    elementos.append(_tabla_candidatos_rhitso(datos.get('candidatos_rhitso', {})))
     elementos.append(Spacer(1, 4 * mm))
 
     # ================================================================
