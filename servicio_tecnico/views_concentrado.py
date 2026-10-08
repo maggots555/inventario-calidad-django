@@ -378,56 +378,50 @@ def exportar_concentrado_excel(request):
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_concentrado_pdf(request):
     """
-    Exporta el concentrado semanal a un PDF con las 3 tablas del reporte.
+    Exporta el concentrado semanal a un PDF con resumen y tablas.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Usa la librería ReportLab para generar un PDF en orientación horizontal
-    (landscape) con las 3 tablas del concentrado semanal:
-      1. Ingreso de Equipos
-      2. Asignación a Ingeniería
-      3. Egreso de Equipos
+    El PDF usa el mismo diseño que los formatos OOW y Diagnóstico
+    (logo, barras navy, hoja vertical). Arriba va el resumen contra
+    la semana anterior y la lista de equipos RHITSO. Debajo, las tablas.
+
+    El filtro de sucursal respeta también los grupos CIS y Foráneas,
+    igual que la página. Antes un grupo se ignoraba y el PDF salía de todo.
 
     Parámetros GET:
         semana (str): Semana ISO (ej: '2025-W18')
-        sucursal_id (int): Filtrar por sucursal
+        sucursal_id (int | 'grupo_cis' | 'grupo_foranea'): Filtro de sucursal
 
     Returns:
         HttpResponse: Archivo PDF como descarga
+
+    Efectos secundarios:
+        Ninguno en disco. Lee órdenes de esta semana y de la anterior.
     """
-    from .concentrado_semanal import (
-        obtener_semana_actual,
-        lunes_desde_numero_semana,
-        obtener_concentrado_semanal,
-        DIAS_SEMANA,
-        SITIOS,
-        TIPOS_EQUIPO,
-    )
+    from datetime import timedelta
+
+    from .concentrado_semanal import obtener_concentrado_semanal
     from .pdf_concentrado import generar_pdf_concentrado
 
-    # Leer parámetros
-    semana_param = request.GET.get('semana', '')
-    sucursal_id = request.GET.get('sucursal_id', None)
-    if sucursal_id:
-        try:
-            sucursal_id = int(sucursal_id)
-        except ValueError:
-            sucursal_id = None
+    filtros = _filtros_exportacion_concentrado(request)
+    lunes_seleccionado = filtros['lunes']
+    sucursal_id = filtros['sucursal_id']
+    sucursal_ids = filtros['sucursal_ids']
 
-    lunes_seleccionado = obtener_semana_actual()
-    if semana_param:
-        try:
-            partes = semana_param.split('-W')
-            lunes_seleccionado = lunes_desde_numero_semana(int(partes[0]), int(partes[1]))
-        except (ValueError, IndexError):
-            lunes_seleccionado = obtener_semana_actual()
+    datos = obtener_concentrado_semanal(
+        lunes_seleccionado,
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
+    # La variación del resumen necesita la misma selección, siete días antes.
+    datos_anterior = obtener_concentrado_semanal(
+        lunes_seleccionado - timedelta(days=7),
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
 
-    # Obtener datos
-    datos = obtener_concentrado_semanal(lunes_seleccionado, sucursal_id=sucursal_id)
+    pdf_buffer = generar_pdf_concentrado(datos, datos_anterior)
 
-    # Generar PDF
-    pdf_buffer = generar_pdf_concentrado(datos)
-
-    # Preparar respuesta
     num_semana = datos['numero_semana']
     año = datos['año']
     filename = f'Concentrado_Semanal_S{num_semana:02d}_{año}.pdf'
@@ -436,4 +430,64 @@ def exportar_concentrado_pdf(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
+
+
+def _filtros_exportacion_concentrado(request):
+    """
+    Lee la semana y la sucursal con las mismas reglas que la página.
+
+    Objetivo de negocio:
+        Exportar el PDF del grupo que se está viendo (CIS, Foráneas,
+        una sucursal o todas), no de otra selección.
+
+    Args:
+        request: Petición con GET semana y sucursal_id.
+            sucursal_id puede ser un número, 'grupo_cis' o 'grupo_foranea'.
+
+    Returns:
+        dict: lunes (date), sucursal_id (int o None), sucursal_ids (lista o None).
+
+    Efectos secundarios:
+        Consulta las sucursales activas para armar los grupos.
+    """
+    from .concentrado_semanal import (
+        lunes_desde_numero_semana,
+        obtener_semana_actual,
+    )
+
+    semana_param = request.GET.get('semana', '')
+    sucursal_param = request.GET.get('sucursal_id', None)
+
+    lunes = obtener_semana_actual()
+    if semana_param:
+        try:
+            partes = semana_param.split('-W')
+            lunes = lunes_desde_numero_semana(int(partes[0]), int(partes[1]))
+        except (ValueError, IndexError):
+            lunes = obtener_semana_actual()
+
+    sucursal_id = None
+    sucursal_ids = None
+    if sucursal_param in ('grupo_cis', 'grupo_foranea'):
+        # Misma regla que la página: Drop/Satélite es CIS; el resto, foránea.
+        grupo_cis_ids = []
+        grupo_foranea_ids = []
+        for suc in Sucursal.objects.filter(activa=True):
+            nombre = suc.nombre.lower()
+            if 'drop' in nombre or 'satelit' in nombre:
+                grupo_cis_ids.append(suc.id)
+            else:
+                grupo_foranea_ids.append(suc.id)
+        sucursal_ids = grupo_cis_ids if sucursal_param == 'grupo_cis' else grupo_foranea_ids
+    elif sucursal_param:
+        try:
+            sucursal_id = int(sucursal_param)
+        except ValueError:
+            sucursal_id = None
+
+    return {
+        'lunes': lunes,
+        'sucursal_id': sucursal_id,
+        'sucursal_ids': sucursal_ids,
+    }
 

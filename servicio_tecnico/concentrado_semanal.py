@@ -285,6 +285,8 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
             - candidatos_rhitso: conteo aparte de órdenes marcadas como
               candidatas a laboratorio externo. No entra al total de asignación,
               porque es el mismo equipo que ya está en la fila del técnico.
+            - lista_candidatos_rhitso: esos mismos equipos, uno por uno
+              (día, folio, técnico, sucursal), para el PDF.
             - egreso: tabla de egresos por sitio/tipo/día
             - resumen_ingreso: totales de carry-in, MIS, etc.
             - totales_ingreso: fila de totales generales
@@ -429,6 +431,8 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
     rhitso_fila = {dia: 0 for dia in DIAS_SEMANA}
     rhitso_fila['nombre'] = 'Candidatos RHITSO'
     rhitso_fila['total'] = 0
+    # La lista nombra cada equipo. El conteo de arriba solo dice "cuántos".
+    lista_candidatos_rhitso = []
     candidatos_rhitso = base_qs.filter(es_candidato_rhitso=True)
     for orden in candidatos_rhitso:
         dia_idx = orden.fecha_ingreso.weekday()
@@ -437,6 +441,25 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         dia_nombre = DIAS_SEMANA[dia_idx]
         rhitso_fila[dia_nombre] += 1
         rhitso_fila['total'] += 1
+
+        detalle = getattr(orden, 'detalle_equipo', None)
+        folio_cliente = ''
+        if detalle is not None:
+            folio_cliente = (detalle.orden_cliente or '').strip()
+        # Sin folio de cliente, el número interno (ORD-...) sigue identificando el equipo.
+        folio = folio_cliente or orden.numero_orden_interno
+        tecnico = orden.tecnico_asignado_actual
+        lista_candidatos_rhitso.append({
+            'dia': dia_nombre,
+            'dia_idx': dia_idx,
+            'folio': folio,
+            'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
+            'sucursal': orden.sucursal.nombre if orden.sucursal_id else '',
+        })
+
+    lista_candidatos_rhitso.sort(key=lambda item: (item['dia_idx'], item['folio']))
+    for item in lista_candidatos_rhitso:
+        item.pop('dia_idx', None)
 
     # Solo ingenieros, ordenados de quien más equipos tuvo a quien menos.
     lista_asignacion = sorted(
@@ -510,6 +533,7 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         'ingreso': datos_ingreso,
         'asignacion': lista_asignacion,
         'candidatos_rhitso': rhitso_fila,
+        'lista_candidatos_rhitso': lista_candidatos_rhitso,
         'egreso': datos_egreso,
         'totales_ingreso': totales_ingreso,
         'totales_egreso': totales_egreso,
@@ -526,6 +550,48 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         'sitios': SITIOS,
         'tipos_equipo': TIPOS_EQUIPO,
         'tipos_visibles_por_sitio': tipos_visibles_por_sitio,
+    }
+
+
+def comparar_concentrado_con_semana_anterior(actual, anterior):
+    """
+    Compara esta semana con la anterior para el resumen del PDF.
+
+    Objetivo de negocio:
+        En la junta se lee cuántos entraron, cuántos salieron y si el piso
+        creció o bajó, frente a la semana pasada. El candidato RHITSO se
+        compara aparte: no forma parte del balance de ingresos.
+
+    Args:
+        actual (dict): Resultado de obtener_concentrado_semanal de esta semana.
+        anterior (dict): El mismo cálculo del lunes anterior.
+
+    Returns:
+        dict: ingresaron, salieron, balance, candidatos_rhitso y la
+        variación de cada uno (esta semana menos la anterior).
+
+    Efectos secundarios:
+        Ninguno. Solo resta números que ya vienen calculados.
+    """
+    # El balance es "entraron de más". Positivo = quedaron más equipos
+    # de los que salieron. No incluye RHITSO: esos ya van en el ingreso.
+    ingresaron = actual['totales_ingreso']['total']
+    salieron = actual['totales_egreso']['total']
+    rhitso = actual['candidatos_rhitso']['total']
+    ingresaron_ant = anterior['totales_ingreso']['total']
+    salieron_ant = anterior['totales_egreso']['total']
+    rhitso_ant = anterior['candidatos_rhitso']['total']
+    balance = ingresaron - salieron
+    balance_ant = ingresaron_ant - salieron_ant
+    return {
+        'ingresaron': ingresaron,
+        'salieron': salieron,
+        'balance': balance,
+        'candidatos_rhitso': rhitso,
+        'variacion_ingresaron': ingresaron - ingresaron_ant,
+        'variacion_salieron': salieron - salieron_ant,
+        'variacion_balance': balance - balance_ant,
+        'variacion_rhitso': rhitso - rhitso_ant,
     }
 
 

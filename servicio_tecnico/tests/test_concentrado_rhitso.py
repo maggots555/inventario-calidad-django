@@ -7,7 +7,7 @@ Un equipo asignado a un técnico ya suma 1 en la fila de ese técnico.
 Si además está marcado como candidato a RHITSO, es el mismo equipo:
 no entró otro. Antes esa marca se sumaba otra vez al total.
 
-Estos tests revisan el cálculo, sin abrir el navegador ni generar PDF.
+Estos tests revisan el cálculo y que el PDF del resumen se genera.
 """
 
 from datetime import date, datetime
@@ -18,8 +18,12 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
 from inventario.models import Empleado, Sucursal
-from servicio_tecnico.concentrado_semanal import obtener_concentrado_semanal
+from servicio_tecnico.concentrado_semanal import (
+    comparar_concentrado_con_semana_anterior,
+    obtener_concentrado_semanal,
+)
 from servicio_tecnico.models import OrdenServicio
+from servicio_tecnico.pdf_concentrado import generar_pdf_concentrado
 
 
 # Lunes 5 de octubre de 2026 (el 8 es jueves, así que el 5 es lunes).
@@ -150,3 +154,51 @@ class ConcentradoRhitsoNoDobleConteoTest(TestCase):
         self.assertIn('Total Equipos Ingresados', html)
         # La fila RHITSO ya no vive dentro de la tabla de ingenieros.
         self.assertNotIn('concentrado-fila-rhitso', html.split('Total Equipos Ingresados')[0])
+
+    def test_lista_rhitso_y_variacion_de_la_semana(self):
+        """
+        La lista nombra al candidato y la variación resta la semana anterior.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Esta semana Juan tiene el único candidato. La semana pasada Ana
+        tenía otro. La variación de RHITSO es 1 - 1 = 0. El equipo de Ana
+        de esta semana no entra a la lista porque no es candidato.
+        """
+        ingreso_previo = timezone.make_aware(datetime(2026, 9, 28, 10, 0))
+        OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='espera',
+            tecnico_asignado_actual=self.ana,
+            es_candidato_rhitso=True,
+            fecha_ingreso=ingreso_previo,
+        )
+
+        datos = obtener_concentrado_semanal(LUNES_SEMANA)
+        anterior = obtener_concentrado_semanal(date(2026, 9, 28))
+        comparacion = comparar_concentrado_con_semana_anterior(datos, anterior)
+
+        self.assertEqual(len(datos['lista_candidatos_rhitso']), 1)
+        candidato = datos['lista_candidatos_rhitso'][0]
+        self.assertEqual(candidato['dia'], 'Lunes')
+        self.assertEqual(candidato['tecnico'], self.juan.nombre_completo)
+        self.assertEqual(candidato['sucursal'], self.sucursal.nombre)
+        self.assertTrue(candidato['folio'].startswith('ORD-'))
+        self.assertNotIn(
+            self.ana.nombre_completo,
+            [item['tecnico'] for item in datos['lista_candidatos_rhitso']],
+        )
+
+        self.assertEqual(comparacion['candidatos_rhitso'], 1)
+        self.assertEqual(comparacion['variacion_rhitso'], 0)
+        # Sin detalle de equipo, ingreso y egreso de estas órdenes quedan en 0.
+        self.assertEqual(comparacion['ingresaron'], 0)
+        self.assertEqual(comparacion['balance'], 0)
+        self.assertEqual(comparacion['variacion_ingresaron'], 0)
+
+        pdf = generar_pdf_concentrado(datos, anterior).getvalue()
+        # El nombre va comprimido dentro del PDF; aquí revisamos que sea
+        # una hoja vertical (carta) y que el título sea el del concentrado.
+        self.assertTrue(pdf.startswith(b'%PDF'))
+        self.assertIn(b'/MediaBox [ 0 0 612 792 ]', pdf)
+        self.assertIn(b'Concentrado semanal', pdf)
