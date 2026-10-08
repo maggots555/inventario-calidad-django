@@ -8,6 +8,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta, date
 from functools import wraps
+from .clima_saludo import frase_clima_para_usuario
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
@@ -320,6 +321,10 @@ def dashboard_principal(request):
     # Genera o recupera del caché la cita del día (ver función arriba)
     cita_diaria = obtener_cita_nihilismo_diaria()
 
+    # Frase del clima para el saludo ("hoy nos espera un día lluvioso").
+    # Si Open-Meteo no responde, llega vacía y el saludo se queda como siempre.
+    frase_clima = frase_clima_para_usuario(request.user)
+
     context = {
         # Inventario
         'total_productos': total_productos,
@@ -356,6 +361,8 @@ def dashboard_principal(request):
 
         # Cita diaria de nihilismo optimista (generada por IA con Ollama)
         'cita_diaria': cita_diaria,
+        # Cola del saludo según el clima de la sucursal (o '' si no hubo dato)
+        'frase_clima': frase_clima,
     }
     
     return render(request, 'dashboard_principal.html', context)

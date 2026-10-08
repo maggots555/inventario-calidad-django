@@ -82,28 +82,36 @@ CARACTERÍSTICAS:
     animation: fadeInDown 0.6s ease-out;
 }
 
-/* Saludo dinámico ("Buenos días, Usuario") */
+/* Saludo dinámico ("Buenos días, Usuario hoy nos espera un día lluvioso") */
+/* inline-block (no flex): la frase parte en palabras, como un párrafo,
+   y la píldora crece hacia abajo en pantallas angostas. */
 .hero-greeting {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
+    display: inline-block;
+    max-width: min(100%, 42rem);
     background: rgba(255, 255, 255, 0.75);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(0, 0, 0, 0.08);
     padding: 0.6rem 1.6rem;
-    border-radius: 999px;
+    border-radius: 1.5rem;
     font-size: 1.15rem;
+    line-height: 1.45;
     color: var(--color-text-gray);
     margin-bottom: 1.25rem;
     font-weight: 500;
     letter-spacing: 0.01em;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    text-align: center;
 }
 
 .greeting-name {
     color: var(--color-text-dark);
     font-weight: 700;
     font-size: 1.2rem;
+}
+
+/* La frase del clima hereda el color del saludo; no compite con el nombre. */
+.greeting-clima {
+    font-weight: 500;
 }
 
 .hero-icon {
@@ -979,7 +987,7 @@ CARACTERÍSTICAS:
    DARK MODE — Overrides para nuevos elementos
    ============================================================================ */
 
-/* Saludo dinámico */
+/* Saludo dinámico. La frase del clima (.greeting-clima) hereda este color. */
 [data-bs-theme="dark"] .hero-greeting {
     background: rgba(30, 41, 59, 0.85);
     border-color: rgba(255, 255, 255, 0.1);
@@ -988,6 +996,9 @@ CARACTERÍSTICAS:
 }
 [data-bs-theme="dark"] .greeting-name {
     color: #e2e8f0;
+}
+[data-bs-theme="dark"] .greeting-clima {
+    color: #94a3b8;
 }
 
 /* KBD badge */

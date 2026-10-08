@@ -39,8 +39,12 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
       </div>
 
       <!-- Saludo dinámico debajo del ícono — tamaño prominente -->
+      <!-- La hora (Buenos días / tardes / noches) la pone el JavaScript de esta página. -->
+      <!-- frase_clima llega del servidor, por ejemplo "hoy nos espera un día lluvioso". -->
+      <!-- Los spans van pegados a propósito: un salto de línea se convierte en un -->
+      <!-- espacio y la coma quedaría mal ("Buenos días , Jorge"). -->
       <div class="hero-greeting">
-        <span id="greeting-time">Bienvenido</span>{% if request.user.is_authenticated %}<span class="greeting-name">, {{ request.user.first_name|default:request.user.username }}</span>{% endif %}
+        <span id="greeting-time">Bienvenido</span>{% if request.user.is_authenticated %}<span class="greeting-name">, {{ request.user.first_name|default:request.user.username }}</span>{% endif %}{% if frase_clima %}<span class="greeting-clima"> {{ frase_clima }}</span>{% endif %}
       </div>
 
       <h1 class="hero-title tiktok-sans-regular">
