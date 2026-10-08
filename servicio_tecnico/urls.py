@@ -382,6 +382,11 @@ urlpatterns = [
          views.exportar_concentrado_pdf,
          name='exportar_concentrado_pdf'),
 
+    # El modal confirma y esta URL encola el correo (Excel + PDF).
+    path('concentrado-semanal/compartir/',
+         views.compartir_concentrado_semanal,
+         name='compartir_concentrado'),
+
     # Consulta SICSER (Fase 1: listar + Fase 2: importar órdenes)
     path('sicser/consultar/',
          views.consultar_sicser,

@@ -941,3 +941,24 @@ tr.fila-sat-mis     td.celda-sitio { background-color: rgba(114, 194, 159, 0.40)
 [data-bs-theme="dark"] .wp-dropdown-footer {
     border-top-color: #495057;
 }
+
+/* El botón de compartir y cada contacto del modal se pueden tocar con el dedo. */
+.concentrado-btn-compartir,
+.concentrado-modal-compartir .btn {
+    min-height: 44px;
+}
+
+.concentrado-contacto-correo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 44px;
+    margin-bottom: 0.5rem;
+}
+
+.concentrado-contacto-correo .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0;
+    float: none;
+}

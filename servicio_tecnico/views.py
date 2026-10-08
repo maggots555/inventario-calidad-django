@@ -182,6 +182,7 @@ from .views_misc import (  # noqa: F401
     actualizar_email_cliente,
 )
 from .views_concentrado import (  # noqa: F401
+    compartir_concentrado_semanal,
     concentrado_semanal,
     exportar_concentrado_excel,
     exportar_concentrado_pdf,

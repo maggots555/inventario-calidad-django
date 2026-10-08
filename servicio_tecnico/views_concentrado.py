@@ -28,7 +28,9 @@ def resolver_filtros_concentrado(request):
         CIS o Foráneas, el archivo no puede salir con todas las sucursales.
 
     Args:
-        request: Petición con GET semana (YYYY-WNN) y sucursal_id.
+        request: Petición con semana (YYYY-WNN) y sucursal_id.
+            En GET los leen la página, el Excel y el PDF.
+            En POST los lee el envío por correo (vienen del modal).
             sucursal_id puede ser un número, 'grupo_cis', 'grupo_foranea' o vacío.
 
     Returns:
@@ -45,8 +47,10 @@ def resolver_filtros_concentrado(request):
         obtener_semana_actual,
     )
 
-    semana_param = request.GET.get('semana', '')
-    sucursal_param = request.GET.get('sucursal_id') or None
+    # El modal manda la semana por POST. El resto de la página usa GET.
+    origen = request.POST if request.method == 'POST' else request.GET
+    semana_param = origen.get('semana', '')
+    sucursal_param = origen.get('sucursal_id') or None
 
     lunes = obtener_semana_actual()
     if semana_param:
@@ -133,6 +137,7 @@ def concentrado_semanal(request):
         SITIOS,
         TIPOS_EQUIPO,
     )
+    from .services.concentrado_correo import destinatarios_concentrado
 
     # Semana y sucursal: la misma función que usan el Excel y el PDF.
     filtros = resolver_filtros_concentrado(request)
@@ -305,6 +310,8 @@ def concentrado_semanal(request):
         'page_title': (
             f'Concentrado Semanal — Semana {datos["numero_semana"]}, {datos["año"]}'
         ),
+        # El modal de correo abre con estos contactos ya marcados.
+        'destinatarios_correo': destinatarios_concentrado(),
     }
 
     return render(request, 'servicio_tecnico/concentrado_semanal.html', context)
@@ -443,4 +450,83 @@ def exportar_concentrado_pdf(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+def compartir_concentrado_semanal(request):
+    """
+    Encola el correo del concentrado que se está viendo en pantalla.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El botón «Compartir por correo» no envía nada: abre un modal con
+    los contactos ya marcados. Este POST es el botón «Enviar» de ese
+    modal. Solo acepta correos de esa lista. El Excel y el PDF los
+    arma la tarea Celery, para no dejar esperando al navegador.
+
+    Parámetros POST:
+        semana (str): Semana ISO, la misma del filtro.
+        sucursal_id (str): Sucursal o grupo, si hay filtro.
+        destinatarios (list): Correos que siguieron marcados.
+
+    Returns:
+        Redirect a la misma semana del concentrado, con un mensaje.
+
+    Efectos secundarios:
+        Encola enviar_concentrado_semanal_task con el país actual.
+        No envía SMTP en esta petición.
+    """
+    from urllib.parse import urlencode
+
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from django.urls import reverse
+
+    from config.paises_config import get_pais_actual
+
+    from .services.concentrado_correo import (
+        describir_alcance,
+        filtrar_destinatarios_elegidos,
+    )
+    from .tasks_concentrado import enviar_concentrado_semanal_task
+
+    if request.method != 'POST':
+        return redirect('servicio_tecnico:concentrado_semanal')
+
+    filtros = resolver_filtros_concentrado(request)
+    lunes = filtros['lunes']
+    iso = lunes.isocalendar()
+    semana_iso = f'{iso.year}-W{iso.week:02d}'
+    consulta = {'semana': semana_iso}
+    if filtros['sucursal_param']:
+        consulta['sucursal_id'] = filtros['sucursal_param']
+    destino = (
+        reverse('servicio_tecnico:concentrado_semanal')
+        + '?'
+        + urlencode(consulta)
+    )
+
+    elegidos = filtrar_destinatarios_elegidos(request.POST.getlist('destinatarios'))
+    if not elegidos:
+        messages.warning(
+            request,
+            'No se envió el concentrado: no quedó ningún contacto marcado.',
+        )
+        return redirect(destino)
+
+    # El worker lee db_alias antes de tocar órdenes. Sin eso cae en México.
+    enviar_concentrado_semanal_task.delay(
+        lunes_iso=lunes.isoformat(),
+        destinatarios=elegidos,
+        sucursal_id=filtros['sucursal_id'],
+        sucursal_ids=filtros['sucursal_ids'],
+        alcance=describir_alcance(filtros),
+        db_alias=get_pais_actual()['db_alias'],
+    )
+    messages.success(
+        request,
+        f'Se programó el envío del concentrado para {len(elegidos)} contacto(s). '
+        'El Excel y el PDF salen en unos momentos.',
+    )
+    return redirect(destino)
 

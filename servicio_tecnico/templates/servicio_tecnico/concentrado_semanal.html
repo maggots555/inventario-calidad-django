@@ -17,7 +17,7 @@
          ENCABEZADO: TÍTULO + CONTROLES
          ====================================================================== -->
     <div class="row mb-3 align-items-center">
-        <div class="col-lg-7">
+        <div class="col-lg-6">
             <h2 class="concentrado-titulo mb-1">
                 <i class="bi bi-table"></i>
                 Concentrado Semanal CIS
@@ -30,7 +30,7 @@
                 {{ lunes|date:"d/m/Y" }} &mdash; {{ viernes|date:"d/m/Y" }}
             </p>
         </div>
-        <div class="col-lg-5 d-flex justify-content-lg-end align-items-center flex-wrap gap-2 mt-2 mt-lg-0">
+        <div class="col-lg-6 d-flex justify-content-lg-end align-items-center flex-wrap gap-2 mt-2 mt-lg-0">
             <a href="{% url 'servicio_tecnico:exportar_concentrado_excel' %}?semana={{ semana_actual_iso }}{% if sucursal_id_seleccionada %}&sucursal_id={{ sucursal_id_seleccionada }}{% endif %}"
                class="btn btn-success btn-sm"
                title="Exportar a Excel con 4 hojas: Semanal, Q1-Q4, Gráficos">
@@ -43,6 +43,77 @@
                 <i class="bi bi-file-earmark-pdf-fill"></i>
                 Exportar PDF
             </a>
+            {# Abre el modal. El envío ocurre al confirmar, no al apretar este botón. #}
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm concentrado-btn-compartir"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalCompartirConcentrado"
+                    title="Revisar contactos y enviar el Excel y el PDF">
+                <i class="bi bi-envelope"></i>
+                Compartir por correo
+            </button>
+        </div>
+    </div>
+
+    {# Modal: los contactos ya vienen marcados. Enviar es el que confirma. #}
+    <div class="modal fade concentrado-modal-compartir"
+         id="modalCompartirConcentrado"
+         tabindex="-1"
+         aria-labelledby="modalCompartirConcentradoTitulo"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <form method="post" action="{% url 'servicio_tecnico:compartir_concentrado' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="semana" value="{{ semana_actual_iso }}">
+                    {% if sucursal_id_seleccionada %}
+                    <input type="hidden" name="sucursal_id" value="{{ sucursal_id_seleccionada }}">
+                    {% endif %}
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="modalCompartirConcentradoTitulo">
+                            Enviar concentrado por correo
+                        </h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            Semana <strong>{{ numero_semana }}</strong> de {{ año }}.
+                            Estos contactos ya están marcados. Quita la marca si alguien
+                            no debe recibir este envío. Se adjuntan el Excel y el PDF.
+                        </p>
+                        {% for persona in destinatarios_correo %}
+                        <div class="form-check concentrado-contacto-correo">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   name="destinatarios"
+                                   value="{{ persona.email }}"
+                                   id="destinatario-concentrado-{{ forloop.counter }}"
+                                   checked>
+                            <label class="form-check-label" for="destinatario-concentrado-{{ forloop.counter }}">
+                                <span class="fw-semibold">{{ persona.nombre }}</span>
+                                <span class="d-block small text-muted">{{ persona.email }} · {{ persona.origen }}</span>
+                            </label>
+                        </div>
+                        {% empty %}
+                        <p class="mb-0">
+                            No hay contactos para este envío. Revisa en el servidor los
+                            correos de jefe de calidad y jefe general, o el rol
+                            Gerente General de los empleados.
+                        </p>
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Cancelar
+                        </button>
+                        {% if destinatarios_correo %}
+                        <button type="submit" class="btn btn-primary">
+                            Enviar Excel y PDF
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

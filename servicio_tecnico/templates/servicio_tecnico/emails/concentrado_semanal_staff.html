@@ -1,0 +1,136 @@
+{% comment %}
+  Correo interno: concentrado semanal para dirección.
+
+  EXPLICACIÓN PARA PRINCIPIANTES:
+  Misma receta que diagnostico_sic_listo_staff.html: tablas, CSS inline
+  y la barra de marca. El pie es interno, sin redes sociales.
+  El Excel y el PDF no van en el HTML: la tarea los adjunta al mensaje.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Concentrado semanal — Semana {{ numero_semana }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        @media only screen and (max-width: 620px) {
+            .email-wrapper { width: 100% !important; max-width: 100% !important; }
+            .email-pad { padding-left: 16px !important; padding-right: 16px !important; }
+            .kpi-celda { display: block !important; width: 100% !important; }
+        }
+        @media (prefers-color-scheme: dark) {
+            .email-outer { background-color: #0f172a !important; }
+            .email-card { background-color: #1e293b !important; }
+            .email-body-text { color: #e2e8f0 !important; }
+            .email-muted { color: #cbd5e1 !important; }
+            .email-panel { background-color: #0f172a !important; }
+            .email-brandbar { background-color: #1e293b !important; }
+            .email-header { background-color: #1e293b !important; }
+            .email-title { color: #7dd3fc !important; }
+            .email-subtitle { color: #cbd5e1 !important; }
+            .email-label { color: #7dd3fc !important; }
+        }
+    </style>
+</head>
+<body class="email-outer" style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f0f4f8;">
+        Semana {{ numero_semana }}: ingresaron {{ ingresaron }}, salieron {{ salieron }}, balance {{ balance }}.
+        &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+    </div>
+
+    <table role="presentation" class="email-outer" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f4f8" style="margin:0;padding:0;background-color:#f0f4f8;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <!--[if mso]>
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td>
+                <![endif]-->
+                <table role="presentation" class="email-wrapper email-card" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;width:100%;background-color:#ffffff;">
+
+                    {% include "servicio_tecnico/emails/partials/_email_brand_bar.html" %}
+
+                    <tr>
+                        <td class="email-header email-pad" bgcolor="#ffffff" align="center" style="padding:20px 32px;background-color:#ffffff;border-bottom:4px solid #1f6391;">
+                            <p class="email-title" style="margin:0;font-size:22px;line-height:28px;font-weight:700;color:#1f6391;">
+                                Concentrado semanal
+                            </p>
+                            <p class="email-subtitle" style="margin:6px 0 0 0;font-size:14px;line-height:20px;color:#475569;">
+                                Semana {{ numero_semana }} de {{ año }} · {{ lunes }} al {{ viernes }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 32px 8px 32px;">
+                            <p class="email-body-text" style="margin:0 0 16px 0;font-size:16px;line-height:26px;color:#334155;">
+                                Resumen de la semana. El Excel y el PDF van adjuntos a este correo.
+                            </p>
+                            <p class="email-muted" style="margin:0 0 20px 0;font-size:14px;line-height:22px;color:#475569;">
+                                Alcance: {{ alcance }}
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 24px 32px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td class="kpi-celda" width="25%" valign="top" bgcolor="#E8EEF5" style="padding:12px 8px;background-color:#E8EEF5;border:1px solid #cccccc;">
+                                        <p class="email-label" style="margin:0;font-size:12px;line-height:16px;font-weight:700;color:#003366;text-align:center;">Ingresaron</p>
+                                        <p class="email-body-text" style="margin:6px 0 0 0;font-size:22px;line-height:26px;font-weight:700;color:#003366;text-align:center;">{{ ingresaron }}</p>
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:11px;line-height:14px;color:#475569;text-align:center;">vs sem. ant. {{ variacion_ingresaron }}</p>
+                                    </td>
+                                    <td class="kpi-celda" width="25%" valign="top" bgcolor="#E8EEF5" style="padding:12px 8px;background-color:#E8EEF5;border:1px solid #cccccc;">
+                                        <p class="email-label" style="margin:0;font-size:12px;line-height:16px;font-weight:700;color:#003366;text-align:center;">Salieron</p>
+                                        <p class="email-body-text" style="margin:6px 0 0 0;font-size:22px;line-height:26px;font-weight:700;color:#003366;text-align:center;">{{ salieron }}</p>
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:11px;line-height:14px;color:#475569;text-align:center;">vs sem. ant. {{ variacion_salieron }}</p>
+                                    </td>
+                                    <td class="kpi-celda" width="25%" valign="top" bgcolor="#E8EEF5" style="padding:12px 8px;background-color:#E8EEF5;border:1px solid #cccccc;">
+                                        <p class="email-label" style="margin:0;font-size:12px;line-height:16px;font-weight:700;color:#003366;text-align:center;">Balance</p>
+                                        <p class="email-body-text" style="margin:6px 0 0 0;font-size:22px;line-height:26px;font-weight:700;color:#003366;text-align:center;">{{ balance }}</p>
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:11px;line-height:14px;color:#475569;text-align:center;">vs sem. ant. {{ variacion_balance }}</p>
+                                    </td>
+                                    <td class="kpi-celda" width="25%" valign="top" bgcolor="#FDECEC" style="padding:12px 8px;background-color:#FDECEC;border:1px solid #cccccc;">
+                                        <p class="email-label" style="margin:0;font-size:12px;line-height:16px;font-weight:700;color:#842029;text-align:center;">Candidatos RHITSO</p>
+                                        <p class="email-body-text" style="margin:6px 0 0 0;font-size:22px;line-height:26px;font-weight:700;color:#842029;text-align:center;">{{ candidatos_rhitso }}</p>
+                                        <p class="email-muted" style="margin:4px 0 0 0;font-size:11px;line-height:14px;color:#475569;text-align:center;">vs sem. ant. {{ variacion_rhitso }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:0 32px 28px 32px;">
+                            <p class="email-muted" style="margin:0;font-size:13px;line-height:20px;color:#475569;">
+                                Los candidatos RHITSO ya están contados con el técnico que los tiene.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#1e293b" class="email-pad" align="center" style="padding:18px 32px;background-color:#1e293b;">
+                            <p style="margin:0;font-size:13px;line-height:20px;color:#cbd5e1;">
+                                Aviso interno de SIGMA — Servicio Técnico
+                                {% if ahora_local %} · {{ ahora_local|date:"d/m/Y H:i" }}{% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso]>
+                </td></tr></table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

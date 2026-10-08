@@ -243,3 +243,223 @@ class ConcentradoRhitsoNoDobleConteoTest(TestCase):
         self.assertIn(drop.id, ids)
         self.assertIn(satelite.id, ids)
         self.assertNotIn(self.sucursal.id, ids)
+
+
+class CorreoConcentradoTest(TestCase):
+    """
+    El modal ofrece los contactos de dirección y el envío solo usa esos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No se manda correo de verdad. Revisamos tres cosas:
+    quién aparece en la lista, que el botón de confirmar encola la tarea,
+    y que el mensaje lleva el Excel y el PDF.
+    """
+
+    def test_une_contactos_del_env_y_gerentes_sin_duplicar(self):
+        """
+        Un gerente cuyo correo ya está en el .env no sale dos veces.
+        """
+        from inventario.models import Empleado
+        from servicio_tecnico.services.concentrado_correo import (
+            destinatarios_concentrado,
+            filtrar_destinatarios_elegidos,
+        )
+
+        Empleado.objects.create(
+            nombre_completo='Gerente Duplicado',
+            cargo='Gerente',
+            area='Dirección',
+            rol='gerente_general',
+            activo=True,
+            email='jefe@test.local',
+        )
+        Empleado.objects.create(
+            nombre_completo='Otra Gerente',
+            cargo='Gerente',
+            area='Dirección',
+            rol='gerente_general',
+            activo=True,
+            email='otra@test.local',
+        )
+        Empleado.objects.create(
+            nombre_completo='Gerente Inactivo',
+            cargo='Gerente',
+            area='Dirección',
+            rol='gerente_general',
+            activo=False,
+            email='inactivo@test.local',
+        )
+        Empleado.objects.create(
+            nombre_completo='Técnico con correo',
+            cargo='Técnico',
+            area='Laboratorio',
+            rol='tecnico',
+            activo=True,
+            email='tecnico@test.local',
+        )
+
+        with override_settings(
+            JEFE_CALIDAD_EMAIL='calidad@test.local',
+            JEFE_CALIDAD_NOMBRE='Ana Calidad',
+            JEFE_CALIDAD_2_EMAIL='',
+            JEFE_GENERAL_EMAIL='jefe@test.local',
+            JEFE_GENERAL_NOMBRE='Jefe General',
+        ):
+            personas = destinatarios_concentrado()
+            elegidos = filtrar_destinatarios_elegidos([
+                'calidad@test.local',
+                'OTRA@test.local',
+                'intruso@test.local',
+            ])
+
+        correos = [persona['email'] for persona in personas]
+        self.assertEqual(correos, [
+            'calidad@test.local',
+            'jefe@test.local',
+            'otra@test.local',
+        ])
+        self.assertEqual(personas[0]['origen'], 'Jefe de Calidad')
+        self.assertEqual(personas[2]['origen'], 'Gerente General')
+        self.assertEqual(elegidos, ['calidad@test.local', 'otra@test.local'])
+
+    def test_el_modal_muestra_los_contactos_ya_marcados(self):
+        """
+        La plantilla trae el checkbox marcado: el usuario solo confirma.
+        """
+        datos = obtener_concentrado_semanal(LUNES_SEMANA)
+        iso = LUNES_SEMANA.isocalendar()
+        semana = f'{iso[0]}-W{iso[1]:02d}'
+        request = RequestFactory().get('/servicio-tecnico/concentrado-semanal/')
+        storages = {
+            **settings.STORAGES,
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        }
+        with override_settings(STORAGES=storages):
+            html = render_to_string(
+                'servicio_tecnico/concentrado_semanal.html',
+                {
+                    **datos,
+                    'semana_actual_iso': semana,
+                    'semana_anterior_iso': semana,
+                    'semana_siguiente_iso': semana,
+                    'sucursal_id_seleccionada': None,
+                    'sucursales': [],
+                    'grupos_sucursales': [],
+                    'grafico_ingresos_html': '',
+                    'grafico_egresos_html': '',
+                    'page_title': 'Concentrado de prueba',
+                    'destinatarios_correo': [{
+                        'nombre': 'Ana Calidad',
+                        'email': 'calidad@test.local',
+                        'origen': 'Jefe de Calidad',
+                    }],
+                },
+                request=request,
+            )
+
+        self.assertIn('Compartir por correo', html)
+        self.assertIn('modalCompartirConcentrado', html)
+        self.assertIn('value="calidad@test.local"', html)
+        self.assertIn('checked', html)
+        self.assertIn('Enviar Excel y PDF', html)
+
+    def test_confirmar_encola_solo_los_correos_marcados(self):
+        """
+        El POST del modal encola la tarea y deja fuera un correo ajeno.
+        """
+        from unittest.mock import patch
+
+        from django.contrib.auth.models import User
+        from django.contrib.messages.middleware import MessageMiddleware
+        from django.contrib.sessions.middleware import SessionMiddleware
+
+        from servicio_tecnico.views_concentrado import compartir_concentrado_semanal
+
+        usuario = User.objects.create_superuser(
+            username='direccion',
+            email='direccion@test.local',
+            password='pass-12345',
+        )
+        fabrica = RequestFactory()
+        request = fabrica.post('/servicio-tecnico/concentrado-semanal/compartir/', {
+            'semana': '2026-W41',
+            'destinatarios': ['calidad@test.local', 'intruso@test.local'],
+        })
+        request.user = usuario
+        SessionMiddleware(lambda req: None).process_request(request)
+        request.session.save()
+        MessageMiddleware(lambda req: None).process_request(request)
+
+        with override_settings(
+            JEFE_CALIDAD_EMAIL='calidad@test.local',
+            JEFE_CALIDAD_NOMBRE='Ana Calidad',
+            JEFE_CALIDAD_2_EMAIL='',
+            JEFE_GENERAL_EMAIL='',
+        ):
+            with patch(
+                'servicio_tecnico.tasks_concentrado.enviar_concentrado_semanal_task.delay'
+            ) as encolar:
+                respuesta = compartir_concentrado_semanal(request)
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn('semana=2026-W41', respuesta.url)
+        encolar.assert_called_once()
+        kwargs = encolar.call_args.kwargs
+        self.assertEqual(kwargs['lunes_iso'], '2026-10-05')
+        self.assertEqual(kwargs['destinatarios'], ['calidad@test.local'])
+        self.assertIn('db_alias', kwargs)
+
+    def test_el_correo_adjunta_excel_y_pdf(self):
+        """
+        El mensaje sale con texto plano, HTML y los dos archivos.
+        """
+        from django.core import mail
+
+        from servicio_tecnico.services.concentrado_correo import (
+            enviar_correo_concentrado,
+        )
+
+        contexto = {
+            'numero_semana': 41,
+            'año': 2026,
+            'lunes': '05/10/2026',
+            'viernes': '09/10/2026',
+            'alcance': 'Todas las sucursales',
+            'ingresaron': 3,
+            'salieron': 1,
+            'balance': '+2',
+            'candidatos_rhitso': 1,
+            'variacion_ingresaron': '+1',
+            'variacion_salieron': '0',
+            'variacion_balance': '+1',
+            'variacion_rhitso': '0',
+            'ahora_local': None,
+        }
+        enviados = enviar_correo_concentrado(
+            destinatarios=['calidad@test.local'],
+            contexto=contexto,
+            excel_bytes=b'excel-falso',
+            pdf_bytes=b'%PDF-falso',
+            nombre_excel='Concentrado_Semanal_S41_2026.xlsx',
+            nombre_pdf='Concentrado_Semanal_S41_2026.pdf',
+        )
+
+        self.assertEqual(enviados, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['calidad@test.local'])
+        self.assertIn('Ingresaron: 3', mensaje.body)
+        self.assertIn('Semana 41', mensaje.subject)
+        nombres = []
+        for adjunto in mensaje.attachments:
+            if isinstance(adjunto, tuple):
+                nombres.append(adjunto[0])
+            else:
+                nombres.append(adjunto.get_filename())
+        self.assertIn('Concentrado_Semanal_S41_2026.xlsx', nombres)
+        self.assertIn('Concentrado_Semanal_S41_2026.pdf', nombres)
+        html = mensaje.alternatives[0][0]
+        self.assertIn('Candidatos RHITSO', html)
+        self.assertIn('cid:logo_sic_white', html)
