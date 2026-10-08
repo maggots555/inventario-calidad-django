@@ -10,6 +10,7 @@
  * - Burbuja flotante que se expande en un panel de chat
  * - Historial persistente en localStorage (por token del enlace)
  * - Efecto visual de escritura letra a letra en respuestas del bot
+ * - Saludo flotante a los 5 s, junto al robot, con el mismo efecto de escritura
  * - Markdown básico seguro en respuestas del bot (negrita, listas)
  * - Chips de sugerencias dinámicos según estado de la orden (renderizados en Django)
  * - Indicador de procesamiento por etapas ("Consultando...", "Preparando...")
@@ -68,6 +69,16 @@ const CHAT_TYPING_MS: number = 18;
 /** Mensaje de bienvenida fijo del bot (no forma parte del historial enviado a la IA) */
 const CHAT_WELCOME_MSG: string =
     '👋 Hola, soy el asistente virtual de SIC Fix. Puedo responder preguntas sobre tu equipo en reparación. ¿En qué puedo ayudarte?';
+
+/** Espera antes de mostrar el saludo flotante junto al robot */
+const CHAT_TEASER_DELAY_MS: number = 5000;
+
+/**
+ * Texto del recuadro flotante. No se manda a la IA ni se guarda en el historial:
+ * solo invita a abrir el chat.
+ */
+const CHAT_TEASER_MSG: string =
+    '¿Tienes dudas de tu equipo? Escríbeme y te ayudo con el estado de tu reparación.';
 
 /** Control del indicador de procesamiento con etapas de texto */
 interface IndicadorProcesando {
@@ -179,6 +190,9 @@ class SeguimientoChat {
     private suggestEl:   HTMLElement | null;
     private badge:       HTMLElement | null;
     private statusLabel: HTMLElement | null;
+    private teaser:      HTMLElement | null;
+    private teaserTexto: HTMLButtonElement | null;
+    private teaserClose: HTMLButtonElement | null;
 
     private historial:              MensajeChat[] = [];
     private cargando:               boolean = false;
@@ -190,6 +204,10 @@ class SeguimientoChat {
     private aiEnabled:              boolean;
     private animacionActiva:        boolean = false;
     private cancelarAnimacion:      (() => void) | null = null;
+    /** Identificador del temporizador de 5 s. null cuando ya no hay espera pendiente. */
+    private teaserTimer:            number | null = null;
+    /** Corta la escritura del saludo si el cliente abre el chat o cierra el recuadro. */
+    private teaserCancelar:         (() => void) | null = null;
 
     constructor(
         bubble: HTMLButtonElement,
@@ -202,6 +220,9 @@ class SeguimientoChat {
         suggestEl: HTMLElement | null,
         badge: HTMLElement | null,
         statusLabel: HTMLElement | null,
+        teaser: HTMLElement | null,
+        teaserTexto: HTMLButtonElement | null,
+        teaserClose: HTMLButtonElement | null,
     ) {
         this.bubble      = bubble;
         this.panel       = panel;
@@ -213,6 +234,9 @@ class SeguimientoChat {
         this.suggestEl   = suggestEl;
         this.badge       = badge;
         this.statusLabel = statusLabel;
+        this.teaser      = teaser;
+        this.teaserTexto = teaserTexto;
+        this.teaserClose = teaserClose;
 
         this.chatEndpoint = bubble.dataset['chatEndpoint'] ?? '';
         this.chatToken    = bubble.dataset['chatToken'] ?? '';
@@ -221,6 +245,8 @@ class SeguimientoChat {
         this.inicializarBadge();
         this.restaurarHistorial();
         this.registrarEventListeners();
+        // El saludo no forma parte del historial: solo espera 5 s y escribe junto al robot.
+        this.programarSaludoFlotante();
     }
 
     // ========================================================================
@@ -373,9 +399,23 @@ class SeguimientoChat {
         document.addEventListener('click', (e: MouseEvent) => {
             if (!this.panelAbierto) return;
             const target = e.target as Node;
+            if (this.teaser && this.teaser.contains(target)) return;
             if (!this.panel.contains(target) && !this.bubble.contains(target)) {
                 this.cerrarPanel();
             }
+        });
+
+        // Un clic en el texto abre el chat. La X solo cierra el recuadro.
+        // stopPropagation evita que el mismo clic cierre el panel al instante:
+        // el listener del documento vería el clic fuera del panel.
+        this.teaser?.addEventListener('click', (e: MouseEvent) => {
+            e.stopPropagation();
+            const target = e.target as Node;
+            if (this.teaserClose && this.teaserClose.contains(target)) {
+                this.ocultarSaludoFlotante();
+                return;
+            }
+            this.abrirPanel();
         });
 
         window.addEventListener('resize', () => this.ajustarPosicion());
@@ -394,6 +434,9 @@ class SeguimientoChat {
 
     private abrirPanel(): void {
         this.panelAbierto = true;
+        // Si el saludo sigue en pantalla (o el temporizador aún no disparó),
+        // se cancela: el recuadro taparía el panel que el cliente acaba de abrir.
+        this.ocultarSaludoFlotante();
         if (!this.chatAbiertoRegistrado) {
             this.chatAbiertoRegistrado = true;
             window.EventosSeguimiento?.registrarEvento('chat_abierto', {}, true);
@@ -418,6 +461,119 @@ class SeguimientoChat {
         this.panel.setAttribute('aria-hidden', 'true');
         this.bubble.classList.remove('st-chat-bubble--active');
         this.bubble.setAttribute('aria-expanded', 'false');
+    }
+
+    /**
+     * Programa el saludo flotante para dentro de 5 segundos.
+     *
+     * No se guarda en el navegador: cada visita vuelve a esperar.
+     * Si el cliente abre el chat antes, abrirPanel() cancela este temporizador.
+     */
+    private programarSaludoFlotante(): void {
+        if (!this.teaser || !this.teaserTexto) return;
+
+        this.teaserTimer = window.setTimeout(() => {
+            this.teaserTimer = null;
+            // El chat ya está abierto: el recuadro no aporta y taparía el panel.
+            if (this.panelAbierto) return;
+            this.mostrarSaludoFlotante();
+        }, CHAT_TEASER_DELAY_MS);
+    }
+
+    /**
+     * Muestra el recuadro junto al robot y empieza a escribir el saludo.
+     *
+     * El texto visible arranca vacío a propósito. El aria-label del botón
+     * ya trae la frase completa para el lector de pantalla.
+     */
+    private mostrarSaludoFlotante(): void {
+        if (!this.teaser || !this.teaserTexto || this.panelAbierto) return;
+
+        this.teaser.hidden = false;
+        // Sin este reflow, el navegador no anima la opacidad: hidden y la
+        // clase visible caerían en el mismo fotograma.
+        void this.teaser.offsetWidth;
+        this.teaser.classList.add('st-chat-teaser--visible');
+        this.escribirSaludoFlotante(CHAT_TEASER_MSG);
+    }
+
+    /**
+     * Esconde el recuadro y corta la escritura o la espera de 5 segundos.
+     *
+     * Efecto: el saludo deja de existir en pantalla. No toca el historial
+     * del chat ni llama a la IA.
+     */
+    private ocultarSaludoFlotante(): void {
+        if (this.teaserTimer !== null) {
+            window.clearTimeout(this.teaserTimer);
+            this.teaserTimer = null;
+        }
+        if (this.teaserCancelar) {
+            this.teaserCancelar();
+        }
+        if (!this.teaser) return;
+
+        this.teaser.classList.remove('st-chat-teaser--visible');
+        this.teaser.hidden = true;
+    }
+
+    /**
+     * Escribe el saludo letra a letra, con la misma pausa que las respuestas del chat.
+     *
+     * @param texto Frase completa que debe quedar visible al terminar.
+     *
+     * Si el sistema pide menos movimiento, pinta el texto de un golpe.
+     * Al cancelar no rellena el resto: el recuadro ya se está ocultando.
+     */
+    private escribirSaludoFlotante(texto: string): void {
+        const destino = this.teaserTexto;
+        if (!destino) return;
+
+        const reducirMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reducirMovimiento) {
+            destino.textContent = texto;
+            return;
+        }
+
+        let indice = 0;
+        let cancelado = false;
+
+        const pintarParcial = (parcial: string, conCursor: boolean): void => {
+            destino.textContent = '';
+            destino.appendChild(document.createTextNode(parcial));
+            if (!conCursor) return;
+            const cursor = document.createElement('span');
+            cursor.className = 'st-chat-cursor';
+            cursor.setAttribute('aria-hidden', 'true');
+            cursor.textContent = '▌';
+            destino.appendChild(cursor);
+        };
+
+        this.teaserCancelar = (): void => {
+            cancelado = true;
+            this.teaserCancelar = null;
+        };
+
+        const tick = (): void => {
+            if (cancelado) return;
+
+            if (indice >= texto.length) {
+                pintarParcial(texto, false);
+                this.teaserCancelar = null;
+                return;
+            }
+
+            // Misma cadencia que escribirProgresivo: 18 ms, y 120 ms tras . ? !
+            const parcial = texto.slice(0, indice + 1);
+            pintarParcial(parcial, true);
+            indice += 1;
+
+            const char = texto[indice - 1];
+            const pausa = (char === '.' || char === '?' || char === '!') ? 120 : CHAT_TYPING_MS;
+            window.setTimeout(tick, pausa);
+        };
+
+        tick();
     }
 
     private ajustarPosicion(): void {
@@ -704,6 +860,9 @@ document.addEventListener('DOMContentLoaded', function (): void {
     const suggestEl  = document.querySelector<HTMLElement>('#chat-ia-suggestions');
     const badge      = document.querySelector<HTMLElement>('#chat-ia-badge');
     const statusLabel = document.querySelector<HTMLElement>('#chat-ia-status-label');
+    const teaser      = document.querySelector<HTMLElement>('#chat-ia-teaser');
+    const teaserTexto = document.querySelector<HTMLButtonElement>('#chat-ia-teaser-text');
+    const teaserClose = document.querySelector<HTMLButtonElement>('#chat-ia-teaser-close');
 
     if (!panel || !closeBtn || !messagesEl || !inputEl || !sendBtn) {
         console.warn('[SeguimientoChat] Faltan elementos del DOM del chatbot.');
@@ -721,5 +880,8 @@ document.addEventListener('DOMContentLoaded', function (): void {
         suggestEl,
         badge,
         statusLabel,
+        teaser,
+        teaserTexto,
+        teaserClose,
     );
 });

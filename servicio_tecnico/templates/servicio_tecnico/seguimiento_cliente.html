@@ -162,6 +162,23 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 (tracking, finalizado, entregado) y cuando AI_ENABLED está activo
 {% endcomment %}
 
+{# Saludo flotante: a los 5 s el script lo muestra y escribe el texto letra a letra. Va fuera del botón del robot porque la X es otro botón y no puede anidar. #}
+<div id="chat-ia-teaser" class="st-chat-teaser" hidden>
+  <button type="button"
+          id="chat-ia-teaser-close"
+          class="st-chat-teaser-close"
+          aria-label="Cerrar mensaje del asistente">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+  {# El aria-label trae la frase completa: el lector de pantalla no oye cada letra. #}
+  <button type="button"
+          id="chat-ia-teaser-text"
+          class="st-chat-teaser-text"
+          aria-label="¿Tienes dudas de tu equipo? Escríbeme y te ayudo con el estado de tu reparación. Abrir asistente."></button>
+</div>
+
 {# Burbuja flotante: botón para abrir/cerrar el chat #}
 <button id="chat-ia-bubble"
         class="st-chat-bubble"

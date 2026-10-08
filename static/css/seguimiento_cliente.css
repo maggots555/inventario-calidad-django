@@ -2762,6 +2762,93 @@
   50%       { transform: scale(1.12); }
 }
 
+/* ── Saludo flotante junto al robot ──
+   El recuadro queda a la izquierda del botón (56px) y del botón de tema.
+   El fondo y el texto usan las variables del chat para que el modo oscuro
+   cambie solo, sin colores fijos. Crece hacia arriba: así no se sale
+   por debajo de la pantalla cuando el texto ocupa varias líneas. */
+.st-chat-teaser {
+  position: fixed;
+  z-index: 1000;
+  right: calc(1rem + 46px + 12px + 56px + 12px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex;
+  align-items: flex-start;
+  width: min(240px, calc(100vw - 160px));
+  margin: 0;
+  padding: 8px 6px 10px 14px;
+  background: var(--chat-bg-panel);
+  color: var(--chat-text-bot);
+  border: 1px solid var(--chat-border);
+  border-radius: 16px;
+  box-shadow: var(--chat-shadow);
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+/* El atributo hidden pone display:none, pero un display:flex de autor
+   lo pisa. Esta regla lo mantiene oculto hasta que el script quite hidden. */
+.st-chat-teaser[hidden] {
+  display: none;
+}
+
+.st-chat-teaser--visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.st-chat-teaser-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--chat-disclaimer);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.st-chat-teaser-close:hover,
+.st-chat-teaser-close:focus-visible {
+  color: var(--chat-text-bot);
+  outline: none;
+}
+
+.st-chat-teaser-text {
+  display: block;
+  width: 100%;
+  min-height: 1.4em;
+  margin: 0;
+  padding: 8px 32px 4px 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.st-chat-teaser-text:focus-visible {
+  outline: 2px solid var(--chat-primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 /* ── Panel de chat ── */
 .st-chat-panel {
   position: fixed;
@@ -3185,6 +3272,13 @@
     bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
+  /* Misma separación que el robot, pero un hueco más a la izquierda. */
+  .st-chat-teaser {
+    right: calc(0.75rem + 46px + 10px + 56px + 10px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    width: min(220px, calc(100vw - 150px));
+  }
+
   /* En mobile: tema pegado a la derecha */
   .st-dark-toggle {
     right: 0.75rem;
@@ -3243,6 +3337,10 @@
   }
 
   .st-chat-msg--streaming .st-chat-msg-bubble {
+    transition: none;
+  }
+
+  .st-chat-teaser {
     transition: none;
   }
 }
