@@ -104,6 +104,34 @@ SIGUIENTE_PASO_SEGUIMIENTO: dict[str, str] = {
     'pnc_parte_no_disponible': 'Buscando alternativas de disponibilidad',
 }
 
+# Días hábiles que la cotización enviada al cliente sigue vigente.
+# El día 5 todavía cuenta; a partir del 6 hay que recotizar.
+DIAS_HABILES_VIGENCIA_COTIZACION: int = 5
+
+# Política de plazos de SIC. Va siempre en el prompt del chat público.
+# No es una fecha de esta orden: el modelo no debe convertirla en un día de calendario.
+GUIA_PLAZOS_PROCESO_CHAT: str = """\
+PLAZOS GENERALES DEL PROCESO (política de SIC, igual para todas las órdenes):
+Estos rangos son días hábiles (lunes a viernes). Son una expectativa general,
+NO una fecha prometida de ESTA orden. No calcules ni inventes un día de calendario.
+
+  • Diagnóstico: de 1 a 5 días hábiles, según la complejidad del equipo.
+    Cuando termina, se envía el diagnóstico al cliente.
+  • Cotización de piezas: de 1 a 6 días hábiles después de enviar el diagnóstico.
+    Cuando está lista, se comparte al cliente.
+  • Vigencia de la cotización: 5 días hábiles desde que se compartió.
+    Si después de esos 5 días hábiles no hay respuesta, es necesario solicitar una recotización.
+    Esto NO es la vigencia del enlace de seguimiento.
+  • Piezas al proveedor: si el cliente acepta, se solicitan al proveedor.
+    Las fechas de llegada las define el proveedor. Cualquier dato concreto
+    se consulta con el responsable de seguimiento.
+  • Reparación: al llegar las piezas, de 1 a 3 días hábiles para completar
+    la reparación, incluidas las pruebas de calidad.
+  • Recolección: el cliente solo puede acudir por el equipo cuando el
+    responsable de seguimiento haya confirmado que está listo.
+    El rango de 1 a 3 días NO autoriza a pasar a recogerlo.
+"""
+
 
 def resolver_nombre_estado_publico(
     codigo: str,
@@ -188,6 +216,57 @@ def formatear_aclaraciones_cotizacion_para_chat(estado_orden: str) -> str:
         lineas.append(f'  • Estado actual («{nombre_publico}»): {aclaracion_actual}')
 
     return '\n'.join(lineas)
+
+
+def texto_vigencia_cotizacion_chat(
+    fecha_envio: datetime | None,
+    usuario_acepto: bool | None,
+    ahora: datetime | None = None,
+) -> str:
+    """
+    Dice si la cotización enviada al cliente sigue vigente o ya pide recotización.
+
+    Objetivo: el chat no cuenta días hábiles por su cuenta. Python le entrega
+    el hecho, para que no invente si esta cotización ya venció.
+
+    Args:
+        fecha_envio: Momento en que se envió la cotización. None si no hay fecha.
+        usuario_acepto: True si aceptó, False si rechazó, None si aún no responde.
+        ahora: Fecha de referencia para la cuenta. None usa el día de hoy.
+
+    Returns:
+        str: Una línea para el contexto del chat, o cadena vacía si no aplica.
+
+    Efectos secundarios: ninguno. No escribe en la base ni llama a la IA.
+    """
+    # Ya hubo respuesta: la vigencia ya no decide una recotización.
+    if usuario_acepto is not None:
+        return ''
+    if fecha_envio is None:
+        return ''
+
+    # Import local: este helper no debe cargar utils_rhitso al importar el módulo.
+    from servicio_tecnico.utils_rhitso import calcular_dias_habiles
+
+    # calcular_dias_habiles no cuenta el día de envío.
+    # 5 días transcurridos siguen vigentes; el sexto ya venció.
+    if ahora is None:
+        dias = calcular_dias_habiles(fecha_envio)
+    else:
+        dias = calcular_dias_habiles(fecha_envio, ahora)
+
+    if dias > DIAS_HABILES_VIGENCIA_COTIZACION:
+        return (
+            f"  Vigencia de esta cotización: vencida "
+            f"({dias} días hábiles desde el envío; el límite es "
+            f"{DIAS_HABILES_VIGENCIA_COTIZACION}). "
+            f"Si no hay respuesta del cliente, es necesario solicitar una recotización."
+        )
+    return (
+        f"  Vigencia de esta cotización: vigente "
+        f"({dias} día(s) hábil(es) desde el envío; el límite es "
+        f"{DIAS_HABILES_VIGENCIA_COTIZACION}). Aún no hace falta recotizar."
+    )
 
 
 def construir_timeline_seguimiento_cliente(

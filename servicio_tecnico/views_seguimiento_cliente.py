@@ -1102,7 +1102,10 @@ def chat_seguimiento_cliente(request, token):
         chat_seguimiento_dispatch,
         formatear_contexto_sucursales_chat,
     )
-    from .chat_seguimiento_helpers import construir_timeline_seguimiento_cliente
+    from .chat_seguimiento_helpers import (
+        construir_timeline_seguimiento_cliente,
+        texto_vigencia_cotizacion_chat,
+    )
 
     # ── Verificar que al menos un proveedor de IA está habilitado ──
     if not getattr(settings, 'AI_ENABLED', False):
@@ -1269,8 +1272,15 @@ def chat_seguimiento_cliente(request, token):
         lineas_cot = [
             f"  Estado: {estado_cot}",
             f"  Enviada: {fecha_envio_cot}  |  Respuesta: {fecha_resp_cot}",
-            f"  Piezas cotizadas:",
         ]
+        # La cuenta de días hábiles la hace Python. La IA solo lee el resultado.
+        linea_vigencia = texto_vigencia_cotizacion_chat(
+            cotizacion_obj.fecha_envio,
+            cotizacion_obj.usuario_acepto,
+        )
+        if linea_vigencia:
+            lineas_cot.append(linea_vigencia)
+        lineas_cot.append("  Piezas cotizadas:")
 
         piezas_cotizadas_qs = PiezaCotizada.objects.filter(
             cotizacion=cotizacion_obj
