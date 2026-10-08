@@ -63,7 +63,9 @@
          aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
-                <form method="post" action="{% url 'servicio_tecnico:compartir_concentrado' %}">
+                <form method="post"
+                      id="formCompartirConcentrado"
+                      action="{% url 'servicio_tecnico:compartir_concentrado' %}">
                     {% csrf_token %}
                     <input type="hidden" name="semana" value="{{ semana_actual_iso }}">
                     {% if sucursal_id_seleccionada %}

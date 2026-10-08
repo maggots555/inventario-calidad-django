@@ -20,7 +20,9 @@ import re
 from typing import Iterable
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from django.core.validators import validate_email
 from django.template.loader import render_to_string
 
 logger = logging.getLogger('servicio_tecnico')
@@ -47,6 +49,27 @@ def _correo_limpio(valor) -> str:
     return (valor or '').strip()
 
 
+def _correo_valido(valor) -> str:
+    """
+    Deja pasar solo un correo que Django aceptaría en un EmailField.
+
+    Args:
+        valor: Texto del .env o del empleado.
+
+    Returns:
+        El correo, o cadena vacía si está vacío o mal formado.
+        Un salto de línea también se rechaza: no puede colarse en el Para.
+    """
+    email = _correo_limpio(valor)
+    if not email or any(corte in email for corte in ('\n', '\r')):
+        return ''
+    try:
+        validate_email(email)
+    except ValidationError:
+        return ''
+    return email
+
+
 def destinatarios_concentrado() -> list[dict]:
     """
     Junta a quién se le puede enviar el concentrado.
@@ -71,7 +94,7 @@ def destinatarios_concentrado() -> list[dict]:
 
     # 1) Los tres contactos del .env. Si el correo está vacío, se omite.
     for clave_email, clave_nombre, origen in _CONTACTOS_ENV:
-        email = _correo_limpio(getattr(settings, clave_email, ''))
+        email = _correo_valido(getattr(settings, clave_email, ''))
         clave = email.casefold()
         if not email or clave in vistos:
             continue
@@ -87,7 +110,7 @@ def destinatarios_concentrado() -> list[dict]:
         .order_by('nombre_completo')
     )
     for gerente in gerentes:
-        email = _correo_limpio(gerente.email)
+        email = _correo_valido(gerente.email)
         clave = email.casefold()
         if not email or clave in vistos:
             continue
@@ -143,13 +166,19 @@ def describir_alcance(filtros: dict) -> str:
         filtros: El dict de resolver_filtros_concentrado.
 
     Returns:
-        «Todas las sucursales», el nombre del grupo o el de la sucursal.
+        «Todas las sucursales», la etiqueta del grupo o el nombre de la sucursal.
+        La etiqueta del grupo es la misma del select de la página.
     """
+    from servicio_tecnico.concentrado_semanal import (
+        ETIQUETA_GRUPO_CIS,
+        ETIQUETA_GRUPO_FORANEA,
+    )
+
     parametro = filtros.get('sucursal_param')
     if parametro == 'grupo_cis':
-        return 'CIS (Drop Off + Satélite)'
+        return ETIQUETA_GRUPO_CIS
     if parametro == 'grupo_foranea':
-        return 'Foráneas'
+        return ETIQUETA_GRUPO_FORANEA
     sucursal_id = filtros.get('sucursal_id')
     if sucursal_id:
         for sucursal in filtros.get('sucursales') or []:
@@ -250,7 +279,11 @@ def enviar_correo_concentrado(
         Envía por el backend de correo de Django (SMTP en producción).
         Adjunta el logo blanco por CID para la barra de marca.
     """
+    # Segunda revisión: la tarea no manda un correo que el modal no ofrecía,
+    # aunque alguien encole la tarea a mano con otra dirección.
+    destinatarios = filtrar_destinatarios_elegidos(destinatarios)
     if not destinatarios:
+        logger.warning('[CONCENTRADO] Sin destinatarios permitidos; no se envía.')
         return 0
 
     html = render_to_string(

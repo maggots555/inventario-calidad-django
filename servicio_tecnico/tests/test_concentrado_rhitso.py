@@ -244,6 +244,35 @@ class ConcentradoRhitsoNoDobleConteoTest(TestCase):
         self.assertIn(satelite.id, ids)
         self.assertNotIn(self.sucursal.id, ids)
 
+    def test_la_semana_iso_vuelve_al_mismo_lunes(self):
+        """
+        El texto de la semana que viaja en el modal abre el mismo lunes.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El 29 de diciembre de 2025 cae en la semana 1 de 2026.
+        Si el correo guardara «2025-W01», mandaría otra semana.
+        """
+        from servicio_tecnico.concentrado_semanal import (
+            lunes_desde_numero_semana,
+            semana_iso_desde_lunes,
+        )
+
+        lunes = date(2025, 12, 29)
+        texto = semana_iso_desde_lunes(lunes)
+        self.assertEqual(texto, '2026-W01')
+        self.assertEqual(lunes_desde_numero_semana(2026, 1), lunes)
+
+    def test_un_grupo_sin_sucursales_no_cuenta_todas(self):
+        """
+        Una lista vacía de sucursales deja el reporte en cero.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Elegir CIS cuando no hay sucursales CIS no puede mandar
+        el concentrado de todo el país con la etiqueta de CIS.
+        """
+        datos = obtener_concentrado_semanal(LUNES_SEMANA, sucursal_ids=[])
+        self.assertEqual(datos['total_asignados'], 0)
+
 
 class CorreoConcentradoTest(TestCase):
     """
@@ -301,7 +330,7 @@ class CorreoConcentradoTest(TestCase):
         with override_settings(
             JEFE_CALIDAD_EMAIL='calidad@test.local',
             JEFE_CALIDAD_NOMBRE='Ana Calidad',
-            JEFE_CALIDAD_2_EMAIL='',
+            JEFE_CALIDAD_2_EMAIL='esto-no-es-un-correo',
             JEFE_GENERAL_EMAIL='jefe@test.local',
             JEFE_GENERAL_NOMBRE='Jefe General',
         ):
@@ -363,6 +392,7 @@ class CorreoConcentradoTest(TestCase):
         self.assertIn('modalCompartirConcentrado', html)
         self.assertIn('value="calidad@test.local"', html)
         self.assertIn('checked', html)
+        self.assertIn('formCompartirConcentrado', html)
         self.assertIn('Enviar Excel y PDF', html)
 
     def test_confirmar_encola_solo_los_correos_marcados(self):
@@ -437,14 +467,20 @@ class CorreoConcentradoTest(TestCase):
             'variacion_rhitso': '0',
             'ahora_local': None,
         }
-        enviados = enviar_correo_concentrado(
-            destinatarios=['calidad@test.local'],
-            contexto=contexto,
-            excel_bytes=b'excel-falso',
-            pdf_bytes=b'%PDF-falso',
-            nombre_excel='Concentrado_Semanal_S41_2026.xlsx',
-            nombre_pdf='Concentrado_Semanal_S41_2026.pdf',
-        )
+        with override_settings(
+            JEFE_CALIDAD_EMAIL='calidad@test.local',
+            JEFE_CALIDAD_NOMBRE='Ana Calidad',
+            JEFE_CALIDAD_2_EMAIL='',
+            JEFE_GENERAL_EMAIL='',
+        ):
+            enviados = enviar_correo_concentrado(
+                destinatarios=['calidad@test.local', 'intruso@test.local'],
+                contexto=contexto,
+                excel_bytes=b'excel-falso',
+                pdf_bytes=b'%PDF-falso',
+                nombre_excel='Concentrado_Semanal_S41_2026.xlsx',
+                nombre_pdf='Concentrado_Semanal_S41_2026.pdf',
+            )
 
         self.assertEqual(enviados, 1)
         self.assertEqual(len(mail.outbox), 1)

@@ -47,6 +47,11 @@ TIPOS_EQUIPO = ['LENOVO', 'DELL', 'OOW', 'MIS DELL', 'MIS LENOVO']
 # Sitios (sucursales) del concentrado
 SITIOS = ['DROP OFF', 'SATELITE']
 
+# Mismas etiquetas en el filtro de la página y en el correo.
+# Si cambian aquí, el modal y el Excel dicen lo mismo.
+ETIQUETA_GRUPO_CIS = 'CIS (Drop Off + Satélite)'
+ETIQUETA_GRUPO_FORANEA = 'Foráneas (MTY + GDL)'
+
 # Quarters del año
 QUARTERS = {
     'Q1': {'nombre': 'Q1 (Ene - Mar)', 'meses': [1, 2, 3]},
@@ -118,6 +123,67 @@ def lunes_desde_numero_semana(año, numero_semana):
     # El día 1 de la semana ISO 1 del año
     primer_dia = date.fromisocalendar(año, numero_semana, 1)
     return primer_dia
+
+
+def semana_iso_desde_lunes(lunes):
+    """
+    Arma el texto YYYY-WNN que el filtro y el correo pueden volver a leer.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El 29 de diciembre de 2025 es lunes, pero en el calendario ISO
+    esa semana es la 1 de 2026, no la 1 de 2025. Si guardáramos
+    «2025-W01», al abrirla caeríamos en otra semana.
+    Esta función es el camino de vuelta de lunes_desde_numero_semana.
+
+    Args:
+        lunes (date): Lunes de la semana que se está viendo.
+
+    Returns:
+        str: Por ejemplo «2026-W01».
+    """
+    iso = lunes.isocalendar()
+    return f'{iso.year}-W{iso.week:02d}'
+
+
+def nombre_archivo_concentrado(datos_semana, extension):
+    """
+    Nombre del Excel o del PDF, igual en la descarga y en el correo.
+
+    Args:
+        datos_semana (dict): Resultado de obtener_concentrado_semanal.
+        extension (str): «xlsx» o «pdf», sin punto.
+
+    Returns:
+        str: Concentrado_Semanal_SNN_AAAA.extensión
+    """
+    numero = datos_semana['numero_semana']
+    año = datos_semana['año']
+    return f'Concentrado_Semanal_S{numero:02d}_{año}.{extension}'
+
+
+def _aplicar_filtro_sucursal(qs, sucursal_id=None, sucursal_ids=None):
+    """
+    Aplica el corte de sucursal sin confundir «todas» con «ninguna».
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    None significa que el usuario no eligió grupo: se ven todas.
+    Una lista, aunque esté vacía, significa que sí eligió un grupo.
+    Si ese grupo no tiene sucursales, el reporte sale en cero.
+    Antes una lista vacía se ignoraba y el reporte salía con todas.
+
+    Args:
+        qs: QuerySet de órdenes.
+        sucursal_id: Una sucursal, o None.
+        sucursal_ids: Ids del grupo, None si no hay grupo.
+
+    Returns:
+        QuerySet filtrado.
+    """
+    if sucursal_ids is not None:
+        return qs.filter(sucursal_id__in=sucursal_ids)
+    if sucursal_id:
+        return qs.filter(sucursal_id=sucursal_id)
+    return qs
 
 
 # ===========================================================================
@@ -322,13 +388,9 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         fecha_finalizacion__week_day__in=[2, 3, 4, 5, 6],
     )
 
-    # Filtro adicional por sucursal (individual o grupo)
-    if sucursal_ids:
-        base_qs = base_qs.filter(sucursal_id__in=sucursal_ids)
-        qs_egreso = qs_egreso.filter(sucursal_id__in=sucursal_ids)
-    elif sucursal_id:
-        base_qs = base_qs.filter(sucursal_id=sucursal_id)
-        qs_egreso = qs_egreso.filter(sucursal_id=sucursal_id)
+    # None = todas las sucursales. Lista vacía = el grupo no tiene ninguna.
+    base_qs = _aplicar_filtro_sucursal(base_qs, sucursal_id, sucursal_ids)
+    qs_egreso = _aplicar_filtro_sucursal(qs_egreso, sucursal_id, sucursal_ids)
 
     # Excluir órdenes canceladas del conteo
     base_qs = base_qs.exclude(estado='cancelado')
@@ -643,12 +705,8 @@ def obtener_tendencia_semanal(año, sucursal_id=None, sucursal_ids=None):
         fecha_finalizacion__week_day__in=[2, 3, 4, 5, 6],
     ).exclude(estado='cancelado')
 
-    if sucursal_ids:
-        qs_ingresos = qs_ingresos.filter(sucursal_id__in=sucursal_ids)
-        qs_egresos = qs_egresos.filter(sucursal_id__in=sucursal_ids)
-    elif sucursal_id:
-        qs_ingresos = qs_ingresos.filter(sucursal_id=sucursal_id)
-        qs_egresos = qs_egresos.filter(sucursal_id=sucursal_id)
+    qs_ingresos = _aplicar_filtro_sucursal(qs_ingresos, sucursal_id, sucursal_ids)
+    qs_egresos = _aplicar_filtro_sucursal(qs_egresos, sucursal_id, sucursal_ids)
 
     # Contar por semana usando anotación
     from django.db.models.functions import ExtractWeek
@@ -746,12 +804,8 @@ def obtener_reporte_trimestral(año, sucursal_id=None, sucursal_ids=None):
             fecha_finalizacion__month__in=meses,
         ).exclude(estado='cancelado')
 
-        if sucursal_ids:
-            qs_ingreso = qs_ingreso.filter(sucursal_id__in=sucursal_ids)
-            qs_egreso = qs_egreso.filter(sucursal_id__in=sucursal_ids)
-        elif sucursal_id:
-            qs_ingreso = qs_ingreso.filter(sucursal_id=sucursal_id)
-            qs_egreso = qs_egreso.filter(sucursal_id=sucursal_id)
+        qs_ingreso = _aplicar_filtro_sucursal(qs_ingreso, sucursal_id, sucursal_ids)
+        qs_egreso = _aplicar_filtro_sucursal(qs_egreso, sucursal_id, sucursal_ids)
 
         # Conteos de ingreso por sitio y tipo
         ingreso_q = _contar_por_sitio_tipo(qs_ingreso)
@@ -859,13 +913,9 @@ def obtener_reporte_mensual(año, sucursal_id=None, sucursal_ids=None):
                 fecha_finalizacion__month=mes,
             ).exclude(estado='cancelado')
 
-            # ----- Aplicar filtros de sucursal -----
-            if sucursal_ids:
-                qs_ingreso = qs_ingreso.filter(sucursal_id__in=sucursal_ids)
-                qs_egreso = qs_egreso.filter(sucursal_id__in=sucursal_ids)
-            elif sucursal_id:
-                qs_ingreso = qs_ingreso.filter(sucursal_id=sucursal_id)
-                qs_egreso = qs_egreso.filter(sucursal_id=sucursal_id)
+            # None = todas. Una lista vacía no debe contar el resto del país.
+            qs_ingreso = _aplicar_filtro_sucursal(qs_ingreso, sucursal_id, sucursal_ids)
+            qs_egreso = _aplicar_filtro_sucursal(qs_egreso, sucursal_id, sucursal_ids)
 
             conteo_ingreso = qs_ingreso.count()
             conteo_egreso = qs_egreso.count()
@@ -892,6 +942,52 @@ def obtener_reporte_mensual(año, sucursal_id=None, sucursal_ids=None):
 
     resultado['meses_lista'] = meses_lista
     return resultado
+
+
+def cortes_excel_concentrado(lunes, sucursal_id=None, sucursal_ids=None):
+    """
+    Arma los cuatro cortes del Excel, una sola vez para descarga y correo.
+
+    Objetivo de negocio:
+        El archivo que llega por correo tiene que ser el mismo que el
+        botón «Exportar Excel». Si mañana se agrega una hoja, entra aquí
+        y los dos caminos la reciben.
+
+    Args:
+        lunes (date): Lunes de la semana visible.
+        sucursal_id: Una sucursal, o None.
+        sucursal_ids: Grupo CIS o foráneas, o None.
+
+    Returns:
+        dict con semana, trimestral, tendencia y mensual.
+
+    Efectos secundarios:
+        Lee órdenes del año de esa semana.
+    """
+    año = lunes.year
+    # La hoja semanal y las otras tres usan el mismo corte de sucursal.
+    return {
+        'semana': obtener_concentrado_semanal(
+            lunes,
+            sucursal_id=sucursal_id,
+            sucursal_ids=sucursal_ids,
+        ),
+        'trimestral': obtener_reporte_trimestral(
+            año,
+            sucursal_id=sucursal_id,
+            sucursal_ids=sucursal_ids,
+        ),
+        'tendencia': obtener_tendencia_semanal(
+            año,
+            sucursal_id=sucursal_id,
+            sucursal_ids=sucursal_ids,
+        ),
+        'mensual': obtener_reporte_mensual(
+            año,
+            sucursal_id=sucursal_id,
+            sucursal_ids=sucursal_ids,
+        ),
+    }
 
 
 def _contar_por_sitio_tipo(queryset):

@@ -43,6 +43,8 @@ def resolver_filtros_concentrado(request):
         Consulta las sucursales activas para armar CIS y foráneas.
     """
     from .concentrado_semanal import (
+        ETIQUETA_GRUPO_CIS,
+        ETIQUETA_GRUPO_FORANEA,
         lunes_desde_numero_semana,
         obtener_semana_actual,
     )
@@ -73,12 +75,12 @@ def resolver_filtros_concentrado(request):
     grupos_sucursales = []
     if grupo_cis_ids:
         grupos_sucursales.append({
-            'label': 'CIS (Drop Off + Satélite)',
+            'label': ETIQUETA_GRUPO_CIS,
             'value': 'grupo_cis',
         })
     if grupo_foranea_ids:
         grupos_sucursales.append({
-            'label': 'Foráneas (MTY + GDL)',
+            'label': ETIQUETA_GRUPO_FORANEA,
             'value': 'grupo_foranea',
         })
 
@@ -133,6 +135,7 @@ def concentrado_semanal(request):
     from .concentrado_semanal import (
         obtener_concentrado_semanal,
         obtener_tendencia_semanal,
+        semana_iso_desde_lunes,
         DIAS_SEMANA,
         SITIOS,
         TIPOS_EQUIPO,
@@ -164,14 +167,10 @@ def concentrado_semanal(request):
     lunes_anterior = lunes_seleccionado - timedelta(days=7)
     lunes_siguiente = lunes_seleccionado + timedelta(days=7)
 
-    def _formatear_semana_iso(lunes):
-        num = lunes.isocalendar()[1]
-        año = lunes.year
-        return f"{año}-W{num:02d}"
-
-    semana_anterior_iso = _formatear_semana_iso(lunes_anterior)
-    semana_siguiente_iso = _formatear_semana_iso(lunes_siguiente)
-    semana_actual_iso = _formatear_semana_iso(lunes_seleccionado)
+    # Año ISO: la semana del 29/dic/2025 es 2026-W01, no 2025-W01.
+    semana_anterior_iso = semana_iso_desde_lunes(lunes_anterior)
+    semana_siguiente_iso = semana_iso_desde_lunes(lunes_siguiente)
+    semana_actual_iso = semana_iso_desde_lunes(lunes_seleccionado)
 
     # ------------------------------------------------------------------
     # Gráficos de tendencia anual (Plotly)
@@ -341,49 +340,30 @@ def exportar_concentrado_excel(request):
     Returns:
         HttpResponse: Archivo Excel como descarga
     """
-    import openpyxl
     from django.http import HttpResponse
     from .concentrado_semanal import (
-        obtener_concentrado_semanal,
-        obtener_reporte_trimestral,
-        obtener_tendencia_semanal,
-        obtener_reporte_mensual,
+        cortes_excel_concentrado,
+        nombre_archivo_concentrado,
     )
     from .excel_exporters_concentrado import generar_excel_concentrado
 
     filtros = resolver_filtros_concentrado(request)
-    lunes_seleccionado = filtros['lunes']
-    sucursal_id = filtros['sucursal_id']
-    sucursal_ids = filtros['sucursal_ids']
-    año = lunes_seleccionado.year
+    # El mismo paquete que adjunta el correo. No hay una segunda receta.
+    cortes = cortes_excel_concentrado(
+        filtros['lunes'],
+        sucursal_id=filtros['sucursal_id'],
+        sucursal_ids=filtros['sucursal_ids'],
+    )
+    datos_semana = cortes['semana']
 
-    datos_semana = obtener_concentrado_semanal(
-        lunes_seleccionado,
-        sucursal_id=sucursal_id,
-        sucursal_ids=sucursal_ids,
-    )
-    datos_trimestral = obtener_reporte_trimestral(
-        año,
-        sucursal_id=sucursal_id,
-        sucursal_ids=sucursal_ids,
-    )
-    datos_tendencia = obtener_tendencia_semanal(
-        año,
-        sucursal_id=sucursal_id,
-        sucursal_ids=sucursal_ids,
-    )
-    datos_mensual = obtener_reporte_mensual(
-        año,
-        sucursal_id=sucursal_id,
-        sucursal_ids=sucursal_ids,
+    wb = generar_excel_concentrado(
+        datos_semana,
+        cortes['trimestral'],
+        cortes['tendencia'],
+        cortes['mensual'],
     )
 
-    # Generar el archivo Excel
-    wb = generar_excel_concentrado(datos_semana, datos_trimestral, datos_tendencia, datos_mensual)
-
-    # Preparar respuesta HTTP para descarga
-    num_semana = datos_semana['numero_semana']
-    filename = f'Concentrado_Semanal_S{num_semana:02d}_{año}.xlsx'
+    filename = nombre_archivo_concentrado(datos_semana, 'xlsx')
 
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -420,7 +400,10 @@ def exportar_concentrado_pdf(request):
     """
     from datetime import timedelta
 
-    from .concentrado_semanal import obtener_concentrado_semanal
+    from .concentrado_semanal import (
+        nombre_archivo_concentrado,
+        obtener_concentrado_semanal,
+    )
     from .pdf_concentrado import generar_pdf_concentrado
 
     filtros = resolver_filtros_concentrado(request)
@@ -442,9 +425,7 @@ def exportar_concentrado_pdf(request):
 
     pdf_buffer = generar_pdf_concentrado(datos, datos_anterior)
 
-    num_semana = datos['numero_semana']
-    año = datos['año']
-    filename = f'Concentrado_Semanal_S{num_semana:02d}_{año}.pdf'
+    filename = nombre_archivo_concentrado(datos, 'pdf')
 
     response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -484,6 +465,7 @@ def compartir_concentrado_semanal(request):
 
     from config.paises_config import get_pais_actual
 
+    from .concentrado_semanal import semana_iso_desde_lunes
     from .services.concentrado_correo import (
         describir_alcance,
         filtrar_destinatarios_elegidos,
@@ -495,8 +477,7 @@ def compartir_concentrado_semanal(request):
 
     filtros = resolver_filtros_concentrado(request)
     lunes = filtros['lunes']
-    iso = lunes.isocalendar()
-    semana_iso = f'{iso.year}-W{iso.week:02d}'
+    semana_iso = semana_iso_desde_lunes(lunes)
     consulta = {'semana': semana_iso}
     if filtros['sucursal_param']:
         consulta['sucursal_id'] = filtros['sucursal_param']

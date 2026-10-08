@@ -472,7 +472,18 @@ document.addEventListener('DOMContentLoaded', () => {
     inicializarNavegacionSemana();
     // 4. Navegación con teclado
     inicializarTeclado();
-    // 5. Inicializar tooltips de Bootstrap (para los botones de exportar)
+    // 5. Un segundo clic en «Enviar» no encola otro correo.
+    const formCompartir = document.getElementById('formCompartirConcentrado');
+    if (formCompartir) {
+        formCompartir.addEventListener('submit', () => {
+            const boton = formCompartir.querySelector('button[type="submit"]');
+            if (boton) {
+                boton.disabled = true;
+                boton.textContent = 'Enviando...';
+            }
+        });
+    }
+    // 6. Inicializar tooltips de Bootstrap (para los botones de exportar)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const bsGlobal = window.bootstrap;
     if (typeof bsGlobal !== 'undefined' && bsGlobal) {

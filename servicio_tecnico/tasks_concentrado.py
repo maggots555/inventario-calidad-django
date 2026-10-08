@@ -65,10 +65,9 @@ def enviar_concentrado_semanal_task(
 
     from servicio_tecnico.concentrado_semanal import (
         comparar_concentrado_con_semana_anterior,
+        cortes_excel_concentrado,
+        nombre_archivo_concentrado,
         obtener_concentrado_semanal,
-        obtener_reporte_mensual,
-        obtener_reporte_trimestral,
-        obtener_tendencia_semanal,
     )
     from servicio_tecnico.excel_exporters_concentrado import generar_excel_concentrado
     from servicio_tecnico.pdf_concentrado import generar_pdf_concentrado
@@ -86,15 +85,21 @@ def enviar_concentrado_semanal_task(
         logger.warning('[CONCENTRADO] Sin destinatarios; no se envía.')
         return {'success': False, 'enviados': 0}
 
+    # Una fecha imposible no se arregla reintentando. Se descarta.
     try:
         lunes = date.fromisoformat(lunes_iso)
-        año = lunes.year
-        # Los mismos cortes que usan los botones de Excel y de PDF.
-        datos = obtener_concentrado_semanal(
+    except (TypeError, ValueError):
+        logger.error('[CONCENTRADO] Fecha inválida: %s', lunes_iso)
+        return {'success': False, 'enviados': 0}
+
+    try:
+        # Mismos cuatro cortes que el botón de Excel, más la semana previa del PDF.
+        cortes = cortes_excel_concentrado(
             lunes,
             sucursal_id=sucursal_id,
             sucursal_ids=sucursal_ids,
         )
+        datos = cortes['semana']
         anterior = obtener_concentrado_semanal(
             lunes - timedelta(days=7),
             sucursal_id=sucursal_id,
@@ -104,18 +109,16 @@ def enviar_concentrado_semanal_task(
 
         libro = generar_excel_concentrado(
             datos,
-            obtener_reporte_trimestral(año, sucursal_id=sucursal_id, sucursal_ids=sucursal_ids),
-            obtener_tendencia_semanal(año, sucursal_id=sucursal_id, sucursal_ids=sucursal_ids),
-            obtener_reporte_mensual(año, sucursal_id=sucursal_id, sucursal_ids=sucursal_ids),
+            cortes['trimestral'],
+            cortes['tendencia'],
+            cortes['mensual'],
         )
         buffer_excel = io.BytesIO()
         libro.save(buffer_excel)
         pdf_buffer = generar_pdf_concentrado(datos, anterior)
 
-        numero = datos['numero_semana']
-        nombre_base = f'Concentrado_Semanal_S{numero:02d}_{año}'
         contexto = {
-            'numero_semana': numero,
+            'numero_semana': datos['numero_semana'],
             'año': datos['año'],
             'lunes': datos['lunes'].strftime('%d/%m/%Y'),
             'viernes': datos['viernes'].strftime('%d/%m/%Y'),
@@ -135,9 +138,11 @@ def enviar_concentrado_semanal_task(
             contexto=contexto,
             excel_bytes=buffer_excel.getvalue(),
             pdf_bytes=pdf_buffer.getvalue(),
-            nombre_excel=f'{nombre_base}.xlsx',
-            nombre_pdf=f'{nombre_base}.pdf',
+            nombre_excel=nombre_archivo_concentrado(datos, 'xlsx'),
+            nombre_pdf=nombre_archivo_concentrado(datos, 'pdf'),
         )
+        if not enviados:
+            return {'success': False, 'enviados': 0}
         return {'success': True, 'enviados': enviados}
     except Exception as exc:
         logger.error('[CONCENTRADO] Error al enviar: %s', exc, exc_info=True)
