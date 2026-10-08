@@ -758,6 +758,9 @@ Al arrancar, `web` (`SIGMA_MIGRAR=1`) migra `default`, `argentina`, `chile` y `c
 ❌ NUNCA volver Redis a `allkeys-lru`: esa política puede borrar la cola de Celery. La vigente es `volatile-lru`
 ❌ NUNCA dejar `cloudflare/cloudflared:latest`. La imagen va fijada (hoy `2026.10.0`)
 ❌ NUNCA reescribir un `$` de `docker/.env` a `$$` en un servidor que ya corre: Compose interpola el `$` al crear el contenedor, y cambiarlo ahora altera la clave efectiva y cierra sesiones. Una clave nueva sí debe escapar cada `$` como `$$`
+❌ NUNCA cambiar el usuario de `web`, `celery` o `celery-beat` a uno no-root sin pedido explícito. Esos tres corren como root: fotos, videos, logs y el sello de renovación quedan de root en el disco del host. Postgres y Redis no; usan el usuario de su propia imagen
+
+✅ Si el usuario del host no puede borrar o copiar dentro de `media/` o `logs/`, el comando va por el contenedor: `docker compose --env-file docker/.env exec -u root web ...`. El cron de las 3:00 solo lee esas carpetas y sí puede subirlas a Drive
 
 ✅ Siempre --profile cloudflare en sic-sigma cuando el comando pueda recrear el proyecto. El túnel no abre puertos: Cloudflare entra a http://nginx:80
 ✅ Hostnames públicos en el túnel sic-sigma: mexico, argentina, chile, colombia y el apex sigmasystem.work
