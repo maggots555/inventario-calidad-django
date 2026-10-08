@@ -425,41 +425,35 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         datos_asignacion[tec.id]['total'] += 1
 
     # Candidatos RHITSO: es una marca del mismo equipo, no un ingreso nuevo.
-    # Si el técnico ya lo tiene en su fila y además está marcado como candidato,
-    # sumarlo aquí al total lo contaría dos veces. Por eso vive en su propio dict
-    # y NO se mete en lista_asignacion.
-    rhitso_fila = {dia: 0 for dia in DIAS_SEMANA}
-    rhitso_fila['nombre'] = 'Candidatos RHITSO'
-    rhitso_fila['total'] = 0
-    # La lista nombra cada equipo. El conteo de arriba solo dice "cuántos".
+    # La lista es la fuente. El conteo por día sale de esa lista, así el
+    # total del PDF no puede decir un número distinto de los equipos nombrados.
     lista_candidatos_rhitso = []
-    candidatos_rhitso = base_qs.filter(es_candidato_rhitso=True)
-    for orden in candidatos_rhitso:
+    for orden in base_qs.filter(es_candidato_rhitso=True):
         dia_idx = orden.fecha_ingreso.weekday()
         if dia_idx > 4:
             continue
-        dia_nombre = DIAS_SEMANA[dia_idx]
-        rhitso_fila[dia_nombre] += 1
-        rhitso_fila['total'] += 1
-
         detalle = getattr(orden, 'detalle_equipo', None)
         folio_cliente = ''
         if detalle is not None:
             folio_cliente = (detalle.orden_cliente or '').strip()
-        # Sin folio de cliente, el número interno (ORD-...) sigue identificando el equipo.
+        # Sin folio de cliente, el número interno (ORD-...) identifica el equipo.
         folio = folio_cliente or orden.numero_orden_interno
         tecnico = orden.tecnico_asignado_actual
         lista_candidatos_rhitso.append({
-            'dia': dia_nombre,
-            'dia_idx': dia_idx,
+            'dia': DIAS_SEMANA[dia_idx],
             'folio': folio,
             'tecnico': tecnico.nombre_completo if tecnico else 'Sin técnico',
             'sucursal': orden.sucursal.nombre if orden.sucursal_id else '',
         })
 
-    lista_candidatos_rhitso.sort(key=lambda item: (item['dia_idx'], item['folio']))
+    lista_candidatos_rhitso.sort(
+        key=lambda item: (DIAS_SEMANA.index(item['dia']), item['folio'])
+    )
+    rhitso_fila = {dia: 0 for dia in DIAS_SEMANA}
+    rhitso_fila['nombre'] = 'Candidatos RHITSO'
+    rhitso_fila['total'] = len(lista_candidatos_rhitso)
     for item in lista_candidatos_rhitso:
-        item.pop('dia_idx', None)
+        rhitso_fila[item['dia']] += 1
 
     # Solo ingenieros, ordenados de quien más equipos tuvo a quien menos.
     lista_asignacion = sorted(
@@ -553,7 +547,7 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
     }
 
 
-def comparar_concentrado_con_semana_anterior(actual, anterior):
+def comparar_concentrado_con_semana_anterior(actual, anterior=None):
     """
     Compara esta semana con la anterior para el resumen del PDF.
 
@@ -564,7 +558,8 @@ def comparar_concentrado_con_semana_anterior(actual, anterior):
 
     Args:
         actual (dict): Resultado de obtener_concentrado_semanal de esta semana.
-        anterior (dict): El mismo cálculo del lunes anterior.
+        anterior (dict | None): El mismo cálculo del lunes anterior.
+            None se trata como una semana en ceros.
 
     Returns:
         dict: ingresaron, salieron, balance, candidatos_rhitso y la
@@ -573,14 +568,25 @@ def comparar_concentrado_con_semana_anterior(actual, anterior):
     Efectos secundarios:
         Ninguno. Solo resta números que ya vienen calculados.
     """
+    if anterior is None:
+        anterior = {
+            'totales_ingreso': {'total': 0},
+            'totales_egreso': {'total': 0},
+            'candidatos_rhitso': {'total': 0},
+        }
+
+    def _total(bloque, clave):
+        """Lee un total. Si falta la clave, la semana cuenta como cero."""
+        return (bloque.get(clave) or {}).get('total', 0)
+
     # El balance es "entraron de más". Positivo = quedaron más equipos
-    # de los que salieron. No incluye RHITSO: esos ya van en el ingreso.
-    ingresaron = actual['totales_ingreso']['total']
-    salieron = actual['totales_egreso']['total']
-    rhitso = actual['candidatos_rhitso']['total']
-    ingresaron_ant = anterior['totales_ingreso']['total']
-    salieron_ant = anterior['totales_egreso']['total']
-    rhitso_ant = anterior['candidatos_rhitso']['total']
+    # de los que salieron. RHITSO ya va dentro del ingreso.
+    ingresaron = _total(actual, 'totales_ingreso')
+    salieron = _total(actual, 'totales_egreso')
+    rhitso = _total(actual, 'candidatos_rhitso')
+    ingresaron_ant = _total(anterior, 'totales_ingreso')
+    salieron_ant = _total(anterior, 'totales_egreso')
+    rhitso_ant = _total(anterior, 'candidatos_rhitso')
     balance = ingresaron - salieron
     balance_ant = ingresaron_ant - salieron_ant
     return {
@@ -696,7 +702,7 @@ def obtener_tendencia_semanal(año, sucursal_id=None, sucursal_ids=None):
 # DATOS PARA REPORTE TRIMESTRAL
 # ===========================================================================
 
-def obtener_reporte_trimestral(año, sucursal_id=None):
+def obtener_reporte_trimestral(año, sucursal_id=None, sucursal_ids=None):
     """
     Calcula el concentrado acumulado por quarter (Q1, Q2, Q3, Q4).
 
@@ -707,7 +713,9 @@ def obtener_reporte_trimestral(año, sucursal_id=None):
 
     Args:
         año (int): Año a analizar (ej: 2025)
-        sucursal_id (int, optional): Filtrar por sucursal
+        sucursal_id (int, optional): Filtrar por una sucursal.
+        sucursal_ids (list, optional): Filtrar por un grupo (CIS o foráneas).
+            Si viene la lista, manda sobre sucursal_id.
 
     Returns:
         dict: {
@@ -738,7 +746,10 @@ def obtener_reporte_trimestral(año, sucursal_id=None):
             fecha_finalizacion__month__in=meses,
         ).exclude(estado='cancelado')
 
-        if sucursal_id:
+        if sucursal_ids:
+            qs_ingreso = qs_ingreso.filter(sucursal_id__in=sucursal_ids)
+            qs_egreso = qs_egreso.filter(sucursal_id__in=sucursal_ids)
+        elif sucursal_id:
             qs_ingreso = qs_ingreso.filter(sucursal_id=sucursal_id)
             qs_egreso = qs_egreso.filter(sucursal_id=sucursal_id)
 

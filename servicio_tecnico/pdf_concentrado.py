@@ -33,6 +33,7 @@ from reportlab.platypus import (
 )
 
 from config.paises_config import get_pais_actual
+from servicio_tecnico.concentrado_semanal import comparar_concentrado_con_semana_anterior
 
 
 # Misma paleta que OOW y Diagnóstico. El rojo suave marca RHITSO
@@ -357,14 +358,15 @@ def _tabla_asignacion(asignacion, totales_asignacion):
     filas = [encabezados]
     style_cmds = _estilo_tabla_datos()
     if not asignacion:
-        # Sin ingenieros, la fila -2 sería el encabezado y ReportLab se queja.
+        # Sin ingenieros no hay filas de datos: -2 apuntaría al encabezado.
         style_cmds = [cmd for cmd in style_cmds if cmd[0] != 'ROWBACKGROUNDS']
-    style_cmds += [
-        ('ALIGN', (0, 1), (0, -2), 'LEFT'),
-        ('ALIGN', (1, 1), (-1, -2), 'CENTER'),
-        ('FONTNAME', (-1, 1), (-1, -2), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (-1, 1), (-1, -2), COLOR_NAVY),
-    ]
+    else:
+        style_cmds += [
+            ('ALIGN', (0, 1), (0, -2), 'LEFT'),
+            ('ALIGN', (1, 1), (-1, -2), 'CENTER'),
+            ('FONTNAME', (-1, 1), (-1, -2), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (-1, 1), (-1, -2), COLOR_NAVY),
+        ]
 
     fila_idx = 1
     for fila_ing in asignacion:
@@ -677,18 +679,6 @@ def generar_pdf_concentrado(datos, datos_anterior=None):
     Efectos secundarios:
         Ninguno en disco ni en la base. Solo llena un buffer en memoria.
     """
-    from servicio_tecnico.concentrado_semanal import (
-        comparar_concentrado_con_semana_anterior,
-    )
-
-    if datos_anterior is None:
-        # Sin semana previa, la variación es el propio número de esta semana.
-        datos_anterior = {
-            'totales_ingreso': {'total': 0},
-            'totales_egreso': {'total': 0},
-            'candidatos_rhitso': {'total': 0},
-        }
-
     comparacion = comparar_concentrado_con_semana_anterior(datos, datos_anterior)
     estilos = _crear_estilos()
     buffer = io.BytesIO()

@@ -195,6 +195,14 @@ class ConcentradoRhitsoNoDobleConteoTest(TestCase):
         self.assertEqual(comparacion['ingresaron'], 0)
         self.assertEqual(comparacion['balance'], 0)
         self.assertEqual(comparacion['variacion_ingresaron'], 0)
+        self.assertEqual(
+            datos['candidatos_rhitso']['total'],
+            len(datos['lista_candidatos_rhitso']),
+        )
+        self.assertEqual(
+            sum(datos['candidatos_rhitso'][dia] for dia in datos['dias_semana']),
+            datos['candidatos_rhitso']['total'],
+        )
 
         pdf = generar_pdf_concentrado(datos, anterior).getvalue()
         # El nombre va comprimido dentro del PDF; aquí revisamos que sea
@@ -202,3 +210,36 @@ class ConcentradoRhitsoNoDobleConteoTest(TestCase):
         self.assertTrue(pdf.startswith(b'%PDF'))
         self.assertIn(b'/MediaBox [ 0 0 612 792 ]', pdf)
         self.assertIn(b'Concentrado semanal', pdf)
+
+    def test_grupo_cis_no_mezcla_sucursales_foraneas(self):
+        """
+        CIS y foráneas salen de la misma regla para la página, el Excel y el PDF.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El nombre de la sucursal decide el grupo: si dice Drop o Satélite,
+        es CIS. Esta prueba usa el filtro compartido, no una copia.
+        """
+        from servicio_tecnico.views_concentrado import resolver_filtros_concentrado
+
+        drop = Sucursal.objects.create(
+            codigo='DROP-REV',
+            nombre='Drop Off Revision',
+            ciudad='CDMX',
+        )
+        satelite = Sucursal.objects.create(
+            codigo='SAT-REV',
+            nombre='Satelite Revision',
+            ciudad='CDMX',
+        )
+        request = RequestFactory().get('/', {
+            'sucursal_id': 'grupo_cis',
+            'semana': '2026-W41',
+        })
+        filtros = resolver_filtros_concentrado(request)
+        ids = set(filtros['sucursal_ids'])
+
+        self.assertEqual(filtros['lunes'], LUNES_SEMANA)
+        self.assertIsNone(filtros['sucursal_id'])
+        self.assertIn(drop.id, ids)
+        self.assertIn(satelite.id, ids)
+        self.assertNotIn(self.sucursal.id, ids)

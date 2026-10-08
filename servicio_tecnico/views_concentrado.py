@@ -19,6 +19,88 @@ from inventario.models import Sucursal
 from .decorators import permission_required_with_message
 
 
+def resolver_filtros_concentrado(request):
+    """
+    Lee la semana y la sucursal una sola vez para página, Excel y PDF.
+
+    Objetivo de negocio:
+        Los tres salidas deben ver el mismo corte. Si en pantalla elegiste
+        CIS o Foráneas, el archivo no puede salir con todas las sucursales.
+
+    Args:
+        request: Petición con GET semana (YYYY-WNN) y sucursal_id.
+            sucursal_id puede ser un número, 'grupo_cis', 'grupo_foranea' o vacío.
+
+    Returns:
+        dict:
+            lunes (date), sucursal_id (int o None), sucursal_ids (lista o None),
+            sucursal_param (el valor crudo del GET, para remarcar el filtro),
+            sucursales (queryset activas), grupos_sucursales (opciones del select).
+
+    Efectos secundarios:
+        Consulta las sucursales activas para armar CIS y foráneas.
+    """
+    from .concentrado_semanal import (
+        lunes_desde_numero_semana,
+        obtener_semana_actual,
+    )
+
+    semana_param = request.GET.get('semana', '')
+    sucursal_param = request.GET.get('sucursal_id') or None
+
+    lunes = obtener_semana_actual()
+    if semana_param:
+        try:
+            año_param, num_semana_param = semana_param.split('-W')
+            lunes = lunes_desde_numero_semana(int(año_param), int(num_semana_param))
+        except (ValueError, IndexError):
+            lunes = obtener_semana_actual()
+
+    sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
+    grupo_cis_ids = []
+    grupo_foranea_ids = []
+    for sucursal in sucursales:
+        nombre = sucursal.nombre.lower()
+        if 'drop' in nombre or 'satelit' in nombre:
+            grupo_cis_ids.append(sucursal.id)
+        else:
+            grupo_foranea_ids.append(sucursal.id)
+
+    grupos_sucursales = []
+    if grupo_cis_ids:
+        grupos_sucursales.append({
+            'label': 'CIS (Drop Off + Satélite)',
+            'value': 'grupo_cis',
+        })
+    if grupo_foranea_ids:
+        grupos_sucursales.append({
+            'label': 'Foráneas (MTY + GDL)',
+            'value': 'grupo_foranea',
+        })
+
+    sucursal_id = None
+    sucursal_ids = None
+    if sucursal_param == 'grupo_cis':
+        sucursal_ids = grupo_cis_ids
+    elif sucursal_param == 'grupo_foranea':
+        sucursal_ids = grupo_foranea_ids
+    elif sucursal_param:
+        try:
+            sucursal_id = int(sucursal_param)
+        except ValueError:
+            sucursal_id = None
+            sucursal_param = None
+
+    return {
+        'lunes': lunes,
+        'sucursal_id': sucursal_id,
+        'sucursal_ids': sucursal_ids,
+        'sucursal_param': sucursal_param,
+        'sucursales': sucursales,
+        'grupos_sucursales': grupos_sucursales,
+    }
+
+
 @login_required
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def concentrado_semanal(request):
@@ -44,10 +126,7 @@ def concentrado_semanal(request):
     import json as _json
     import plotly.graph_objects as go
     import plotly.io as pio
-    from datetime import date
     from .concentrado_semanal import (
-        obtener_semana_actual,
-        lunes_desde_numero_semana,
         obtener_concentrado_semanal,
         obtener_tendencia_semanal,
         DIAS_SEMANA,
@@ -55,80 +134,14 @@ def concentrado_semanal(request):
         TIPOS_EQUIPO,
     )
 
-    # ------------------------------------------------------------------
-    # Leer parámetros GET
-    # ------------------------------------------------------------------
-    semana_param = request.GET.get('semana', '')
-    sucursal_param = request.GET.get('sucursal_id', None)
-
-    # sucursal_id puede ser:
-    #   - None / '' → todas las sucursales
-    #   - 'grupo_cis'     → Drop Off + Satélite (se resuelve a lista de IDs más abajo)
-    #   - 'grupo_foranea' → MTY + GDL (ídem)
-    #   - Un número entero → sucursal individual
-    sucursal_id = None          # valor que se pasa a las funciones de negocio (int o None)
-    sucursal_ids_grupo = None   # lista de IDs cuando es un grupo
-
-    if sucursal_param in ('grupo_cis', 'grupo_foranea'):
-        # Se resuelve después de cargar las sucursales (ver más abajo)
-        sucursal_id = None
-    elif sucursal_param:
-        try:
-            sucursal_id = int(sucursal_param)
-        except ValueError:
-            sucursal_id = None
-
-    # ------------------------------------------------------------------
-    # Determinar la semana seleccionada
-    # ------------------------------------------------------------------
-    lunes_seleccionado = obtener_semana_actual()
-
-    if semana_param:
-        # Formato esperado: "2025-W18"
-        try:
-            partes = semana_param.split('-W')
-            año_param = int(partes[0])
-            num_semana_param = int(partes[1])
-            lunes_seleccionado = lunes_desde_numero_semana(año_param, num_semana_param)
-        except (ValueError, IndexError):
-            lunes_seleccionado = obtener_semana_actual()
-
-    # ------------------------------------------------------------------
-    # Lista de sucursales para el filtro + resolución de grupos
-    # (debe hacerse ANTES de llamar a las funciones del concentrado)
-    # ------------------------------------------------------------------
-    sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
-
-    # Clasificamos cada sucursal en un grupo según su nombre.
-    # Grupo "CIS"     → nombre contiene 'drop' o 'satelit'
-    # Grupo "Foránea" → cualquier otra (MTY, GDL, etc.)
-    grupo_cis_ids = []
-    grupo_foranea_ids = []
-    for suc in sucursales:
-        nombre_lower = suc.nombre.lower()
-        if 'drop' in nombre_lower or 'satelit' in nombre_lower:
-            grupo_cis_ids.append(suc.id)
-        else:
-            grupo_foranea_ids.append(suc.id)
-
-    # Resolver grupos: convertir 'grupo_cis'/'grupo_foranea' a lista de IDs
-    if sucursal_param == 'grupo_cis':
-        sucursal_ids_grupo = grupo_cis_ids
-    elif sucursal_param == 'grupo_foranea':
-        sucursal_ids_grupo = grupo_foranea_ids
-
-    # Estructura de grupos para renderizar optgroup en el template
-    grupos_sucursales = []
-    if grupo_cis_ids:
-        grupos_sucursales.append({
-            'label': 'CIS (Drop Off + Satélite)',
-            'value': 'grupo_cis',
-        })
-    if grupo_foranea_ids:
-        grupos_sucursales.append({
-            'label': 'Foráneas (MTY + GDL)',
-            'value': 'grupo_foranea',
-        })
+    # Semana y sucursal: la misma función que usan el Excel y el PDF.
+    filtros = resolver_filtros_concentrado(request)
+    lunes_seleccionado = filtros['lunes']
+    sucursal_id = filtros['sucursal_id']
+    sucursal_ids_grupo = filtros['sucursal_ids']
+    sucursal_param = filtros['sucursal_param']
+    sucursales = filtros['sucursales']
+    grupos_sucursales = filtros['grupos_sucursales']
 
     # ------------------------------------------------------------------
     # Calcular datos del concentrado
@@ -324,8 +337,6 @@ def exportar_concentrado_excel(request):
     import openpyxl
     from django.http import HttpResponse
     from .concentrado_semanal import (
-        obtener_semana_actual,
-        lunes_desde_numero_semana,
         obtener_concentrado_semanal,
         obtener_reporte_trimestral,
         obtener_tendencia_semanal,
@@ -333,30 +344,32 @@ def exportar_concentrado_excel(request):
     )
     from .excel_exporters_concentrado import generar_excel_concentrado
 
-    # Leer parámetros
-    semana_param = request.GET.get('semana', '')
-    sucursal_id = request.GET.get('sucursal_id', None)
-    if sucursal_id:
-        try:
-            sucursal_id = int(sucursal_id)
-        except ValueError:
-            sucursal_id = None
-
-    lunes_seleccionado = obtener_semana_actual()
-    if semana_param:
-        try:
-            partes = semana_param.split('-W')
-            lunes_seleccionado = lunes_desde_numero_semana(int(partes[0]), int(partes[1]))
-        except (ValueError, IndexError):
-            lunes_seleccionado = obtener_semana_actual()
-
+    filtros = resolver_filtros_concentrado(request)
+    lunes_seleccionado = filtros['lunes']
+    sucursal_id = filtros['sucursal_id']
+    sucursal_ids = filtros['sucursal_ids']
     año = lunes_seleccionado.year
 
-    # Obtener datos
-    datos_semana = obtener_concentrado_semanal(lunes_seleccionado, sucursal_id=sucursal_id)
-    datos_trimestral = obtener_reporte_trimestral(año, sucursal_id=sucursal_id)
-    datos_tendencia = obtener_tendencia_semanal(año, sucursal_id=sucursal_id)
-    datos_mensual = obtener_reporte_mensual(año, sucursal_id=sucursal_id)
+    datos_semana = obtener_concentrado_semanal(
+        lunes_seleccionado,
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
+    datos_trimestral = obtener_reporte_trimestral(
+        año,
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
+    datos_tendencia = obtener_tendencia_semanal(
+        año,
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
+    datos_mensual = obtener_reporte_mensual(
+        año,
+        sucursal_id=sucursal_id,
+        sucursal_ids=sucursal_ids,
+    )
 
     # Generar el archivo Excel
     wb = generar_excel_concentrado(datos_semana, datos_trimestral, datos_tendencia, datos_mensual)
@@ -403,7 +416,7 @@ def exportar_concentrado_pdf(request):
     from .concentrado_semanal import obtener_concentrado_semanal
     from .pdf_concentrado import generar_pdf_concentrado
 
-    filtros = _filtros_exportacion_concentrado(request)
+    filtros = resolver_filtros_concentrado(request)
     lunes_seleccionado = filtros['lunes']
     sucursal_id = filtros['sucursal_id']
     sucursal_ids = filtros['sucursal_ids']
@@ -430,64 +443,4 @@ def exportar_concentrado_pdf(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
-
-
-def _filtros_exportacion_concentrado(request):
-    """
-    Lee la semana y la sucursal con las mismas reglas que la página.
-
-    Objetivo de negocio:
-        Exportar el PDF del grupo que se está viendo (CIS, Foráneas,
-        una sucursal o todas), no de otra selección.
-
-    Args:
-        request: Petición con GET semana y sucursal_id.
-            sucursal_id puede ser un número, 'grupo_cis' o 'grupo_foranea'.
-
-    Returns:
-        dict: lunes (date), sucursal_id (int o None), sucursal_ids (lista o None).
-
-    Efectos secundarios:
-        Consulta las sucursales activas para armar los grupos.
-    """
-    from .concentrado_semanal import (
-        lunes_desde_numero_semana,
-        obtener_semana_actual,
-    )
-
-    semana_param = request.GET.get('semana', '')
-    sucursal_param = request.GET.get('sucursal_id', None)
-
-    lunes = obtener_semana_actual()
-    if semana_param:
-        try:
-            partes = semana_param.split('-W')
-            lunes = lunes_desde_numero_semana(int(partes[0]), int(partes[1]))
-        except (ValueError, IndexError):
-            lunes = obtener_semana_actual()
-
-    sucursal_id = None
-    sucursal_ids = None
-    if sucursal_param in ('grupo_cis', 'grupo_foranea'):
-        # Misma regla que la página: Drop/Satélite es CIS; el resto, foránea.
-        grupo_cis_ids = []
-        grupo_foranea_ids = []
-        for suc in Sucursal.objects.filter(activa=True):
-            nombre = suc.nombre.lower()
-            if 'drop' in nombre or 'satelit' in nombre:
-                grupo_cis_ids.append(suc.id)
-            else:
-                grupo_foranea_ids.append(suc.id)
-        sucursal_ids = grupo_cis_ids if sucursal_param == 'grupo_cis' else grupo_foranea_ids
-    elif sucursal_param:
-        try:
-            sucursal_id = int(sucursal_param)
-        except ValueError:
-            sucursal_id = None
-
-    return {
-        'lunes': lunes,
-        'sucursal_id': sucursal_id,
-        'sucursal_ids': sucursal_ids,
-    }
 
