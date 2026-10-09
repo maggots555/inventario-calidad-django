@@ -92,7 +92,10 @@ services:
     # Un worker atiende una petición de Django a la vez. sic-sigma tiene 8 núcleos
     # y ~30 GB de RAM: uno por núcleo. Más de eso (el techo teórico es 17) solo
     # haría que los procesos compitan por CPU en dashboards y PDFs.
-    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+    # max-requests: cada worker se reemplaza tras ~500 páginas, para soltar
+    # la RAM que Python no devuelve (fotos, PDF, gráficas). El jitter reparte
+    # ese relevo entre 500 y 600, así no se reinician los 8 al mismo tiempo.
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "8", "--max-requests", "500", "--max-requests-jitter", "100", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
     volumes:
       - ${SIGMA_DATA_ROOT:-./docker-data}/media:/app/media
       - ${SIGMA_DATA_ROOT:-./docker-data}/staticfiles:/app/staticfiles
