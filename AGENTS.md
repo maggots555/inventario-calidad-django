@@ -620,7 +620,7 @@ Política y comandos: **§1**. Suites: `almacen/tests/` (formal), `servicio_tecn
 | Deps Python (reproducible) | `pip install -r requirements.lock` |
 | Deps Python (intent / actualizar) | editar `requirements.txt` → install → `pip freeze > requirements.lock` |
 | Docker laptop | `sh docker/levantar.sh` |
-| Docker sic-sigma, código nuevo | `git pull` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
+| Docker sic-sigma, código nuevo | En `master`: `git pull origin master` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
 | Docker sic-sigma, solo `.env` | `docker compose --env-file docker/.env --profile cloudflare up -d --force-recreate web celery celery-beat` |
 | Logs Docker | `docker compose --env-file docker/.env logs -f --tail 50 web` |
 
@@ -733,16 +733,16 @@ No “arreglar” quitando `select_for_update()`: eso elimina la protección con
 
 ## 12. DOCKER EN SIC-SIGMA
 
-Guía para personas: `docs/guias/setup/DOCKER_SIGMA.md`. Esta sección es la regla para agentes. Hasta que la rama `dockerizacion` se una a `master`, el servidor público sigue en `dockerizacion`. Un cambio que tenga que verse en producción se integra ahí.
+Guía para personas: `docs/guias/setup/DOCKER_SIGMA.md`. Esta sección es la regla para agentes. La rama `dockerizacion` ya se unió a `master` (9 de octubre de 2026, fast-forward a `2a80785`). sic-sigma y el desarrollo quedan en `master`. Un cambio que tenga que verse en producción se integra en `master`.
 
 El código de Django va **dentro** de la imagen `sigma-web:local`. No está montado como carpeta. `pull_policy: build` solo evita buscar esa imagen en Docker Hub. Si el código cambió, hace falta `--build`. Compose reutiliza la imagen vieja si se omite.
 
 | Qué cambió | Comando, desde `/srv/sic/apps/sigma` |
 |---|---|
-| Python, plantillas, CSS/JS o `requirements-docker.txt` | `git pull` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
+| Python, plantillas, CSS/JS o `requirements-docker.txt` | En `master`: `git pull origin master` y `docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat` |
 | Solo `docker/.env` | `up -d --force-recreate` de esos tres servicios, sin `--build`. `restart` no vuelve a leer el `.env` |
 | Nada: solo reiniciar | `docker compose --env-file docker/.env restart web celery` |
-| `docker/backup_sigma.sh` | `git pull`. El cron lee el archivo del disco. No reconstruye la imagen |
+| `docker/backup_sigma.sh` | En `master`: `git pull origin master`. El cron lee el archivo del disco. No reconstruye la imagen |
 
 Al arrancar, `web` (`SIGMA_MIGRAR=1`) migra `default`, `argentina`, `chile` y `colombia`, y corre `collectstatic`. `mexico` no se migra otra vez: es la misma base que `default`. Celery y Beat llevan `SIGMA_MIGRAR=0`. Los dos montan `staticfiles` en solo lectura. Sin ese disco, con `DEBUG=False`, fallan al importar `urls.py` por el manifest del favicon.
 
@@ -754,6 +754,7 @@ Al arrancar, `web` (`SIGMA_MIGRAR=1`) migra `default`, `argentina`, `chile` y `c
 ❌ NUNCA usar rclone sync en el respaldo. El script usa copy: no borra en Drive lo que aún no está en este disco
 ❌ NUNCA apuntar el cron de sic-sigma a scripts/backup_postgres.sh. Ese script es del servidor anterior y solo vuelca inventario_django
 ❌ NUNCA hacer git pull ni reiniciar Gunicorn en el servidor anterior como si fuera el deploy. Ese equipo queda encendido durante la observación; su cron de respaldo está comentado a propósito
+❌ NUNCA desplegar sic-sigma desde `dockerizacion`. El merge a `master` ya está hecho (octubre 2026, `2a80785`). Si esa rama sigue existiendo, no es el checkout de producción
 ❌ NUNCA quitar el volumen staticfiles de celery o celery-beat
 ❌ NUNCA volver Redis a `allkeys-lru`: esa política puede borrar la cola de Celery. La vigente es `volatile-lru`
 ❌ NUNCA dejar `cloudflare/cloudflared:latest`. La imagen va fijada (hoy `2026.10.0`)
@@ -770,6 +771,7 @@ Al arrancar, `web` (`SIGMA_MIGRAR=1`) migra `default`, `argentina`, `chile` y `c
 ✅ El script vuelca las cuatro bases y después hace rclone copy de media/mexico, argentina, chile y colombia hacia gdrive:SIGMA-Backups/
 ✅ Logs de Gunicorn y Celery: docker compose --env-file docker/.env logs. Los de Django: /srv/sic/data/sigma/logs/
 ✅ Guía de personas y valores de prueba: docs/guias/setup/DOCKER_SIGMA.md y docker/.env.example
+✅ sic-sigma está en `master`. El deploy parte de `/srv/sic/apps/sigma` con `git pull origin master`. Si `git status` muestra otra rama, `git checkout master` antes de construir
 ```
 
 | Ruta en sic-sigma | Qué es |

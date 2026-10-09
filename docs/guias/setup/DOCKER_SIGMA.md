@@ -2,7 +2,7 @@
 
 SIGMA en producción corre en Docker, en el servidor **sic-sigma**. La misma receta sirve para probar en la laptop. Los secretos (claves, token del túnel, token de Drive) viven solo en `docker/.env` de cada máquina. Ese archivo no se sube a git.
 
-Hasta que la rama `dockerizacion` se una a `master`, sic-sigma sigue en `dockerizacion`.
+La rama `dockerizacion` ya se unió a `master` (9 de octubre de 2026, fast-forward hasta `2a80785`). sic-sigma está en `master` y los cambios de producción se integran ahí. `dockerizacion` no tiene commits que `master` no tenga; se puede borrar cuando ya no haga falta como recordatorio.
 
 ## Qué se levanta
 
@@ -89,10 +89,12 @@ docker compose --env-file docker/.env --profile cloudflare up -d
 
 El código de Django va dentro de la imagen. Un `git pull` no cambia lo que ya está corriendo hasta que se reconstruye.
 
+El checkout de sic-sigma es la rama `master` (sigue a `origin/master`). Antes de actualizar, `git status` tiene que decir que estás en `master`. Si aparece otra rama, primero `git checkout master`.
+
 En `/srv/sic/apps/sigma`, si cambió Python, plantillas, CSS, JavaScript o `requirements-docker.txt`:
 
 ```bash
-git pull
+git pull origin master
 docker compose --env-file docker/.env --profile cloudflare up -d --build web celery celery-beat
 ```
 
@@ -147,7 +149,7 @@ Ese script:
 
 Usa `rclone copy`. Copia lo que falta o cambió. No borra en Drive una foto que todavía no esté en este disco. El log queda en `/srv/sic/data/sigma/logs/backup_sigma.log` y cierra con `=== Respaldo terminado ===`.
 
-Un cambio en ese script llega con `git pull`. No hace falta `--build`: el cron lee el archivo del disco.
+Un cambio en ese script llega con `git pull origin master`, ya parado en `master`. No hace falta `--build`: el cron lee el archivo del disco.
 
 No apuntes este cron a `scripts/backup_postgres.sh`. Ese script es del servidor anterior y solo vuelca `inventario_django`.
 
