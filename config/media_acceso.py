@@ -10,7 +10,9 @@ Tres puertas:
 1. Los banners de publicidad (carpeta banners/) siguen públicos.
 2. El personal con sesión puede ver el resto.
 3. El cliente, sin sesión, solo si trae el token vigente de SU orden
-   (?t=...) y el archivo está en la carpeta de esa orden.
+   (?t=...) y la ruta es una foto o un video guardados en esa orden.
+   No basta con que la carpeta se llame como el folio: ese folio se
+   puede repetir y el número interno también sale en los correos.
 """
 
 from urllib.parse import quote
@@ -53,21 +55,6 @@ def ruta_relativa_segura(path: str) -> str | None:
     if not partes:
         return None
     return '/'.join(partes)
-
-
-# Carpetas donde el nombre que sigue es el folio de UNA orden.
-# El folio tiene que ir ahí, no en cualquier pedazo de la ruta:
-# si el folio fuera "imagenes", no debe abrir toda la carpeta imagenes.
-_PREFIJOS_DE_ORDEN = (
-    'servicio_tecnico/imagenes/',
-    'servicio_tecnico/imagenes_originales/',
-    'servicio_tecnico/videos/',
-    'servicio_tecnico/videos_thumbs/',
-    'servicio_tecnico/comprobantes/',
-    'servicio_tecnico/formato_oow/',
-    'servicio_tecnico/formato_garantia/',
-    'servicio_tecnico/formato_venta_mostrador/',
-)
 
 
 def _pais_de_esta_peticion() -> str:
@@ -170,24 +157,110 @@ def es_banner_publico(path: str) -> bool:
     return resto.split('/', 1)[0] == 'banners'
 
 
-def archivo_pertenece_a_orden(path: str, orden) -> bool:
+def _variantes_de_ruta(nombre: str) -> set[str]:
     """
-    True si alguna carpeta de la ruta es el folio de esa orden.
+    Ruta tal cual y, si empieza con país, también sin esa carpeta.
 
     Objetivo de negocio:
-        El token del cliente abre las fotos de SU equipo, no el disco
-        completo. El folio (orden_cliente o el número interno) es el
-        nombre de la carpeta. Los CFDI viven en facturacion/<id>/.
+        En la base la foto puede estar como
+        ``servicio_tecnico/imagenes/OOW-1/a.jpg`` o como
+        ``mexico/servicio_tecnico/...``. La URL del navegador trae el
+        país. Las dos formas son el mismo archivo.
 
     Args:
-        path: Ruta relativa bajo media.
-        orden: OrdenServicio (con detalle_equipo si ya se cargó).
+        nombre: Ruta relativa. Puede venir de la URL o del FileField.
+
+    Returns:
+        set[str]: Vacío si el nombre está vacío.
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    limpio = str(nombre or '').replace('\\', '/').lstrip('/')
+    if not limpio:
+        return set()
+    variantes = {limpio}
+    pais, _sep, cola = limpio.partition('/')
+    # Solo se quita el primer tramo si es un país conocido. Si no,
+    # el resto del nombre se queda igual y no se "recorta" de más.
+    if cola and pais in PAISES_MEDIA:
+        variantes.add(cola)
+    return variantes
+
+
+def _es_foto_o_video_de_la_orden(path: str, resto: str, orden) -> bool:
+    """
+    True si esa ruta es la foto de galería o el video guardados en la orden.
+
+    Objetivo de negocio:
+        El folio del cliente no es único. Autorizar la carpeta abría
+        las fotos de otra orden con el mismo folio, y también la
+        carpeta del número interno (ORD-2026-0001), que sale en los
+        correos. Aquí solo pasa el archivo que esta orden tiene en la
+        base.
+
+    Args:
+        path: Ruta completa ya limpia (con país, si lo trae).
+        resto: La misma ruta sin la carpeta de país.
+        orden: OrdenServicio.
 
     Returns:
         bool.
 
     Efectos secundarios:
-        Ninguno. No consulta la base; usa el objeto que ya tienes.
+        Lee ImagenOrden.imagen y VideoOrden.video. No escribe.
+    """
+    from servicio_tecnico.models import ImagenOrden, VideoOrden
+
+    if getattr(orden, 'pk', None) is None:
+        return False
+    pedidos = _variantes_de_ruta(path) | _variantes_de_ruta(resto)
+    if not pedidos:
+        return False
+
+    # Paso 1: la galería del seguimiento usa ImagenOrden.imagen.
+    fotos = (
+        ImagenOrden.objects.filter(orden=orden)
+        .exclude(imagen='')
+        .values_list('imagen', flat=True)
+    )
+    for nombre in fotos:
+        if _variantes_de_ruta(nombre) & pedidos:
+            return True
+
+    # Paso 2: el correo de video manda VideoOrden.video, no la miniatura
+    # ni la firma. Esos otros archivos no se abren con el token.
+    videos = (
+        VideoOrden.objects.filter(orden=orden)
+        .exclude(video='')
+        .values_list('video', flat=True)
+    )
+    for nombre in videos:
+        if _variantes_de_ruta(nombre) & pedidos:
+            return True
+    return False
+
+
+def archivo_pertenece_a_orden(path: str, orden) -> bool:
+    """
+    True si el cliente con el token de esta orden puede ver esa ruta.
+
+    Objetivo de negocio:
+        La foto y el video que SIGMA le mandó al cliente sí se abren.
+        Una firma, un comprobante o un jpg que solo comparte el folio
+        no. El CFDI y el PDF de diagnóstico siguen por el id de la
+        orden, que no se repite.
+
+    Args:
+        path: Ruta relativa bajo media.
+        orden: OrdenServicio.
+
+    Returns:
+        bool.
+
+    Efectos secundarios:
+        Si la ruta es de este país, lee las fotos y los videos de la
+        orden. No escribe.
     """
     separado = _pais_y_resto(path)
     if separado is None:
@@ -197,26 +270,10 @@ def archivo_pertenece_a_orden(path: str, orden) -> bool:
     if pais is not None and pais != _pais_de_esta_peticion():
         return False
 
-    refs = set()
-    detalle = getattr(orden, 'detalle_equipo', None)
-    if detalle is not None:
-        folio = (getattr(detalle, 'orden_cliente', None) or '').strip()
-        if folio:
-            refs.add(folio)
-    interno = (getattr(orden, 'numero_orden_interno', None) or '').strip()
-    if interno:
-        refs.add(interno)
-
-    # Paso: el folio es la carpeta que sigue a imagenes/, videos/, firmas/, etc.
-    # Tiene que haber un archivo después. No basta con que el folio aparezca
-    # en el nombre del jpg.
-    for prefijo in _PREFIJOS_DE_ORDEN:
-        if not resto.startswith(prefijo):
-            continue
-        cola = resto[len(prefijo):]
-        carpeta, _sep, archivo = cola.partition('/')
-        if archivo and carpeta in refs:
-            return True
+    limpio = ruta_relativa_segura(path) or resto
+    # La foto y el video tienen que estar guardados en ESTA orden.
+    if _es_foto_o_video_de_la_orden(limpio, resto, orden):
+        return True
 
     # CFDIs y el PDF de diagnóstico usan el id de la orden, no el folio.
     orden_id = str(getattr(orden, 'pk', '') or '')
@@ -276,7 +333,8 @@ def clasificar_acceso_media(request, path: str) -> str:
         o ``denegado``.
 
     Efectos secundarios:
-        Si hay token, lee el enlace en la base.
+        Si hay token, lee el enlace y, para una foto o un video,
+        comprueba que esa ruta esté guardada en la orden.
     """
     # Primero el país. Un banner de Argentina no es público en México.
     if not ruta_es_de_este_pais(path):

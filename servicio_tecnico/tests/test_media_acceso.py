@@ -17,7 +17,13 @@ from config.media_acceso import (
 )
 from config.media_views import serve_media_from_multiple_locations
 from inventario.models import Empleado, Sucursal
-from servicio_tecnico.models import DetalleEquipo, EnlaceSeguimientoCliente, OrdenServicio
+from servicio_tecnico.models import (
+    DetalleEquipo,
+    EnlaceSeguimientoCliente,
+    ImagenOrden,
+    OrdenServicio,
+    VideoOrden,
+)
 from servicio_tecnico.services.nombre_archivo_privado import nombre_archivo_privado
 
 
@@ -101,13 +107,62 @@ class RutaYAccesoMediaTests(TestCase):
         request = self._get(evidencia, _UsuarioLogueado())
         self.assertEqual(clasificar_acceso_media(request, evidencia), 'privado')
 
-    def test_token_solo_abre_la_carpeta_de_su_orden(self):
-        """El ?t= del cliente sirve para su folio, no para el de otra orden."""
+    def _guardar_foto(self, orden, nombre):
+        """Deja en la base el nombre de la foto, sin escribir el jpg en disco."""
+        foto = ImagenOrden(orden=orden, tipo='ingreso', subido_por=self.tecnico)
+        foto.imagen.name = nombre
+        foto.save()
+        return foto
+
+    def test_token_solo_abre_el_archivo_guardado_de_su_orden(self):
+        """El ?t= abre la foto y el video de esa orden. Otro nombre en la carpeta, no."""
         propia = 'mexico/servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_1.jpg'
+        # En la base a veces no está el país: la URL sí lo trae. Las dos son la misma foto.
+        self._guardar_foto(self.orden, 'servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_1.jpg')
+        video = VideoOrden(orden=self.orden, tipo='ingreso', subido_por=self.tecnico)
+        video.video.name = 'mexico/servicio_tecnico/videos/OOW-MEDIA-01/ingreso_1.mp4'
+        video.save()
+        mismo_folio_otro_archivo = (
+            'mexico/servicio_tecnico/imagenes/OOW-MEDIA-01/firma_cliente.png'
+        )
         ajena = 'mexico/servicio_tecnico/imagenes/OTRA-ORDEN/ingreso_1.jpg'
         request = self._get(propia, AnonymousUser(), token='token-media-vigente')
         self.assertEqual(clasificar_acceso_media(request, propia), 'privado')
+        ruta_video = 'mexico/servicio_tecnico/videos/OOW-MEDIA-01/ingreso_1.mp4'
+        self.assertEqual(clasificar_acceso_media(request, ruta_video), 'privado')
+        self.assertEqual(
+            clasificar_acceso_media(request, mismo_folio_otro_archivo),
+            'denegado',
+        )
         self.assertEqual(clasificar_acceso_media(request, ajena), 'denegado')
+
+    def test_token_no_abre_la_foto_de_otra_orden_con_el_mismo_folio(self):
+        """Dos órdenes pueden compartir folio. El enlace de una no abre la foto de la otra."""
+        self._guardar_foto(
+            self.orden,
+            'mexico/servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_1.jpg',
+        )
+        otra = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            tipo_servicio='diagnostico',
+            estado='diagnostico',
+            tecnico_asignado_actual=self.tecnico,
+        )
+        DetalleEquipo.objects.create(
+            orden=otra,
+            orden_cliente='OOW-MEDIA-01',
+            tipo_equipo='Laptop',
+            marca='Dell',
+            modelo='Inspiron',
+            numero_serie='SN-MEDIA-02',
+            email_cliente='otro.media@test.local',
+            nombre_cliente='Otro Cliente',
+            falla_principal='No carga',
+        )
+        ruta_ajena = 'mexico/servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_2.jpg'
+        self._guardar_foto(otra, ruta_ajena)
+        request = self._get(ruta_ajena, AnonymousUser(), token='token-media-vigente')
+        self.assertEqual(clasificar_acceso_media(request, ruta_ajena), 'denegado')
 
     def test_token_no_abre_otro_pais_ni_un_folio_suelto_en_el_nombre(self):
         """ORD-2026-0001 existe en cada país. El token no cruza la carpeta."""
