@@ -384,6 +384,7 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
             'Recepcionista Pagos',
             'recepcionista',
             con_add_pago=True,
+            con_change_orden=True,
         )
         self.user_tecnico = self._crear_usuario(
             'tecnico.pagos@test.local',
@@ -425,7 +426,7 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
             args=[self.orden.pk],
         )
 
-    def _crear_usuario(self, email, nombre, rol, con_add_pago):
+    def _crear_usuario(self, email, nombre, rol, con_add_pago, con_change_orden=False):
         """
         Crea User + Empleado con view_ordenservicio y, si aplica, add_pagoorden.
 
@@ -434,6 +435,8 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
             nombre: nombre_completo del Empleado.
             rol: código de Empleado.ROL_CHOICES.
             con_add_pago: True para recepción/facturación.
+            con_change_orden: True si este usuario cambia el estado de la orden.
+                En producción el grupo Recepcionista sí tiene change_ordenservicio.
 
         Returns:
             User recargado (permisos visibles en has_perm).
@@ -467,6 +470,13 @@ class DetalleOrdenPagosIntegracionTest(TestCase):
                 Permission.objects.get(
                     content_type=ct_pago,
                     codename='add_pagoorden',
+                ),
+            )
+        if con_change_orden:
+            user.user_permissions.add(
+                Permission.objects.get(
+                    content_type=ct_orden,
+                    codename='change_ordenservicio',
                 ),
             )
         return User.objects.get(pk=user.pk)

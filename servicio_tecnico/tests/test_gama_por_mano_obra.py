@@ -256,11 +256,12 @@ class GuardarManoObraActualizaGamaViewTest(TestCase):
             rol='tecnico',
         )
         ct = ContentType.objects.get_for_model(OrdenServicio)
-        perm = Permission.objects.get(
-            content_type=ct,
-            codename='view_ordenservicio',
+        self.user.user_permissions.add(
+            Permission.objects.get(content_type=ct, codename='view_ordenservicio'),
+            Permission.objects.get(content_type=ct, codename='change_ordenservicio'),
         )
-        self.user.user_permissions.add(perm)
+        # has_perm cachea: recargar después de asignar permisos.
+        self.user = User.objects.get(pk=self.user.pk)
 
         self.orden = OrdenServicio.objects.create(
             sucursal=self.sucursal,

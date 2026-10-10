@@ -3,7 +3,7 @@ Configuración del Admin de Django para Servicio Técnico
 Administración completa de órdenes, cotizaciones, imágenes y más
 """
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
@@ -374,24 +374,30 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         }
         color = colores.get(obj.tipo_servicio, '#6c757d')  # Gris por defecto
         
-        # Badge principal de tipo
-        badge = f'<span style="background-color: {color}; color: white; padding: 3px 10px; border-radius: 3px; font-weight: bold;">{obj.get_tipo_servicio_display()}</span>'
-        
-        # NUEVO: Indicadores de complementos
-        indicadores = []
-        
+        # El color sale de nuestro diccionario. El texto del tipo va en {}
+        # para que format_html lo escape (un solo argumento NO escapa).
+        partes = [format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-weight: bold;">{}</span>',
+            color,
+            obj.get_tipo_servicio_display(),
+        )]
+
         if hasattr(obj, 'cotizacion') and obj.cotizacion:
-            indicadores.append('<span style="background-color: #0d6efd; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; margin-left: 4px;" title="Tiene cotización">📋</span>')
-        
+            partes.append(format_html(
+                '<span style="background-color: #0d6efd; color: white; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 0.9em; margin-left: 4px;" '
+                'title="Tiene cotización">📋</span>'
+            ))
+
         if hasattr(obj, 'venta_mostrador') and obj.venta_mostrador:
-            indicadores.append('<span style="background-color: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; margin-left: 4px;" title="Tiene venta mostrador">💰</span>')
-        
-        # Combinar badge + indicadores
-        resultado = badge
-        if indicadores:
-            resultado += ''.join(indicadores)
-        
-        return format_html(resultado)
+            partes.append(format_html(
+                '<span style="background-color: #28a745; color: white; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 0.9em; margin-left: 4px;" '
+                'title="Tiene venta mostrador">💰</span>'
+            ))
+
+        return format_html_join('', '{}', ((parte,) for parte in partes))
     
     tipo_servicio_badge.short_description = 'Tipo / Complementos'
     
@@ -449,25 +455,25 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         if not obj.estado_rhitso:
             return format_html('<span style="color: #ffc107; font-weight: bold;">⚠️ Sin estado</span>')
         
-        # Badge del estado
-        badge = f'<span style="background-color: #0d6efd; color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.85em;">{obj.estado_rhitso[:30]}</span>'
-        
-        # Indicadores de fechas
-        indicadores = []
+        # estado_rhitso es texto libre. Va en {} para que no se ejecute como HTML.
+        partes = [format_html(
+            '<span style="background-color: #0d6efd; color: white; padding: 3px 8px; '
+            'border-radius: 3px; font-size: 0.85em;">{}</span>',
+            obj.estado_rhitso[:30],
+        )]
+
         if obj.fecha_envio_rhitso:
-            indicadores.append('<span title="Fecha de envío registrada: {}">📤</span>'.format(
-                obj.fecha_envio_rhitso.strftime('%d/%m/%Y %H:%M')
+            partes.append(format_html(
+                '<span title="Fecha de envío registrada: {}">📤</span>',
+                obj.fecha_envio_rhitso.strftime('%d/%m/%Y %H:%M'),
             ))
         if obj.fecha_recepcion_rhitso:
-            indicadores.append('<span title="Fecha de recepción registrada: {}">📥</span>'.format(
-                obj.fecha_recepcion_rhitso.strftime('%d/%m/%Y %H:%M')
+            partes.append(format_html(
+                '<span title="Fecha de recepción registrada: {}">📥</span>',
+                obj.fecha_recepcion_rhitso.strftime('%d/%m/%Y %H:%M'),
             ))
-        
-        resultado = badge
-        if indicadores:
-            resultado += ' ' + ' '.join(indicadores)
-        
-        return format_html(resultado)
+
+        return format_html_join(' ', '{}', ((parte,) for parte in partes))
     
     estado_rhitso_display.short_description = 'Estado RHITSO'
 
@@ -2454,26 +2460,27 @@ class AnalisisSentimientoEncuestaAdmin(admin.ModelAdmin):
         temas = obj.temas_positivos or []
         if not temas:
             return '—'
-        chips = ''.join(
-            f'<span style="display:inline-block;background:#dcfce7;color:#166534;'
-            f'border:1px solid #bbf7d0;border-radius:12px;padding:2px 10px;'
-            f'margin:2px;font-size:12px;">{tema}</span>'
-            for tema in temas
+        # Cada tema (viene de la IA o de la encuesta) se escapa en {}.
+        return format_html_join(
+            '',
+            '<span style="display:inline-block;background:#dcfce7;color:#166534;'
+            'border:1px solid #bbf7d0;border-radius:12px;padding:2px 10px;'
+            'margin:2px;font-size:12px;">{}</span>',
+            ((tema,) for tema in temas),
         )
-        return format_html(chips)
 
     @admin.display(description='Temas Negativos')
     def temas_negativos_display(self, obj):
         temas = obj.temas_negativos or []
         if not temas:
             return '—'
-        chips = ''.join(
-            f'<span style="display:inline-block;background:#ffedd5;color:#9a3412;'
-            f'border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;'
-            f'margin:2px;font-size:12px;">{tema}</span>'
-            for tema in temas
+        return format_html_join(
+            '',
+            '<span style="display:inline-block;background:#ffedd5;color:#9a3412;'
+            'border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;'
+            'margin:2px;font-size:12px;">{}</span>',
+            ((tema,) for tema in temas),
         )
-        return format_html(chips)
 
     # ── Deshabilitar creación/edición desde el admin ────────────────────────
 

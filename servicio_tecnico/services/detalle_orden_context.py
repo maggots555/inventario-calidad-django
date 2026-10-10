@@ -13,6 +13,7 @@ Efectos secundarios:
 import json
 
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Q
 from django.utils.safestring import mark_safe
 
@@ -40,6 +41,39 @@ from servicio_tecnico.services.formato_oow import orden_es_candidata_formato_oow
 from servicio_tecnico.services.formato_venta_mostrador import (
     orden_es_candidata_formato_venta_mostrador,
 )
+
+
+# Misma tabla que usa Django en el filtro json_script. translate la
+# aplica de un jalón: no hay un reemplazo que vuelva a meter un <.
+_ESCAPES_JSON_EN_SCRIPT = {
+    ord('&'): '\\u0026',
+    ord('<'): '\\u003c',
+    ord('>'): '\\u003e',
+}
+
+
+def json_seguro_para_script(valor):
+    """
+    Convierte un valor a JSON que se puede meter dentro de <script>.
+
+    Objetivo de negocio:
+        El detalle de la orden manda datos al JavaScript (carga de
+        técnicos, etc.). Si un nombre trajera </script>, el navegador
+        cerraría la etiqueta y ejecutaría lo que sigue. El cambio es
+        de <, > y &, no de las comillas: JSON.parse las necesita.
+
+    Args:
+        valor: dict, lista, fecha o Decimal. DjangoJSONEncoder sabe
+            convertir fechas y decimales; json.dumps pelado no.
+
+    Returns:
+        SafeString listo para {{ ... }} dentro de un <script>.
+
+    Efectos secundarios:
+        Ninguno.
+    """
+    texto = json.dumps(valor, cls=DjangoJSONEncoder)
+    return mark_safe(texto.translate(_ESCAPES_JSON_EN_SCRIPT))
 
 
 def build_detalle_orden_context(request, orden):
@@ -408,7 +442,9 @@ def build_detalle_orden_context(request, orden):
 
         # Componentes para el modal de diagnóstico
         'componentes_diagnostico_orden': COMPONENTES_DIAGNOSTICO_ORDEN,
-        'componentes_adicionales_json': mark_safe(json.dumps(componentes_adicionales_list)),
+        # Texto plano: el template lo escapa dentro del atributo HTML.
+        # mark_safe aquí dejaría pasar una comilla del nombre.
+        'componentes_adicionales_json': json.dumps(componentes_adicionales_list),
 
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,  # Días naturales (mantener por compatibilidad)
@@ -422,7 +458,7 @@ def build_detalle_orden_context(request, orden):
         'tiene_venta_mostrador': venta_mostrador is not None,
 
         # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
-        'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),
+        'estadisticas_tecnicos': json_seguro_para_script(estadisticas_tecnicos),
 
         # ── Feedback de rechazo pendiente de confirmar envío ──
         # Estas variables llegan desde la sesión tras guardar un rechazo de cotización.

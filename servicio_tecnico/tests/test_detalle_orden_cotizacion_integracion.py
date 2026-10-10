@@ -74,12 +74,23 @@ class DetalleOrdenCotizacionIntegracionTest(TestCase):
             contraseña_configurada=True,
         )
         ct = ContentType.objects.get_for_model(OrdenServicio)
+        ct_cotizacion = ContentType.objects.get_for_model(Cotizacion)
         self.user.user_permissions.add(
             Permission.objects.get(
                 content_type=ct,
                 codename='view_ordenservicio',
             ),
+            Permission.objects.get(
+                content_type=ct_cotizacion,
+                codename='add_cotizacion',
+            ),
+            Permission.objects.get(
+                content_type=ct_cotizacion,
+                codename='change_cotizacion',
+            ),
         )
+        # has_perm cachea: recargar después de asignar permisos.
+        self.user = User.objects.get(pk=self.user.pk)
         self.orden = OrdenServicio.objects.create(
             sucursal=self.sucursal,
             tipo_servicio='diagnostico',

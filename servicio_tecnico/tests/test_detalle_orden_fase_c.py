@@ -15,6 +15,7 @@ test_detalle_orden_cotizacion_integracion.py
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.utils.safestring import SafeString
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.fallback import FallbackStorage
@@ -24,7 +25,12 @@ from django.urls import reverse
 from inventario.models import Empleado, Sucursal
 from servicio_tecnico.models import DetalleEquipo, OrdenServicio
 from servicio_tecnico.services.detalle_orden_context import build_detalle_orden_context
-from servicio_tecnico.views_detalle_orden import _FORM_TYPE_HANDLERS, detalle_orden
+from servicio_tecnico.views_detalle_orden import (
+    _FORM_TYPE_HANDLERS,
+    _FORM_TYPES_PAGO,
+    _PERMISO_POR_FORM_TYPE,
+    detalle_orden,
+)
 
 
 User = get_user_model()
@@ -77,6 +83,30 @@ class DetalleOrdenFaseCDispatcherTest(SimpleTestCase):
         for nombre, handler in _FORM_TYPE_HANDLERS.items():
             with self.subTest(form_type=nombre):
                 self.assertTrue(callable(handler))
+
+    def test_cada_escritura_tiene_permiso_propio(self):
+        """
+        Objetivo: un form_type nuevo no puede escribir solo con permiso de ver.
+
+        Los pagos quedan fuera: su módulo ya revisa quién cobra.
+        """
+        # None solo puede ser un pago. Si alguien marca "cambiar estado"
+        # con permiso vacío, esta lista deja de coincidir y el test falla.
+        self.assertEqual(
+            _FORM_TYPES_PAGO,
+            frozenset({
+                'registrar_pago',
+                'actualizar_datos_factura',
+                'eliminar_pago',
+                'validar_pago',
+            }),
+        )
+        escrituras = set(_FORM_TYPE_HANDLERS) - set(_FORM_TYPES_PAGO)
+        self.assertEqual(set(_PERMISO_POR_FORM_TYPE), escrituras)
+        for form_type, permiso in _PERMISO_POR_FORM_TYPE.items():
+            with self.subTest(form_type=form_type):
+                self.assertTrue(permiso)
+                self.assertIn('.', permiso)
 
     def test_multimedia_tiene_imports_criticos(self):
         """
@@ -239,6 +269,9 @@ class DetalleOrdenFaseCContextTest(TestCase):
         ):
             with self.subTest(clave=clave):
                 self.assertIn(clave, ctx)
+        # El JSON del <script> es seguro; el del atributo HTML lo escapa el template.
+        self.assertIsInstance(ctx['estadisticas_tecnicos'], SafeString)
+        self.assertNotIsInstance(ctx['componentes_adicionales_json'], SafeString)
 
     def test_render_incluye_config_json_y_scripts_fase_c(self):
         """GET renderiza el JSON de config y los script src nuevos."""

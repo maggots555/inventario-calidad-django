@@ -1434,8 +1434,15 @@ function initDiagnosticoModal() {
         const label = document.createElement('label');
         label.htmlFor = idUnico;
         label.className = 'mb-0 cursor-pointer small';
-        // Badge corto "Adic" (title explica); no hincha la fila
-        label.innerHTML = `${nombreComponente} <span class="badge bg-success diag-badge-adic" title="Componente adicional">Adic</span>`;
+        // El nombre viene de la base: textContent, no innerHTML.
+        // Si el nombre trajera HTML, el navegador lo mostraría como texto.
+        label.appendChild(document.createTextNode(nombreComponente));
+        label.appendChild(document.createTextNode(' '));
+        const badgeAdic = document.createElement('span');
+        badgeAdic.className = 'badge bg-success diag-badge-adic';
+        badgeAdic.title = 'Componente adicional';
+        badgeAdic.textContent = 'Adic';
+        label.appendChild(badgeAdic);
         wrapNombre.appendChild(label);
         const btnEliminar = document.createElement('button');
         btnEliminar.type = 'button';
@@ -2029,16 +2036,20 @@ function initDiagnosticoModal() {
             // Match de componente (badge chico)
             if (pieza.componenteDb) {
                 const matchSpan = document.createElement('span');
+                const iconoMatch = document.createElement('i');
                 if (esComponenteDuplicado) {
                     matchSpan.className = 'badge diag-pieza-badge-mini bg-warning bg-opacity-25 text-dark border border-warning';
-                    matchSpan.innerHTML = `<i class="bi bi-diagram-2"></i> ${pieza.componenteDb}`;
+                    iconoMatch.className = 'bi bi-diagram-2';
                     matchSpan.title = `${pieza.componenteDb} (duplicado — reasigna)`;
                 }
                 else {
                     matchSpan.className = 'badge diag-pieza-badge-mini bg-light text-dark border';
-                    matchSpan.innerHTML = `<i class="bi bi-link-45deg"></i> ${pieza.componenteDb}`;
+                    iconoMatch.className = 'bi bi-link-45deg';
                     matchSpan.title = `Coincide con: ${pieza.componenteDb}`;
                 }
+                // Nombre de componente como texto. El icono va en su propia etiqueta.
+                matchSpan.appendChild(iconoMatch);
+                matchSpan.appendChild(document.createTextNode(` ${pieza.componenteDb}`));
                 infoDiv.appendChild(matchSpan);
                 // Solo contar como match único (para "Aplicar todas") si no es duplicado
                 if (!esComponenteDuplicado) {

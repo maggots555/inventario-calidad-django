@@ -22,9 +22,32 @@ Request → [Middlewares] → View → Template → Response
           ↑ Nuestro middleware intercepta aquí
 """
 
+from django.conf import settings
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib import messages
+
+
+def _prefijo_de_url(url_setting: str) -> str:
+    """
+    Deja STATIC_URL o MEDIA_URL listos para compararlos con request.path.
+
+    En settings suelen venir como 'static/' o 'media/', sin la barra
+    del inicio. request.path siempre empieza con /.
+
+    Args:
+        url_setting: Valor de settings.STATIC_URL o settings.MEDIA_URL.
+
+    Returns:
+        Prefijo con barras, por ejemplo '/media/'.
+    """
+    prefijo = (url_setting or '').strip()
+    if not prefijo.startswith('/'):
+        prefijo = '/' + prefijo
+    if not prefijo.endswith('/'):
+        prefijo = prefijo + '/'
+    return prefijo
 
 
 class ForcePasswordChangeMiddleware:
@@ -43,7 +66,11 @@ class ForcePasswordChangeMiddleware:
     - /logout/ → Permitir cerrar sesión
     - /cambiar-contraseña-inicial/ → La página donde cambian la contraseña
     - /admin/ → No afectar al panel de administración
-    - /static/ y /media/ → Archivos estáticos (CSS, JS, imágenes)
+    - /static/ → CSS y JS de esa pantalla
+
+    /media/ NO es excepción. Quien todavía trae la contraseña temporal
+    no puede descargar fotos, videos ni comprobantes hasta cambiarla.
+    Un empleado que ya configuró su contraseña sí puede ver /media/.
     """
     
     def __init__(self, get_response):
@@ -127,10 +154,20 @@ class ForcePasswordChangeMiddleware:
         if current_path == logout_url or current_path.startswith('/logout'):
             return self.get_response(request)
         
-        # ===== PASO 8: Permitir archivos estáticos y admin =====
-        # También permitir archivos estáticos (CSS, JS, imágenes)
-        if current_path.startswith('/static/') or current_path.startswith('/media/'):
+        # ===== PASO 8: CSS/JS de la pantalla de cambio, no las evidencias =====
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # /static/ es el diseño de la página (Bootstrap, el formulario).
+        # /media/ son fotos, firmas y comprobantes. No redirigimos cada
+        # imagen a la página de la clave: el navegador pide muchas a la
+        # vez y cada redirect dejaría un aviso nuevo en la sesión.
+        # Respondemos 403 y el archivo no sale.
+        if current_path.startswith(_prefijo_de_url(settings.STATIC_URL)):
             return self.get_response(request)
+
+        if current_path.startswith(_prefijo_de_url(settings.MEDIA_URL)):
+            return HttpResponseForbidden(
+                'Debes cambiar tu contraseña temporal antes de ver archivos.'
+            )
         
         # Si está intentando acceder al admin, permitirlo (puede ser un caso especial)
         if current_path.startswith('/admin/'):
