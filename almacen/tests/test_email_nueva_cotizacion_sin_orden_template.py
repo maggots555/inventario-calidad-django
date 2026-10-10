@@ -104,7 +104,9 @@ class NuevaCotizacionSinOrdenEmailTemplateTests(SimpleTestCase):
         self.assertIn('Equipo de Compras,', html)
         self.assertIn('sin orden de servicio vinculada', html)
         self.assertIn('cuando este terminada', html)
-        self.assertIn('Editar Unidad', html)
+        # Una cotización sin orden todavía no tiene unidad de inventario.
+        # El correo apunta a crear la orden, no a editar una unidad.
+        self.assertIn('Crear orden de servicio', html)
         self.assertIn('Ana López', html)
         self.assertIn('SN-6', html)
         self.assertIn('5512345678', html)

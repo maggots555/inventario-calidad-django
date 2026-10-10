@@ -26,8 +26,15 @@ from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
 from config.cliente_ip import ip_cliente
+from .models import HistorialOrden, ImagenOrden
 
 logger = logging.getLogger(__name__)
+
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# HistorialOrden arma la línea de tiempo que ve el cliente.
+# ImagenOrden son las fotos de ingreso, diagnóstico, reparación y egreso.
+# Si estos nombres no están importados aquí, la página pública truena
+# con NameError en cuanto alguien abre su enlace.
 
 
 # ============================================================================
