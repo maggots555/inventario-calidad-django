@@ -24,6 +24,7 @@ from servicio_tecnico.models import (
     OrdenServicio,
     VideoOrden,
 )
+from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
 from servicio_tecnico.services.nombre_archivo_privado import nombre_archivo_privado
 
 
@@ -136,6 +137,16 @@ class RutaYAccesoMediaTests(TestCase):
         )
         self.assertEqual(clasificar_acceso_media(request, ajena), 'denegado')
 
+    def test_url_sin_pais_no_abre_un_archivo_guardado_con_pais(self):
+        """Si la base dice mexico/..., pedir la ruta sin mexico abre otro lugar del disco."""
+        guardada = 'mexico/servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_1.jpg'
+        self._guardar_foto(self.orden, guardada)
+        sin_pais = 'servicio_tecnico/imagenes/OOW-MEDIA-01/ingreso_1.jpg'
+        request = self._get(sin_pais, AnonymousUser(), token='token-media-vigente')
+        self.assertEqual(clasificar_acceso_media(request, sin_pais), 'denegado')
+        con_pais = self._get(guardada, AnonymousUser(), token='token-media-vigente')
+        self.assertEqual(clasificar_acceso_media(con_pais, guardada), 'privado')
+
     def test_token_no_abre_la_foto_de_otra_orden_con_el_mismo_folio(self):
         """Dos órdenes pueden compartir folio. El enlace de una no abre la foto de la otra."""
         self._guardar_foto(
@@ -183,13 +194,31 @@ class RutaYAccesoMediaTests(TestCase):
         request = self._get(ajena, _UsuarioLogueado())
         self.assertEqual(clasificar_acceso_media(request, ajena), 'denegado')
 
-    def test_token_abre_el_cfdi_de_su_orden_y_no_el_de_otra(self):
-        """facturacion/<id>/ sí. El id de otra orden, no."""
-        propia = f'mexico/facturacion/{self.orden.pk}/pdf/uuid.pdf'
+    def test_token_solo_abre_la_factura_y_el_diagnostico_guardados(self):
+        """El nombre guardado sí. Otro archivo en la misma carpeta, no."""
+        pdf_factura = f'mexico/facturacion/{self.orden.pk}/pdf/uuid.pdf'
+        documento = DocumentoFiscalOrden(
+            orden=self.orden,
+            web_id='SAT-MEDIA-01',
+            tipo='pue',
+            descripcion='Diagnóstico',
+        )
+        documento.pdf.name = pdf_factura
+        documento.save()
+        suelto_factura = f'mexico/facturacion/{self.orden.pk}/pdf/otro.pdf'
         ajena = 'mexico/facturacion/999999/pdf/uuid.pdf'
-        request = self._get(propia, AnonymousUser(), token='token-media-vigente')
-        self.assertEqual(clasificar_acceso_media(request, propia), 'privado')
+
+        pdf_dx = f'mexico/seguimiento/{self.orden.pk}/diagnostico/diag.pdf'
+        self.enlace.pdf_diagnostico.name = pdf_dx
+        self.enlace.save(update_fields=['pdf_diagnostico'])
+        suelto_dx = f'mexico/seguimiento/{self.orden.pk}/diagnostico/otro.pdf'
+
+        request = self._get(pdf_factura, AnonymousUser(), token='token-media-vigente')
+        self.assertEqual(clasificar_acceso_media(request, pdf_factura), 'privado')
+        self.assertEqual(clasificar_acceso_media(request, suelto_factura), 'denegado')
         self.assertEqual(clasificar_acceso_media(request, ajena), 'denegado')
+        self.assertEqual(clasificar_acceso_media(request, pdf_dx), 'privado')
+        self.assertEqual(clasificar_acceso_media(request, suelto_dx), 'denegado')
 
     def test_token_se_anexa_a_la_url_de_la_galeria(self):
         """La página de seguimiento tiene que mandar el permiso en la foto."""

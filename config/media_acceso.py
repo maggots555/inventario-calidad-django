@@ -157,86 +157,140 @@ def es_banner_publico(path: str) -> bool:
     return resto.split('/', 1)[0] == 'banners'
 
 
-def _variantes_de_ruta(nombre: str) -> set[str]:
+def _normalizar_ruta(nombre: str) -> str:
     """
-    Ruta tal cual y, si empieza con país, también sin esa carpeta.
-
-    Objetivo de negocio:
-        En la base la foto puede estar como
-        ``servicio_tecnico/imagenes/OOW-1/a.jpg`` o como
-        ``mexico/servicio_tecnico/...``. La URL del navegador trae el
-        país. Las dos formas son el mismo archivo.
+    Deja la ruta con barras / y sin slash al inicio.
 
     Args:
-        nombre: Ruta relativa. Puede venir de la URL o del FileField.
+        nombre: Ruta de la URL o del FileField. Puede venir vacía.
 
     Returns:
-        set[str]: Vacío si el nombre está vacío.
+        str: Ruta limpia, o '' si no había nada.
 
     Efectos secundarios:
         Ninguno.
     """
-    limpio = str(nombre or '').replace('\\', '/').lstrip('/')
-    if not limpio:
-        return set()
-    variantes = {limpio}
-    pais, _sep, cola = limpio.partition('/')
-    # Solo se quita el primer tramo si es un país conocido. Si no,
-    # el resto del nombre se queda igual y no se "recorta" de más.
-    if cola and pais in PAISES_MEDIA:
-        variantes.add(cola)
-    return variantes
+    return str(nombre or '').replace('\\', '/').lstrip('/')
 
 
-def _es_foto_o_video_de_la_orden(path: str, resto: str, orden) -> bool:
+def _ruta_pedida_es_la_guardada(pedida: str, guardada: str) -> bool:
     """
-    True si esa ruta es la foto de galería o el video guardados en la orden.
+    True si el navegador pide el mismo archivo que está en la base.
 
     Objetivo de negocio:
-        El folio del cliente no es único. Autorizar la carpeta abría
-        las fotos de otra orden con el mismo folio, y también la
-        carpeta del número interno (ORD-2026-0001), que sale en los
-        correos. Aquí solo pasa el archivo que esta orden tiene en la
-        base.
+        La galería guarda ``servicio_tecnico/imagenes/OOW/a.jpg`` y el
+        navegador pide ``mexico/servicio_tecnico/imagenes/OOW/a.jpg``.
+        Eso sí es el mismo archivo. Al revés no: si la base ya trae
+        ``mexico/...`` y piden la ruta sin país, el disco abriría
+        ``media/servicio_tecnico/...``, que puede ser otra foto vieja.
 
     Args:
-        path: Ruta completa ya limpia (con país, si lo trae).
-        resto: La misma ruta sin la carpeta de país.
+        pedida: Ruta que vino en la URL, ya limpia.
+        guardada: ``name`` del FileField de esta orden.
+
+    Returns:
+        bool.
+
+    Efectos secundarios:
+        Lee el país de la visita para armar el prefijo. No escribe.
+    """
+    pedido = _normalizar_ruta(pedida)
+    guardado = _normalizar_ruta(guardada)
+    if not pedido or not guardado:
+        return False
+    if pedido == guardado:
+        return True
+    # El nombre guardado ya trae país: no le pegamos otro ni se lo quitamos.
+    primer_tramo, _sep, _cola = guardado.partition('/')
+    if primer_tramo in PAISES_MEDIA:
+        return False
+    pais_visita = _pais_de_esta_peticion()
+    return pedido == f'{pais_visita}/{guardado}'
+
+
+def _algun_nombre_coincide(pedida: str, nombres) -> bool:
+    """
+    True si alguna ruta guardada es la que pidió el navegador.
+
+    Args:
+        pedida: Ruta de la URL.
+        nombres: Iterable de ``name`` de FileField (pueden venir vacíos).
+
+    Returns:
+        bool.
+
+    Efectos secundarios:
+        Ninguno. Quien llama ya leyó la base.
+    """
+    for nombre in nombres:
+        if _ruta_pedida_es_la_guardada(pedida, nombre):
+            return True
+    return False
+
+
+def _es_archivo_registrado_en_la_orden(pedida: str, orden) -> bool:
+    """
+    True si esa ruta es un archivo que esta orden tiene guardado.
+
+    Objetivo de negocio:
+        El token abre la foto de la galería, el video del correo, el
+        PDF de diagnóstico y la factura (pdf y xml) de ESA orden.
+        No abre otro nombre en la misma carpeta, aunque el folio o el
+        id coincidan.
+
+    Args:
+        pedida: Ruta relativa ya limpia.
         orden: OrdenServicio.
 
     Returns:
         bool.
 
     Efectos secundarios:
-        Lee ImagenOrden.imagen y VideoOrden.video. No escribe.
+        Lee fotos, videos, el PDF de diagnóstico y los CFDI. No escribe.
     """
-    from servicio_tecnico.models import ImagenOrden, VideoOrden
+    from servicio_tecnico.models import EnlaceSeguimientoCliente, ImagenOrden, VideoOrden
+    from servicio_tecnico.models_facturacion import DocumentoFiscalOrden
 
-    if getattr(orden, 'pk', None) is None:
-        return False
-    pedidos = _variantes_de_ruta(path) | _variantes_de_ruta(resto)
-    if not pedidos:
+    if getattr(orden, 'pk', None) is None or not _normalizar_ruta(pedida):
         return False
 
-    # Paso 1: la galería del seguimiento usa ImagenOrden.imagen.
+    # Paso 1: galería del seguimiento (ImagenOrden.imagen).
     fotos = (
         ImagenOrden.objects.filter(orden=orden)
         .exclude(imagen='')
         .values_list('imagen', flat=True)
     )
-    for nombre in fotos:
-        if _variantes_de_ruta(nombre) & pedidos:
-            return True
+    if _algun_nombre_coincide(pedida, fotos):
+        return True
 
-    # Paso 2: el correo de video manda VideoOrden.video, no la miniatura
-    # ni la firma. Esos otros archivos no se abren con el token.
+    # Paso 2: el mp4 del correo. La miniatura y la firma no van aquí.
     videos = (
         VideoOrden.objects.filter(orden=orden)
         .exclude(video='')
         .values_list('video', flat=True)
     )
-    for nombre in videos:
-        if _variantes_de_ruta(nombre) & pedidos:
+    if _algun_nombre_coincide(pedida, videos):
+        return True
+
+    # Paso 3: el PDF que el botón de seguimiento abre por su propia vista.
+    # Si alguien pide el archivo por /media/, tiene que ser ese nombre.
+    diagnosticos = (
+        EnlaceSeguimientoCliente.objects.filter(orden=orden)
+        .exclude(pdf_diagnostico='')
+        .exclude(pdf_diagnostico__isnull=True)
+        .values_list('pdf_diagnostico', flat=True)
+    )
+    if _algun_nombre_coincide(pedida, diagnosticos):
+        return True
+
+    # Paso 4: factura. Solo el pdf y el xml guardados, no la carpeta entera.
+    documentos = DocumentoFiscalOrden.objects.filter(orden=orden).values_list(
+        'pdf', 'cfdi_xml'
+    )
+    for pdf, xml in documentos:
+        if _ruta_pedida_es_la_guardada(pedida, pdf):
+            return True
+        if _ruta_pedida_es_la_guardada(pedida, xml):
             return True
     return False
 
@@ -246,10 +300,9 @@ def archivo_pertenece_a_orden(path: str, orden) -> bool:
     True si el cliente con el token de esta orden puede ver esa ruta.
 
     Objetivo de negocio:
-        La foto y el video que SIGMA le mandó al cliente sí se abren.
-        Una firma, un comprobante o un jpg que solo comparte el folio
-        no. El CFDI y el PDF de diagnóstico siguen por el id de la
-        orden, que no se repite.
+        Solo se entrega el archivo que esta orden tiene en la base:
+        foto, video, PDF de diagnóstico o factura. Una firma, un
+        comprobante o un nombre suelto en la carpeta no.
 
     Args:
         path: Ruta relativa bajo media.
@@ -259,8 +312,8 @@ def archivo_pertenece_a_orden(path: str, orden) -> bool:
         bool.
 
     Efectos secundarios:
-        Si la ruta es de este país, lee las fotos y los videos de la
-        orden. No escribe.
+        Si la ruta es de este país, lee los archivos de la orden.
+        No escribe.
     """
     separado = _pais_y_resto(path)
     if separado is None:
@@ -271,19 +324,7 @@ def archivo_pertenece_a_orden(path: str, orden) -> bool:
         return False
 
     limpio = ruta_relativa_segura(path) or resto
-    # La foto y el video tienen que estar guardados en ESTA orden.
-    if _es_foto_o_video_de_la_orden(limpio, resto, orden):
-        return True
-
-    # CFDIs y el PDF de diagnóstico usan el id de la orden, no el folio.
-    orden_id = str(getattr(orden, 'pk', '') or '')
-    if not orden_id:
-        return False
-    if resto.startswith(f'facturacion/{orden_id}/'):
-        return True
-    if resto.startswith(f'seguimiento/{orden_id}/'):
-        return True
-    return False
+    return _es_archivo_registrado_en_la_orden(limpio, orden)
 
 
 def _enlace_vigente(token: str):
