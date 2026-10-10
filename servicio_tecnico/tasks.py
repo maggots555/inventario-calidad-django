@@ -453,19 +453,21 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
         # NOTA: 'componente__nombre' accede al nombre a través de la relación ForeignKey
         # Renombramos la clave para que el template sea más legible
         piezas_raw = feedback.cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=False).values(
-            'componente__nombre', 'costo_unitario', 'cantidad'
+            'componente__nombre', 'precio_unitario_cliente', 'cantidad'
         )
         piezas = [
             {
                 'nombre_pieza': p['componente__nombre'],
-                'costo_unitario': p['costo_unitario'],
+                'precio_unitario_cliente': p['precio_unitario_cliente'],
                 'cantidad': p['cantidad']
             }
             for p in piezas_raw
         ]
-        monto_total_piezas = sum(
-            (p['costo_unitario'] or 0) * (p['cantidad'] or 1) for p in piezas
+        # Mismo total que la página pública: precio al cliente, no costo interno.
+        from servicio_tecnico.services.feedback_rechazo_montos import (
+            monto_rechazo_visible_cliente,
         )
+        monto_total_piezas = monto_rechazo_visible_cliente(piezas)
 
         # EXPLICACIÓN: el correo lista solo piezas. La mano de obra no se manda.
         ahora_local = timezone.localtime(timezone.now())
@@ -4706,9 +4708,15 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
                 # URL directa al archivo de video para el enlace del correo
                 if video_obj.video:
                     try:
-                        from config.paises_config import get_pais_actual as _get_pais_vid
+                        from config.media_acceso import (
+                            anexar_token_seguimiento,
+                            token_seguimiento_vigente,
+                        )
                         site_url_vid = _get_pais_vid().get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
-                        video_url = f"{site_url_vid}{video_obj.video.url}"
+                        video_url = anexar_token_seguimiento(
+                            f"{site_url_vid}{video_obj.video.url}",
+                            token_seguimiento_vigente(orden),
+                        )
                     except Exception:
                         pass
             except VideoOrden.DoesNotExist:
@@ -5013,7 +5021,12 @@ def enviar_evidencia_video_task(
         todos_los_frames = []
         videos_data = []
         from config.paises_config import get_pais_actual as _get_pais_ev
+        from config.media_acceso import (
+            anexar_token_seguimiento,
+            token_seguimiento_vigente,
+        )
         site_url = _get_pais_ev().get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
+        token_video = token_seguimiento_vigente(orden)
 
         for video in videos:
             video_path = video.video.path if video.video else None
@@ -5061,7 +5074,10 @@ def enviar_evidencia_video_task(
                 'tamano': str(video.tamano_final_mb) if video.tamano_final_mb else '',
                 'tiene_thumbnail': thumbnail_bytes is not None,
                 'thumbnail_bytes': thumbnail_bytes,
-                'video_url': f"{site_url}{video.video.url}" if video.video else '',
+                'video_url': anexar_token_seguimiento(
+                    f"{site_url}{video.video.url}",
+                    token_video,
+                ) if video.video else '',
             })
 
         if not videos_data:

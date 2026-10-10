@@ -104,7 +104,8 @@ def _lineas_de_cotizacion(piezas: list, context: dict) -> list[str]:
         pueda ver la tabla HTML. La mano de obra no se incluye.
 
     Args:
-        piezas: Lista de dicts con nombre_pieza, cantidad y costo_unitario.
+        piezas: Lista de dicts con nombre_pieza, cantidad y
+            precio_unitario_cliente (no el costo interno).
         context: Contexto del correo; usa monto_total.
 
     Returns:
@@ -117,12 +118,13 @@ def _lineas_de_cotizacion(piezas: list, context: dict) -> list[str]:
         'DETALLE DE LA COTIZACIÓN',
         'Pieza / Componente | Cant. | Subtotal',
     ]
-    # El HTML muestra el costo unitario en la columna Subtotal: se respeta.
+    # El HTML muestra el precio cotizado al cliente, no el costo de SIC.
     for pieza in piezas:
         nombre = pieza.get('nombre_pieza') or ''
         cantidad = pieza.get('cantidad')
-        costo = _dinero(pieza.get('costo_unitario'))
-        lineas.append(f'{nombre} | {cantidad} | ${costo}')
+        precio = pieza.get('precio_unitario_cliente')
+        monto = '—' if precio is None else f'${_dinero(precio)}'
+        lineas.append(f'{nombre} | {cantidad} | {monto}')
 
     lineas.extend(
         [

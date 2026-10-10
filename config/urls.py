@@ -17,8 +17,6 @@ Including another URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include, re_path
-from django.conf import settings
-from django.conf.urls.static import static
 from django.views.generic.base import RedirectView
 from django.templatetags.static import static as static_file
 from inventario import views as inventario_views
@@ -130,23 +128,18 @@ urlpatterns = [
 ]
 
 # ============================================================================
-# SERVIR ARCHIVOS MEDIA EN DESARROLLO (CON SOPORTE PARA MÚLTIPLES UBICACIONES)
+# SERVIR ARCHIVOS MEDIA (CON PERMISO)
 # ============================================================================
 # EXPLICACIÓN PARA PRINCIPIANTES:
-# En desarrollo (DEBUG=True), Django necesita servir los archivos media.
-# Usamos una vista personalizada que busca archivos en DOS ubicaciones:
-# 1. Disco alterno (D:\Media_Django\...) - Archivos nuevos
-# 2. Disco principal (C:\...\media\) - Archivos antiguos
-#
-# IMPORTANTE: En producción (DEBUG=False), el servidor web (nginx/apache)
-# debe configurarse para servir ambas ubicaciones.
-if settings.DEBUG:
-    # Usar vista personalizada para servir archivos media desde múltiples ubicaciones
-    # re_path permite usar regex para capturar cualquier ruta después de /media/
-    urlpatterns += [
-        re_path(
-            r'^media/(?P<path>.*)$',  # Captura cualquier ruta después de /media/
-            serve_media_from_multiple_locations,
-            name='serve_media_multi_location'
-        ),
-    ]
+# Esta ruta SIEMPRE pasa por Django, en la laptop y en el servidor.
+# Django revisa sesión o token y, en Docker, le dice a Nginx que
+# entregue el archivo. En runserver lo lee del disco.
+# No depende de DEBUG: si solo se registrara en desarrollo, en
+# producción /media/ llegaría a Django y no habría vista.
+urlpatterns += [
+    re_path(
+        r'^media/(?P<path>.*)$',
+        serve_media_from_multiple_locations,
+        name='serve_media_multi_location'
+    ),
+]

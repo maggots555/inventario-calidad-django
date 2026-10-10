@@ -530,15 +530,24 @@ def aplicar_payload_borrador(
         ):
             formato.tipo_diagrama = payload['tipo_diagrama']
 
-        # Firmas opcionales (entrega CIS / entrega a cliente)
+        # Firmas opcionales (entrega CIS / entrega a cliente).
+        # El nombre lleva un sufijo aleatorio: firma_cis.png y
+        # firma_cliente.png se podían pedir si se conocía el folio.
+        from servicio_tecnico.services.nombre_archivo_privado import (
+            nombre_archivo_privado,
+        )
         firma_cis = _decode_data_url(payload.get('firma_entrega_cis_data') or '')
         if firma_cis is not None:
-            formato.firma_entrega_cis.save('firma_cis.png', firma_cis, save=False)
+            formato.firma_entrega_cis.save(
+                nombre_archivo_privado('firma_cis'),
+                firma_cis,
+                save=False,
+            )
 
         firma_cli = _decode_data_url(payload.get('firma_entrega_cliente_data') or '')
         if firma_cli is not None:
             formato.firma_entrega_cliente.save(
-                'firma_cliente.png',
+                nombre_archivo_privado('firma_cliente'),
                 firma_cli,
                 save=False,
             )

@@ -427,6 +427,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # https://docs.djangoproject.com/en/5.2/topics/files/
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# En Docker, Nginx tiene /media-interno/ como "internal". Django autoriza
+# y responde X-Accel-Redirect. En runserver (laptop) queda False y la
+# vista lee el archivo ella misma. decouple: "True"/"False" → bool.
+MEDIA_ACCEL_REDIRECT = config('MEDIA_ACCEL_REDIRECT', default=False, cast=bool)
 
 # ============================================================================
 # CONFIGURACIÓN DE ALMACENAMIENTO DINÁMICO (DISCO ALTERNO)
@@ -854,6 +858,12 @@ AXES_LOCKOUT_TEMPLATE = None  # Usa mensaje por defecto de Django (403 Forbidden
 # Logging de intentos
 AXES_VERBOSE = True  # Registra intentos de acceso en logs
 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Axes, por defecto, mira REMOTE_ADDR. Detrás de Nginx esa IP es la
+# del contenedor, la misma para todo el mundo. Le pedimos X-Real-IP,
+# que Nginx escribe él (no la lista X-Forwarded-For que puede mentir).
+AXES_IPWARE_META_PRECEDENCE_ORDER = ('HTTP_X_REAL_IP', 'REMOTE_ADDR')
+
 # IP Whitelisting (opcional - descomentarlo si necesitas permitir IPs específicas)
 # AXES_NEVER_LOCKOUT_WHITELIST = True
 # AXES_IP_WHITELIST = ['127.0.0.1', '192.168.100.22']  # IPs que nunca se bloquean
@@ -866,36 +876,32 @@ AXES_VERBOSE = True  # Registra intentos de acceso en logs
 # (enlaces de seguimiento, encuestas, etc.) limitando cuántas requests puede
 # hacer una IP por minuto.
 #
-# En producción con Nginx + Gunicorn (Unix socket), REMOTE_ADDR está vacío
-# porque la conexión no es directa. Nginx añade la IP real en el header
-# X-Forwarded-For, pero ese header puede contener MÚLTIPLES IPs separadas
-# por coma: "IP_cliente, 127.0.0.1" (la del cliente + la del proxy).
-# Si se usa la cadena completa como IP, Python lanza un ValueError.
-#
-# La solución es un callable que extrae SOLO la primera IP de la lista.
+# Nginx escribe la IP verdadera en X-Real-IP. No usamos la primera
+# IP de X-Forwarded-For: esa lista la puede inventar quien llama.
 
 
 def _get_client_ip(request):
     """
-    Extrae la IP real del cliente de forma segura.
+    IP para django-ratelimit. Delega en ``ip_cliente``.
 
-    X-Forwarded-For puede contener varias IPs: "cliente, proxy1, proxy2"
-    Solo nos interesa la primera (la del cliente real).
-    Si el header no existe (desarrollo sin proxy), usa REMOTE_ADDR.
+    Args:
+        request: Petición HTTP.
+
+    Returns:
+        str: IP de confianza (X-Real-IP o REMOTE_ADDR).
+
+    Efectos secundarios:
+        Ninguno.
     """
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        # Tomar solo la primera IP, ignorar proxies intermedios
-        return x_forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR', '127.0.0.1')
+    # Import perezoso: settings no debe cargar el resto de config al arrancar.
+    from config.cliente_ip import ip_cliente
+    return ip_cliente(request)
 
 
 RATELIMIT_ENABLE = True               # Activar rate limiting
 RATELIMIT_USE_CACHE = 'default'       # Usar cache de Redis para tracking
 
-# Callable personalizado para obtener la IP del cliente correctamente.
-# Maneja X-Forwarded-For con múltiples IPs (Nginx + Gunicorn) y también
-# funciona en desarrollo local donde no hay proxy (usa REMOTE_ADDR).
+# Callable: lee X-Real-IP (Nginx) o REMOTE_ADDR (laptop sin proxy).
 RATELIMIT_IP_META_KEY = _get_client_ip
 
 # ============================================================================

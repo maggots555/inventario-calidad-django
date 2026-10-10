@@ -19,19 +19,27 @@ El problema:
 
 La solución:
 - Esta vista busca el archivo en AMBAS ubicaciones
-- Primero busca en el disco alterno (D:)
-- Si no lo encuentra, busca en el disco principal (C:)
-- Retorna el primero que encuentre
+- Primero busca en el disco principal
+- Si no lo encuentra, busca en el disco alterno
+- No sigue enlaces (symlink): un nombre público no puede apuntar a una firma
 
-IMPORTANTE: Solo se usa en desarrollo (DEBUG=True)
-En producción, configura tu servidor web (nginx/apache) para servir ambas rutas.
+IMPORTANTE:
+En Docker (MEDIA_ACCEL_REDIRECT=True) esta vista solo autoriza y le
+pide a Nginx que entregue el archivo (X-Accel-Redirect). En la laptop
+con runserver lee el disco ella misma, en las dos carpetas de siempre.
+Sin sesión (y sin token de seguimiento de esa orden) responde 404.
+Los banners de publicidad siguen públicos.
 """
 
 from pathlib import Path
+import mimetypes
 
-from django.http import FileResponse, Http404, HttpResponseNotModified
+from django.conf import settings
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseNotModified
 from django.utils.http import http_date
 from django.views.static import was_modified_since
+
+from config.media_acceso import clasificar_acceso_media, ruta_interna_nginx
 
 
 def _archivo_si_esta_dentro_de(location, path_relativo: str):
@@ -61,9 +69,19 @@ def _archivo_si_esta_dentro_de(location, path_relativo: str):
     if not limpio or limpio.startswith('/'):
         return None
 
-    # Paso 2: resolver (sigue los .. de verdad) y comparar contra la raíz.
+    # Paso 2: un enlace (symlink) no se sigue. Si banners/apunta a una
+    # firma, la URL se ve pública y Nginx entregaría el archivo privado.
     raiz = Path(location).resolve()
-    candidato = (raiz / limpio).resolve()
+    cursor = raiz
+    for parte in limpio.split('/'):
+        if parte in ('', '.', '..'):
+            return None
+        cursor = cursor / parte
+        if cursor.is_symlink():
+            return None
+
+    # Paso 3: resolver (sigue los .. de verdad) y comparar contra la raíz.
+    candidato = cursor.resolve()
     # is_relative_to: Python 3.9+; aquí corremos 3.12.
     if not candidato.is_relative_to(raiz):
         return None
@@ -81,8 +99,8 @@ def serve_media_from_multiple_locations(request, path):
     cuando lo encuentra. Es similar a como Django busca archivos estáticos.
     
     Orden de búsqueda:
-    1. Disco alterno (D:/Media_Django/...) - Archivos nuevos
-    2. Disco principal (C:/.../media/) - Archivos antiguos
+    1. Disco principal
+    2. Disco alterno (si el archivo no estaba en el principal)
     
     Args:
         request: La petición HTTP del navegador
@@ -102,43 +120,57 @@ def serve_media_from_multiple_locations(request, path):
     """
     # Importar configuración de storage_utils
     from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
-    
-    # Lista de ubicaciones donde buscar (en orden de prioridad)
-    # IMPORTANTE: Buscar primero en PRIMARY (donde se guardan nuevos archivos)
-    # luego en ALTERNATE (donde están archivos antiguos)
-    search_locations = [
-        PRIMARY_STORAGE_PATH,    # Disco principal - Archivos nuevos (1TB)
-        ALTERNATE_STORAGE_PATH,  # Disco alterno - Archivos antiguos (fallback)
-    ]
 
-    # Buscar el archivo en cada ubicación, sin salir de esa carpeta.
-    for location in search_locations:
-        full_path = _archivo_si_esta_dentro_de(location, path)
-        if full_path is None:
-            continue
+    # Paso 1: sin permiso, el mismo 404 que si el archivo no existiera.
+    # Así no se confirma "sí hay una firma con ese nombre".
+    acceso = clasificar_acceso_media(request, path)
+    if acceso == 'denegado':
+        raise Http404('Archivo media no encontrado')
 
-        # Obtener información del archivo
-        statobj = full_path.stat()
+    # Paso 2: el archivo tiene que existir DENTRO de una carpeta media.
+    # resolve() sigue los enlaces simbólicos: si apuntan fuera, no se sirve.
+    hallado = None
+    for location in (PRIMARY_STORAGE_PATH, ALTERNATE_STORAGE_PATH):
+        hallado = _archivo_si_esta_dentro_de(location, path)
+        if hallado is not None:
+            break
+    if hallado is None:
+        raise Http404('Archivo media no encontrado')
 
-        # Verificar si el archivo fue modificado (para caché del navegador)
-        if_modified_since = request.META.get('HTTP_IF_MODIFIED_SINCE')
-        if if_modified_since:
-            if not was_modified_since(if_modified_since, statobj.st_mtime):
-                return HttpResponseNotModified()
-
-        response = FileResponse(full_path.open('rb'))
-        response['Last-Modified'] = http_date(statobj.st_mtime)
-        print(f"[MEDIA SERVE] Archivo encontrado: {full_path}")
+    primaria = Path(PRIMARY_STORAGE_PATH).resolve()
+    # Paso 3: en Docker, Nginx solo tiene montada la carpeta principal.
+    # Le pasamos la ruta ya resuelta, no la que escribió el navegador.
+    if settings.MEDIA_ACCEL_REDIRECT and hallado.is_relative_to(primaria):
+        relativo = hallado.relative_to(primaria).as_posix()
+        interno = ruta_interna_nginx(relativo)
+        if interno is None:
+            raise Http404('Archivo media no encontrado')
+        tipo, _codificacion = mimetypes.guess_type(relativo)
+        response = HttpResponse(content_type=tipo or 'application/octet-stream')
+        response['X-Accel-Redirect'] = interno
+        response['X-Content-Type-Options'] = 'nosniff'
+        if acceso == 'publico':
+            response['Cache-Control'] = 'public, max-age=86400'
+        else:
+            # private: Cloudflare no guarda la foto para el siguiente visitante.
+            response['Cache-Control'] = 'private, no-store'
         return response
-    
-    # Si llegamos aquí, el archivo no existe en ninguna ubicación
-    print(f"[MEDIA SERVE] ❌ Archivo no encontrado: {path}")
-    print(f"[MEDIA SERVE]    Buscado en:")
-    for location in search_locations:
-        print(f"[MEDIA SERVE]      - {Path(location) / path}")
-    
-    # Lanzar error 404
-    raise Http404(f"Archivo media no encontrado: {path}")
+
+    # Laptop (runserver) o archivo que solo está en el disco alterno.
+    statobj = hallado.stat()
+    if_modified_since = request.META.get('HTTP_IF_MODIFIED_SINCE')
+    if if_modified_since:
+        if not was_modified_since(if_modified_since, statobj.st_mtime):
+            return HttpResponseNotModified()
+
+    response = FileResponse(hallado.open('rb'))
+    response['Last-Modified'] = http_date(statobj.st_mtime)
+    response['X-Content-Type-Options'] = 'nosniff'
+    if acceso == 'publico':
+        response['Cache-Control'] = 'public, max-age=86400'
+    else:
+        response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 def get_media_locations_info():

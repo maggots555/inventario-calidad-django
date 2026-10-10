@@ -23,6 +23,7 @@ class ComposeDockerRobustoTests(SimpleTestCase):
         """Carga el texto de compose y del respaldo una vez por test."""
         self.compose = (RAIZ / "compose.yaml").read_text(encoding="utf-8")
         self.respaldo = (RAIZ / "docker" / "backup_sigma.sh").read_text(encoding="utf-8")
+        self.nginx = (RAIZ / "docker" / "nginx.conf").read_text(encoding="utf-8")
 
     def test_redis_no_borra_la_cola(self):
         """volatile-lru conserva la cola; allkeys-lru podía borrarla."""
@@ -49,3 +50,21 @@ class ComposeDockerRobustoTests(SimpleTestCase):
         self.assertIn("gzip -t", self.respaldo)
         self.assertIn('rm -f "$destino"', self.respaldo)
         self.assertIn('rm -f "$archivo"', self.respaldo)
+
+    def test_nginx_solo_escucha_en_localhost(self):
+        """El 8080 no queda abierto en todas las tarjetas de red."""
+        self.assertIn('127.0.0.1:${SIGMA_HTTP_PORT:-8080}:80', self.compose)
+
+    def test_nginx_no_cree_la_ip_que_manda_el_visitante(self):
+        """La IP sale de Cloudflare o del socket, no de X-Forwarded-For."""
+        self.assertIn('$http_cf_connecting_ip', self.nginx)
+        self.assertIn('proxy_set_header X-Real-IP $sigma_real_ip;', self.nginx)
+        self.assertIn('proxy_set_header X-Forwarded-For $sigma_real_ip;', self.nginx)
+        self.assertNotIn('$proxy_add_x_forwarded_for', self.nginx)
+        self.assertNotIn('$http_x_forwarded_proto', self.nginx)
+
+    def test_media_no_se_entrega_sin_pasar_por_django(self):
+        """/media/ va a Gunicorn. El disco solo se abre por la ruta interna."""
+        self.assertIn('location /media-interno/', self.nginx)
+        self.assertIn('internal;', self.nginx)
+        self.assertNotIn('location /media/ {\n        alias /app/media/;', self.nginx)

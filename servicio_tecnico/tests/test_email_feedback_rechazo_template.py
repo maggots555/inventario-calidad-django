@@ -42,7 +42,8 @@ def _contexto(**overrides):
         'piezas': [
             {
                 'nombre_pieza': 'Pantalla',
-                'costo_unitario': 1500,
+                'costo_unitario': 80,
+                'precio_unitario_cliente': 1500,
                 'cantidad': 1,
             },
         ],
@@ -76,6 +77,7 @@ class FeedbackRechazoEmailTemplateTests(SimpleTestCase):
         self.assertIn('Precio elevado', html)
         self.assertIn('Pantalla', html)
         self.assertIn('$1500.00', html)
+        self.assertNotIn('$80.00', html)
         self.assertNotIn('Mano de obra', html)
         self.assertIn('Total cotizado:', html)
         self.assertIn('Dejar mi comentario', html)
@@ -126,7 +128,8 @@ class FeedbackRechazoPaginaClienteTests(SimpleTestCase):
         """Feliz: se ve la pieza y el total de piezas, no la mano de obra."""
         pieza = SimpleNamespace(
             componente=SimpleNamespace(nombre='Pantalla'),
-            costo_unitario=1500,
+            costo_unitario=80,
+            precio_unitario_cliente=1500,
         )
         html = render_to_string(
             'servicio_tecnico/feedback_rechazo.html',
@@ -149,6 +152,7 @@ class FeedbackRechazoPaginaClienteTests(SimpleTestCase):
         )
         self.assertIn('Pantalla', html)
         self.assertIn('$1500.00', html)
+        self.assertNotIn('$80.00', html)
         self.assertNotIn('Mano de obra', html)
         self.assertNotIn('$570.00', html)
         # El header es azul: el logo a color se pierde. El blanco es el de satisfacción.
@@ -171,6 +175,7 @@ class FeedbackRechazoTextoPlanoTests(SimpleTestCase):
         self.assertIn('Tu opinión nos importa', texto)
         self.assertIn('FL-8801', texto)
         self.assertIn('Pantalla | 1 | $1500.00', texto)
+        self.assertNotIn('$80.00', texto)
         self.assertNotIn('Mano de obra', texto)
         self.assertIn('Total cotizado: $1500.00', texto)
         self.assertIn(URL, texto)

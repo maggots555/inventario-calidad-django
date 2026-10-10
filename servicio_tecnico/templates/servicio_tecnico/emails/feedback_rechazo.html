@@ -155,7 +155,11 @@
                                                     {{ p.cantidad }}
                                                 </td>
                                                 <td class="email-body-text" align="right" style="padding:10px 12px;font-size:14px;line-height:20px;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">
-                                                    ${{ p.costo_unitario|floatformat:2 }}
+                                                    {% if p.precio_unitario_cliente is not None %}
+                                                    ${{ p.precio_unitario_cliente|floatformat:2 }}
+                                                    {% else %}
+                                                    —
+                                                    {% endif %}
                                                 </td>
                                             </tr>
                                             {% endfor %}

@@ -544,8 +544,12 @@ def aplicar_payload_borrador(
         # --- Firmas (data URLs) ---
         firma_cliente = _decode_data_url(payload.get('firma_cliente_data') or '')
         if firma_cliente is not None:
+            # Nombre aleatorio: ya no es siempre firma_cliente.png.
+            from servicio_tecnico.services.nombre_archivo_privado import (
+                nombre_archivo_privado,
+            )
             formato.firma_cliente.save(
-                'firma_cliente.png',
+                nombre_archivo_privado('firma_cliente'),
                 firma_cliente,
                 save=False,
             )

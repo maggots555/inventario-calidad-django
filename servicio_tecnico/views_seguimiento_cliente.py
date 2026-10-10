@@ -25,7 +25,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
-from .models import HistorialOrden, ImagenOrden
+from config.cliente_ip import ip_cliente
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +63,8 @@ def seguimiento_orden_cliente(request, token):
 
     TEMPLATE = 'servicio_tecnico/seguimiento_cliente.html'
 
-    # ── Obtener IP del cliente para logging de seguridad ──
-    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
+    # IP que Nginx dejó en X-Real-IP. No usamos X-Forwarded-For: se puede falsificar.
+    _ip = ip_cliente(request)
 
     # ── Buscar el enlace por token ──
     try:
@@ -90,12 +89,8 @@ def seguimiento_orden_cliente(request, token):
         return render(request, TEMPLATE, {'estado': 'invalido'})
 
     # ── Registrar acceso del cliente ──
-    x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-    ip_cliente = (
-        x_forwarded.split(',')[0].strip() if x_forwarded
-        else request.META.get('REMOTE_ADDR')
-    )
-    enlace.registrar_acceso(ip=ip_cliente)
+    ip_cliente_visita = ip_cliente(request)
+    enlace.registrar_acceso(ip=ip_cliente_visita)
 
     from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
     registrar_evento_seguimiento(enlace, 'visita_pagina', request=request)
@@ -153,6 +148,9 @@ def seguimiento_orden_cliente(request, token):
     folio_display = detalle.orden_cliente or orden.numero_orden_interno
 
     # ── Imágenes del equipo para la galería pública ──
+    # El ?t= es el token de esta página. Sin él, /media/ responde 404
+    # aunque el cliente tenga la foto abierta: la URL sola ya no basta.
+    from config.media_acceso import anexar_token_seguimiento
     # Solo se muestran los tipos relevantes para el cliente (no autorizacion/packing).
     _TIPO_LABEL_GALERIA = {
         'ingreso':     'Ingreso',
@@ -162,7 +160,7 @@ def seguimiento_orden_cliente(request, token):
     }
     imagenes_galeria = [
         {
-            'url':        img.imagen.url,
+            'url': anexar_token_seguimiento(img.imagen.url, token),
             'tipo':       img.tipo,
             'tipo_label': _TIPO_LABEL_GALERIA.get(img.tipo, img.tipo.capitalize()),
             'descripcion': img.descripcion,
@@ -694,8 +692,7 @@ def feedback_rechazo_view(request, token):
     from .forms import FeedbackRechazoClienteForm
 
     # ── Obtener IP para logging de seguridad ──
-    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
+    _ip = ip_cliente(request)
 
     # ── Buscar el feedback por token ──
     try:
@@ -732,10 +729,12 @@ def feedback_rechazo_view(request, token):
     detalle = orden.detalle_equipo
     piezas = feedback.cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=False)
 
-    # EXPLICACIÓN: el cliente solo ve piezas. La mano de obra no se muestra.
-    monto_piezas = sum(
-        (p.costo_unitario or 0) * (p.cantidad or 1) for p in piezas
+    # EXPLICACIÓN: el cliente solo ve el precio que se le cotizó.
+    # costo_unitario es lo que la pieza le costó a SIC y no sale aquí.
+    from servicio_tecnico.services.feedback_rechazo_montos import (
+        monto_rechazo_visible_cliente,
     )
+    monto_piezas = monto_rechazo_visible_cliente(piezas)
 
     if request.method == 'POST':
         form = FeedbackRechazoClienteForm(request.POST)
@@ -911,8 +910,7 @@ def feedback_satisfaccion_cliente(request, token):
     TEMPLATE = 'servicio_tecnico/feedback_satisfaccion.html'
 
     # ── Obtener IP para logging de seguridad ──
-    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
+    _ip = ip_cliente(request)
 
     # ── Buscar feedback por token y tipo ──────────────────────────────────
     try:
@@ -1119,8 +1117,7 @@ def chat_seguimiento_cliente(request, token):
         return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
 
     # ── Obtener IP del cliente para logging ──
-    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
-    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR', '?')
+    _ip = ip_cliente(request)
 
     # ── Validar el token (mismo mecanismo que la vista padre) ──
     try:

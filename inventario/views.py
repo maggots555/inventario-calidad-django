@@ -894,10 +894,33 @@ def eliminar_sucursal(request, sucursal_id):
     return render(request, 'inventario/confirmar_eliminar_sucursal.html', context)
 
 # ===== FUNCIONES AJAX/API =====
+@login_required
+@permission_required_with_message(
+    'inventario.add_movimiento',
+    message='No tienes permisos para consultar productos con el escáner.',
+)
 def buscar_producto_qr(request):
     """
-    API endpoint para buscar producto por código QR (AJAX)
-    Con limpieza de caracteres invisibles del scanner
+    Busca un producto del inventario por el código que leyó el escáner.
+
+    Objetivo de negocio:
+        El movimiento rápido (pantalla de almacén) necesita el nombre,
+        el stock y la ubicación al escanear. Pide el mismo permiso que
+        esa pantalla (``inventario.add_movimiento``): haber iniciado
+        sesión no alcanza.
+
+    Args:
+        request: GET con ``codigo_qr``. Sin sesión, Django manda a
+            ``/login/``. Sin el permiso, manda a acceso denegado.
+
+    Returns:
+        JsonResponse 200 con id, nombre, stock y ubicación.
+        400 si el código llega vacío. 404 si no existe el producto.
+        Esos errores solo dicen qué falló: no incluyen el código
+        crudo ni un campo ``debug`` (eso ayudaba a probar códigos).
+
+    Efectos secundarios:
+        Ninguno. Solo lee ``Producto``.
     """
     codigo_qr_raw = request.GET.get('codigo_qr')
     
@@ -911,10 +934,10 @@ def buscar_producto_qr(request):
     codigo_qr = re.sub(r'\s+', '', codigo_qr)  # Remover espacios internos
     
     if not codigo_qr:
+        # EXPLICACIÓN: el escáner a veces manda solo saltos de línea.
+        # No devolvemos el texto crudo: la pantalla ya tiene lo que teclearon.
         return JsonResponse({
             'error': 'Código QR vacío después de limpieza',
-            'codigo_recibido': repr(codigo_qr_raw),
-            'debug': f'Código original tenía {len(codigo_qr_raw)} caracteres'
         }, status=400)
     
     try:
@@ -923,9 +946,6 @@ def buscar_producto_qr(request):
     except Producto.DoesNotExist:
         return JsonResponse({
             'error': 'Producto no encontrado',
-            'codigo_buscado': codigo_qr,
-            'codigo_original': repr(codigo_qr_raw),
-            'debug': f'Buscando: "{codigo_qr}" (longitud: {len(codigo_qr)})'
         }, status=404)
     
     # VALIDACIÓN: Verificar si es un producto fraccionario

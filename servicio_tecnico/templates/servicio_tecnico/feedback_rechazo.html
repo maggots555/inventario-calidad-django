@@ -61,7 +61,13 @@
         {% for p in piezas %}
         <div class="fr-pieza-item">
           <span>{{ p.componente.nombre }}</span>
-          <span>${{ p.costo_unitario|floatformat:2 }}</span>
+          <span>
+            {% if p.precio_unitario_cliente is not None %}
+            ${{ p.precio_unitario_cliente|floatformat:2 }}
+            {% else %}
+            —
+            {% endif %}
+          </span>
         </div>
         {% endfor %}
         <div class="fr-pieza-total">

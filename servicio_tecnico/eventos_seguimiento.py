@@ -39,13 +39,26 @@ def _tipos_validos() -> frozenset[str]:
 
 
 def _extraer_ip(request) -> str | None:
-    """Obtiene la IP del cliente respetando proxy inverso (X-Forwarded-For)."""
+    """
+    IP del cliente que Nginx ya escribió en X-Real-IP.
+
+    Objetivo de negocio:
+        El embudo de seguimiento anota quién abrió la página. No usamos
+        X-Forwarded-For: el visitante puede inventar esa lista.
+
+    Args:
+        request: Petición HTTP, o None si el evento no vino de una visita.
+
+    Returns:
+        str o None si no hay request.
+
+    Efectos secundarios:
+        Ninguno.
+    """
     if request is None:
         return None
-    x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded:
-        return x_forwarded.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+    from config.cliente_ip import ip_cliente
+    return ip_cliente(request)
 
 
 def registrar_evento_seguimiento(
