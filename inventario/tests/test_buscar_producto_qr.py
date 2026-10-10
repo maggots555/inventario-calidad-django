@@ -14,7 +14,7 @@ from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.test import RequestFactory, TestCase
 
 from inventario.models import Producto
-from inventario.views import buscar_producto_qr
+from inventario.views import buscar_producto_fraccionable_qr, buscar_producto_qr
 
 
 class BuscarProductoQrSeguroTests(TestCase):
@@ -83,3 +83,71 @@ class BuscarProductoQrSeguroTests(TestCase):
         self.assertNotIn('debug', data)
         self.assertNotIn('codigo_buscado', data)
         self.assertNotIn('codigo_original', data)
+
+
+class BuscarProductoFraccionableQrSeguroTests(TestCase):
+    """La búsqueda fraccionaria pide el mismo permiso y no devuelve pistas."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.producto = Producto.objects.create(
+            nombre='Alcohol litro',
+            codigo_qr='INV-QR-FRAC-01',
+            cantidad=2,
+            ubicacion='Anaquel C',
+            es_fraccionable=True,
+            unidad_base='ml',
+            cantidad_unitaria=1000,
+            cantidad_actual=400,
+            stock_minimo=0,
+        )
+        self.usuario = User.objects.create_user(
+            username='almacen_frac',
+            password='testpass123',
+        )
+        permiso = Permission.objects.get(codename='add_movimiento')
+        self.usuario.user_permissions.add(permiso)
+        self.usuario = User.objects.get(pk=self.usuario.pk)
+        self.sin_permiso = User.objects.create_user(
+            username='sin_frac',
+            password='testpass123',
+        )
+
+    def _get(self, usuario, codigo):
+        """Arma el GET de la pantalla fraccionaria y llama la vista."""
+        request = self.factory.get(
+            '/inventario/api/buscar-producto-fraccionable-qr/',
+            {'codigo_qr': codigo},
+        )
+        request.user = usuario
+        return buscar_producto_fraccionable_qr(request)
+
+    def test_anonimo_va_al_login(self):
+        """Sin sesión no hay stock fraccionario."""
+        response = self._get(AnonymousUser(), self.producto.codigo_qr)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+    def test_sesion_sin_permiso_no_ve_el_producto(self):
+        """Una cuenta sin el permiso del escáner no consulta esta API."""
+        response = self._get(self.sin_permiso, self.producto.codigo_qr)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('acceso', response.url)
+
+    def test_con_permiso_encuentra_el_fraccionable(self):
+        """Quien registra movimientos sí ve el nombre y la unidad."""
+        response = self._get(self.usuario, self.producto.codigo_qr)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['nombre'], 'Alcohol litro')
+        self.assertEqual(data['unidad_base'], 'ml')
+        self.assertNotIn('costo_unitario', data)
+
+    def test_no_encontrado_no_repite_el_codigo(self):
+        """Un fallo no devuelve el texto buscado ni un repr del escáner."""
+        response = self._get(self.usuario, 'NO-EXISTE-FRAC')
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertEqual(data, {'error': 'Producto no encontrado'})
+        self.assertNotIn('codigo_buscado', data)
+        self.assertNotIn('codigo_recibido', data)

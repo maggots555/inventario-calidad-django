@@ -60,8 +60,10 @@ class ComposeDockerRobustoTests(SimpleTestCase):
         self.assertIn('$http_cf_connecting_ip', self.nginx)
         self.assertIn('proxy_set_header X-Real-IP $sigma_real_ip;', self.nginx)
         self.assertIn('proxy_set_header X-Forwarded-For $sigma_real_ip;', self.nginx)
+        self.assertIn('proxy_set_header X-Forwarded-Host $host;', self.nginx)
         self.assertNotIn('$proxy_add_x_forwarded_for', self.nginx)
         self.assertNotIn('$http_x_forwarded_proto', self.nginx)
+        self.assertNotIn('$http_x_forwarded_host', self.nginx)
 
     def test_media_no_se_entrega_sin_pasar_por_django(self):
         """/media/ va a Gunicorn. El disco solo se abre por la ruta interna."""

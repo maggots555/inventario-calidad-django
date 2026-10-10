@@ -973,10 +973,31 @@ def buscar_producto_qr(request):
 
 
 @login_required
+@permission_required_with_message(
+    'inventario.add_movimiento',
+    message='No tienes permisos para consultar productos fraccionables con el escáner.',
+)
 def buscar_producto_fraccionable_qr(request):
     """
-    API endpoint para buscar producto fraccionable por código QR
-    Proporciona información detallada sobre el estado fraccionario
+    Busca un producto fraccionable por el código que leyó el escáner.
+
+    Objetivo de negocio:
+        La pantalla de movimiento fraccionario necesita stock y unidad.
+        Pide el mismo permiso que esa pantalla
+        (``inventario.add_movimiento``). La otra búsqueda QR ya lo pedía;
+        esta quedaba abierta para cualquier cuenta logueada.
+
+    Args:
+        request: GET con ``codigo_qr``. Sin sesión, Django manda a
+            ``/login/``. Sin el permiso, manda a acceso denegado.
+
+    Returns:
+        JsonResponse 200 con id, nombre, stock fraccionario y ubicación.
+        400 si el código llega vacío o el producto no es fraccionable.
+        404 si no existe. Esos errores no repiten el código buscado.
+
+    Efectos secundarios:
+        Ninguno. Solo lee ``Producto``.
     """
     codigo_qr_raw = request.GET.get('codigo_qr')
     
@@ -990,9 +1011,10 @@ def buscar_producto_fraccionable_qr(request):
     codigo_qr = re.sub(r'\s+', '', codigo_qr)
     
     if not codigo_qr:
+        # El escáner a veces manda solo saltos de línea. La pantalla
+        # ya tiene el texto: no lo devolvemos ni con repr().
         return JsonResponse({
             'error': 'Código QR vacío después de limpieza',
-            'codigo_recibido': repr(codigo_qr_raw)
         }, status=400)
     
     try:
@@ -1000,7 +1022,6 @@ def buscar_producto_fraccionable_qr(request):
     except Producto.DoesNotExist:
         return JsonResponse({
             'error': 'Producto no encontrado',
-            'codigo_buscado': codigo_qr
         }, status=404)
     
     # Verificar si el producto es fraccionable
